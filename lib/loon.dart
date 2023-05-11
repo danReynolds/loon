@@ -3,7 +3,7 @@ library loon;
 import 'dart:async';
 import 'package:uuid/uuid.dart';
 
-export 'widgets/stream_query_builder.dart';
+export 'widgets/query_stream_builder.dart';
 export 'persistor/file_persistor.dart';
 
 part 'watch_query.dart';

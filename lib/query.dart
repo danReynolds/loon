@@ -27,7 +27,14 @@ class Query<T> {
   }
 
   List<DocumentSnapshot<T>> get() {
-    return _resolveQuery(Loon.instance._getDocuments(collection));
+    return _resolveQuery(
+      Loon.instance._getDocuments(
+        collection,
+        fromJson: fromJson,
+        toJson: toJson,
+        persistorSettings: persistorSettings,
+      ),
+    );
   }
 
   WatchQuery<T> watch() {
