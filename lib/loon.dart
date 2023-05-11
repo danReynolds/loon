@@ -54,6 +54,13 @@ class Loon {
     return _collectionDataStore.containsKey(collection);
   }
 
+  void _deleteCollection(String collection) {
+    if (_hasCollection(collection)) {
+      _collectionDataStore.remove(collection);
+      _scheduleBroadcast();
+    }
+  }
+
   void _initializeCollection(String collection) {
     _collectionDataStore[collection] = {};
     _broadcastCollectionDataStore[collection] = {};

@@ -29,6 +29,15 @@ class UserModel {
       'users',
       fromJson: UserModel.fromJson,
       toJson: (user) => user.toJson(),
+      persistorSettings: FilePersistorSettings(
+        shardFn: (doc) {
+          final snap = doc.get();
+          if (snap == null) {
+            return null;
+          }
+          return snap.data.name.toLowerCase().split(' ').first;
+        },
+      ),
     );
   }
 }

@@ -18,8 +18,8 @@ class Collection<T> extends Query<T> {
     );
   }
 
-  void delete(String id) {
-    Loon.instance._deleteDocument<T>(doc(id));
+  void delete() {
+    Loon.instance._deleteCollection(collection);
   }
 
   Query<T> where(FilterFn<T> filter) {

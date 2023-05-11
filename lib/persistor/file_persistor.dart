@@ -8,8 +8,20 @@ import 'package:path/path.dart' as path;
 import '../loon.dart';
 
 class FilePersistorSettings<T> extends PersistorSettings<T> {
-  final String Function(Document<T> doc)? shardFn;
+  final String? Function(Document<T> doc)? shardFn;
   final int maxShards;
+
+  bool get shardEnabled {
+    return shardFn != null;
+  }
+
+  String? getShard(Document doc) {
+    if (shardFn == null) {
+      return null;
+    }
+
+    return shardFn!(doc as Document<T>);
+  }
 
   FilePersistorSettings({
     this.shardFn,
@@ -49,6 +61,10 @@ class FileDataStore {
 
   Future<void> writeFile(String value) async {
     await file.writeAsString(value);
+  }
+
+  Future<void> delete() async {
+    await file.delete();
   }
 
   Future<void> hydrate() async {
@@ -135,6 +151,10 @@ class FilePersistor extends Persistor {
     return '$collectionFilename.json';
   }
 
+  List<FileDataStore> getFileDataStores() {
+    return _fileDataStoreCollection.values.toList();
+  }
+
   @override
   persist(docs) async {
     final updatedFileDataStores = _fileDataStoreCollection.values
@@ -151,11 +171,10 @@ class FilePersistor extends Persistor {
 
       if (persistorSettings != null &&
           persistorSettings is FilePersistorSettings) {
-        final persistorShardFn = persistorSettings.shardFn;
         final maxShards = persistorSettings.maxShards;
 
-        if (persistorShardFn != null && maxShards > 1) {
-          documentDataStoreShard = persistorShardFn(doc);
+        if (persistorSettings.shardEnabled && maxShards > 1) {
+          documentDataStoreShard = persistorSettings.getShard(doc);
           final documentDataStoreShardFilename = buildFileDataStoreFilename(
             collection: collection,
             shard: documentDataStoreShard,
@@ -241,5 +260,17 @@ class FilePersistor extends Persistor {
         fileDataStore.collection: fileDataStore.data,
       };
     });
+  }
+
+  @override
+  clear(String collection) async {
+    final collectionDataStores = _fileDataStoreCollection.values
+        .where((fileDataStore) => fileDataStore.collection == collection)
+        .toSet();
+
+    await Future.wait(collectionDataStores.map((dataStore) async {
+      await dataStore.delete();
+      _fileDataStoreCollection.remove(dataStore);
+    }));
   }
 }

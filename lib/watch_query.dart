@@ -38,6 +38,13 @@ class WatchQuery<T> extends Query<T> {
   void _onBroadcast() {
     bool shouldBroadcast = false;
 
+    // If the entire collection has been deleted, then clear the snapshot.
+    if (!Loon.instance._hasCollection(collection)) {
+      snapshot = [];
+      _controller.add(snapshot);
+      return;
+    }
+
     final broadcastDocs = Loon.instance._getBroadcastDocuments<T>(
       collection,
       fromJson: fromJson,
