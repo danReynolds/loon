@@ -24,7 +24,7 @@ class StreamQueryState<T> extends State<QueryStreamBuilder<T>> {
 
     if (oldWidget.query != widget.query) {
       _watchQuery.dispose();
-      _watchQuery = widget.query.watch();
+      _watchQuery = widget.query.asWatchQuery();
     }
   }
 
@@ -32,7 +32,7 @@ class StreamQueryState<T> extends State<QueryStreamBuilder<T>> {
   void initState() {
     super.initState();
 
-    _watchQuery = widget.query.watch();
+    _watchQuery = widget.query.asWatchQuery();
   }
 
   @override
@@ -46,7 +46,7 @@ class StreamQueryState<T> extends State<QueryStreamBuilder<T>> {
     return StreamBuilder<List<DocumentSnapshot<T>>>(
       key: ObjectKey(_watchQuery),
       initialData: _watchQuery.snapshot,
-      stream: _watchQuery.stream,
+      stream: _watchQuery.stream(),
       builder: (context, snap) => widget.builder(context, snap.requireData),
     );
   }

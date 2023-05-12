@@ -37,7 +37,7 @@ class Query<T> {
     );
   }
 
-  WatchQuery<T> watch() {
+  WatchQuery<T> asWatchQuery() {
     return WatchQuery<T>(
       collection,
       filter: filter,
@@ -45,5 +45,9 @@ class Query<T> {
       toJson: toJson,
       persistorSettings: persistorSettings,
     );
+  }
+
+  Stream<List<DocumentSnapshot<T>>> stream() {
+    return asWatchQuery().stream();
   }
 }

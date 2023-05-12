@@ -6,7 +6,7 @@ typedef WatchQuerySnapshotDiff<T> = (
 );
 
 class WatchQuery<T> extends Query<T> {
-  final _controller = StreamController<WatchQuerySnapshotDiff<T>>.broadcast();
+  late final StreamController<WatchQuerySnapshotDiff<T>> _controller;
   late final Stream<List<DocumentSnapshot<T>>> _snapshotStream;
   late List<DocumentSnapshot<T>> snapshot;
   List<DocumentSnapshot<T>> prevSnapshot = [];
@@ -18,6 +18,8 @@ class WatchQuery<T> extends Query<T> {
     required super.toJson,
     required super.persistorSettings,
   }) {
+    _controller =
+        StreamController<WatchQuerySnapshotDiff<T>>(onCancel: dispose);
     _snapshotStream = _controller.stream.map((record) {
       final (_, snap) = record;
       return snap;
@@ -33,7 +35,8 @@ class WatchQuery<T> extends Query<T> {
     Loon.instance._unregisterWatchQuery(this);
   }
 
-  Stream<List<DocumentSnapshot<T>>> get stream {
+  @override
+  Stream<List<DocumentSnapshot<T>>> stream() {
     return _snapshotStream;
   }
 
