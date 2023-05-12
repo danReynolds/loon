@@ -76,17 +76,7 @@ abstract class Persistor {
         _broadcastCollectionDataStore[collection] = {};
       }
 
-      final collectionDataStore = _broadcastCollectionDataStore[collection]!;
-
-      switch (doc.type) {
-        case BroadcastEventTypes.removed:
-          if (collectionDataStore.containsKey(docId)) {
-            collectionDataStore.remove(docId);
-          }
-          break;
-        default:
-          collectionDataStore[docId] = doc;
-      }
+      _broadcastCollectionDataStore[collection]![docId] = doc;
     }
   }
 
