@@ -44,7 +44,7 @@ class StreamQueryState<T> extends State<QueryStreamBuilder<T>> {
   @override
   build(context) {
     return StreamBuilder<List<DocumentSnapshot<T>>>(
-      key: Key(_watchQuery.queryId),
+      key: ObjectKey(_watchQuery),
       initialData: _watchQuery.snapshot,
       stream: _watchQuery.stream,
       builder: (context, snap) => widget.builder(context, snap.requireData),

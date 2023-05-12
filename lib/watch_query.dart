@@ -1,7 +1,6 @@
 part of loon;
 
 class WatchQuery<T> extends Query<T> {
-  final String queryId;
   final _controller = StreamController<List<DocumentSnapshot<T>>>.broadcast();
   late List<DocumentSnapshot<T>> snapshot;
 
@@ -11,7 +10,7 @@ class WatchQuery<T> extends Query<T> {
     required super.fromJson,
     required super.toJson,
     required super.persistorSettings,
-  }) : queryId = uuid.v4() {
+  }) {
     snapshot = get();
     _controller.add(snapshot);
     Loon.instance._registerWatchQuery(this);

@@ -1,7 +1,6 @@
 library loon;
 
 import 'dart:async';
-import 'package:uuid/uuid.dart';
 
 export 'widgets/query_stream_builder.dart';
 export 'persistor/file_persistor.dart';
@@ -13,8 +12,6 @@ part 'document.dart';
 part 'types.dart';
 part 'document_snapshot.dart';
 part 'persistor/persistor.dart';
-
-const uuid = Uuid();
 
 typedef DocumentDataStore = Map<String, Json>;
 typedef CollectionDataStore = Map<String, DocumentDataStore>;
@@ -32,7 +29,7 @@ class Loon {
 
   final BroadcastCollectionDataStore _broadcastCollectionDataStore = {};
 
-  final Map<String, WatchQuery<dynamic>> _watchQueryStore = {};
+  final Set<WatchQuery<dynamic>> _watchQueryStore = {};
 
   bool _hasPendingBroadcast = false;
 
@@ -129,11 +126,11 @@ class Loon {
   }
 
   void _registerWatchQuery(WatchQuery query) {
-    _watchQueryStore[query.queryId] = query;
+    _watchQueryStore.add(query);
   }
 
   void _unregisterWatchQuery(WatchQuery query) {
-    _watchQueryStore.remove(query.queryId);
+    _watchQueryStore.remove(query);
   }
 
   void _scheduleBroadcast() {
@@ -151,7 +148,7 @@ class Loon {
   void _broadcastQueries({
     bool broadcastPersistor = true,
   }) {
-    for (final watchQuery in _watchQueryStore.values) {
+    for (final watchQuery in _watchQueryStore) {
       watchQuery._onBroadcast();
     }
     for (final broadcastCollection in _broadcastCollectionDataStore.values) {
