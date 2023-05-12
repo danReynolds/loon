@@ -4,7 +4,7 @@
 <br />
 <br />
 
-Loon is a reactive, noSQL data store for Dart & Flutter.
+Loon is a reactive, key/value data store for Dart & Flutter.
 
 > Note: Still early days, give it a try on hobbyist projects for now.
 
