@@ -1,8 +1,15 @@
 part of loon;
 
+typedef WatchQuerySnapshotDiff<T> = (
+  List<DocumentSnapshot<T>> prevSnap,
+  List<DocumentSnapshot<T>> snap
+);
+
 class WatchQuery<T> extends Query<T> {
-  final _controller = StreamController<List<DocumentSnapshot<T>>>.broadcast();
+  final _controller = StreamController<WatchQuerySnapshotDiff<T>>.broadcast();
+  late final Stream<List<DocumentSnapshot<T>>> _snapshotStream;
   late List<DocumentSnapshot<T>> snapshot;
+  List<DocumentSnapshot<T>> prevSnapshot = [];
 
   WatchQuery(
     super.collection, {
@@ -11,8 +18,13 @@ class WatchQuery<T> extends Query<T> {
     required super.toJson,
     required super.persistorSettings,
   }) {
+    _snapshotStream = _controller.stream.map((record) {
+      final (_, snap) = record;
+      return snap;
+    });
+
     snapshot = get();
-    _controller.add(snapshot);
+    _controller.add((prevSnapshot, snapshot));
     Loon.instance._registerWatchQuery(this);
   }
 
@@ -22,6 +34,10 @@ class WatchQuery<T> extends Query<T> {
   }
 
   Stream<List<DocumentSnapshot<T>>> get stream {
+    return _snapshotStream;
+  }
+
+  Stream<WatchQuerySnapshotDiff<T>> get changes {
     return _controller.stream;
   }
 
@@ -40,7 +56,7 @@ class WatchQuery<T> extends Query<T> {
     // If the entire collection has been deleted, then clear the snapshot.
     if (!Loon.instance._hasCollection(collection)) {
       snapshot = [];
-      _controller.add(snapshot);
+      _controller.add((prevSnapshot, snapshot));
       return;
     }
 
@@ -125,6 +141,7 @@ class WatchQuery<T> extends Query<T> {
     }
 
     if (shouldBroadcast) {
+      prevSnapshot = snapshot;
       snapshot = queryDocIds
           .map(
             (docId) => docsById[docId].get(),
@@ -132,7 +149,7 @@ class WatchQuery<T> extends Query<T> {
           .whereType<DocumentSnapshot<T>>()
           .toList();
 
-      _controller.add(snapshot);
+      _controller.add((prevSnapshot, snapshot));
     }
   }
 }
