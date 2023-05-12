@@ -3,7 +3,9 @@ library loon;
 import 'dart:async';
 
 export 'widgets/query_stream_builder.dart';
+export 'widgets/document_stream_builder.dart';
 export 'persistor/file_persistor.dart';
+export 'persistor/encrypted_file_persistor.dart';
 
 part 'broadcast_observable.dart';
 part 'query.dart';
@@ -35,13 +37,11 @@ class Loon {
 
   bool _hasPendingBroadcast = false;
 
-  void _validateSerialization<T>({
+  static void _validateSerialization<T>({
     required FromJson<T>? fromJson,
     required ToJson<T>? toJson,
   }) {
-    if (persistor != null &&
-        T is! Json &&
-        (fromJson == null || toJson == null)) {
+    if (T is! Json && (fromJson == null || toJson == null)) {
       throw Exception('Missing fromJson/toJson serializer');
     }
   }
@@ -296,6 +296,10 @@ class Loon {
     ToJson<T>? toJson,
     PersistorSettings<T>? persistorSettings,
   }) {
+    _validateSerialization<T>(
+      fromJson: fromJson,
+      toJson: toJson,
+    );
     return Collection<T>(
       collection,
       fromJson: fromJson,

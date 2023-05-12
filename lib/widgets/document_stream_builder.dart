@@ -12,10 +12,10 @@ class DocumentStreamBuilder<T> extends StatefulWidget {
   });
 
   @override
-  StreamQueryState<T> createState() => StreamQueryState<T>();
+  DocumentStreamState<T> createState() => DocumentStreamState<T>();
 }
 
-class StreamQueryState<T> extends State<DocumentStreamBuilder<T>> {
+class DocumentStreamState<T> extends State<DocumentStreamBuilder<T>> {
   late ObservableDocument<T> _observableDoc;
 
   @override

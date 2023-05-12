@@ -117,6 +117,10 @@ class FilePersistor extends Persistor {
 
   final filenameRegex = RegExp(r'loon_(.*?)(?:_(.*?))?\.json');
 
+  FilePersistor({
+    super.persistenceThrottle,
+  });
+
   Future<void> _initStorageDirectory() async {
     final applicationDirectory = await getApplicationDocumentsDirectory();
     _fileDataStoreDirectory = Directory('${applicationDirectory.path}/loon');

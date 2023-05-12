@@ -55,34 +55,44 @@ class _MyHomePageState extends State<MyHomePage> {
     });
   }
 
-  Future<void> _showEditDialog(DocumentSnapshot<UserModel> userSnap) async {
-    final controller = TextEditingController();
+  Future<void> _showEditDialog(Document<UserModel> doc) async {
+    final initialUser = doc.get()!;
+
     return showDialog(
       context: context,
       builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('Edit name'),
-          content: TextField(
-            controller: controller,
-            decoration: const InputDecoration(hintText: 'Enter name here'),
-          ),
-          actions: <Widget>[
-            TextButton(
-              child: const Text('Cancel'),
-              onPressed: () {
-                Navigator.of(context).pop();
-              },
-            ),
-            TextButton(
-              child: const Text('Save'),
-              onPressed: () {
-                userSnap.doc.update(
-                  userSnap.data.copyWith(name: controller.text),
-                );
-                Navigator.of(context).pop();
-              },
-            ),
-          ],
+        return DocumentStreamBuilder(
+          doc: doc,
+          builder: (context, userSnap) {
+            final user = userSnap!.data;
+
+            return AlertDialog(
+              title: const Text('Edit name'),
+              content: TextFormField(
+                initialValue: user.name,
+                onChanged: (updatedName) {
+                  userSnap.doc.update(
+                    user.copyWith(name: updatedName),
+                  );
+                },
+              ),
+              actions: <Widget>[
+                TextButton(
+                  child: const Text('Cancel'),
+                  onPressed: () {
+                    doc.update(initialUser.data);
+                    Navigator.of(context).pop();
+                  },
+                ),
+                TextButton(
+                  child: const Text('Done'),
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                  },
+                ),
+              ],
+            );
+          },
         );
       },
     );
@@ -137,7 +147,7 @@ class _MyHomePageState extends State<MyHomePage> {
                                     Text(user.name),
                                     TextButton(
                                       onPressed: () {
-                                        _showEditDialog(userSnap);
+                                        _showEditDialog(userSnap.doc);
                                       },
                                       child: const Text('Edit'),
                                     ),
