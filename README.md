@@ -27,7 +27,7 @@ Loon.collection('reviews').doc('The Book of Boba Fett').create({
 });
 ```
 
-Documents are stored under collections in a map structure that allows for synchronous reading, writing and querying. For type safety, you can define your own classes to represent collections and implement a serializer:
+Documents are stored under collections in a map structure that allows for synchronous reading/writing. To get type safety, you can define your own classes to represent collections and implement a serializer:
 
 ```dart
 import 'package:loon/loon.dart';
@@ -82,7 +82,6 @@ ReviewModel.store.doc('Andor').create(
 ## 📚 Reading documents
 
 ```dart
-import 'package:loon/loon.dart';
 import './models/reviews.dart';
 
 final snap = ReviewModel.store.doc('The Book of Boba Fett').get();
@@ -342,6 +341,6 @@ The base `Persistor` class implements batching and throttling, so you can just c
 
 I've been wanting to play around with building a data store library for a while, incorporating some reflections from working with web libraries like `Redux`, `ApolloClient` and Flutter libraries like `cloud_firestore` (the collection/document pattern most notably).
 
-The library is really new and I'm thinking about the streaming and persistence models so feel free to give feedback.
+The library is really new and I'm still thinking about the streaming and persistence models so feel free to give feedback.
 
 Happy coding!
