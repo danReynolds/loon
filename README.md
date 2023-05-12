@@ -2,6 +2,7 @@
 
 <img src="https://github.com/danReynolds/loon/assets/2192930/8d03dc8f-9d43-4b7e-951d-5e54ec857897" width="300" height="300">
 
+
 Loon is a reactive, noSQL data store for Dart & Flutter.
 
 > Note: Still early days, give it a try on hobbyist projects for now.
@@ -340,6 +341,6 @@ The base `Persistor` class implements batching and throttling, so you can just c
 
 I've been wanting to play around with building a data store library for a while, incorporating some reflections from working with web libraries like `Redux`, `ApolloClient` and Flutter libraries like `cloud_firestore` (the collection/document pattern most notably).
 
-The library is really new and I'm playing around with the streaming and persistence models so feel free to give feedback.
+The library is really new and I'm thinking about the streaming and persistence models so feel free to give feedback.
 
 Happy coding!
