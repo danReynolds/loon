@@ -1,7 +1,7 @@
 name: loon
-description: A new Flutter package project.
+description: Loon is a reactive, noSQL data store for Dart & Flutter.
 version: 0.0.1
-homepage:
+homepage: https://github.com/danReynolds/loon
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
