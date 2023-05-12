@@ -58,6 +58,10 @@ class Loon {
     if (_hasCollection(collection)) {
       _collectionDataStore.remove(collection);
       _scheduleBroadcast();
+
+      if (persistor != null) {
+        persistor!.clear(collection);
+      }
     }
   }
 

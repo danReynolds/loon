@@ -270,7 +270,7 @@ class FilePersistor extends Persistor {
 
     await Future.wait(collectionDataStores.map((dataStore) async {
       await dataStore.delete();
-      _fileDataStoreCollection.remove(dataStore);
+      _fileDataStoreCollection.remove(dataStore.filename);
     }));
   }
 }

@@ -4,6 +4,9 @@ import 'package:example/models/user.dart';
 import 'package:flutter/material.dart';
 import 'package:loon/loon.dart';
 import 'package:loon/persistor/debug_file_persistor.dart';
+import 'package:uuid/uuid.dart';
+
+const uuid = Uuid();
 
 final _persistor = DebugFilePersistor();
 
@@ -42,7 +45,6 @@ class MyHomePage extends StatefulWidget {
 }
 
 class _MyHomePageState extends State<MyHomePage> {
-  int _userCount = 0;
   final _controller = TextEditingController();
 
   @override
@@ -206,17 +208,32 @@ class _MyHomePageState extends State<MyHomePage> {
           ],
         ),
       ),
-      floatingActionButton: FloatingActionButton(
-        child: const Icon(Icons.add),
-        onPressed: () {
-          final id = _userCount.toString();
-          final doc = UserModel.store.doc(id);
+      floatingActionButton: Container(
+        padding: const EdgeInsets.symmetric(vertical: 0, horizontal: 10.0),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.end,
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            FloatingActionButton(
+              onPressed: () {
+                final id = uuid.v4();
+                final doc = UserModel.store.doc(id);
 
-          if (!doc.exists()) {
-            UserModel.store.doc(id).create(UserModel(name: 'User $_userCount'));
-          }
-          _userCount++;
-        },
+                if (!doc.exists()) {
+                  UserModel.store.doc(id).create(UserModel(name: 'User $id'));
+                }
+              },
+              child: const Icon(Icons.add),
+            ),
+            const SizedBox(width: 24),
+            FloatingActionButton(
+              onPressed: () {
+                UserModel.store.delete();
+              },
+              child: const Icon(Icons.delete),
+            ),
+          ],
+        ),
       ),
     );
   }
