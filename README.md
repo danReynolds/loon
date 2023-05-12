@@ -275,7 +275,7 @@ In this example, the documents in our reviews collection would be spread across 
 * `reviews_bad.json`:
   * The Book of Boba Fett
 
-If some of your collections contain sensitive data, you can choose to encrypt them by using the `EncryptedFilePersistor` instead, either globally:
+If some of your collections contain sensitive data, you can choose to encrypt them by using the `EncryptedFilePersistor` instead (no web support yet), either globally:
 
 ```dart
 import 'package:loon/loon.dart';
