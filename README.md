@@ -98,7 +98,7 @@ print(snap.id) // Book of Boba Fett
 print(snap.data) // ReviewModel(...)
 ```
 
-To watch for changes to a document, you read it as a stream:
+To watch for changes to a document, you can read it as a stream:
 
 ```dart
 import './models/reviews.dart';
