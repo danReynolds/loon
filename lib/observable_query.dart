@@ -1,65 +1,33 @@
 part of loon;
 
-typedef WatchQuerySnapshotDiff<T> = (
-  List<DocumentSnapshot<T>> prevSnap,
-  List<DocumentSnapshot<T>> snap
-);
-
-class WatchQuery<T> extends Query<T> {
-  late final StreamController<WatchQuerySnapshotDiff<T>> _controller;
-  late final Stream<List<DocumentSnapshot<T>>> _snapshotStream;
-  late List<DocumentSnapshot<T>> snapshot;
-  List<DocumentSnapshot<T>> prevSnapshot = [];
-
-  WatchQuery(
+class ObservableQuery<T> extends Query<T>
+    with BroadcastObservable<List<DocumentSnapshot<T>>> {
+  ObservableQuery(
     super.collection, {
     required super.filter,
     required super.fromJson,
     required super.toJson,
     required super.persistorSettings,
   }) {
-    _controller =
-        StreamController<WatchQuerySnapshotDiff<T>>(onCancel: dispose);
-    _snapshotStream = _controller.stream.map((record) {
-      final (_, snap) = record;
-      return snap;
-    });
-
-    snapshot = get();
-    _controller.add((prevSnapshot, snapshot));
-    Loon.instance._registerWatchQuery(this);
-  }
-
-  void dispose() {
-    _controller.close();
-    Loon.instance._unregisterWatchQuery(this);
-  }
-
-  @override
-  Stream<List<DocumentSnapshot<T>>> stream() {
-    return _snapshotStream;
-  }
-
-  Stream<WatchQuerySnapshotDiff<T>> get changes {
-    return _controller.stream;
+    observe([]);
   }
 
   /// On broadcast, the watch examines all documents that have been added, removed or modified
-  /// since the last broadcast and determines if the query needs to re-emit an updated list.
-  /// The query could be dirty if any of the following are true:
+  /// since the last broadcast and determines if the query needs to rebroadcast to observers. The conditions
+  /// for rebroadcasting the updated query are the following:
   /// 1. A new document has been added that satisfies the query filter.
   /// 2. A document that previously satisfied the query filter has been removed.
   /// 3. A document that has been modified and meets one of the following requirements:
   ///   a) Previously satisfied the query filter and now does not.
   ///   b) Previously did not satisfy the query filter and now does.
   ///   c) Previously satisfied the query filter and still does (since its modified data must be delivered on the query).
+  @override
   void _onBroadcast() {
     bool shouldBroadcast = false;
 
     // If the entire collection has been deleted, then clear the snapshot.
     if (!Loon.instance._hasCollection(collection)) {
-      snapshot = [];
-      _controller.add((prevSnapshot, snapshot));
+      rebroadcast([]);
       return;
     }
 
@@ -74,7 +42,7 @@ class WatchQuery<T> extends Query<T> {
       return;
     }
 
-    final existingDocs = snapshot.map((snap) => snap.doc).toList();
+    final existingDocs = value.map((snap) => snap.doc).toList();
     final queryDocIds = existingDocs.map((doc) => doc.id).toSet();
 
     final docsById = [
@@ -144,15 +112,14 @@ class WatchQuery<T> extends Query<T> {
     }
 
     if (shouldBroadcast) {
-      prevSnapshot = snapshot;
-      snapshot = queryDocIds
-          .map(
-            (docId) => docsById[docId].get(),
-          )
-          .whereType<DocumentSnapshot<T>>()
-          .toList();
-
-      _controller.add((prevSnapshot, snapshot));
+      rebroadcast(
+        queryDocIds
+            .map(
+              (docId) => docsById[docId].get(),
+            )
+            .whereType<DocumentSnapshot<T>>()
+            .toList(),
+      );
     }
   }
 }

@@ -43,6 +43,20 @@ class Document<T> {
     return null;
   }
 
+  ObservableDocument<T> asObservable() {
+    return ObservableDocument<T>(
+      id: id,
+      collection: collection,
+      fromJson: fromJson,
+      toJson: toJson,
+      persistorSettings: persistorSettings,
+    );
+  }
+
+  Stream<DocumentSnapshot<T>?> stream() {
+    return asObservable().stream();
+  }
+
   Json? getJson() {
     return Loon.instance._getSerializedDocumentData(this);
   }

@@ -5,10 +5,12 @@ import 'dart:async';
 export 'widgets/query_stream_builder.dart';
 export 'persistor/file_persistor.dart';
 
-part 'watch_query.dart';
+part 'broadcast_observable.dart';
 part 'query.dart';
+part 'observable_query.dart';
 part 'collection.dart';
 part 'document.dart';
+part 'observable_document.dart';
 part 'types.dart';
 part 'document_snapshot.dart';
 part 'persistor/persistor.dart';
@@ -29,9 +31,20 @@ class Loon {
 
   final BroadcastCollectionDataStore _broadcastCollectionDataStore = {};
 
-  final Set<WatchQuery<dynamic>> _watchQueryStore = {};
+  final Set<BroadcastObservable> _broadcastObservers = {};
 
   bool _hasPendingBroadcast = false;
+
+  void _validateSerialization<T>({
+    required FromJson<T>? fromJson,
+    required ToJson<T>? toJson,
+  }) {
+    if (persistor != null &&
+        T is! Json &&
+        (fromJson == null || toJson == null)) {
+      throw Exception('Missing fromJson/toJson serializer');
+    }
+  }
 
   Json? _getSerializedDocumentData(Document doc) {
     return _collectionDataStore[doc.collection]?[doc.id];
@@ -107,9 +120,10 @@ class Loon {
       } else {
         // If the broadcast document was created through the hydration process, then it would have been added
         // as a Json document, and we must now convert it to a document of the given type.
-        if (fromJson == null || toJson == null) {
-          throw Exception('Missing fromJson/toJson serializer');
-        }
+        _validateSerialization<T>(
+          fromJson: fromJson,
+          toJson: toJson,
+        );
 
         return BroadcastDocument<T>(
           Document<T>(
@@ -125,12 +139,12 @@ class Loon {
     }).toList();
   }
 
-  void _registerWatchQuery(WatchQuery query) {
-    _watchQueryStore.add(query);
+  void addBroadcastObserver(BroadcastObservable observer) {
+    _broadcastObservers.add(observer);
   }
 
-  void _unregisterWatchQuery(WatchQuery query) {
-    _watchQueryStore.remove(query);
+  void removeBroadcastObserver(BroadcastObservable observer) {
+    _broadcastObservers.remove(observer);
   }
 
   void _scheduleBroadcast() {
@@ -148,8 +162,8 @@ class Loon {
   void _broadcastQueries({
     bool broadcastPersistor = true,
   }) {
-    for (final watchQuery in _watchQueryStore) {
-      watchQuery._onBroadcast();
+    for (final observer in _broadcastObservers) {
+      observer._onBroadcast();
     }
     for (final broadcastCollection in _broadcastCollectionDataStore.values) {
       if (persistor != null && broadcastPersistor) {
@@ -178,10 +192,11 @@ class Loon {
     if (T == Json) {
       _collectionDataStore[collection]![docId] = data as Json;
     } else {
-      if (toJson == null) {
-        throw Exception('Missing fromJson/toJson serializer');
-      }
-      _collectionDataStore[collection]![docId] = toJson(data);
+      _validateSerialization<T>(
+        fromJson: doc.fromJson,
+        toJson: toJson,
+      );
+      _collectionDataStore[collection]![docId] = toJson!(data);
     }
 
     _broadcastCollectionDataStore[collection]![docId] = BroadcastDocument<T>(
@@ -281,10 +296,6 @@ class Loon {
     ToJson<T>? toJson,
     PersistorSettings<T>? persistorSettings,
   }) {
-    if (T is! Json && (fromJson == null || toJson == null)) {
-      throw Exception('Missing fromJson/toJson serializer');
-    }
-
     return Collection<T>(
       collection,
       fromJson: fromJson,

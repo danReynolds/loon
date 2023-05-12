@@ -16,15 +16,15 @@ class QueryStreamBuilder<T> extends StatefulWidget {
 }
 
 class StreamQueryState<T> extends State<QueryStreamBuilder<T>> {
-  late WatchQuery<T> _watchQuery;
+  late ObservableQuery<T> _observableQuery;
 
   @override
   void didUpdateWidget(covariant QueryStreamBuilder<T> oldWidget) {
     super.didUpdateWidget(oldWidget);
 
     if (oldWidget.query != widget.query) {
-      _watchQuery.dispose();
-      _watchQuery = widget.query.asWatchQuery();
+      _observableQuery.dispose();
+      _observableQuery = widget.query.asObservable();
     }
   }
 
@@ -32,21 +32,21 @@ class StreamQueryState<T> extends State<QueryStreamBuilder<T>> {
   void initState() {
     super.initState();
 
-    _watchQuery = widget.query.asWatchQuery();
+    _observableQuery = widget.query.asObservable();
   }
 
   @override
   void dispose() {
     super.dispose();
-    _watchQuery.dispose();
+    _observableQuery.dispose();
   }
 
   @override
   build(context) {
     return StreamBuilder<List<DocumentSnapshot<T>>>(
-      key: ObjectKey(_watchQuery),
-      initialData: _watchQuery.snapshot,
-      stream: _watchQuery.stream(),
+      key: ObjectKey(_observableQuery),
+      initialData: _observableQuery.value,
+      stream: _observableQuery.stream(),
       builder: (context, snap) => widget.builder(context, snap.requireData),
     );
   }

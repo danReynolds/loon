@@ -37,8 +37,8 @@ class Query<T> {
     );
   }
 
-  WatchQuery<T> asWatchQuery() {
-    return WatchQuery<T>(
+  ObservableQuery<T> asObservable() {
+    return ObservableQuery<T>(
       collection,
       filter: filter,
       fromJson: fromJson,
@@ -48,6 +48,6 @@ class Query<T> {
   }
 
   Stream<List<DocumentSnapshot<T>>> stream() {
-    return asWatchQuery().stream();
+    return asObservable().stream();
   }
 }
