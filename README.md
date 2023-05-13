@@ -150,7 +150,7 @@ class MyWidget extends StatelessWidget {
   @override
   build(context) {
     return QueryStreamBuilder<ReviewModel>(
-      doc: ReviewModel.store.where((snap) => snap.data.rating >= 5/10),
+      query: ReviewModel.store.where((snap) => snap.data.rating >= 5/10),
       builder: (context, snapshots) {
         return ListView.builder(
           itemCount: snapshots.length,
