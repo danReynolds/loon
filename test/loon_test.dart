@@ -1,6 +1,18 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:loon/loon.dart';
 
+bool mapsEqual(Map<dynamic, dynamic> map1, Map<dynamic, dynamic> map2) {
+  if (map1.length != map2.length) return false;
+
+  for (var key in map1.keys) {
+    if (!map2.containsKey(key) || map1[key] != map2[key]) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
 class TestUserModel {
   final String name;
 
@@ -23,13 +35,49 @@ class TestUserModel {
   }
 }
 
+class DocumentSnapshotMatcher extends Matcher {
+  DocumentSnapshot<TestUserModel> expected;
+  late DocumentSnapshot<TestUserModel> actual;
+  DocumentSnapshotMatcher(this.expected);
+
+  @override
+  Description describe(Description description) {
+    return description.add(
+      "has expected document ID: ${expected.id}, data: ${expected.data}",
+    );
+  }
+
+  @override
+  Description describeMismatch(
+    dynamic item,
+    Description mismatchDescription,
+    Map<dynamic, dynamic> matchState,
+    bool verbose,
+  ) {
+    return mismatchDescription.add(
+      "has expected document ID: ${matchState['actual'].id}, data: ${matchState['actual'].data}",
+    );
+  }
+
+  @override
+  bool matches(actual, Map matchState) {
+    final actual0 = actual as DocumentSnapshot<TestUserModel>;
+    this.actual = actual0;
+    return actual.id == expected.id &&
+        mapsEqual(
+          actual.data.toJson(),
+          expected.data.toJson(),
+        );
+  }
+}
+
 void main() {
   group('Create document', () {
     tearDown(() {
       Loon.clearAll();
     });
 
-    test('Instance user document added successfully', () {
+    test('Instance user document created successfully', () {
       final user = TestUserModel('User 1');
       final userDoc = TestUserModel.store.doc('1');
 
@@ -41,7 +89,7 @@ void main() {
       );
     });
 
-    test('JSON user document added successfully', () {
+    test('JSON user document created successfully', () {
       final userCollection = Loon.collection('users');
       final userDoc = userCollection.doc('2');
       final userJson = {
@@ -59,6 +107,18 @@ void main() {
     test('Instance document added without serializer throws error', () {
       expect(
         () => Loon.collection('users').doc('1').create(TestUserModel('1')),
+        throwsException,
+      );
+    });
+
+    test('Duplicate user document created fails', () {
+      final user = TestUserModel('User 1');
+      final userDoc = TestUserModel.store.doc('1');
+
+      userDoc.create(user);
+
+      expect(
+        () => userDoc.create(user),
         throwsException,
       );
     });
@@ -266,6 +326,135 @@ void main() {
       userDoc.delete();
 
       expect(userDoc.exists(), false);
+    });
+  });
+
+  group('Stream document', () {
+    tearDown(() {
+      Loon.clearAll();
+    });
+
+    test('Emits the current document', () async {
+      final user = TestUserModel('User 1');
+      final userDoc = TestUserModel.store.doc('1');
+
+      userDoc.create(user);
+
+      final userStream = userDoc.stream();
+
+      expectLater(
+        userStream,
+        emits(
+          DocumentSnapshotMatcher(
+            DocumentSnapshot(
+              doc: userDoc,
+              data: user,
+            ),
+          ),
+        ),
+      );
+    });
+
+    test('Emits updates to the document', () async {
+      final user = TestUserModel('User 1');
+      final updatedUser = TestUserModel('Updated User 1');
+      final userDoc = TestUserModel.store.doc('1');
+
+      final userStream = userDoc.stream();
+
+      userDoc.create(user);
+
+      // Wait for the enqueued micro-task broadcast to emit the user on the stream and then perform the next update.
+      await Future.delayed(
+        const Duration(milliseconds: 1),
+        () {
+          userDoc.update(updatedUser);
+        },
+      );
+
+      await Future.delayed(
+        const Duration(milliseconds: 1),
+        () {
+          userDoc.delete();
+        },
+      );
+
+      expectLater(
+        userStream,
+        emitsInOrder([
+          null,
+          DocumentSnapshotMatcher(
+            DocumentSnapshot(
+              doc: userDoc,
+              data: user,
+            ),
+          ),
+          DocumentSnapshotMatcher(
+            DocumentSnapshot(
+              doc: userDoc,
+              data: updatedUser,
+            ),
+          ),
+          null,
+        ]),
+      );
+    });
+  });
+
+  group('Clear collection', () {
+    tearDown(() {
+      Loon.clearAll();
+    });
+
+    test('Clears all documents in the collection', () {
+      final userDoc = TestUserModel.store.doc('1');
+      final userDoc2 = TestUserModel.store.doc('2');
+
+      userDoc.create(TestUserModel('User 1'));
+      userDoc2.create(TestUserModel('User 2'));
+
+      TestUserModel.store.clear();
+
+      expect(userDoc.get(), null);
+      expect(userDoc2.get(), null);
+    });
+  });
+
+  group('Clearing all collections', () {
+    tearDown(() {
+      Loon.clearAll();
+    });
+
+    test('Clears all documents across all collections', () {
+      final userDoc = TestUserModel.store.doc('1');
+      final userDoc2 = Loon.collection<TestUserModel>(
+        'users2',
+        fromJson: TestUserModel.fromJson,
+        toJson: (user) => user.toJson(),
+      ).doc('2');
+
+      userDoc.create(TestUserModel('User 1'));
+      userDoc2.create(TestUserModel('User 2'));
+
+      Loon.clearAll();
+
+      expect(userDoc.get(), null);
+      expect(userDoc2.get(), null);
+    });
+  });
+
+  group('Root collection', () {
+    test('Writes documents successfully', () {
+      final data = {"test": true};
+      final rootDoc = Loon.doc('1');
+
+      rootDoc.create(data);
+
+      final rootSnap = rootDoc.get();
+
+      expect(rootSnap?.collection, '__ROOT__');
+      expect(rootSnap?.id, '1');
+      expect(rootSnap?.data, data);
     });
   });
 }
