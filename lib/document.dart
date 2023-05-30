@@ -57,6 +57,11 @@ class Document<T> {
     return asObservable().stream();
   }
 
+  Stream<BroadcastObservableChangeRecord<DocumentSnapshot<T>?>>
+      streamChanges() {
+    return asObservable().streamChanges();
+  }
+
   Json? getJson() {
     return Loon._instance._getSerializedDocumentData(this);
   }

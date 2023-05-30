@@ -1,9 +1,9 @@
 part of loon;
 
-typedef BroadcastObservableDiff<T> = (T prev, T next);
+typedef BroadcastObservableChangeRecord<T> = (T prev, T next);
 
 mixin BroadcastObservable<T> {
-  late final StreamController<BroadcastObservableDiff<T>> _controller;
+  late final StreamController<BroadcastObservableChangeRecord<T>> _controller;
   late final Stream<T> broadcastStream;
   late T value;
   late T prevValue;
@@ -12,7 +12,7 @@ mixin BroadcastObservable<T> {
 
   void observe(T initialValue) {
     _controller =
-        StreamController<BroadcastObservableDiff<T>>(onCancel: dispose);
+        StreamController<BroadcastObservableChangeRecord<T>>(onCancel: dispose);
     broadcastStream = _controller.stream.map((record) {
       final (_, next) = record;
       return next;
@@ -38,7 +38,7 @@ mixin BroadcastObservable<T> {
     return broadcastStream;
   }
 
-  Stream<BroadcastObservableDiff<T>> get diff {
+  Stream<BroadcastObservableChangeRecord<T>> streamChanges() {
     return _controller.stream;
   }
 

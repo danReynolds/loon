@@ -401,6 +401,107 @@ void main() {
     });
   });
 
+  group('Query documents', () {
+    tearDown(() {
+      Loon.clearAll();
+    });
+
+    test('Returns documents that satisfy the query', () {
+      final user = TestUserModel('User 1');
+      final user2 = TestUserModel('User 2');
+      final userDoc = TestUserModel.store.doc('1');
+      final userDoc2 = TestUserModel.store.doc('2');
+
+      userDoc.create(user);
+      userDoc2.create(user2);
+
+      final querySnap =
+          TestUserModel.store.where((snap) => snap.id == '1').get();
+
+      expect(querySnap.length, 1);
+      expect(
+        querySnap.first,
+        DocumentSnapshotMatcher(
+          DocumentSnapshot(
+            doc: userDoc,
+            data: user,
+          ),
+        ),
+      );
+    });
+  });
+
+  group('Stream documents', () {
+    tearDown(() {
+      Loon.clearAll();
+    });
+
+    test('Returns a stream of documents that satisfy the query', () async {
+      final user = TestUserModel('User 1');
+      final user2 = TestUserModel('User 2');
+      final userDoc = TestUserModel.store.doc('1');
+      final userDoc2 = TestUserModel.store.doc('2');
+
+      userDoc.create(user);
+      userDoc2.create(user2);
+
+      final queryStream =
+          TestUserModel.store.where((snap) => snap.id == '1').stream();
+
+      final querySnap = await queryStream.first;
+
+      expect(querySnap.length, 1);
+      expect(
+        querySnap.first,
+        DocumentSnapshotMatcher(
+          DocumentSnapshot(
+            doc: userDoc,
+            data: user,
+          ),
+        ),
+      );
+    });
+
+    test('Updates the stream of documents when they change', () async {
+      final user = TestUserModel('User 1');
+      final user2 = TestUserModel('User 2');
+      final userDoc = TestUserModel.store.doc('1');
+
+      userDoc.create(user);
+
+      final queryStream = TestUserModel.store
+          .where((snap) {
+            return snap.data.name == 'User 1';
+          })
+          .stream()
+          // We take 3 changes instead of 2 here because the stream first immediately emits its current value,
+          // and then the broadcast scheduled by the create call re-executes the query and emits the updated value. We don't
+          // care about this intermediary broadcast and just compare the first/last result.
+          .take(3);
+
+      await Future.delayed(const Duration(milliseconds: 1), () {
+        userDoc.update(user2);
+      });
+
+      final querySnaps = await queryStream.toList();
+      final firstSnap = querySnaps.first;
+      final lastSnap = querySnaps.last;
+
+      expect(firstSnap.length, 1);
+      expect(
+        firstSnap[0],
+        DocumentSnapshotMatcher(
+          DocumentSnapshot(
+            doc: userDoc,
+            data: user,
+          ),
+        ),
+      );
+
+      expect(lastSnap.isEmpty, true);
+    });
+  });
+
   group('Clear collection', () {
     tearDown(() {
       Loon.clearAll();
