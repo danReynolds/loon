@@ -18,8 +18,8 @@ class Collection<T> extends Query<T> {
     );
   }
 
-  void delete() {
-    Loon.instance._deleteCollection(collection);
+  void clear() {
+    Loon._instance._clearCollection(collection);
   }
 
   Query<T> where(FilterFn<T> filter) {

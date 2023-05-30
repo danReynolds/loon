@@ -325,4 +325,12 @@ class FilePersistor extends Persistor {
       _fileDataStoreCollection.remove(dataStore.filename);
     }));
   }
+
+  @override
+  clearAll() {
+    final clearCollectionFutures = _fileDataStoreCollection.values
+        .map((fileDataStore) => fileDataStore.delete())
+        .toList();
+    return Future.wait(clearCollectionFutures);
+  }
 }

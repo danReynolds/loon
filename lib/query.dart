@@ -28,7 +28,7 @@ class Query<T> {
 
   List<DocumentSnapshot<T>> get() {
     return _resolveQuery(
-      Loon.instance._getDocuments(
+      Loon._instance._getDocuments(
         collection,
         fromJson: fromJson,
         toJson: toJson,

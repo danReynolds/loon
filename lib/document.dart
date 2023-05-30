@@ -16,26 +16,26 @@ class Document<T> {
   });
 
   void delete() {
-    Loon.instance._deleteDocument<T>(this);
+    Loon._instance._deleteDocument<T>(this);
   }
 
   DocumentSnapshot<T> update(T data) {
-    return Loon.instance._updateDocument<T>(this, data);
+    return Loon._instance._updateDocument<T>(this, data);
   }
 
   DocumentSnapshot<T> modify(ModifyFn<T> modifyFn) {
-    return Loon.instance._modifyDocument(
+    return Loon._instance._modifyDocument(
       this,
       modifyFn,
     );
   }
 
   DocumentSnapshot<T> create(T data) {
-    return Loon.instance._addDocument<T>(this, data);
+    return Loon._instance._addDocument<T>(this, data);
   }
 
   DocumentSnapshot<T>? get() {
-    final data = Loon.instance._getDocumentData<T>(this);
+    final data = Loon._instance._getDocumentData<T>(this);
 
     if (data != null) {
       return DocumentSnapshot<T>(doc: this, data: data);
@@ -58,11 +58,11 @@ class Document<T> {
   }
 
   Json? getJson() {
-    return Loon.instance._getSerializedDocumentData(this);
+    return Loon._instance._getSerializedDocumentData(this);
   }
 
   bool exists() {
-    return Loon.instance._hasDocument(this);
+    return Loon._instance._hasDocument(this);
   }
 }
 

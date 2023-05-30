@@ -26,12 +26,12 @@ class ObservableQuery<T> extends Query<T>
     bool shouldBroadcast = false;
 
     // If the entire collection has been deleted, then clear the snapshot.
-    if (!Loon.instance._hasCollection(collection)) {
+    if (!Loon._instance._hasCollection(collection)) {
       rebroadcast([]);
       return;
     }
 
-    final broadcastDocs = Loon.instance._getBroadcastDocuments<T>(
+    final broadcastDocs = Loon._instance._getBroadcastDocuments<T>(
       collection,
       fromJson: fromJson,
       toJson: toJson,

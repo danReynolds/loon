@@ -85,4 +85,6 @@ abstract class Persistor {
   Future<CollectionDataStore> hydrate();
 
   Future<void> clear(String collection);
+
+  Future<void> clearAll();
 }

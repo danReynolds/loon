@@ -25,7 +25,7 @@ typedef BroadcastCollectionDataStore
 class Loon {
   Persistor? persistor;
 
-  static final Loon instance = Loon._();
+  static final Loon _instance = Loon._();
 
   Loon._();
 
@@ -37,11 +37,21 @@ class Loon {
 
   bool _hasPendingBroadcast = false;
 
-  static void _validateSerialization<T>({
+  static void _validateDataSerialization<T>({
+    required FromJson<T>? fromJson,
+    required ToJson<T>? toJson,
+    required T? data,
+  }) {
+    if (data is! Json? && (fromJson == null || toJson == null)) {
+      throw Exception('Missing fromJson/toJson serializer');
+    }
+  }
+
+  static void _validateTypeSerialization<T>({
     required FromJson<T>? fromJson,
     required ToJson<T>? toJson,
   }) {
-    if (T is! Json && (fromJson == null || toJson == null)) {
+    if (T != Json && T != dynamic && (fromJson == null || toJson == null)) {
       throw Exception('Missing fromJson/toJson serializer');
     }
   }
@@ -54,6 +64,11 @@ class Loon {
     final fromJson = doc.fromJson;
     final serializedData = _getSerializedDocumentData(doc);
 
+    _validateTypeSerialization<T>(
+      fromJson: doc.fromJson,
+      toJson: doc.toJson,
+    );
+
     if (serializedData != null && fromJson != null) {
       return fromJson(serializedData);
     }
@@ -64,7 +79,7 @@ class Loon {
     return _collectionDataStore.containsKey(collection);
   }
 
-  void _deleteCollection(String collection) {
+  void _clearCollection(String collection) {
     if (_hasCollection(collection)) {
       _collectionDataStore.remove(collection);
       _scheduleBroadcast();
@@ -72,6 +87,19 @@ class Loon {
       if (persistor != null) {
         persistor!.clear(collection);
       }
+    }
+  }
+
+  Future<void> _clearAll() async {
+    if (_collectionDataStore.isEmpty) {
+      return;
+    }
+
+    _collectionDataStore.clear();
+    _scheduleBroadcast();
+
+    if (persistor != null) {
+      return persistor!.clearAll();
     }
   }
 
@@ -120,9 +148,10 @@ class Loon {
       } else {
         // If the broadcast document was created through the hydration process, then it would have been added
         // as a Json document, and we must now convert it to a document of the given type.
-        _validateSerialization<T>(
+        _validateDataSerialization<T>(
           fromJson: fromJson,
           toJson: toJson,
+          data: doc.get()?.data,
         );
 
         return BroadcastDocument<T>(
@@ -189,12 +218,13 @@ class Loon {
 
     final isNewDocument = !_hasDocument(doc);
 
-    if (T == Json) {
-      _collectionDataStore[collection]![docId] = data as Json;
+    if (data is Json) {
+      _collectionDataStore[collection]![docId] = data;
     } else {
-      _validateSerialization<T>(
+      _validateDataSerialization<T>(
         fromJson: doc.fromJson,
         toJson: toJson,
+        data: data,
       );
       _collectionDataStore[collection]![docId] = toJson!(data);
     }
@@ -236,7 +266,7 @@ class Loon {
     ModifyFn<T> modifyFn, {
     bool broadcast = true,
   }) {
-    return modifyFn(doc.get()?.data);
+    return _writeDocument<T>(doc, modifyFn(doc.get()));
   }
 
   void _deleteDocument<T>(
@@ -261,8 +291,8 @@ class Loon {
     Persistor? persistor,
   }) {
     if (persistor != null) {
-      instance.persistor = persistor;
-      instance._hydrate();
+      _instance.persistor = persistor;
+      _instance._hydrate();
     }
   }
 
@@ -285,9 +315,11 @@ class Loon {
           );
         }
       }
-    } finally {
-      _broadcastQueries(broadcastPersistor: false);
+    } catch (e) {
+      // ignore: avoid_print
+      print('Loon: Error hydrating');
     }
+    _broadcastQueries(broadcastPersistor: false);
   }
 
   static Collection<T> collection<T>(
@@ -296,15 +328,19 @@ class Loon {
     ToJson<T>? toJson,
     PersistorSettings<T>? persistorSettings,
   }) {
-    _validateSerialization<T>(
-      fromJson: fromJson,
-      toJson: toJson,
-    );
     return Collection<T>(
       collection,
       fromJson: fromJson,
       toJson: toJson,
       persistorSettings: persistorSettings,
     );
+  }
+
+  static Document<T> doc<T>(String id) {
+    return collection<T>('__ROOT__').doc(id);
+  }
+
+  static Future<void> clearAll() {
+    return Loon._instance._clearAll();
   }
 }

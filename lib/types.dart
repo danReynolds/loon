@@ -4,7 +4,7 @@ typedef Json = Map<String, dynamic>;
 
 typedef FilterFn<T> = bool Function(DocumentSnapshot<T> snap);
 
-typedef ModifyFn<T> = DocumentSnapshot<T> Function(T? data);
+typedef ModifyFn<T> = T Function(DocumentSnapshot<T>? snap);
 
 typedef FromJson<T> = T Function(Json json);
 

@@ -238,7 +238,7 @@ class _MyHomePageState extends State<MyHomePage> {
             const SizedBox(width: 24),
             FloatingActionButton(
               onPressed: () {
-                UserModel.store.delete();
+                UserModel.store.clear();
               },
               child: const Icon(Icons.delete),
             ),
