@@ -142,6 +142,10 @@ class Loon {
     ToJson<T>? toJson,
     PersistorSettings<T>? persistorSettings,
   }) {
+    if (!_broadcastCollectionDataStore.containsKey(collection)) {
+      return [];
+    }
+
     return _broadcastCollectionDataStore[collection]!.values.map((doc) {
       if (doc is BroadcastDocument<T>) {
         return doc;
@@ -292,23 +296,22 @@ class Loon {
   }) {
     if (persistor != null) {
       _instance.persistor = persistor;
-      _instance._hydrate();
     }
   }
 
-  Future<void> _hydrate() async {
-    if (persistor == null) {
+  static Future<void> hydrate() async {
+    if (_instance.persistor == null) {
       return;
     }
     try {
-      final CollectionDataStore data = await persistor!.hydrate();
+      final CollectionDataStore data = await _instance.persistor!.hydrate();
 
       for (final collectionDataStoreEntry in data.entries) {
         final collection = collectionDataStoreEntry.key;
         final documentDataStore = collectionDataStoreEntry.value;
 
         for (final documentDataEntry in documentDataStore.entries) {
-          _writeDocument<Json>(
+          _instance._writeDocument<Json>(
             Document<Json>(collection: collection, id: documentDataEntry.key),
             documentDataEntry.value,
             broadcast: false,
@@ -319,7 +322,7 @@ class Loon {
       // ignore: avoid_print
       print('Loon: Error hydrating');
     }
-    _broadcastQueries(broadcastPersistor: false);
+    _instance._broadcastQueries(broadcastPersistor: false);
   }
 
   static Collection<T> collection<T>(
@@ -336,8 +339,18 @@ class Loon {
     );
   }
 
-  static Document<T> doc<T>(String id) {
-    return collection<T>('__ROOT__').doc(id);
+  static Document<T> doc<T>(
+    String id, {
+    FromJson<T>? fromJson,
+    ToJson<T>? toJson,
+    PersistorSettings<T>? persistorSettings,
+  }) {
+    return collection<T>(
+      '__ROOT__',
+      fromJson: fromJson,
+      toJson: toJson,
+      persistorSettings: persistorSettings,
+    ).doc(id);
   }
 
   static Future<void> clearAll() {

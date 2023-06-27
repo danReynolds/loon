@@ -219,6 +219,8 @@ void main() {
 
   Loon.configure(persistor: FilePersistor());
 
+  Loon.hydrate(); // Hydrate data from persistence.
+
   runApp(const MyApp());
 }
 ```
@@ -230,9 +232,9 @@ You can specify the frequency that batch updates should be written:
 ```dart
 import 'package:loon/loon.dart';
 
-FilePersistor(
+PersistorSettings(
   persistenceThrottle: Duration(milliseconds: 200),
-)
+);
 ```
 
 as well as specify custom options per collection, like sharding documents:

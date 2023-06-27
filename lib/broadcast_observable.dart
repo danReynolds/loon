@@ -4,7 +4,7 @@ typedef BroadcastObservableChangeRecord<T> = (T prev, T next);
 
 mixin BroadcastObservable<T> {
   late final StreamController<BroadcastObservableChangeRecord<T>> _controller;
-  late final Stream<T> broadcastStream;
+  late final Stream<T> _valueStream;
   late T value;
   late T prevValue;
 
@@ -13,7 +13,7 @@ mixin BroadcastObservable<T> {
   void observe(T initialValue) {
     _controller =
         StreamController<BroadcastObservableChangeRecord<T>>(onCancel: dispose);
-    broadcastStream = _controller.stream.map((record) {
+    _valueStream = _controller.stream.map((record) {
       final (_, next) = record;
       return next;
     });
@@ -35,7 +35,7 @@ mixin BroadcastObservable<T> {
   }
 
   Stream<T> stream() {
-    return broadcastStream;
+    return _valueStream;
   }
 
   Stream<BroadcastObservableChangeRecord<T>> streamChanges() {

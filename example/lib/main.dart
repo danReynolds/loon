@@ -10,10 +10,12 @@ const uuid = Uuid();
 
 final _persistor = DebugFilePersistor();
 
-void main() {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   Loon.configure(persistor: _persistor);
+
+  await Loon.hydrate();
 
   runApp(const MyApp());
 }

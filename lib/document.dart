@@ -34,6 +34,13 @@ class Document<T> {
     return Loon._instance._addDocument<T>(this, data);
   }
 
+  DocumentSnapshot<T> createOrUpdate(T data) {
+    if (exists()) {
+      return update(data);
+    }
+    return create(data);
+  }
+
   DocumentSnapshot<T>? get() {
     final data = Loon._instance._getDocumentData<T>(this);
 

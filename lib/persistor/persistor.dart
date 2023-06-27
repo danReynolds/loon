@@ -1,16 +1,24 @@
 part of loon;
 
-abstract class PersistorSettings<T> {}
+class PersistorSettings<T> {
+  final Duration persistenceThrottle;
+  final bool persistenceEnabled;
+
+  const PersistorSettings({
+    this.persistenceThrottle = const Duration(milliseconds: 100),
+    this.persistenceEnabled = true,
+  });
+}
 
 abstract class Persistor {
   final BroadcastCollectionDataStore _broadcastCollectionDataStore = {};
   Timer? _persistTimer;
   bool _isPersisting = false;
 
-  final Duration persistenceThrottle;
+  final PersistorSettings persistorSettings;
 
   Persistor({
-    this.persistenceThrottle = const Duration(milliseconds: 100),
+    this.persistorSettings = const PersistorSettings(),
   });
 
   List<BroadcastDocument> get _pendingDocuments {
@@ -62,7 +70,7 @@ abstract class Persistor {
     }
 
     if (_persistTimer == null && !_isPersisting) {
-      _persistTimer = Timer(persistenceThrottle, () {
+      _persistTimer = Timer(persistorSettings.persistenceThrottle, () {
         _persistTimer = null;
         _persist();
       });

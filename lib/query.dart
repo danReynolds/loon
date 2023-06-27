@@ -50,4 +50,9 @@ class Query<T> {
   Stream<List<DocumentSnapshot<T>>> stream() {
     return asObservable().stream();
   }
+
+  Stream<BroadcastObservableChangeRecord<List<DocumentSnapshot<T>>>>
+      streamChanges() {
+    return asObservable().streamChanges();
+  }
 }

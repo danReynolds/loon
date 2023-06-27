@@ -24,8 +24,9 @@ class FilePersistorSettings<T> extends PersistorSettings<T> {
   }
 
   FilePersistorSettings({
+    super.persistenceEnabled = true,
     this.shardFn,
-    this.maxShards = 5,
+    this.maxShards = 1,
   });
 }
 
@@ -115,10 +116,10 @@ class FilePersistor extends Persistor {
 
   late final Directory _fileDataStoreDirectory;
 
-  final filenameRegex = RegExp(r'loon_(.*?)(?:_(.*?))?\.json');
+  final filenameRegex = RegExp(r'^loon_(\w+)(?:\.(shard_\w+))?\.json$');
 
   FilePersistor({
-    super.persistenceThrottle,
+    super.persistorSettings,
   });
 
   Future<void> _initStorageDirectory() async {
@@ -131,7 +132,7 @@ class FilePersistor extends Persistor {
     return _fileDataStoreDirectory
         .listSync()
         .whereType<File>()
-        .where((file) => filenameRegex.hasMatch(file.path))
+        .where((file) => filenameRegex.hasMatch(path.basename(file.path)))
         .toList();
   }
 
@@ -155,7 +156,7 @@ class FilePersistor extends Persistor {
   }
 
   FileDataStore buildFileDataStore({required File file}) {
-    final match = filenameRegex.firstMatch(file.path)!;
+    final match = filenameRegex.firstMatch(path.basename(file.path))!;
     final collection = match.group(1)!;
     final shard = match.group(2);
 
@@ -174,7 +175,7 @@ class FilePersistor extends Persistor {
     final collectionFilename = 'loon_$collection';
 
     if (shard != null) {
-      return '${collectionFilename}_shard_$shard.json';
+      return '$collectionFilename.shard_$shard.json';
     }
     return '$collectionFilename.json';
   }
@@ -187,14 +188,17 @@ class FilePersistor extends Persistor {
   persist(docs) async {
     for (final doc in docs) {
       final collection = doc.collection;
-      final persistorSettings = doc.persistorSettings;
+      final persistorSettings = doc.persistorSettings ?? this.persistorSettings;
+
+      if (!persistorSettings.persistenceEnabled) {
+        continue;
+      }
 
       String? documentDataStoreShard;
       final FileDataStore documentDataStore;
       final String documentDataStoreFilename;
 
-      if (persistorSettings != null &&
-          persistorSettings is FilePersistorSettings) {
+      if (persistorSettings is FilePersistorSettings) {
         final maxShards = persistorSettings.maxShards;
 
         if (persistorSettings.shardEnabled && maxShards > 1) {

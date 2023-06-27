@@ -3,16 +3,18 @@ import 'dart:io';
 import 'package:encrypt/encrypt.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:loon/loon.dart';
+import 'package:path/path.dart' as path;
 
 const _secureStorageKey = 'loon_encrypted_file_persistor_key';
 
 class EncryptedFilePersistorSettings<T> extends FilePersistorSettings<T> {
-  final bool isEncrypted;
+  final bool encryptionEnabled;
 
   EncryptedFilePersistorSettings({
-    required this.isEncrypted,
-    super.maxShards = 5,
+    required this.encryptionEnabled,
     super.shardFn,
+    super.maxShards = 5,
+    super.persistenceEnabled = true,
   });
 }
 
@@ -44,7 +46,8 @@ class EncryptedFilePersistor extends FilePersistor {
 
   @override
   // ignore: overridden_fields
-  final filenameRegex = RegExp(r'loon_(.*?)(?:_(.*?))?(\.encrypted)?\.json');
+  final filenameRegex =
+      RegExp(r'^loon_(\w+)(?:\.(shard_\w+))?\.encrypted\.json$');
 
   String encrypt(String plainText) {
     final iv = IV.fromSecureRandom(16);
@@ -72,7 +75,7 @@ class EncryptedFilePersistor extends FilePersistor {
     );
 
     if (settings != null && settings is EncryptedFilePersistorSettings) {
-      if (!settings.isEncrypted) {
+      if (!settings.encryptionEnabled) {
         return filename;
       }
     }
@@ -82,13 +85,13 @@ class EncryptedFilePersistor extends FilePersistor {
 
   @override
   FileDataStore buildFileDataStore({required File file}) {
-    final match = filenameRegex.firstMatch(file.path)!;
+    final match = filenameRegex.firstMatch(path.basename(file.path))!;
 
     final collection = match.group(1)!;
     final shard = match.group(2);
-    final isEncrypted = match.group(3) != null;
+    final encryptionEnabled = match.group(3) != null;
 
-    if (isEncrypted) {
+    if (encryptionEnabled) {
       return EncryptedFileDataStore(
         encrypt: encrypt,
         decrypt: decrypt,
