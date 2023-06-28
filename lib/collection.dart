@@ -6,7 +6,7 @@ class Collection<T> extends Query<T> {
     required super.fromJson,
     required super.toJson,
     required super.persistorSettings,
-  }) : super(filter: null);
+  }) : super(filter: null, sort: null);
 
   Document<T> doc(String id) {
     return Document<T>(
@@ -26,6 +26,18 @@ class Collection<T> extends Query<T> {
     return Query<T>(
       collection,
       filter: filter,
+      sort: sort,
+      fromJson: fromJson,
+      toJson: toJson,
+      persistorSettings: persistorSettings,
+    );
+  }
+
+  Query<T> sortBy(SortFn<T> sort) {
+    return Query<T>(
+      collection,
+      filter: filter,
+      sort: sort,
       fromJson: fromJson,
       toJson: toJson,
       persistorSettings: persistorSettings,

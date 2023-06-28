@@ -3,6 +3,7 @@ part of loon;
 class Query<T> {
   final String collection;
   final FilterFn<T>? filter;
+  final SortFn<T>? sort;
   final FromJson<T>? fromJson;
   final ToJson<T>? toJson;
   final PersistorSettings<T>? persistorSettings;
@@ -10,6 +11,7 @@ class Query<T> {
   Query(
     this.collection, {
     required this.filter,
+    required this.sort,
     required this.fromJson,
     required this.toJson,
     required this.persistorSettings,
@@ -18,6 +20,10 @@ class Query<T> {
   List<DocumentSnapshot<T>> _resolveQuery(List<Document<T>> docs) {
     final snaps =
         docs.map((doc) => doc.get()).whereType<DocumentSnapshot<T>>().toList();
+
+    if (sort != null) {
+      snaps.sort(sort);
+    }
 
     if (filter == null) {
       return snaps;
@@ -41,6 +47,7 @@ class Query<T> {
     return ObservableQuery<T>(
       collection,
       filter: filter,
+      sort: sort,
       fromJson: fromJson,
       toJson: toJson,
       persistorSettings: persistorSettings,

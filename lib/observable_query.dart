@@ -5,6 +5,7 @@ class ObservableQuery<T> extends Query<T>
   ObservableQuery(
     super.collection, {
     required super.filter,
+    required super.sort,
     required super.fromJson,
     required super.toJson,
     required super.persistorSettings,

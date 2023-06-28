@@ -13,7 +13,7 @@ mixin BroadcastObservable<T> {
   void observe(T initialValue) {
     _controller =
         StreamController<BroadcastObservableChangeRecord<T>>(onCancel: dispose);
-    _valueStream = _controller.stream.map((record) {
+    _valueStream = _controller.stream.asBroadcastStream().map((record) {
       final (_, next) = record;
       return next;
     });
