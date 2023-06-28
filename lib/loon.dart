@@ -17,8 +17,10 @@ part 'types.dart';
 part 'document_snapshot.dart';
 part 'persistor/persistor.dart';
 
-typedef DocumentDataStore = Map<String, Json>;
-typedef CollectionDataStore = Map<String, DocumentDataStore>;
+typedef SerializedDocumentDataStore = Map<String, Json>;
+typedef ParsedCollectionDataStore = Map<String, Map<String, dynamic>>;
+typedef SerializedCollectionDataStore
+    = Map<String, SerializedDocumentDataStore>;
 typedef BroadcastCollectionDataStore
     = Map<String, Map<String, BroadcastDocument>>;
 
@@ -29,7 +31,17 @@ class Loon {
 
   Loon._();
 
-  final CollectionDataStore _collectionDataStore = {};
+  /// Document data is cached in both a serialized and de-serialized collection data store. The serialized document data store is required for 3 reasons:
+  /// 1. This is essential for hydrating document data from persistent storage, since hydration can only restore serialized data and
+  /// does not know how to parse document data into a de-serialized representation.
+  /// 2. It also improves the performance of persisting data, enabling updated data to only ever be serialized once.
+  /// 3. It allows a document data to be read with or without a [fromJson] de-serializer.
+  ///
+  /// The de-serialized document data store is necessary in order to improve the performance of repeatedly reading document data.
+  /// The de-serialized data store sits in front of the serialized data and can return the de-serialized representation without the performance hit of
+  /// repeated de-serialization.
+  final SerializedCollectionDataStore _serializedCollectionDataStore = {};
+  final ParsedCollectionDataStore _parsedCollectionDataStore = {};
 
   final BroadcastCollectionDataStore _broadcastCollectionDataStore = {};
 
@@ -57,7 +69,11 @@ class Loon {
   }
 
   Json? _getSerializedDocumentData(Document doc) {
-    return _collectionDataStore[doc.collection]?[doc.id];
+    return _serializedCollectionDataStore[doc.collection]?[doc.id];
+  }
+
+  T? _getParsedDocumentData<T>(Document<T> doc) {
+    return _parsedCollectionDataStore[doc.collection]?[doc.id];
   }
 
   T? _getDocumentData<T>(Document<T> doc) {
@@ -70,18 +86,26 @@ class Loon {
     );
 
     if (serializedData != null && fromJson != null) {
-      return fromJson(serializedData);
+      final cachedData = _getParsedDocumentData<T>(doc);
+
+      if (cachedData != null) {
+        return cachedData;
+      }
+
+      final parsedData = fromJson(serializedData);
+      _cacheParsedDocumentData(doc, parsedData);
+      return parsedData;
     }
     return serializedData as T?;
   }
 
   bool _hasCollection(String collection) {
-    return _collectionDataStore.containsKey(collection);
+    return _serializedCollectionDataStore.containsKey(collection);
   }
 
   void _clearCollection(String collection) {
     if (_hasCollection(collection)) {
-      _collectionDataStore.remove(collection);
+      _serializedCollectionDataStore.remove(collection);
       _scheduleBroadcast();
 
       if (persistor != null) {
@@ -91,11 +115,11 @@ class Loon {
   }
 
   Future<void> _clearAll() async {
-    if (_collectionDataStore.isEmpty) {
+    if (_serializedCollectionDataStore.isEmpty) {
       return;
     }
 
-    _collectionDataStore.clear();
+    _serializedCollectionDataStore.clear();
     _scheduleBroadcast();
 
     if (persistor != null) {
@@ -104,7 +128,7 @@ class Loon {
   }
 
   void _initializeCollection(String collection) {
-    _collectionDataStore[collection] = {};
+    _serializedCollectionDataStore[collection] = {};
     _broadcastCollectionDataStore[collection] = {};
   }
 
@@ -112,7 +136,7 @@ class Loon {
     final collection = doc.collection;
 
     return _hasCollection(collection) &&
-        _collectionDataStore[collection]!.containsKey(doc.id);
+        _serializedCollectionDataStore[collection]!.containsKey(doc.id);
   }
 
   List<Document<T>> _getDocuments<T>(
@@ -124,7 +148,7 @@ class Loon {
     if (!_hasCollection(collection)) {
       _initializeCollection(collection);
     }
-    return _collectionDataStore[collection]!.entries.map((entry) {
+    return _serializedCollectionDataStore[collection]!.entries.map((entry) {
       return Document<T>(
         collection: collection,
         id: entry.key,
@@ -207,6 +231,16 @@ class Loon {
     }
   }
 
+  void _cacheParsedDocumentData<T>(Document<T> doc, T data) {
+    final collection = doc.collection;
+
+    if (!_parsedCollectionDataStore.containsKey(collection)) {
+      _parsedCollectionDataStore[collection] = {};
+    }
+
+    _parsedCollectionDataStore[doc.collection]![doc.id] = data;
+  }
+
   DocumentSnapshot<T> _writeDocument<T>(
     Document<T> doc,
     T data, {
@@ -223,14 +257,15 @@ class Loon {
     final isNewDocument = !_hasDocument(doc);
 
     if (data is Json) {
-      _collectionDataStore[collection]![docId] = data;
+      _serializedCollectionDataStore[collection]![docId] = data;
     } else {
       _validateDataSerialization<T>(
         fromJson: doc.fromJson,
         toJson: toJson,
         data: data,
       );
-      _collectionDataStore[collection]![docId] = toJson!(data);
+      _cacheParsedDocumentData<T>(doc, data);
+      _serializedCollectionDataStore[collection]![docId] = toJson!(data);
     }
 
     _broadcastCollectionDataStore[collection]![docId] = BroadcastDocument<T>(
@@ -278,7 +313,7 @@ class Loon {
     bool broadcast = true,
   }) {
     if (doc.exists()) {
-      _collectionDataStore[doc.collection]!.remove(doc.id);
+      _serializedCollectionDataStore[doc.collection]!.remove(doc.id);
       _broadcastCollectionDataStore[doc.collection]![doc.id] =
           BroadcastDocument<T>(
         doc,
@@ -304,7 +339,8 @@ class Loon {
       return;
     }
     try {
-      final CollectionDataStore data = await _instance.persistor!.hydrate();
+      final SerializedCollectionDataStore data =
+          await _instance.persistor!.hydrate();
 
       for (final collectionDataStoreEntry in data.entries) {
         final collection = collectionDataStoreEntry.key;

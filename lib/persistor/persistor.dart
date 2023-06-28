@@ -90,7 +90,7 @@ abstract class Persistor {
 
   Future<void> persist(List<BroadcastDocument> docs);
 
-  Future<CollectionDataStore> hydrate();
+  Future<SerializedCollectionDataStore> hydrate();
 
   Future<void> clear(String collection);
 
