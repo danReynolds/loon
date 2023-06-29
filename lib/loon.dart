@@ -35,7 +35,7 @@ class Loon {
   /// 1. This is essential for hydrating document data from persistent storage, since hydration can only restore serialized data and
   /// does not know how to parse document data into a de-serialized representation.
   /// 2. It also improves the performance of persisting data, enabling updated data to only ever be serialized once.
-  /// 3. It allows a document data to be read with or without a [fromJson] de-serializer.
+  /// 3. It allows document data to be read with or without a [fromJson] de-serializer.
   ///
   /// The de-serialized document data store is necessary in order to improve the performance of repeatedly reading document data.
   /// The de-serialized data store sits in front of the serialized data and can return the de-serialized representation without the performance hit of
