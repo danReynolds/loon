@@ -31,7 +31,7 @@ class Loon {
 
   Loon._();
 
-  /// Document data is cached in both a serialized and de-serialized collection data store. The serialized document data store is required for 3 reasons:
+  /// Document data is stored in both a serialized and de-serialized collection data store. The serialized document data store is required for 3 reasons:
   /// 1. This is essential for hydrating document data from persistent storage, since hydration can only restore serialized data and
   /// does not know how to parse document data into a de-serialized representation.
   /// 2. It also improves the performance of persisting data, enabling updated data to only ever be serialized once.
