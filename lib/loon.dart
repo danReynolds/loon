@@ -216,15 +216,27 @@ class Loon {
     }
   }
 
+  bool _isScheduledForBroadcast<T>(Document<T> doc) {
+    return _instance._broadcastCollectionDataStore[doc.collection]!
+        .containsKey(doc.id);
+  }
+
   void _broadcastQueries({
     bool broadcastPersistor = true,
   }) {
     for (final observer in _broadcastObservers) {
       observer._onBroadcast();
     }
+
     for (final broadcastCollection in _broadcastCollectionDataStore.values) {
       if (persistor != null && broadcastPersistor) {
-        persistor!.onBroadcast(broadcastCollection.values.toList());
+        persistor!.onBroadcast(
+          broadcastCollection.values
+              // Touched documents do not need to be re-persisted since their data has not changed.
+              .where((broadcastDoc) =>
+                  broadcastDoc.type != BroadcastEventTypes.touched)
+              .toList(),
+        );
       }
 
       broadcastCollection.clear();
@@ -391,5 +403,22 @@ class Loon {
 
   static Future<void> clearAll() {
     return Loon._instance._clearAll();
+  }
+
+  /// Enqueues a document to be rebroadcasted, updating all streams that are subscribed to that document.
+  static void rebroadcast<T>(Document<T> doc) {
+    if (!doc.exists()) {
+      return;
+    }
+
+    // If the document is already scheduled for broadcast, then manually touching it for rebroadcast is a no-op, since it
+    // is aleady enqueued for broadcast.
+    if (!_instance._isScheduledForBroadcast(doc)) {
+      _instance._broadcastCollectionDataStore[doc.collection]![doc.id] =
+          BroadcastDocument<T>(
+        doc,
+        BroadcastEventTypes.touched,
+      );
+    }
   }
 }

@@ -79,9 +79,17 @@ class Document<T> {
 }
 
 enum BroadcastEventTypes {
+  /// The document has been modified.
   modified,
+
+  /// The document has been added.
   added,
+
+  /// The document has been removed.
   removed,
+
+  /// The document has been manually touched for rebroadcast.
+  touched,
 }
 
 class BroadcastDocument<T> extends Document<T> {

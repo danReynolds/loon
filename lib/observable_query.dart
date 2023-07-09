@@ -22,6 +22,7 @@ class ObservableQuery<T> extends Query<T>
   ///   a) Previously satisfied the query filter and now does not.
   ///   b) Previously did not satisfy the query filter and now does.
   ///   c) Previously satisfied the query filter and still does (since its modified data must be delivered on the query).
+  /// 4. A document that has been manually rebroadcasted.
   @override
   void _onBroadcast() {
     bool shouldBroadcast = false;
@@ -56,7 +57,7 @@ class ObservableQuery<T> extends Query<T>
       };
     });
 
-    final addedDocsIds = _resolveQuery(
+    final addedDocsIds = _filterQuery(
       broadcastDocs
           .where((doc) => doc.type == BroadcastEventTypes.added)
           .toList(),
@@ -89,7 +90,7 @@ class ObservableQuery<T> extends Query<T>
 
     // The document IDs of the modified documents that satisfy the query filter.
     final filteredModifiedDocIds =
-        _resolveQuery(modifiedDocs).map((doc) => doc.id).toSet();
+        _filterQuery(modifiedDocs).map((doc) => doc.id).toSet();
     final filteredModifiedDocIdsToAdd =
         filteredModifiedDocIds.difference(existingModifiedDocIds);
 
@@ -112,8 +113,19 @@ class ObservableQuery<T> extends Query<T>
       shouldBroadcast = true;
     }
 
+    // 4. If the broadcast documents include any documents that were manually touched for rebroadcast and are part of this query's
+    // result set, then the query should be rebroadcasted.
+    final touchedDocs = broadcastDocs
+        .where((doc) =>
+            doc.type == BroadcastEventTypes.touched &&
+            queryDocIds.contains(doc.id))
+        .toList();
+    if (touchedDocs.isNotEmpty) {
+      shouldBroadcast = true;
+    }
+
     if (shouldBroadcast) {
-      rebroadcast(
+      final snaps = _sortQuery(
         queryDocIds
             .map(
               (docId) => docsById[docId].get(),
@@ -121,6 +133,8 @@ class ObservableQuery<T> extends Query<T>
             .whereType<DocumentSnapshot<T>>()
             .toList(),
       );
+
+      rebroadcast(snaps);
     }
   }
 }

@@ -17,13 +17,9 @@ class Query<T> {
     required this.persistorSettings,
   });
 
-  List<DocumentSnapshot<T>> _resolveQuery(List<Document<T>> docs) {
+  List<DocumentSnapshot<T>> _filterQuery(List<Document<T>> docs) {
     final snaps =
         docs.map((doc) => doc.get()).whereType<DocumentSnapshot<T>>().toList();
-
-    if (sort != null) {
-      snaps.sort(sort);
-    }
 
     if (filter == null) {
       return snaps;
@@ -32,13 +28,23 @@ class Query<T> {
     return snaps.where(filter!).toList();
   }
 
+  List<DocumentSnapshot<T>> _sortQuery(List<DocumentSnapshot<T>> snaps) {
+    if (sort == null) {
+      return snaps;
+    }
+    snaps.sort(sort);
+    return snaps;
+  }
+
   List<DocumentSnapshot<T>> get() {
-    return _resolveQuery(
-      Loon._instance._getDocuments(
-        collection,
-        fromJson: fromJson,
-        toJson: toJson,
-        persistorSettings: persistorSettings,
+    return _sortQuery(
+      _filterQuery(
+        Loon._instance._getDocuments(
+          collection,
+          fromJson: fromJson,
+          toJson: toJson,
+          persistorSettings: persistorSettings,
+        ),
       ),
     );
   }
