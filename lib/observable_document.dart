@@ -17,17 +17,8 @@ class ObservableDocument<T> extends Document<T>
   /// Observing a document just involves checking if it is included in the latest broadcast
   /// and if so, rebroadcasting the update to observers.
   void _onBroadcast() {
-    final broadcastDocuments =
-        Loon._instance._getBroadcastDocuments(collection);
-    final shouldBroadcast = broadcastDocuments
-        .where((element) => element.id == id)
-        .toList()
-        .isNotEmpty;
-
-    if (!shouldBroadcast) {
-      return;
+    if (Loon._instance._isScheduledForBroadcast(this)) {
+      rebroadcast(get());
     }
-
-    rebroadcast(get());
   }
 }

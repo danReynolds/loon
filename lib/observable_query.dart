@@ -22,7 +22,7 @@ class ObservableQuery<T> extends Query<T>
   ///   a) Previously satisfied the query filter and now does not.
   ///   b) Previously did not satisfy the query filter and now does.
   ///   c) Previously satisfied the query filter and still does (since its modified data must be delivered on the query).
-  /// 4. A document that has been manually rebroadcasted.
+  /// 4. A document that has been manually touched to be rebroadcasted.
   @override
   void _onBroadcast() {
     bool shouldBroadcast = false;
