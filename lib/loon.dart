@@ -419,6 +419,8 @@ class Loon {
         doc,
         BroadcastEventTypes.touched,
       );
+
+      _instance._scheduleBroadcast();
     }
   }
 }
