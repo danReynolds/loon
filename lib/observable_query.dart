@@ -4,7 +4,7 @@ class ObservableQuery<T> extends Query<T>
     with BroadcastObservable<List<DocumentSnapshot<T>>> {
   ObservableQuery(
     super.collection, {
-    required super.filter,
+    required super.filters,
     required super.sort,
     required super.fromJson,
     required super.toJson,

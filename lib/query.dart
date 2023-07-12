@@ -2,7 +2,7 @@ part of loon;
 
 class Query<T> {
   final String collection;
-  final FilterFn<T>? filter;
+  final List<FilterFn<T>> filters;
   final SortFn<T>? sort;
   final FromJson<T>? fromJson;
   final ToJson<T>? toJson;
@@ -10,7 +10,7 @@ class Query<T> {
 
   Query(
     this.collection, {
-    required this.filter,
+    required this.filters,
     required this.sort,
     required this.fromJson,
     required this.toJson,
@@ -21,11 +21,18 @@ class Query<T> {
     final snaps =
         docs.map((doc) => doc.get()).whereType<DocumentSnapshot<T>>().toList();
 
-    if (filter == null) {
+    if (filters.isEmpty) {
       return snaps;
     }
 
-    return snaps.where(filter!).toList();
+    return snaps.where((snap) {
+      for (final filter in filters) {
+        if (!filter(snap)) {
+          return false;
+        }
+      }
+      return true;
+    }).toList();
   }
 
   List<DocumentSnapshot<T>> _sortQuery(List<DocumentSnapshot<T>> snaps) {
@@ -52,7 +59,7 @@ class Query<T> {
   ObservableQuery<T> asObservable() {
     return ObservableQuery<T>(
       collection,
-      filter: filter,
+      filters: filters,
       sort: sort,
       fromJson: fromJson,
       toJson: toJson,
@@ -67,5 +74,27 @@ class Query<T> {
   Stream<BroadcastObservableChangeRecord<List<DocumentSnapshot<T>>>>
       streamChanges() {
     return asObservable().streamChanges();
+  }
+
+  Query<T> sortBy(SortFn<T> sort) {
+    return Query<T>(
+      collection,
+      filters: filters,
+      sort: sort,
+      fromJson: fromJson,
+      toJson: toJson,
+      persistorSettings: persistorSettings,
+    );
+  }
+
+  Query<T> where(FilterFn<T> filter) {
+    return Query<T>(
+      collection,
+      filters: [...filters, filter],
+      sort: sort,
+      fromJson: fromJson,
+      toJson: toJson,
+      persistorSettings: persistorSettings,
+    );
   }
 }
