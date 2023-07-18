@@ -34,7 +34,7 @@ class FileDataStore {
   final String collection;
   final String? shard;
   final File file;
-  SerializedDocumentDataStore data = {};
+  CollectionDataStore data = {};
   bool shouldPersist = false;
 
   FileDataStore({
@@ -298,8 +298,7 @@ class FilePersistor extends Persistor {
       };
     });
 
-    return fileDataStores.fold<SerializedCollectionDataStore>({},
-        (acc, fileDataStore) {
+    return fileDataStores.fold<CollectionDataStore>({}, (acc, fileDataStore) {
       final existingCollectionData = acc[fileDataStore.collection];
       final fileDataStoreCollectionData = fileDataStore.data;
 

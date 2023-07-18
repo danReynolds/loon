@@ -70,7 +70,13 @@ class Document<T> {
   }
 
   Json? getJson() {
-    return Loon._instance._getSerializedDocumentData(this);
+    final data = Loon._instance._getDocumentData<T>(this);
+
+    if (data is Json?) {
+      return data;
+    }
+
+    return toJson!(data);
   }
 
   bool exists() {

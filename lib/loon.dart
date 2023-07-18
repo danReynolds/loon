@@ -17,12 +17,8 @@ part 'types.dart';
 part 'document_snapshot.dart';
 part 'persistor/persistor.dart';
 
-typedef SerializedDocumentDataStore = Map<String, Json>;
-typedef ParsedCollectionDataStore = Map<String, Map<String, dynamic>>;
-typedef SerializedCollectionDataStore
-    = Map<String, SerializedDocumentDataStore>;
-typedef BroadcastCollectionDataStore
-    = Map<String, Map<String, BroadcastDocument>>;
+typedef CollectionDataStore = Map<String, Map<String, dynamic>>;
+typedef BroadcastCollectionStore = Map<String, Map<String, BroadcastDocument>>;
 
 class Loon {
   Persistor? persistor;
@@ -31,20 +27,12 @@ class Loon {
 
   Loon._();
 
-  /// Document data is stored in both a serialized and de-serialized collection data store. The serialized document data store is required for 3 reasons:
-  /// 1. This is essential for hydrating document data from persistent storage, since hydration can only restore serialized data and
-  /// does not know how to parse document data into a de-serialized representation.
-  /// 2. It also improves the performance of persisting data, enabling updated data to only ever be serialized once.
-  /// 3. It allows document data to be read with or without a [fromJson] de-serializer.
-  ///
-  /// The de-serialized document data store is necessary in order to improve the performance of repeatedly reading document data.
-  /// The de-serialized data store sits in front of the serialized data and can return the de-serialized representation without the performance hit of
-  /// repeated de-serialization.
-  final SerializedCollectionDataStore _serializedCollectionDataStore = {};
-  final ParsedCollectionDataStore _parsedCollectionDataStore = {};
+  /// Document data is stored in a dynamic collection mixing both serialized and parsed data. Documents are initially hydrated in their serialized
+  /// representation, since de-serializers cannot be known ahead of time. They are then cached in their parsed representation when they are first accessed
+  /// using a serializer. Caching the parsed document data is necessary in order to improve the performance of repeatedly reading document data.
+  final CollectionDataStore _collectionDataStore = {};
 
-  final BroadcastCollectionDataStore _broadcastCollectionDataStore = {};
-
+  final BroadcastCollectionStore _broadcastCollectionStore = {};
   final Set<BroadcastObservable> _broadcastObservers = {};
 
   bool _hasPendingBroadcast = false;
@@ -68,44 +56,30 @@ class Loon {
     }
   }
 
-  Json? _getSerializedDocumentData(Document doc) {
-    return _serializedCollectionDataStore[doc.collection]?[doc.id];
-  }
-
-  T? _getParsedDocumentData<T>(Document<T> doc) {
-    return _parsedCollectionDataStore[doc.collection]?[doc.id];
-  }
-
   T? _getDocumentData<T>(Document<T> doc) {
     final fromJson = doc.fromJson;
-    final serializedData = _getSerializedDocumentData(doc);
+    dynamic documentData = _collectionDataStore[doc.collection]?[doc.id];
 
     _validateTypeSerialization<T>(
       fromJson: doc.fromJson,
       toJson: doc.toJson,
     );
 
-    if (serializedData != null && fromJson != null) {
-      final cachedData = _getParsedDocumentData<T>(doc);
-
-      if (cachedData != null) {
-        return cachedData;
-      }
-
-      final parsedData = fromJson(serializedData);
-      _cacheParsedDocumentData(doc, parsedData);
-      return parsedData;
+    // Upon first read of serialized data using a serializer, the parsed representation
+    // of the document is cached for efficient repeat access.
+    if (documentData != null && fromJson != null && documentData is Json) {
+      return _writeDocumentData<T>(doc, fromJson(documentData));
     }
-    return serializedData as T?;
+    return documentData as T?;
   }
 
   bool _hasCollection(String collection) {
-    return _serializedCollectionDataStore.containsKey(collection);
+    return _collectionDataStore.containsKey(collection);
   }
 
   void _clearCollection(String collection) {
     if (_hasCollection(collection)) {
-      _serializedCollectionDataStore.remove(collection);
+      _collectionDataStore.remove(collection);
       _scheduleBroadcast();
 
       if (persistor != null) {
@@ -115,11 +89,11 @@ class Loon {
   }
 
   Future<void> _clearAll() async {
-    if (_serializedCollectionDataStore.isEmpty) {
+    if (_collectionDataStore.isEmpty) {
       return;
     }
 
-    _serializedCollectionDataStore.clear();
+    _collectionDataStore.clear();
     _scheduleBroadcast();
 
     if (persistor != null) {
@@ -127,16 +101,8 @@ class Loon {
     }
   }
 
-  void _initializeCollection(String collection) {
-    _serializedCollectionDataStore[collection] = {};
-    _broadcastCollectionDataStore[collection] = {};
-  }
-
   bool _hasDocument(Document doc) {
-    final collection = doc.collection;
-
-    return _hasCollection(collection) &&
-        _serializedCollectionDataStore[collection]!.containsKey(doc.id);
+    return _collectionDataStore[doc.collection]?.containsKey(doc.id) ?? false;
   }
 
   List<Document<T>> _getDocuments<T>(
@@ -146,9 +112,10 @@ class Loon {
     PersistorSettings<T>? persistorSettings,
   }) {
     if (!_hasCollection(collection)) {
-      _initializeCollection(collection);
+      return [];
     }
-    return _serializedCollectionDataStore[collection]!.entries.map((entry) {
+
+    return _collectionDataStore[collection]!.entries.map((entry) {
       return Document<T>(
         collection: collection,
         id: entry.key,
@@ -166,11 +133,11 @@ class Loon {
     ToJson<T>? toJson,
     PersistorSettings<T>? persistorSettings,
   }) {
-    if (!_broadcastCollectionDataStore.containsKey(collection)) {
+    if (!_broadcastCollectionStore.containsKey(collection)) {
       return [];
     }
 
-    return _broadcastCollectionDataStore[collection]!.values.map((doc) {
+    return _broadcastCollectionStore[collection]!.values.map((doc) {
       if (doc is BroadcastDocument<T>) {
         return doc;
       } else {
@@ -217,8 +184,9 @@ class Loon {
   }
 
   bool _isScheduledForBroadcast<T>(Document<T> doc) {
-    return _instance._broadcastCollectionDataStore[doc.collection]!
-        .containsKey(doc.id);
+    return _instance._broadcastCollectionStore[doc.collection]
+            ?.containsKey(doc.id) ??
+        false;
   }
 
   void _broadcastQueries({
@@ -228,7 +196,7 @@ class Loon {
       observer._onBroadcast();
     }
 
-    for (final broadcastCollection in _broadcastCollectionDataStore.values) {
+    for (final broadcastCollection in _broadcastCollectionStore.values) {
       if (persistor != null && broadcastPersistor) {
         persistor!.onBroadcast(
           broadcastCollection.values
@@ -243,14 +211,14 @@ class Loon {
     }
   }
 
-  void _cacheParsedDocumentData<T>(Document<T> doc, T data) {
+  T _writeDocumentData<T>(Document<T> doc, T data) {
     final collection = doc.collection;
 
-    if (!_parsedCollectionDataStore.containsKey(collection)) {
-      _parsedCollectionDataStore[collection] = {};
+    if (!_collectionDataStore.containsKey(collection)) {
+      _collectionDataStore[collection] = {};
     }
 
-    _parsedCollectionDataStore[doc.collection]![doc.id] = data;
+    return _collectionDataStore[doc.collection]![doc.id] = data;
   }
 
   DocumentSnapshot<T> _writeDocument<T>(
@@ -258,31 +226,20 @@ class Loon {
     T data, {
     bool broadcast = true,
   }) {
-    final docId = doc.id;
-    final collection = doc.collection;
-    final toJson = doc.toJson;
-
-    if (!_hasCollection(collection)) {
-      _initializeCollection(collection);
-    }
-
-    final isNewDocument = !_hasDocument(doc);
-
-    if (data is Json) {
-      _serializedCollectionDataStore[collection]![docId] = data;
-    } else {
+    if (data is! Json) {
       _validateDataSerialization<T>(
         fromJson: doc.fromJson,
-        toJson: toJson,
+        toJson: doc.toJson,
         data: data,
       );
-      _cacheParsedDocumentData<T>(doc, data);
-      _serializedCollectionDataStore[collection]![docId] = toJson!(data);
     }
 
-    _broadcastCollectionDataStore[collection]![docId] = BroadcastDocument<T>(
+    _writeDocumentData<T>(doc, data);
+    _writeBroadcastDocument<T>(
       doc,
-      isNewDocument ? BroadcastEventTypes.added : BroadcastEventTypes.modified,
+      _hasDocument(doc)
+          ? BroadcastEventTypes.modified
+          : BroadcastEventTypes.added,
     );
 
     if (broadcast) {
@@ -325,12 +282,8 @@ class Loon {
     bool broadcast = true,
   }) {
     if (doc.exists()) {
-      _serializedCollectionDataStore[doc.collection]!.remove(doc.id);
-      _broadcastCollectionDataStore[doc.collection]![doc.id] =
-          BroadcastDocument<T>(
-        doc,
-        BroadcastEventTypes.removed,
-      );
+      _collectionDataStore[doc.collection]!.remove(doc.id);
+      _writeBroadcastDocument<T>(doc, BroadcastEventTypes.removed);
 
       if (broadcast) {
         _scheduleBroadcast();
@@ -351,8 +304,7 @@ class Loon {
       return;
     }
     try {
-      final SerializedCollectionDataStore data =
-          await _instance.persistor!.hydrate();
+      final CollectionDataStore data = await _instance.persistor!.hydrate();
 
       for (final collectionDataStoreEntry in data.entries) {
         final collection = collectionDataStoreEntry.key;
@@ -405,21 +357,34 @@ class Loon {
     return Loon._instance._clearAll();
   }
 
-  /// Enqueues a document to be rebroadcasted, updating all streams that are subscribed to that document.
-  static void rebroadcast<T>(Document<T> doc) {
-    if (!doc.exists()) {
+  void _writeBroadcastDocument<T>(
+    Document<T> doc,
+    BroadcastEventTypes eventType,
+  ) {
+    if (eventType != BroadcastEventTypes.removed && !doc.exists()) {
       return;
     }
 
+    if (!_broadcastCollectionStore.containsKey(doc.collection)) {
+      _broadcastCollectionStore[doc.collection] = {};
+    }
+
+    _instance._broadcastCollectionStore[doc.collection]![doc.id] =
+        BroadcastDocument<T>(
+      doc,
+      eventType,
+    );
+  }
+
+  /// Enqueues a document to be rebroadcasted, updating all streams that are subscribed to that document.
+  static void rebroadcast<T>(Document<T> doc) {
     // If the document is already scheduled for broadcast, then manually touching it for rebroadcast is a no-op, since it
-    // is aleady enqueued for broadcast.
+    // is already enqueued for broadcast.
     if (!_instance._isScheduledForBroadcast(doc)) {
-      _instance._broadcastCollectionDataStore[doc.collection]![doc.id] =
-          BroadcastDocument<T>(
+      _instance._writeBroadcastDocument<T>(
         doc,
         BroadcastEventTypes.touched,
       );
-
       _instance._scheduleBroadcast();
     }
   }

@@ -11,7 +11,7 @@ class PersistorSettings<T> {
 }
 
 abstract class Persistor {
-  final BroadcastCollectionDataStore _broadcastCollectionDataStore = {};
+  final BroadcastCollectionStore _broadcastCollectionDataStore = {};
   Timer? _persistTimer;
   bool _isPersisting = false;
 
@@ -90,7 +90,7 @@ abstract class Persistor {
 
   Future<void> persist(List<BroadcastDocument> docs);
 
-  Future<SerializedCollectionDataStore> hydrate();
+  Future<CollectionDataStore> hydrate();
 
   Future<void> clear(String collection);
 
