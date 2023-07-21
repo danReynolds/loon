@@ -42,12 +42,7 @@ class Document<T> {
   }
 
   DocumentSnapshot<T>? get() {
-    final data = Loon._instance._getDocumentData<T>(this);
-
-    if (data != null) {
-      return DocumentSnapshot<T>(doc: this, data: data);
-    }
-    return null;
+    return Loon._instance._getSnapshot<T>(this);
   }
 
   ObservableDocument<T> asObservable() {
@@ -70,7 +65,7 @@ class Document<T> {
   }
 
   Json? getJson() {
-    final data = Loon._instance._getDocumentData<T>(this);
+    final data = Loon._instance._getSnapshot<T>(this)?.data;
 
     if (data is Json?) {
       return data;

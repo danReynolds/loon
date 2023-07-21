@@ -60,6 +60,7 @@ class ObservableQuery<T> extends Query<T>
     final addedDocsIds = _filterQuery(
       broadcastDocs
           .where((doc) => doc.type == BroadcastEventTypes.added)
+          .map((doc) => doc.get()!)
           .toList(),
     ).map((doc) => doc.id).toSet();
 
@@ -89,8 +90,10 @@ class ObservableQuery<T> extends Query<T>
     final existingModifiedDocIds = modifiedDocIds.intersection(queryDocIds);
 
     // The document IDs of the modified documents that satisfy the query filter.
-    final filteredModifiedDocIds =
-        _filterQuery(modifiedDocs).map((doc) => doc.id).toSet();
+    final filteredModifiedDocIds = _filterQuery(
+            modifiedDocs.map((modifiedDoc) => modifiedDoc.get()!).toList())
+        .map((doc) => doc.id)
+        .toSet();
     final filteredModifiedDocIdsToAdd =
         filteredModifiedDocIds.difference(existingModifiedDocIds);
 

@@ -34,7 +34,7 @@ class FileDataStore {
   final String collection;
   final String? shard;
   final File file;
-  CollectionDataStore data = {};
+  Map<String, Json> data = {};
   bool shouldPersist = false;
 
   FileDataStore({
@@ -298,7 +298,8 @@ class FilePersistor extends Persistor {
       };
     });
 
-    return fileDataStores.fold<CollectionDataStore>({}, (acc, fileDataStore) {
+    return fileDataStores.fold<SerializedCollectionStore>({},
+        (acc, fileDataStore) {
       final existingCollectionData = acc[fileDataStore.collection];
       final fileDataStoreCollectionData = fileDataStore.data;
 

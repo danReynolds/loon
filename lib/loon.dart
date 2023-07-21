@@ -17,7 +17,7 @@ part 'types.dart';
 part 'document_snapshot.dart';
 part 'persistor/persistor.dart';
 
-typedef CollectionDataStore = Map<String, Map<String, dynamic>>;
+typedef CollectionStore = Map<String, Map<String, DocumentSnapshot>>;
 typedef BroadcastCollectionStore = Map<String, Map<String, BroadcastDocument>>;
 
 class Loon {
@@ -27,10 +27,10 @@ class Loon {
 
   Loon._();
 
-  /// Document data is stored in a dynamic collection mixing both serialized and parsed data. Documents are initially hydrated in their serialized
+  /// Document data is stored in a dynamic collection mixing snapshots of both serialized and parsed data. Documents are initially hydrated in their serialized
   /// representation, since de-serializers cannot be known ahead of time. They are then cached in their parsed representation when they are first accessed
-  /// using a serializer. Caching the parsed document data is necessary in order to improve the performance of repeatedly reading document data.
-  final CollectionDataStore _collectionDataStore = {};
+  /// using a serializer. Caching the parsed document snapshots is necessary in order to improve the performance of repeatedly reading document data.
+  final CollectionStore _collectionStore = {};
 
   /// The collection store of documents that are pending a scheduled broadcast.
   final BroadcastCollectionStore _broadcastCollectionStore = {};
@@ -62,9 +62,18 @@ class Loon {
   }
 
   /// Returns the data for a given document.
-  T? _getDocumentData<T>(Document<T> doc) {
+  DocumentSnapshot<T>? _getSnapshot<T>(Document<T> doc) {
+    final snap = _collectionStore[doc.collection]?[doc.id];
+
+    if (snap == null) {
+      return null;
+    }
+
+    if (snap is DocumentSnapshot<T>) {
+      return snap;
+    }
+
     final fromJson = doc.fromJson;
-    dynamic documentData = _collectionDataStore[doc.collection]?[doc.id];
 
     _validateTypeSerialization<T>(
       fromJson: doc.fromJson,
@@ -73,21 +82,18 @@ class Loon {
 
     // Upon first read of serialized data using a serializer, the parsed representation
     // of the document is cached for efficient repeat access.
-    if (documentData != null && fromJson != null && documentData is Json) {
-      return _writeDocumentData<T>(doc, fromJson(documentData));
-    }
-    return documentData as T?;
+    return _writeSnapshot<T>(doc, fromJson!(snap.data));
   }
 
   /// Returns whether a collection name exists in the collection data store.
   bool _hasCollection(String collection) {
-    return _collectionDataStore.containsKey(collection);
+    return _collectionStore.containsKey(collection);
   }
 
   /// Clears the given collection name from the collection data store.
   Future<void> _clearCollection(String collection) async {
     if (_hasCollection(collection)) {
-      _collectionDataStore.remove(collection);
+      _collectionStore.remove(collection);
       _scheduleBroadcast();
 
       if (persistor != null) {
@@ -98,11 +104,11 @@ class Loon {
 
   /// Clears the entire collection data store.
   Future<void> _clearAll() async {
-    if (_collectionDataStore.isEmpty) {
+    if (_collectionStore.isEmpty) {
       return;
     }
 
-    _collectionDataStore.clear();
+    _collectionStore.clear();
     _scheduleBroadcast();
 
     if (persistor != null) {
@@ -112,10 +118,10 @@ class Loon {
 
   /// Whether a document exists in the collection data store.
   bool _hasDocument(Document doc) {
-    return _collectionDataStore[doc.collection]?.containsKey(doc.id) ?? false;
+    return _collectionStore[doc.collection]?.containsKey(doc.id) ?? false;
   }
 
-  List<Document<T>> _getDocuments<T>(
+  List<DocumentSnapshot<T>> _getSnapshots<T>(
     String collection, {
     FromJson<T>? fromJson,
     ToJson<T>? toJson,
@@ -125,13 +131,27 @@ class Loon {
       return [];
     }
 
-    return _collectionDataStore[collection]!.entries.map((entry) {
-      return Document<T>(
-        collection: collection,
-        id: entry.key,
+    return _collectionStore[collection]!.values.map((snap) {
+      if (snap is DocumentSnapshot<T>) {
+        return snap;
+      }
+
+      _validateTypeSerialization<T>(
         fromJson: fromJson,
         toJson: toJson,
-        persistorSettings: persistorSettings,
+      );
+
+      // Upon first read of serialized data using a serializer, the parsed representation
+      // of the document is cached for efficient repeat access.
+      return _writeSnapshot<T>(
+        Document<T>(
+          id: snap.doc.id,
+          collection: collection,
+          fromJson: fromJson,
+          toJson: toJson,
+          persistorSettings: persistorSettings,
+        ),
+        fromJson!(snap.data),
       );
     }).toList();
   }
@@ -221,17 +241,7 @@ class Loon {
     }
   }
 
-  T _writeDocumentData<T>(Document<T> doc, T data) {
-    final collection = doc.collection;
-
-    if (!_collectionDataStore.containsKey(collection)) {
-      _collectionDataStore[collection] = {};
-    }
-
-    return _collectionDataStore[doc.collection]![doc.id] = data;
-  }
-
-  DocumentSnapshot<T> _writeDocument<T>(
+  DocumentSnapshot<T> _writeSnapshot<T>(
     Document<T> doc,
     T data, {
     bool broadcast = true,
@@ -244,7 +254,12 @@ class Loon {
       );
     }
 
-    _writeDocumentData<T>(doc, data);
+    final collection = doc.collection;
+
+    if (!_collectionStore.containsKey(collection)) {
+      _collectionStore[collection] = {};
+    }
+
     _writeBroadcastDocument<T>(
       doc,
       _hasDocument(doc)
@@ -252,11 +267,14 @@ class Loon {
           : BroadcastEventTypes.added,
     );
 
+    final snap = _collectionStore[doc.collection]![doc.id] =
+        DocumentSnapshot<T>(doc: doc, data: data);
+
     if (broadcast) {
       _scheduleBroadcast();
     }
 
-    return doc.get()!;
+    return snap;
   }
 
   DocumentSnapshot<T> _addDocument<T>(
@@ -268,7 +286,7 @@ class Loon {
       throw Exception('Cannot add duplicate document');
     }
 
-    return _writeDocument<T>(doc, data);
+    return _writeSnapshot<T>(doc, data, broadcast: broadcast);
   }
 
   DocumentSnapshot<T> _updateDocument<T>(
@@ -276,7 +294,7 @@ class Loon {
     T data, {
     bool broadcast = true,
   }) {
-    return _writeDocument<T>(doc, data);
+    return _writeSnapshot<T>(doc, data, broadcast: broadcast);
   }
 
   DocumentSnapshot<T> _modifyDocument<T>(
@@ -284,7 +302,7 @@ class Loon {
     ModifyFn<T> modifyFn, {
     bool broadcast = true,
   }) {
-    return _writeDocument<T>(doc, modifyFn(doc.get()));
+    return _writeSnapshot<T>(doc, modifyFn(doc.get()), broadcast: broadcast);
   }
 
   void _deleteDocument<T>(
@@ -292,7 +310,7 @@ class Loon {
     bool broadcast = true,
   }) {
     if (doc.exists()) {
-      _collectionDataStore[doc.collection]!.remove(doc.id);
+      _collectionStore[doc.collection]!.remove(doc.id);
       _writeBroadcastDocument<T>(doc, BroadcastEventTypes.removed);
 
       if (broadcast) {
@@ -305,7 +323,9 @@ class Loon {
     Document<T> doc,
     BroadcastEventTypes eventType,
   ) {
-    if (eventType != BroadcastEventTypes.removed && !doc.exists()) {
+    if ((eventType == BroadcastEventTypes.modified ||
+            eventType == BroadcastEventTypes.touched) &&
+        !doc.exists()) {
       return;
     }
 
@@ -333,14 +353,14 @@ class Loon {
       return;
     }
     try {
-      final CollectionDataStore data = await _instance.persistor!.hydrate();
+      final data = await _instance.persistor!.hydrate();
 
       for (final collectionDataStoreEntry in data.entries) {
         final collection = collectionDataStoreEntry.key;
         final documentDataStore = collectionDataStoreEntry.value;
 
         for (final documentDataEntry in documentDataStore.entries) {
-          _instance._writeDocument<Json>(
+          _instance._writeSnapshot<Json>(
             Document<Json>(collection: collection, id: documentDataEntry.key),
             documentDataEntry.value,
             broadcast: false,

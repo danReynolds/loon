@@ -17,10 +17,7 @@ class Query<T> {
     required this.persistorSettings,
   });
 
-  List<DocumentSnapshot<T>> _filterQuery(List<Document<T>> docs) {
-    final snaps =
-        docs.map((doc) => doc.get()).whereType<DocumentSnapshot<T>>().toList();
-
+  List<DocumentSnapshot<T>> _filterQuery(List<DocumentSnapshot<T>> snaps) {
     if (filters.isEmpty) {
       return snaps;
     }
@@ -46,7 +43,7 @@ class Query<T> {
   List<DocumentSnapshot<T>> get() {
     return _sortQuery(
       _filterQuery(
-        Loon._instance._getDocuments(
+        Loon._instance._getSnapshots(
           collection,
           fromJson: fromJson,
           toJson: toJson,

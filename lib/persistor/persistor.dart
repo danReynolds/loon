@@ -1,5 +1,7 @@
 part of loon;
 
+typedef SerializedCollectionStore = Map<String, Map<String, Json>>;
+
 class PersistorSettings<T> {
   final Duration persistenceThrottle;
   final bool persistenceEnabled;
@@ -90,7 +92,7 @@ abstract class Persistor {
 
   Future<void> persist(List<BroadcastDocument> docs);
 
-  Future<CollectionDataStore> hydrate();
+  Future<SerializedCollectionStore> hydrate();
 
   Future<void> clear(String collection);
 

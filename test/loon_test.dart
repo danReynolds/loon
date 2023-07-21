@@ -167,18 +167,6 @@ void main() {
         userJson,
       );
     });
-
-    test('Instance document read without serializer throws error', () {
-      final user = TestUserModel('User 1');
-      final userDoc = TestUserModel.store.doc('1');
-
-      userDoc.create(user);
-
-      expect(
-        () => Loon.collection<TestUserModel>('users').doc('1').get(),
-        throwsException,
-      );
-    });
   });
 
   group('Update document', () {
