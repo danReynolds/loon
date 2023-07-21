@@ -32,11 +32,15 @@ class Loon {
   /// using a serializer. Caching the parsed document data is necessary in order to improve the performance of repeatedly reading document data.
   final CollectionDataStore _collectionDataStore = {};
 
+  /// The collection store of documents that are pending a scheduled broadcast.
   final BroadcastCollectionStore _broadcastCollectionStore = {};
+
+  /// The list of observers, either document or query observers, that should be notified on broadcast.
   final Set<BroadcastObservable> _broadcastObservers = {};
 
   bool _hasPendingBroadcast = false;
 
+  /// Validates that data is either already in a serializable format or comes with a serializer.
   static void _validateDataSerialization<T>({
     required FromJson<T>? fromJson,
     required ToJson<T>? toJson,
@@ -47,6 +51,7 @@ class Loon {
     }
   }
 
+  /// Validates that a type is either already serialized or comes with a serializer.
   static void _validateTypeSerialization<T>({
     required FromJson<T>? fromJson,
     required ToJson<T>? toJson,
@@ -56,6 +61,7 @@ class Loon {
     }
   }
 
+  /// Returns the data for a given document.
   T? _getDocumentData<T>(Document<T> doc) {
     final fromJson = doc.fromJson;
     dynamic documentData = _collectionDataStore[doc.collection]?[doc.id];
@@ -73,21 +79,24 @@ class Loon {
     return documentData as T?;
   }
 
+  /// Returns whether a collection name exists in the collection data store.
   bool _hasCollection(String collection) {
     return _collectionDataStore.containsKey(collection);
   }
 
-  void _clearCollection(String collection) {
+  /// Clears the given collection name from the collection data store.
+  Future<void> _clearCollection(String collection) async {
     if (_hasCollection(collection)) {
       _collectionDataStore.remove(collection);
       _scheduleBroadcast();
 
       if (persistor != null) {
-        persistor!.clear(collection);
+        return persistor!.clear(collection);
       }
     }
   }
 
+  /// Clears the entire collection data store.
   Future<void> _clearAll() async {
     if (_collectionDataStore.isEmpty) {
       return;
@@ -101,6 +110,7 @@ class Loon {
     }
   }
 
+  /// Whether a document exists in the collection data store.
   bool _hasDocument(Document doc) {
     return _collectionDataStore[doc.collection]?.containsKey(doc.id) ?? false;
   }
@@ -163,11 +173,11 @@ class Loon {
     }).toList();
   }
 
-  void addBroadcastObserver(BroadcastObservable observer) {
+  void _addBroadcastObserver(BroadcastObservable observer) {
     _broadcastObservers.add(observer);
   }
 
-  void removeBroadcastObserver(BroadcastObservable observer) {
+  void _removeBroadcastObserver(BroadcastObservable observer) {
     _broadcastObservers.remove(observer);
   }
 
@@ -291,6 +301,25 @@ class Loon {
     }
   }
 
+  void _writeBroadcastDocument<T>(
+    Document<T> doc,
+    BroadcastEventTypes eventType,
+  ) {
+    if (eventType != BroadcastEventTypes.removed && !doc.exists()) {
+      return;
+    }
+
+    if (!_broadcastCollectionStore.containsKey(doc.collection)) {
+      _broadcastCollectionStore[doc.collection] = {};
+    }
+
+    _instance._broadcastCollectionStore[doc.collection]![doc.id] =
+        BroadcastDocument<T>(
+      doc,
+      eventType,
+    );
+  }
+
   static void configure({
     Persistor? persistor,
   }) {
@@ -355,25 +384,6 @@ class Loon {
 
   static Future<void> clearAll() {
     return Loon._instance._clearAll();
-  }
-
-  void _writeBroadcastDocument<T>(
-    Document<T> doc,
-    BroadcastEventTypes eventType,
-  ) {
-    if (eventType != BroadcastEventTypes.removed && !doc.exists()) {
-      return;
-    }
-
-    if (!_broadcastCollectionStore.containsKey(doc.collection)) {
-      _broadcastCollectionStore[doc.collection] = {};
-    }
-
-    _instance._broadcastCollectionStore[doc.collection]![doc.id] =
-        BroadcastDocument<T>(
-      doc,
-      eventType,
-    );
   }
 
   /// Enqueues a document to be rebroadcasted, updating all streams that are subscribed to that document.

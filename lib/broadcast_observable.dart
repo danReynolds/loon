@@ -20,12 +20,12 @@ mixin BroadcastObservable<T> {
     prevValue = value = initialValue;
 
     rebroadcast(get());
-    Loon._instance.addBroadcastObserver(this);
+    Loon._instance._addBroadcastObserver(this);
   }
 
   void dispose() {
     _controller.close();
-    Loon._instance.removeBroadcastObserver(this);
+    Loon._instance._removeBroadcastObserver(this);
   }
 
   void rebroadcast(T updatedValue) {
