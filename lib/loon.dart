@@ -61,7 +61,7 @@ class Loon {
     }
   }
 
-  /// Returns the data for a given document.
+  /// Returns a data snapshot for the given document.
   DocumentSnapshot<T>? _getSnapshot<T>(Document<T> doc) {
     final snap = _collectionStore[doc.collection]?[doc.id];
 
@@ -116,11 +116,12 @@ class Loon {
     }
   }
 
-  /// Whether a document exists in the collection data store.
+  /// Returns whether a document exists in the collection data store.
   bool _hasDocument(Document doc) {
     return _collectionStore[doc.collection]?.containsKey(doc.id) ?? false;
   }
 
+  /// Returns a list of data snapshots for the given collection.
   List<DocumentSnapshot<T>> _getSnapshots<T>(
     String collection, {
     FromJson<T>? fromJson,
