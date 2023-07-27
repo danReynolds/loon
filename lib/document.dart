@@ -80,7 +80,7 @@ class Document<T> {
 
   Collection<T> collection(String collection) {
     return Collection<T>(
-      '$path/$id',
+      '$path/$id/$collection',
       fromJson: fromJson,
       toJson: toJson,
       persistorSettings: persistorSettings,

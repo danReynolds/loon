@@ -546,4 +546,102 @@ void main() {
       expect(rootSnap?.data, data);
     });
   });
+
+  group('Nested collection', () {
+    tearDown(() {
+      Loon.clearAll();
+    });
+
+    test('Creates nested document', () {
+      final data = {"test": true};
+      final nestedDoc =
+          Loon.collection('users').doc('1').collection('friends').doc('2');
+
+      nestedDoc.create(data);
+
+      final nestedSnap = nestedDoc.get();
+
+      expect(nestedSnap?.path, 'users/1/friends');
+      expect(nestedSnap?.id, '2');
+      expect(nestedSnap?.data, data);
+    });
+
+    test('Updates nested document', () {
+      final data = {"test": true};
+      final nestedDoc =
+          Loon.collection('users').doc('1').collection('friends').doc('2');
+
+      nestedDoc.create({"test": false});
+      nestedDoc.update(data);
+
+      final nestedSnap = nestedDoc.get();
+
+      expect(nestedSnap?.path, 'users/1/friends');
+      expect(nestedSnap?.id, '2');
+      expect(nestedSnap?.data, data);
+    });
+
+    test('Removes nested document', () {
+      final nestedDoc =
+          Loon.collection('users').doc('1').collection('friends').doc('2');
+      nestedDoc.create({"test": true});
+      nestedDoc.delete();
+
+      final nestedSnap = nestedDoc.get();
+
+      expect(nestedDoc.exists(), false);
+      expect(nestedSnap?.data, null);
+    });
+
+    test('Streams nested document', () async {
+      final user = TestUserModel('User 1');
+      final userDoc =
+          TestUserModel.store.doc('1').collection('friends').doc('2');
+
+      userDoc.create(user);
+
+      final userStream = userDoc.stream();
+
+      expectLater(
+        userStream,
+        emits(
+          DocumentSnapshotMatcher(
+            DocumentSnapshot(
+              doc: userDoc,
+              data: user,
+            ),
+          ),
+        ),
+      );
+    });
+
+    test('Streams nested query', () {
+      final user = TestUserModel('User 1');
+      final user2 = TestUserModel('User 2');
+      final userDoc =
+          TestUserModel.store.doc('1').collection('friends').doc('1');
+      final userDoc2 =
+          TestUserModel.store.doc('1').collection('friends').doc('2');
+
+      userDoc.create(user);
+      userDoc2.create(user2);
+
+      final querySnap = TestUserModel.store
+          .doc('1')
+          .collection('friends')
+          .where((snap) => snap.id == '1')
+          .get();
+
+      expect(querySnap.length, 1);
+      expect(
+        querySnap.first,
+        DocumentSnapshotMatcher(
+          DocumentSnapshot(
+            doc: userDoc,
+            data: user,
+          ),
+        ),
+      );
+    });
+  });
 }
