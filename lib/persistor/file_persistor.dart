@@ -31,17 +31,43 @@ class FilePersistorSettings<T> extends PersistorSettings<T> {
 }
 
 class FileDataStore {
-  final String collection;
-  final String? shard;
   final File file;
-  Map<String, Json> data = {};
+  late final String collectionPath;
+  late final String? shard;
+  late Map<String, Json> data;
   bool shouldPersist = false;
 
   FileDataStore({
-    required this.collection,
     required this.file,
-    this.shard,
-  });
+    required this.collectionPath,
+    required this.shard,
+    Map<String, Json>? data,
+  }) {
+    this.data = data ?? {};
+  }
+
+  static Future<FileDataStore> fromFile(File file) async {
+    final json = await jsonDecode(await file.readAsString());
+
+    final meta = json['meta'];
+    final Map<String, dynamic> dataJson = json['data'];
+
+    return FileDataStore(
+      file: file,
+      collectionPath: meta['path'],
+      shard: meta['shard'],
+      data: dataJson.map(
+        (key, dynamic value) => MapEntry(
+          key,
+          Map<String, dynamic>.from(value),
+        ),
+      ),
+    );
+  }
+
+  Future<void> persist() async {
+    await file.writeAsString(jsonEncode(toJson()));
+  }
 
   void updateDocument(BroadcastDocument doc) {
     final docId = doc.id;
@@ -70,53 +96,26 @@ class FileDataStore {
     }
   }
 
-  Future<String> readFile() {
-    return file.readAsString();
-  }
-
-  Future<void> writeFile(String value) async {
-    await file.writeAsString(value);
-  }
-
-  Future<void> delete() async {
-    await file.delete();
-  }
-
-  Future<List<String>> hydrate() async {
-    if (!file.existsSync()) {
-      return [];
-    }
-
-    final Map<String, dynamic> fileJson = jsonDecode(await readFile());
-    data = fileJson.map(
-      (key, dynamic value) => MapEntry(
-        key,
-        Map<String, dynamic>.from(value),
-      ),
-    );
-
-    return data.keys.toList();
-  }
-
-  Future<void> persist() async {
-    await writeFile(jsonEncode(data));
-    shouldPersist = false;
-  }
-
-  String get filename {
-    return path.basename(file.path);
+  Json toJson() {
+    return {
+      "meta": {
+        "path": collectionPath,
+        "shard": shard,
+      },
+      "data": data,
+    };
   }
 }
 
 class FilePersistor extends Persistor {
-  Map<String, FileDataStore> _fileDataStoreCollection = {};
+  Map<String, FileDataStore> _fileDataStoreIndex = {};
 
   /// An index of which file data store each document is stored in by document ID.
   final Map<String, FileDataStore> _documentFileDataStoreIndex = {};
 
-  late final Directory _fileDataStoreDirectory;
+  late final Directory fileDataStoreDirectory;
 
-  final filenameRegex = RegExp(r'^loon_(\w+)(?:\.(shard_\w+))?\.json$');
+  final filenameRegex = RegExp(r'^loon_.*\.json$');
 
   FilePersistor({
     super.persistorSettings,
@@ -124,70 +123,55 @@ class FilePersistor extends Persistor {
 
   Future<void> _initStorageDirectory() async {
     final applicationDirectory = await getApplicationDocumentsDirectory();
-    _fileDataStoreDirectory = Directory('${applicationDirectory.path}/loon');
-    _fileDataStoreDirectory.createSync();
+    fileDataStoreDirectory = Directory('${applicationDirectory.path}/loon');
+    fileDataStoreDirectory.createSync();
   }
 
-  Future<List<File>> _readDataStoreFiles() async {
-    return _fileDataStoreDirectory
-        .listSync()
-        .whereType<File>()
-        .where((file) => filenameRegex.hasMatch(path.basename(file.path)))
-        .toList();
+  Future<List<File>> readDataStoreFiles() async {
+    return fileDataStoreDirectory.listSync().whereType<File>().where((file) {
+      return filenameRegex.hasMatch(path.basename(file.path));
+    }).toList();
   }
 
-  List<FileDataStore> get _fileDataStoresToPersist {
-    return _fileDataStoreCollection.values
-        .where((fileDataStore) => fileDataStore.shouldPersist)
-        .toList();
+  Future<List<FileDataStore>> buildFileDataStores() async {
+    final files = await readDataStoreFiles();
+    return Future.wait(files.map(FileDataStore.fromFile).toList());
   }
 
-  File _buildFileDataStoreFile({
-    required String collection,
-    required PersistorSettings? settings,
-    String? shard,
+  String buildFileDataStoreId({
+    required String collectionPath,
+    required String? shard,
   }) {
-    final filename = buildFileDataStoreFilename(
-      collection: collection,
-      shard: shard,
-      settings: settings,
-    );
-    return File('${_fileDataStoreDirectory.path}/$filename');
-  }
-
-  FileDataStore buildFileDataStore({required File file}) {
-    final match = filenameRegex.firstMatch(path.basename(file.path))!;
-    final collection = match.group(1)!;
-    final shard = match.group(2);
-
-    return FileDataStore(
-      collection: collection,
-      file: file,
-      shard: shard,
-    );
-  }
-
-  String buildFileDataStoreFilename({
-    required String collection,
-    required PersistorSettings? settings,
-    String? shard,
-  }) {
-    final collectionFilename = 'loon_$collection';
-
     if (shard != null) {
-      return '$collectionFilename.shard_$shard.json';
+      return '$collectionPath.$shard';
     }
-    return '$collectionFilename.json';
+    return collectionPath;
+  }
+
+  FileDataStore buildFileDataStore({
+    required String collectionPath,
+    required String? shard,
+    required PersistorSettings? persistorSettings,
+  }) {
+    final fileDataStoreId = buildFileDataStoreId(
+      collectionPath: collectionPath,
+      shard: shard,
+    );
+    return FileDataStore(
+      file: File('${fileDataStoreDirectory.path}/loon_$fileDataStoreId.json'),
+      collectionPath: collectionPath,
+      shard: shard,
+    );
   }
 
   List<FileDataStore> getFileDataStores() {
-    return _fileDataStoreCollection.values.toList();
+    return _fileDataStoreIndex.values.toList();
   }
 
   @override
   persist(docs) async {
     for (final doc in docs) {
-      final collection = doc.collection;
+      final collectionPath = doc.path;
       final persistorSettings = doc.persistorSettings ?? this.persistorSettings;
 
       if (!persistorSettings.persistenceEnabled) {
@@ -196,24 +180,21 @@ class FilePersistor extends Persistor {
 
       String? documentDataStoreShard;
       final FileDataStore documentDataStore;
-      final String documentDataStoreFilename;
 
       if (persistorSettings is FilePersistorSettings) {
         final maxShards = persistorSettings.maxShards;
 
         if (persistorSettings.shardEnabled && maxShards > 1) {
           documentDataStoreShard = persistorSettings.getShard(doc);
-          final documentDataStoreShardFilename = buildFileDataStoreFilename(
-            collection: collection,
+          final documentFileDataStoreId = buildFileDataStoreId(
+            collectionPath: collectionPath,
             shard: documentDataStoreShard,
-            settings: persistorSettings,
           );
 
-          if (!_fileDataStoreCollection
-              .containsKey(documentDataStoreShardFilename)) {
+          if (!_fileDataStoreIndex.containsKey(documentFileDataStoreId)) {
             final collectionFileDataStores =
-                _fileDataStoreCollection.values.where((fileDataStore) {
-              return fileDataStore.collection == collection &&
+                _fileDataStoreIndex.values.where((fileDataStore) {
+              return fileDataStore.collectionPath == collectionPath &&
                   fileDataStore.shard != null;
             }).toList();
 
@@ -228,24 +209,19 @@ class FilePersistor extends Persistor {
         }
       }
 
-      documentDataStoreFilename = buildFileDataStoreFilename(
-        collection: collection,
+      final documentFileDataStoreId = buildFileDataStoreId(
+        collectionPath: collectionPath,
         shard: documentDataStoreShard,
-        settings: persistorSettings,
       );
 
-      if (_fileDataStoreCollection.containsKey(documentDataStoreFilename)) {
-        documentDataStore =
-            _fileDataStoreCollection[documentDataStoreFilename]!;
+      if (_fileDataStoreIndex.containsKey(documentFileDataStoreId)) {
+        documentDataStore = _fileDataStoreIndex[documentFileDataStoreId]!;
       } else {
         documentDataStore =
-            _fileDataStoreCollection[documentDataStoreFilename] =
-                buildFileDataStore(
-          file: _buildFileDataStoreFile(
-            collection: collection,
-            shard: documentDataStoreShard,
-            settings: persistorSettings,
-          ),
+            _fileDataStoreIndex[documentFileDataStoreId] = buildFileDataStore(
+          collectionPath: collectionPath,
+          shard: documentDataStoreShard,
+          persistorSettings: persistorSettings,
         );
       }
 
@@ -261,81 +237,95 @@ class FilePersistor extends Persistor {
       documentDataStore.updateDocument(doc);
     }
 
+    final fileDataStoresToPersist = _fileDataStoreIndex.values
+        .where((fileDataStore) => fileDataStore.shouldPersist)
+        .toList();
+
     // If for some reason one or more writes fail, then that is still recoverable as the file data store collections
     // maintains in-memory the latest state of the world, so on next broadcast, any data stores that still
     // require writing will retry at that time.
     await Future.wait(
-      _fileDataStoresToPersist.map(
-        (dataStore) => dataStore.persist(),
-      ),
+      fileDataStoresToPersist.map((dataStore) => dataStore.persist()).toList(),
     );
   }
 
   @override
   hydrate() async {
     await _initStorageDirectory();
+    final fileDataStores = await buildFileDataStores();
 
-    final files = await _readDataStoreFiles();
-    final fileDataStores =
-        files.map((file) => buildFileDataStore(file: file)).toList();
-
-    final fileDataStoreHydrationDocsLists = await Future.wait(
-      fileDataStores.map((dataStore) => dataStore.hydrate()),
-    );
-
-    for (int i = 0; i < fileDataStores.length; i++) {
-      final fileDataStore = fileDataStores[i];
-      final documentIds = fileDataStoreHydrationDocsLists[i];
+    for (final fileDataStore in fileDataStores) {
+      final documentIds = fileDataStore.data.keys.toList();
       for (final documentId in documentIds) {
         _documentFileDataStoreIndex[documentId] = fileDataStore;
       }
     }
 
-    _fileDataStoreCollection = fileDataStores.fold({}, (acc, store) {
+    _fileDataStoreIndex = fileDataStores.fold({}, (acc, store) {
+      final storeId = buildFileDataStoreId(
+        collectionPath: store.collectionPath,
+        shard: store.shard,
+      );
+
       return {
         ...acc,
-        store.filename: store,
+        storeId: store,
       };
     });
 
-    return fileDataStores.fold<SerializedCollectionStore>({},
-        (acc, fileDataStore) {
-      final existingCollectionData = acc[fileDataStore.collection];
-      final fileDataStoreCollectionData = fileDataStore.data;
+    return fileDataStores.fold<SerializedCollectionStore>(
+      {},
+      (acc, fileDataStore) {
+        final existingCollectionData = acc[fileDataStore.collectionPath];
+        final fileDataStoreCollectionData = fileDataStore.data;
 
-      if (existingCollectionData != null) {
+        // Multiple file data stores can map to the same collection in the case of sharded stores.
+        if (existingCollectionData != null) {
+          return {
+            ...acc,
+            fileDataStore.collectionPath: {
+              ...existingCollectionData,
+              ...fileDataStoreCollectionData,
+            }
+          };
+        }
         return {
           ...acc,
-          fileDataStore.collection: {
-            ...existingCollectionData,
-            ...fileDataStoreCollectionData,
-          }
+          fileDataStore.collectionPath: fileDataStoreCollectionData,
         };
-      }
-      return {
-        ...acc,
-        fileDataStore.collection: fileDataStoreCollectionData,
-      };
-    });
+      },
+    );
   }
 
   @override
   clear(String collection) async {
-    final collectionDataStores = _fileDataStoreCollection.values
-        .where((fileDataStore) => fileDataStore.collection == collection)
+    final collectionDataStores = _fileDataStoreIndex.values
+        .where((fileDataStore) => fileDataStore.collectionPath == collection)
         .toSet();
 
-    await Future.wait(collectionDataStores.map((dataStore) async {
-      await dataStore.delete();
-      _fileDataStoreCollection.remove(dataStore.filename);
-    }));
+    await Future.wait(
+      collectionDataStores.map(
+        (dataStore) async {
+          await dataStore.file.delete();
+          _fileDataStoreIndex.remove(
+            buildFileDataStoreId(
+              collectionPath: dataStore.collectionPath,
+              shard: dataStore.shard,
+            ),
+          );
+        },
+      ),
+    );
   }
 
   @override
   clearAll() {
-    final clearCollectionFutures = _fileDataStoreCollection.values
-        .map((fileDataStore) => fileDataStore.delete())
-        .toList();
-    return Future.wait(clearCollectionFutures);
+    return Future.wait(
+      _fileDataStoreIndex.values
+          .map(
+            (collectionDataStore) => clear(collectionDataStore.collectionPath),
+          )
+          .toList(),
+    );
   }
 }

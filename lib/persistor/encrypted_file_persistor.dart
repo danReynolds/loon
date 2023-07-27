@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:encrypt/encrypt.dart';
@@ -19,88 +20,100 @@ class EncryptedFilePersistorSettings<T> extends FilePersistorSettings<T> {
 }
 
 class EncryptedFileDataStore extends FileDataStore {
-  final String Function(String plainText) encrypt;
-  final String Function(String encrypted) decrypt;
+  final Encrypter encrypter;
 
   EncryptedFileDataStore({
-    required super.collection,
+    required this.encrypter,
+    required super.collectionPath,
     required super.file,
-    required this.encrypt,
-    required this.decrypt,
-    super.shard,
+    required super.shard,
   });
 
-  @override
-  Future<String> readFile() async {
-    return decrypt(await super.readFile());
-  }
-
-  @override
-  writeFile(String value) async {
-    await super.writeFile(encrypt(value));
-  }
-}
-
-class EncryptedFilePersistor extends FilePersistor {
-  late final Encrypter _encrypter;
-
-  @override
-  // ignore: overridden_fields
-  final filenameRegex =
-      RegExp(r'^loon_(\w+)(?:\.(shard_\w+))?\.encrypted\.json$');
-
-  String encrypt(String plainText) {
+  static String encrypt(Encrypter encrypter, String plainText) {
     final iv = IV.fromSecureRandom(16);
-    return iv.base64 + _encrypter.encrypt(plainText, iv: iv).base64;
+    return iv.base64 + encrypter.encrypt(plainText, iv: iv).base64;
   }
 
-  String decrypt(String encrypted) {
+  static String decrypt(Encrypter encrypter, String encrypted) {
     final iv = IV.fromBase64(encrypted.substring(0, 24));
-    return _encrypter.decrypt64(
+    return encrypter.decrypt64(
       encrypted.substring(24),
       iv: iv,
     );
   }
 
-  @override
-  buildFileDataStoreFilename({
-    required String collection,
-    required PersistorSettings? settings,
-    String? shard,
-  }) {
-    final filename = super.buildFileDataStoreFilename(
-      collection: collection,
-      shard: shard,
-      settings: settings,
+  static Future<FileDataStore> fromFile(File file, Encrypter encrypter) async {
+    final json = await jsonDecode(decrypt(
+      encrypter,
+      await file.readAsString(),
+    ));
+
+    final meta = json['meta'];
+    final dataJson = json['data'];
+
+    return FileDataStore(
+      file: file,
+      collectionPath: meta['collectionPath'],
+      shard: meta['shard'],
+      data: dataJson.map(
+        (key, dynamic value) => MapEntry(
+          key,
+          Map<String, dynamic>.from(value),
+        ),
+      ),
     );
-
-    if (settings != null && settings is EncryptedFilePersistorSettings) {
-      if (!settings.encryptionEnabled) {
-        return filename;
-      }
-    }
-
-    return filename.replaceFirst('.json', '.encrypted.json');
   }
 
   @override
-  FileDataStore buildFileDataStore({required File file}) {
-    final match = filenameRegex.firstMatch(path.basename(file.path))!;
+  Future<void> persist() async {
+    await file.writeAsString(encrypt(encrypter, jsonEncode(toJson())));
+  }
+}
 
-    final collection = match.group(1)!;
-    final shard = match.group(2);
-    final encryptionEnabled = match.group(3) != null;
+class EncryptedFilePersistor extends FilePersistor {
+  late final Encrypter _encrypter;
+  final encryptedFilenameRegex = RegExp(r'^loon_.*\.encrypted\.json$');
 
-    if (encryptionEnabled) {
+  @override
+  buildFileDataStore({
+    required String collectionPath,
+    required String? shard,
+    required PersistorSettings? persistorSettings,
+  }) {
+    final fileDataStoreId = buildFileDataStoreId(
+      collectionPath: collectionPath,
+      shard: shard,
+    );
+
+    if (persistorSettings is EncryptedFilePersistorSettings &&
+        persistorSettings.encryptionEnabled) {
       return EncryptedFileDataStore(
-        encrypt: encrypt,
-        decrypt: decrypt,
-        collection: collection,
-        file: file,
+        encrypter: _encrypter,
+        collectionPath: collectionPath,
         shard: shard,
+        file: File(
+          '${fileDataStoreDirectory.path}/loon_$fileDataStoreId.encrypted.json',
+        ),
       );
     }
-    return super.buildFileDataStore(file: file);
+
+    return FileDataStore(
+      collectionPath: collectionPath,
+      shard: shard,
+      file: File('${fileDataStoreDirectory.path}/loon_$fileDataStoreId.json'),
+    );
+  }
+
+  @override
+  Future<List<FileDataStore>> buildFileDataStores() async {
+    final files = await readDataStoreFiles();
+
+    return Future.wait(files.map((file) {
+      if (encryptedFilenameRegex.hasMatch(path.basename(file.path))) {
+        return EncryptedFileDataStore.fromFile(file, _encrypter);
+      }
+      return FileDataStore.fromFile(file);
+    }).toList());
   }
 
   @override

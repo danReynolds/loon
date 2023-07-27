@@ -63,7 +63,7 @@ class Loon {
 
   /// Returns a data snapshot for the given document.
   DocumentSnapshot<T>? _getSnapshot<T>(Document<T> doc) {
-    final snap = _collectionStore[doc.collection]?[doc.id];
+    final snap = _collectionStore[doc.path]?[doc.id];
 
     if (snap == null) {
       return null;
@@ -118,21 +118,21 @@ class Loon {
 
   /// Returns whether a document exists in the collection data store.
   bool _hasDocument(Document doc) {
-    return _collectionStore[doc.collection]?.containsKey(doc.id) ?? false;
+    return _collectionStore[doc.path]?.containsKey(doc.id) ?? false;
   }
 
   /// Returns a list of data snapshots for the given collection.
   List<DocumentSnapshot<T>> _getSnapshots<T>(
-    String collection, {
+    String path, {
     FromJson<T>? fromJson,
     ToJson<T>? toJson,
-    PersistorSettings<T>? persistorSettings,
+    PersistorSettings? persistorSettings,
   }) {
-    if (!_hasCollection(collection)) {
+    if (!_hasCollection(path)) {
       return [];
     }
 
-    return _collectionStore[collection]!.values.map((snap) {
+    return _collectionStore[path]!.values.map((snap) {
       if (snap is DocumentSnapshot<T>) {
         return snap;
       }
@@ -147,7 +147,7 @@ class Loon {
       return _writeSnapshot<T>(
         Document<T>(
           id: snap.doc.id,
-          collection: collection,
+          path: path,
           fromJson: fromJson,
           toJson: toJson,
           persistorSettings: persistorSettings,
@@ -159,16 +159,16 @@ class Loon {
 
   /// Returns the list of documents in the given collection that have been added, removed or modified since the last broadcast.
   List<BroadcastDocument<T>> _getBroadcastDocuments<T>(
-    String collection, {
+    String path, {
     FromJson<T>? fromJson,
     ToJson<T>? toJson,
-    PersistorSettings<T>? persistorSettings,
+    PersistorSettings? persistorSettings,
   }) {
-    if (!_broadcastCollectionStore.containsKey(collection)) {
+    if (!_broadcastCollectionStore.containsKey(path)) {
       return [];
     }
 
-    return _broadcastCollectionStore[collection]!.values.map((doc) {
+    return _broadcastCollectionStore[path]!.values.map((doc) {
       if (doc is BroadcastDocument<T>) {
         return doc;
       } else {
@@ -182,8 +182,8 @@ class Loon {
 
         return BroadcastDocument<T>(
           Document<T>(
-            collection: collection,
             id: doc.id,
+            path: path,
             fromJson: fromJson,
             toJson: toJson,
             persistorSettings: persistorSettings,
@@ -215,8 +215,7 @@ class Loon {
   }
 
   bool _isScheduledForBroadcast<T>(Document<T> doc) {
-    return _instance._broadcastCollectionStore[doc.collection]
-            ?.containsKey(doc.id) ??
+    return _instance._broadcastCollectionStore[doc.path]?.containsKey(doc.id) ??
         false;
   }
 
@@ -255,10 +254,10 @@ class Loon {
       );
     }
 
-    final collection = doc.collection;
+    final path = doc.path;
 
-    if (!_collectionStore.containsKey(collection)) {
-      _collectionStore[collection] = {};
+    if (!_collectionStore.containsKey(path)) {
+      _collectionStore[path] = {};
     }
 
     _writeBroadcastDocument<T>(
@@ -268,7 +267,7 @@ class Loon {
           : BroadcastEventTypes.added,
     );
 
-    final snap = _collectionStore[doc.collection]![doc.id] =
+    final snap = _collectionStore[doc.path]![doc.id] =
         DocumentSnapshot<T>(doc: doc, data: data);
 
     if (broadcast) {
@@ -311,7 +310,7 @@ class Loon {
     bool broadcast = true,
   }) {
     if (doc.exists()) {
-      _collectionStore[doc.collection]!.remove(doc.id);
+      _collectionStore[doc.path]!.remove(doc.id);
       _writeBroadcastDocument<T>(doc, BroadcastEventTypes.removed);
 
       if (broadcast) {
@@ -330,11 +329,11 @@ class Loon {
       return;
     }
 
-    if (!_broadcastCollectionStore.containsKey(doc.collection)) {
-      _broadcastCollectionStore[doc.collection] = {};
+    if (!_broadcastCollectionStore.containsKey(doc.path)) {
+      _broadcastCollectionStore[doc.path] = {};
     }
 
-    _instance._broadcastCollectionStore[doc.collection]![doc.id] =
+    _instance._broadcastCollectionStore[doc.path]![doc.id] =
         BroadcastDocument<T>(
       doc,
       eventType,
@@ -357,12 +356,12 @@ class Loon {
       final data = await _instance.persistor!.hydrate();
 
       for (final collectionDataStoreEntry in data.entries) {
-        final collection = collectionDataStoreEntry.key;
+        final path = collectionDataStoreEntry.key;
         final documentDataStore = collectionDataStoreEntry.value;
 
         for (final documentDataEntry in documentDataStore.entries) {
           _instance._writeSnapshot<Json>(
-            Document<Json>(collection: collection, id: documentDataEntry.key),
+            Document<Json>(path: path, id: documentDataEntry.key),
             documentDataEntry.value,
             broadcast: false,
           );

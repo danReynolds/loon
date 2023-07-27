@@ -3,7 +3,7 @@ part of loon;
 class ObservableDocument<T> extends Document<T>
     with BroadcastObservable<DocumentSnapshot<T>?> {
   ObservableDocument({
-    required super.collection,
+    required super.path,
     required super.id,
     super.fromJson,
     super.toJson,

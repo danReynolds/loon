@@ -3,7 +3,7 @@ part of loon;
 class ObservableQuery<T> extends Query<T>
     with BroadcastObservable<List<DocumentSnapshot<T>>> {
   ObservableQuery(
-    super.collection, {
+    super.path, {
     required super.filters,
     required super.sort,
     required super.fromJson,
@@ -28,13 +28,13 @@ class ObservableQuery<T> extends Query<T>
     bool shouldBroadcast = false;
 
     // If the entire collection has been deleted, then clear the snapshot.
-    if (!Loon._instance._hasCollection(collection)) {
+    if (!Loon._instance._hasCollection(path)) {
       rebroadcast([]);
       return;
     }
 
     final broadcastDocs = Loon._instance._getBroadcastDocuments<T>(
-      collection,
+      path,
       fromJson: fromJson,
       toJson: toJson,
       persistorSettings: persistorSettings,

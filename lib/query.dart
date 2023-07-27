@@ -1,15 +1,15 @@
 part of loon;
 
 class Query<T> {
-  final String collection;
+  final String path;
   final List<FilterFn<T>> filters;
   final SortFn<T>? sort;
   final FromJson<T>? fromJson;
   final ToJson<T>? toJson;
-  final PersistorSettings<T>? persistorSettings;
+  final PersistorSettings? persistorSettings;
 
   Query(
-    this.collection, {
+    this.path, {
     required this.filters,
     required this.sort,
     required this.fromJson,
@@ -44,7 +44,7 @@ class Query<T> {
     return _sortQuery(
       _filterQuery(
         Loon._instance._getSnapshots(
-          collection,
+          path,
           fromJson: fromJson,
           toJson: toJson,
           persistorSettings: persistorSettings,
@@ -55,7 +55,7 @@ class Query<T> {
 
   ObservableQuery<T> asObservable() {
     return ObservableQuery<T>(
-      collection,
+      path,
       filters: filters,
       sort: sort,
       fromJson: fromJson,
@@ -75,7 +75,7 @@ class Query<T> {
 
   Query<T> sortBy(SortFn<T> sort) {
     return Query<T>(
-      collection,
+      path,
       filters: filters,
       sort: sort,
       fromJson: fromJson,
@@ -86,7 +86,7 @@ class Query<T> {
 
   Query<T> where(FilterFn<T> filter) {
     return Query<T>(
-      collection,
+      path,
       filters: [...filters, filter],
       sort: sort,
       fromJson: fromJson,

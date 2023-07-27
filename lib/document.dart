@@ -1,14 +1,14 @@
 part of loon;
 
 class Document<T> {
-  final String collection;
+  final String path;
   final String id;
   final FromJson<T>? fromJson;
   final ToJson<T>? toJson;
   final PersistorSettings? persistorSettings;
 
   Document({
-    required this.collection,
+    required this.path,
     required this.id,
     this.fromJson,
     this.toJson,
@@ -48,7 +48,7 @@ class Document<T> {
   ObservableDocument<T> asObservable() {
     return ObservableDocument<T>(
       id: id,
-      collection: collection,
+      path: path,
       fromJson: fromJson,
       toJson: toJson,
       persistorSettings: persistorSettings,
@@ -77,6 +77,15 @@ class Document<T> {
   bool exists() {
     return Loon._instance._hasDocument(this);
   }
+
+  Collection<T> collection(String collection) {
+    return Collection<T>(
+      '$path/$id',
+      fromJson: fromJson,
+      toJson: toJson,
+      persistorSettings: persistorSettings,
+    );
+  }
 }
 
 enum BroadcastEventTypes {
@@ -101,7 +110,7 @@ class BroadcastDocument<T> extends Document<T> {
     this.type,
   ) : super(
           id: doc.id,
-          collection: doc.collection,
+          path: doc.path,
           fromJson: doc.fromJson,
           toJson: doc.toJson,
           persistorSettings: doc.persistorSettings,

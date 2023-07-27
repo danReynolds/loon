@@ -541,7 +541,7 @@ void main() {
 
       final rootSnap = rootDoc.get();
 
-      expect(rootSnap?.collection, '__ROOT__');
+      expect(rootSnap?.path, '__ROOT__');
       expect(rootSnap?.id, '1');
       expect(rootSnap?.data, data);
     });

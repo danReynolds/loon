@@ -200,7 +200,7 @@ class _MyHomePageState extends State<MyHomePage> {
                                 children: [
                                   const Text('File:'),
                                   const SizedBox(height: 8),
-                                  Text(fileDataStore.filename),
+                                  Text(fileDataStore.collectionPath),
                                   const SizedBox(height: 8),
                                   const Text('Document count:'),
                                   const SizedBox(height: 8),

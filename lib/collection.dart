@@ -2,7 +2,7 @@ part of loon;
 
 class Collection<T> extends Query<T> {
   Collection(
-    super.collection, {
+    super.path, {
     required super.fromJson,
     required super.toJson,
     required super.persistorSettings,
@@ -10,8 +10,8 @@ class Collection<T> extends Query<T> {
 
   Document<T> doc(String id) {
     return Document<T>(
-      collection: collection,
       id: id,
+      path: path,
       fromJson: fromJson,
       toJson: toJson,
       persistorSettings: persistorSettings,
@@ -19,6 +19,6 @@ class Collection<T> extends Query<T> {
   }
 
   void clear() {
-    Loon._instance._clearCollection(collection);
+    Loon._instance._clearCollection(path);
   }
 }

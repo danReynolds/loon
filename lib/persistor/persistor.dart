@@ -80,13 +80,13 @@ abstract class Persistor {
 
     for (final doc in docs) {
       final docId = doc.id;
-      final collection = doc.collection;
+      final path = doc.path;
 
-      if (!_broadcastCollectionDataStore.containsKey(collection)) {
-        _broadcastCollectionDataStore[collection] = {};
+      if (!_broadcastCollectionDataStore.containsKey(path)) {
+        _broadcastCollectionDataStore[path] = {};
       }
 
-      _broadcastCollectionDataStore[collection]![docId] = doc;
+      _broadcastCollectionDataStore[path]![docId] = doc;
     }
   }
 

@@ -13,7 +13,7 @@ class DocumentSnapshot<T> {
     return doc.id;
   }
 
-  String get collection {
-    return doc.collection;
+  String get path {
+    return doc.path;
   }
 }
