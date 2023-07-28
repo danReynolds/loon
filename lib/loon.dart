@@ -85,19 +85,28 @@ class Loon {
     return _writeSnapshot<T>(doc, fromJson!(snap.data));
   }
 
-  /// Returns whether a collection name exists in the collection data store.
-  bool _hasCollection(String collection) {
-    return _collectionStore.containsKey(collection);
+  /// Returns whether a collection path exists in the collection data store.
+  bool _hasCollection(String path) {
+    return _collectionStore.containsKey(path);
   }
 
-  /// Clears the given collection name from the collection data store.
-  Future<void> _clearCollection(String collection) async {
-    if (_hasCollection(collection)) {
-      _collectionStore.remove(collection);
+  /// Clears the given collection path and all nested paths from the collection data store.
+  Future<void> _clearCollection(String path) async {
+    if (_hasCollection(path)) {
+      final paths = _collectionStore.keys
+          .where((collectionPath) => collectionPath.startsWith(path))
+          .toList();
+
+      for (final path in paths) {
+        _collectionStore.remove(path);
+      }
+
       _scheduleBroadcast();
 
       if (persistor != null) {
-        return persistor!.clear(collection);
+        await Future.wait(
+          paths.map((path) => persistor!.clear(path)).toList(),
+        );
       }
     }
   }
@@ -267,7 +276,7 @@ class Loon {
           : BroadcastEventTypes.added,
     );
 
-    final snap = _collectionStore[doc.path]![doc.id] =
+    final snap = _collectionStore[path]![doc.id] =
         DocumentSnapshot<T>(doc: doc, data: data);
 
     if (broadcast) {

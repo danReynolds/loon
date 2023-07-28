@@ -78,7 +78,12 @@ class Document<T> {
     return Loon._instance._hasDocument(this);
   }
 
-  Collection<T> collection(String collection) {
+  Collection<T> collection(
+    String collection, {
+    FromJson<T>? fromJson,
+    ToJson<T>? toJson,
+    PersistorSettings? persistorSettings,
+  }) {
     return Collection<T>(
       '$path/$id/$collection',
       fromJson: fromJson,
