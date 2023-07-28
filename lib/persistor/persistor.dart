@@ -3,11 +3,9 @@ part of loon;
 typedef SerializedCollectionStore = Map<String, Map<String, Json>>;
 
 class PersistorSettings<T> {
-  final Duration persistenceThrottle;
   final bool persistenceEnabled;
 
   const PersistorSettings({
-    this.persistenceThrottle = const Duration(milliseconds: 100),
     this.persistenceEnabled = true,
   });
 }
@@ -16,11 +14,13 @@ abstract class Persistor {
   final BroadcastCollectionStore _broadcastCollectionDataStore = {};
   Timer? _persistTimer;
   bool _isPersisting = false;
+  final Duration persistenceThrottle;
 
   final PersistorSettings persistorSettings;
 
   Persistor({
     this.persistorSettings = const PersistorSettings(),
+    this.persistenceThrottle = const Duration(milliseconds: 100),
   });
 
   List<BroadcastDocument> get _pendingDocuments {
@@ -72,7 +72,7 @@ abstract class Persistor {
     }
 
     if (_persistTimer == null && !_isPersisting) {
-      _persistTimer = Timer(persistorSettings.persistenceThrottle, () {
+      _persistTimer = Timer(persistenceThrottle, () {
         _persistTimer = null;
         _persist();
       });
