@@ -108,6 +108,7 @@ class FileDataStore {
 }
 
 class FilePersistor extends Persistor {
+  /// An index of [FileDataStore] entries by the data store collection name.
   Map<String, FileDataStore> _fileDataStoreIndex = {};
 
   /// An index of which file data store each document is stored in by document ID.
@@ -159,7 +160,7 @@ class FilePersistor extends Persistor {
       settings: settings,
     );
     return FileDataStore(
-      file: File("$fileDataStoreDirectory.path/$filename"),
+      file: File("${fileDataStoreDirectory.path}/$filename"),
       collection: collection,
       shard: shard,
     );
@@ -187,7 +188,8 @@ class FilePersistor extends Persistor {
       final collection = doc.collection;
       final persistorSettings = doc.persistorSettings ?? this.persistorSettings;
 
-      if (!persistorSettings.persistenceEnabled) {
+      if (persistorSettings is! FilePersistorSettings ||
+          !persistorSettings.persistenceEnabled) {
         continue;
       }
 
@@ -195,32 +197,27 @@ class FilePersistor extends Persistor {
       final FileDataStore documentDataStore;
       final String documentDataStoreFilename;
 
-      if (persistorSettings is FilePersistorSettings) {
-        final maxShards = persistorSettings.maxShards;
+      final maxShards = persistorSettings.maxShards;
 
-        if (persistorSettings.shardEnabled && maxShards > 1) {
-          documentDataStoreShard = persistorSettings.getShard(doc);
-          final documentDataStoreShardFilename = buildFileDataStoreFilename(
-            collection: collection,
-            shard: documentDataStoreShard,
-            settings: persistorSettings,
-          );
+      if (persistorSettings.shardEnabled && maxShards > 1) {
+        documentDataStoreShard = persistorSettings.getShard(doc);
+        final documentDataStoreShardFilename = buildFileDataStoreFilename(
+          collection: collection,
+          shard: documentDataStoreShard,
+          settings: persistorSettings,
+        );
 
-          if (!_fileDataStoreIndex
-              .containsKey(documentDataStoreShardFilename)) {
-            final collectionFileDataStores =
-                _fileDataStoreIndex.values.where((fileDataStore) {
-              return fileDataStore.collection == collection &&
-                  fileDataStore.shard != null;
-            }).toList();
+        if (!_fileDataStoreIndex.containsKey(documentDataStoreShardFilename)) {
+          final collectionFileDataStores =
+              _fileDataStoreIndex.values.where((fileDataStore) {
+            return fileDataStore.collection == collection;
+          }).toList();
 
-            if (collectionFileDataStores.length >= maxShards) {
-              // If the collection has reached its max shards already, than any additional documents
-              // that do not hash to an existing shard are stored in one of them at random.
-              final shardIndex = Random().nextInt(maxShards);
-              documentDataStoreShard =
-                  collectionFileDataStores[shardIndex].shard;
-            }
+          if (collectionFileDataStores.length >= maxShards) {
+            // If the collection has reached its max shards already, then any additional documents
+            // that do not hash to an existing shard are stored in one of them at random.
+            final shardIndex = Random().nextInt(maxShards);
+            documentDataStoreShard = collectionFileDataStores[shardIndex].shard;
           }
         }
       }
@@ -300,6 +297,8 @@ class FilePersistor extends Persistor {
       final existingCollectionData = acc[fileDataStore.collection];
       final fileDataStoreCollectionData = fileDataStore.data;
 
+      // Multiple data stores map to the same collection across different shards
+      // and they should all aggregate their data into a single collection store.
       if (existingCollectionData != null) {
         return {
           ...acc,

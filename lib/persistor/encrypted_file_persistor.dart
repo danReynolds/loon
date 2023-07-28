@@ -98,7 +98,7 @@ class EncryptedFilePersistor extends FilePersistor {
     if (settings is EncryptedFilePersistorSettings &&
         settings.encryptionEnabled) {
       return EncryptedFileDataStore(
-        file: File("$fileDataStoreDirectory.path/$filename"),
+        file: File("${fileDataStoreDirectory.path}/$filename"),
         collection: collection,
         encrypter: _encrypter,
       );
