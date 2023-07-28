@@ -292,27 +292,29 @@ class FilePersistor extends Persistor {
       };
     });
 
-    return fileDataStores.fold<SerializedCollectionStore>({},
-        (acc, fileDataStore) {
-      final existingCollectionData = acc[fileDataStore.collection];
-      final fileDataStoreCollectionData = fileDataStore.data;
+    return fileDataStores.fold<SerializedCollectionStore>(
+      {},
+      (acc, fileDataStore) {
+        final existingCollectionData = acc[fileDataStore.collection];
+        final fileDataStoreCollectionData = fileDataStore.data;
 
-      // Multiple data stores map to the same collection across different shards
-      // and they should all aggregate their data into a single collection store.
-      if (existingCollectionData != null) {
+        // Multiple data stores map to the same collection across different shards
+        // and they should all aggregate their data into a single collection store.
+        if (existingCollectionData != null) {
+          return {
+            ...acc,
+            fileDataStore.collection: {
+              ...existingCollectionData,
+              ...fileDataStoreCollectionData,
+            }
+          };
+        }
         return {
           ...acc,
-          fileDataStore.collection: {
-            ...existingCollectionData,
-            ...fileDataStoreCollectionData,
-          }
+          fileDataStore.collection: fileDataStoreCollectionData,
         };
-      }
-      return {
-        ...acc,
-        fileDataStore.collection: fileDataStoreCollectionData,
-      };
-    });
+      },
+    );
   }
 
   @override
