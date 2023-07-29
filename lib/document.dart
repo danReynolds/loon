@@ -19,26 +19,39 @@ class Document<T> {
     Loon._instance._deleteDocument<T>(this);
   }
 
-  DocumentSnapshot<T> update(T data) {
-    return Loon._instance._updateDocument<T>(this, data);
+  DocumentSnapshot<T> update(
+    T data, {
+    bool broadcast = false,
+  }) {
+    return Loon._instance._updateDocument<T>(this, data, broadcast: broadcast);
   }
 
-  DocumentSnapshot<T> modify(ModifyFn<T> modifyFn) {
+  DocumentSnapshot<T> modify(
+    ModifyFn<T> modifyFn, {
+    bool broadcast = false,
+  }) {
     return Loon._instance._modifyDocument(
       this,
       modifyFn,
+      broadcast: broadcast,
     );
   }
 
-  DocumentSnapshot<T> create(T data) {
-    return Loon._instance._addDocument<T>(this, data);
+  DocumentSnapshot<T> create(
+    T data, {
+    bool broadcast = false,
+  }) {
+    return Loon._instance._addDocument<T>(this, data, broadcast: broadcast);
   }
 
-  DocumentSnapshot<T> createOrUpdate(T data) {
+  DocumentSnapshot<T> createOrUpdate(
+    T data, {
+    bool broadcast = false,
+  }) {
     if (exists()) {
-      return update(data);
+      return update(data, broadcast: broadcast);
     }
-    return create(data);
+    return create(data, broadcast: broadcast);
   }
 
   DocumentSnapshot<T>? get() {

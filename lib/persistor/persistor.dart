@@ -23,16 +23,18 @@ abstract class Persistor {
     this.persistenceThrottle = const Duration(milliseconds: 100),
   });
 
-  List<BroadcastDocument> get _pendingDocuments {
-    final collectionDataStores = _broadcastCollectionDataStore.values;
+  List<BroadcastDocument> _getBroadcastDocuments() {
+    List<BroadcastDocument> documents = [];
 
-    return collectionDataStores.fold<List<BroadcastDocument>>([],
-        (acc, collection) {
-      return [
-        ...acc,
-        ...collection.values,
-      ];
-    });
+    for (final broadcastCollection in _broadcastCollectionDataStore.values) {
+      for (final broadcastDocument in broadcastCollection.values) {
+        if (broadcastDocument.type != BroadcastEventTypes.touched) {
+          documents.add(broadcastDocument);
+        }
+      }
+    }
+
+    return documents;
   }
 
   Future<void> _persist() async {
@@ -43,7 +45,7 @@ abstract class Persistor {
     }
     _isPersisting = true;
 
-    final docs = _pendingDocuments;
+    final docs = _getBroadcastDocuments();
     if (docs.isEmpty) {
       return;
     }
@@ -60,7 +62,7 @@ abstract class Persistor {
 
       // On persist completing, if there are more docs that have since been added to be persisted,
       // then persist again.
-      if (_pendingDocuments.isNotEmpty) {
+      if (_getBroadcastDocuments().isNotEmpty) {
         _persist();
       }
     }
