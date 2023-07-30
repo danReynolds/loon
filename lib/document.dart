@@ -21,14 +21,14 @@ class Document<T> {
 
   DocumentSnapshot<T> update(
     T data, {
-    bool broadcast = false,
+    bool broadcast = true,
   }) {
     return Loon._instance._updateDocument<T>(this, data, broadcast: broadcast);
   }
 
   DocumentSnapshot<T> modify(
     ModifyFn<T> modifyFn, {
-    bool broadcast = false,
+    bool broadcast = true,
   }) {
     return Loon._instance._modifyDocument(
       this,
@@ -39,14 +39,14 @@ class Document<T> {
 
   DocumentSnapshot<T> create(
     T data, {
-    bool broadcast = false,
+    bool broadcast = true,
   }) {
     return Loon._instance._addDocument<T>(this, data, broadcast: broadcast);
   }
 
   DocumentSnapshot<T> createOrUpdate(
     T data, {
-    bool broadcast = false,
+    bool broadcast = true,
   }) {
     if (exists()) {
       return update(data, broadcast: broadcast);
