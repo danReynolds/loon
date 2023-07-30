@@ -17,19 +17,17 @@ class Query<T> {
     required this.persistorSettings,
   });
 
-  List<DocumentSnapshot<T>> _filterQuery(List<DocumentSnapshot<T>> snaps) {
-    if (filters.isEmpty) {
-      return snaps;
-    }
-
-    return snaps.where((snap) {
-      for (final filter in filters) {
-        if (!filter(snap)) {
-          return false;
-        }
+  bool _filter(DocumentSnapshot<T> snap) {
+    for (final filter in filters) {
+      if (!filter(snap)) {
+        return false;
       }
-      return true;
-    }).toList();
+    }
+    return true;
+  }
+
+  List<DocumentSnapshot<T>> _filterQuery(List<DocumentSnapshot<T>> snaps) {
+    return snaps.where(_filter).toList();
   }
 
   List<DocumentSnapshot<T>> _sortQuery(List<DocumentSnapshot<T>> snaps) {
