@@ -2,7 +2,7 @@ part of loon;
 
 class ObservableQuery<T> extends Query<T>
     with BroadcastObservable<List<DocumentSnapshot<T>>> {
-  /// A cache of the snapshots last broadcasted by the query indexed by their [Document] ID.
+  /// A cache of the snapshots broadcasted by the query indexed by their [Document] ID.
   final Map<String, DocumentSnapshot<T>> _index = {};
 
   ObservableQuery(
@@ -16,9 +16,9 @@ class ObservableQuery<T> extends Query<T>
     observe([]);
   }
 
-  /// On broadcast, the watch examines all documents that have been added, removed or modified
-  /// since the last broadcast and determines if the query needs to rebroadcast to observers. The conditions
-  /// for rebroadcasting the updated query are the following:
+  /// On broadcast, the query examines the documents that have been added, removed or modified
+  /// since the last broadcast and determines if the query needs to rebroadcast to its observers.
+  /// The conditions for rebroadcasting the updated query are as follows:
   /// 1. A new document has been added that satisfies the query filter.
   /// 2. A document that previously satisfied the query filter has been removed.
   /// 3. A document that has been modified and meets one of the following requirements:
