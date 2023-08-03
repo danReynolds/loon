@@ -190,8 +190,7 @@ class FilePersistor extends Persistor {
       final collection = doc.collection;
       final persistorSettings = doc.persistorSettings ?? this.persistorSettings;
 
-      if (persistorSettings is! FilePersistorSettings ||
-          !persistorSettings.persistenceEnabled) {
+      if (!persistorSettings.persistenceEnabled) {
         continue;
       }
 
@@ -199,9 +198,10 @@ class FilePersistor extends Persistor {
       final FileDataStore documentDataStore;
       final String documentDataStoreFilename;
 
-      final maxShards = persistorSettings.maxShards;
-
-      if (persistorSettings.shardEnabled && maxShards > 1) {
+      if (persistorSettings is FilePersistorSettings &&
+          persistorSettings.shardEnabled &&
+          persistorSettings.maxShards > 1) {
+        final maxShards = persistorSettings.maxShards;
         documentDataStoreShard = persistorSettings.getShard(doc);
         final documentDataStoreShardFilename = buildFileDataStoreFilename(
           collection: collection,

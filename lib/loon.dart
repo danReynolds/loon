@@ -433,7 +433,7 @@ class Loon {
     PersistorSettings<T>? persistorSettings,
   }) {
     return collection<T>(
-      '__ROOT__',
+      '__ROOT__$id',
       fromJson: fromJson,
       toJson: toJson,
       persistorSettings: persistorSettings,
