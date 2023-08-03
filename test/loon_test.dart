@@ -509,6 +509,27 @@ void main() {
     });
   });
 
+  group('Replace collection', () {
+    tearDown(() {
+      Loon.clearAll();
+    });
+
+    test('Replaces all documents in the collection', () {
+      final userDoc = TestUserModel.store.doc('1');
+      final userDoc2 = TestUserModel.store.doc('2');
+
+      userDoc.create(TestUserModel('User 1'));
+      userDoc2.create(TestUserModel('User 2'));
+
+      TestUserModel.store.replace([
+        DocumentSnapshot(doc: userDoc, data: TestUserModel('User 3')),
+      ]);
+
+      expect(userDoc.get()?.data.toJson(), TestUserModel('User 3').toJson());
+      expect(userDoc2.get(), null);
+    });
+  });
+
   group('Clearing all collections', () {
     tearDown(() {
       Loon.clearAll();

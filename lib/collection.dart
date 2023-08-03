@@ -21,4 +21,14 @@ class Collection<T> extends Query<T> {
   void clear() {
     Loon._instance._clearCollection(collection);
   }
+
+  void replace(List<DocumentSnapshot<T>> snaps) {
+    Loon._instance._replaceCollection<T>(
+      collection,
+      snaps: snaps,
+      fromJson: fromJson,
+      toJson: toJson,
+      persistorSettings: persistorSettings,
+    );
+  }
 }

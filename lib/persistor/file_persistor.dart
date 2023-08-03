@@ -37,6 +37,7 @@ class FileDataStore {
 
   Map<String, Json> data = {};
   bool shouldPersist = false;
+  bool isDeleting = false;
 
   FileDataStore({
     required this.file,
@@ -80,6 +81,7 @@ class FileDataStore {
   }
 
   Future<void> delete() async {
+    data = {};
     await file.delete();
   }
 
@@ -323,10 +325,19 @@ class FilePersistor extends Persistor {
         .where((fileDataStore) => fileDataStore.collection == collection)
         .toSet();
 
-    await Future.wait(collectionDataStores.map((dataStore) async {
-      await dataStore.delete();
-      _fileDataStoreIndex.remove(dataStore.filename);
-    }));
+    await Future.wait(
+      collectionDataStores.map(
+        (dataStore) async {
+          await dataStore.delete();
+
+          // If new data was added to the data store while the file was being deleted,
+          // then do not remove the store from the index.
+          if (dataStore.data.isEmpty) {
+            _fileDataStoreIndex.remove(dataStore.filename);
+          }
+        },
+      ),
+    );
   }
 
   @override

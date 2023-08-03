@@ -121,6 +121,43 @@ class Loon {
     return _collectionStore[doc.collection]?.containsKey(doc.id) ?? false;
   }
 
+  void _replaceCollection<T>(
+    String collection, {
+    required List<DocumentSnapshot<T>> snaps,
+    FromJson<T>? fromJson,
+    ToJson<T>? toJson,
+    PersistorSettings<T>? persistorSettings,
+  }) {
+    final snapsById =
+        snaps.fold<Map<String, DocumentSnapshot<T>>>({}, (acc, snap) {
+      acc[snap.id] = snap;
+      return acc;
+    });
+
+    final existingSnaps = _getSnapshots<T>(
+      collection,
+      fromJson: fromJson,
+      toJson: toJson,
+      persistorSettings: persistorSettings,
+    );
+
+    for (final existingSnap in existingSnaps) {
+      final docId = existingSnap.id;
+      final updatedSnap = snapsById[docId];
+      snapsById.remove(docId);
+
+      if (updatedSnap != null) {
+        existingSnap.doc.update(updatedSnap.data);
+      } else {
+        existingSnap.doc.delete();
+      }
+    }
+
+    for (final newSnap in snapsById.values) {
+      newSnap.doc.create(newSnap.data);
+    }
+  }
+
   /// Returns a list of data snapshots for the given collection.
   List<DocumentSnapshot<T>> _getSnapshots<T>(
     String collection, {
