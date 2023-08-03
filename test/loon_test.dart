@@ -567,4 +567,25 @@ void main() {
       expect(rootSnap?.data, data);
     });
   });
+
+  group('Subcollections', () {
+    test('Read/Write documents successfully', () {
+      final friendData = TestUserModel('Friend 1');
+      final friendDoc = Loon.collection('users')
+          .doc('1')
+          .subcollection<TestUserModel>(
+            'friends',
+            fromJson: TestUserModel.fromJson,
+            toJson: (friend) => friend.toJson(),
+          )
+          .doc('1');
+
+      friendDoc.create(friendData);
+      final friendSnap = friendDoc.get();
+
+      expect(friendSnap?.data.toJson(), friendData.toJson());
+      expect(friendSnap?.doc.collection, 'users_1_friends');
+      expect(friendSnap?.doc.id, '1');
+    });
+  });
 }

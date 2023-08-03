@@ -15,6 +15,20 @@ class Document<T> {
     this.persistorSettings,
   });
 
+  Collection<S> subcollection<S>(
+    String subcollection, {
+    FromJson<S>? fromJson,
+    ToJson<S>? toJson,
+    PersistorSettings<S>? persistorSettings,
+  }) {
+    return Collection<S>(
+      "${collection}_${id}_$subcollection",
+      fromJson: fromJson,
+      toJson: toJson,
+      persistorSettings: persistorSettings,
+    );
+  }
+
   void delete() {
     Loon._instance._deleteDocument<T>(this);
   }
