@@ -1,7 +1,9 @@
 part of loon;
 
 class ObservableQuery<T> extends Query<T>
-    with BroadcastObservable<List<DocumentSnapshot<T>>> {
+    with
+        Observable<List<DocumentSnapshot<T>>>,
+        BroadcastObservable<List<DocumentSnapshot<T>>> {
   /// A cache of the snapshots broadcasted by the query indexed by their [Document] ID.
   final Map<String, DocumentSnapshot<T>> _index = {};
 
@@ -13,7 +15,7 @@ class ObservableQuery<T> extends Query<T>
     required super.toJson,
     required super.persistorSettings,
   }) {
-    observe([]);
+    add([]);
   }
 
   /// On broadcast, the query examines the documents that have been added, removed or modified
@@ -33,7 +35,7 @@ class ObservableQuery<T> extends Query<T>
     // If the entire collection has been deleted, then clear the snapshot.
     if (!Loon._instance._hasCollection(collection)) {
       _index.clear();
-      rebroadcast([]);
+      add([]);
       return;
     }
 
@@ -105,7 +107,7 @@ class ObservableQuery<T> extends Query<T>
     if (shouldBroadcast) {
       final snaps = _sortQuery(_index.values.toList());
 
-      rebroadcast(snaps);
+      add(snaps);
     }
   }
 }

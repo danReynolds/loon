@@ -7,6 +7,7 @@ export 'widgets/document_stream_builder.dart';
 export 'persistor/file_persistor.dart';
 export 'persistor/encrypted_file_persistor.dart';
 
+part 'observable.dart';
 part 'broadcast_observable.dart';
 part 'query.dart';
 part 'observable_query.dart';
@@ -16,6 +17,9 @@ part 'observable_document.dart';
 part 'types.dart';
 part 'document_snapshot.dart';
 part 'persistor/persistor.dart';
+part 'computable.dart';
+part 'computation.dart';
+part 'observable_computation.dart';
 
 typedef CollectionStore = Map<String, Map<String, DocumentSnapshot>>;
 typedef BroadcastCollectionStore = Map<String, Map<String, BroadcastDocument>>;

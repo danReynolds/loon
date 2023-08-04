@@ -1,6 +1,6 @@
 part of loon;
 
-class Document<T> {
+class Document<T> implements Computable<DocumentSnapshot<T>?> {
   final String collection;
   final String id;
   final FromJson<T>? fromJson;
@@ -68,6 +68,7 @@ class Document<T> {
     return create(data, broadcast: broadcast);
   }
 
+  @override
   DocumentSnapshot<T>? get() {
     return Loon._instance._getSnapshot<T>(this);
   }
@@ -82,12 +83,12 @@ class Document<T> {
     );
   }
 
+  @override
   Stream<DocumentSnapshot<T>?> stream() {
     return asObservable().stream();
   }
 
-  Stream<BroadcastObservableChangeRecord<DocumentSnapshot<T>?>>
-      streamChanges() {
+  Stream<ObservableChangeRecord<DocumentSnapshot<T>?>> streamChanges() {
     return asObservable().streamChanges();
   }
 
