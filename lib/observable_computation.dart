@@ -33,8 +33,8 @@ class ObservableComputation<T> extends Computation<T> with Observable<T> {
 
     for (int i = 0; i < computables.length; i++) {
       _subscriptions.add(
-        /// Skip the current value emitted by each [Computable] since that can be
-        /// is pre-computed as one update rather than n initial updates where n is the number of computables.
+        /// Skip the current value emitted by each [Computable] since the first computation value
+        /// is pre-computed as one initial update rather than n initial updates where n is the number of computables.
         computables[i].stream().skip(1).listen(
           (inputValue) {
             computableValues[i] = inputValue;
