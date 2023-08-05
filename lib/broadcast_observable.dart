@@ -1,6 +1,7 @@
 part of loon;
 
-/// A mixin that extends the [Observable] implementation to support receiving document broadcasts.
+/// A [BroadcastObservable] is an extension of the [Observable] mixin that adds support
+/// for receiving [Document] broadcasts.
 mixin BroadcastObservable<T> on Observable<T> {
   @override
   void init(T initialValue) {

@@ -490,6 +490,106 @@ void main() {
     });
   });
 
+  group('Computations', () {
+    tearDown(() {
+      Loon.clearAll();
+    });
+
+    test('are computed correctly', () {
+      final user = TestUserModel('User 1');
+      final user2 = TestUserModel('User 2');
+      final userDoc = TestUserModel.store.doc('1');
+      final userDoc2 = TestUserModel.store.doc('2');
+
+      userDoc.create(user);
+      userDoc2.create(user2);
+
+      final namesComputation = Loon.compute2<List<String>,
+          DocumentSnapshot<TestUserModel>?, DocumentSnapshot<TestUserModel>?>(
+        [],
+        userDoc,
+        userDoc2,
+        (userSnap, userSnap2) {
+          return [userSnap, userSnap2]
+              .whereType<DocumentSnapshot<TestUserModel>>()
+              .map((snap) => snap.data.name)
+              .toList();
+        },
+      );
+
+      expect(namesComputation.get(), ['User 1', 'User 2']);
+    });
+
+    test('recompute correctly', () {
+      final user = TestUserModel('User 1');
+      final user2 = TestUserModel('User 2');
+      final userDoc = TestUserModel.store.doc('1');
+      final userDoc2 = TestUserModel.store.doc('2');
+
+      userDoc.create(user);
+      userDoc2.create(user2);
+
+      final namesComputation = Loon.compute2<List<String>,
+          DocumentSnapshot<TestUserModel>?, DocumentSnapshot<TestUserModel>?>(
+        [],
+        userDoc,
+        userDoc2,
+        (userSnap, userSnap2) {
+          return [userSnap, userSnap2]
+              .whereType<DocumentSnapshot<TestUserModel>>()
+              .map((snap) => snap.data.name)
+              .toList();
+        },
+      );
+
+      expect(namesComputation.get(), ['User 1', 'User 2']);
+      userDoc.update(TestUserModel('Updated User 1'));
+      expect(namesComputation.get(), ['Updated User 1', 'User 2']);
+    });
+
+    test('recomputes stream correctly', () async {
+      final user = TestUserModel('User 1');
+      final user2 = TestUserModel('User 2');
+      final userDoc = TestUserModel.store.doc('1');
+      final userDoc2 = TestUserModel.store.doc('2');
+
+      final namesComputation = Loon.compute2<List<String>,
+          DocumentSnapshot<TestUserModel>?, DocumentSnapshot<TestUserModel>?>(
+        [],
+        userDoc,
+        userDoc2,
+        (userSnap, userSnap2) {
+          return [userSnap, userSnap2]
+              .whereType<DocumentSnapshot<TestUserModel>>()
+              .map((snap) => snap.data.name)
+              .toList();
+        },
+      );
+
+      final namesStream = namesComputation.stream();
+
+      // Recomputations are grouped by the current event loop tick so to de-lineate them
+      // we separate updates by a micro task.
+      await Future.microtask(() => null);
+
+      userDoc.create(user);
+      userDoc2.create(user2);
+
+      await Future.microtask(() => null);
+
+      userDoc.update(TestUserModel('Updated User 1'));
+
+      expectLater(
+        namesStream,
+        emitsInOrder([
+          [],
+          ['User 1', 'User 2'],
+          ['Updated User 1', 'User 2'],
+        ]),
+      );
+    });
+  });
+
   group('Clear collection', () {
     tearDown(() {
       Loon.clearAll();

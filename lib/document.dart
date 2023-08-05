@@ -73,6 +73,7 @@ class Document<T> implements Computable<DocumentSnapshot<T>?> {
     return Loon._instance._getSnapshot<T>(this);
   }
 
+  @override
   ObservableDocument<T> asObservable() {
     return ObservableDocument<T>(
       id: id,
@@ -84,11 +85,12 @@ class Document<T> implements Computable<DocumentSnapshot<T>?> {
   }
 
   @override
-  Stream<DocumentSnapshot<T>?> stream() {
+  stream() {
     return asObservable().stream();
   }
 
-  Stream<ObservableChangeRecord<DocumentSnapshot<T>?>> streamChanges() {
+  @override
+  streamChanges() {
     return asObservable().streamChanges();
   }
 

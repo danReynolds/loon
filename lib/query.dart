@@ -52,6 +52,7 @@ class Query<T> implements Computable<List<DocumentSnapshot<T>>> {
     );
   }
 
+  @override
   ObservableQuery<T> asObservable() {
     return ObservableQuery<T>(
       collection,
@@ -64,11 +65,12 @@ class Query<T> implements Computable<List<DocumentSnapshot<T>>> {
   }
 
   @override
-  Stream<List<DocumentSnapshot<T>>> stream() {
+  stream() {
     return asObservable().stream();
   }
 
-  Stream<ObservableChangeRecord<List<DocumentSnapshot<T>>>> streamChanges() {
+  @override
+  streamChanges() {
     return asObservable().streamChanges();
   }
 

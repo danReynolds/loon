@@ -2,6 +2,7 @@ part of loon;
 
 typedef ObservableChangeRecord<T> = (T prev, T next);
 
+/// A mixin that provides an observable interface for the access and streaming of stored value.
 mixin Observable<T> {
   late final StreamController<ObservableChangeRecord<T>> _controller;
   late final Stream<T> _valueStream;

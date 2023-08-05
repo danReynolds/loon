@@ -15,10 +15,10 @@ class ObservableQuery<T> extends Query<T>
     required super.toJson,
     required super.persistorSettings,
   }) {
-    add([]);
+    init([]);
   }
 
-  /// On broadcast, the query examines the documents that have been added, removed or modified
+  /// On broadcast, the [ObservableQuery] examines the documents that have been added, removed or modified
   /// since the last broadcast and determines if the query needs to rebroadcast to its observers.
   /// The conditions for rebroadcasting the updated query are as follows:
   /// 1. A new document has been added that satisfies the query filter.
@@ -106,7 +106,6 @@ class ObservableQuery<T> extends Query<T>
 
     if (shouldBroadcast) {
       final snaps = _sortQuery(_index.values.toList());
-
       add(snaps);
     }
   }
