@@ -588,6 +588,68 @@ void main() {
         ]),
       );
     });
+
+    test('supports query computables', () {
+      final user = TestUserModel('User 1');
+      final user2 = TestUserModel('User 2');
+      final userDoc = TestUserModel.store.doc('1');
+      final userDoc2 = TestUserModel.store.doc('2');
+
+      userDoc.create(user);
+      userDoc2.create(user2);
+
+      final userQuery = TestUserModel.store;
+
+      final matchUserComputation = Loon.compute2<
+          DocumentSnapshot<TestUserModel>?,
+          DocumentSnapshot<TestUserModel>?,
+          List<DocumentSnapshot<TestUserModel>>>(
+        null,
+        userDoc,
+        userQuery,
+        (userSnap, usersSnap) {
+          return usersSnap
+              .firstWhere((snap) => snap.doc.id == userSnap?.doc.id);
+        },
+      );
+
+      expect(matchUserComputation.get()?.data.toJson(), user.toJson());
+    });
+
+    test('supports nested computations', () {
+      final user = TestUserModel('User 1');
+      final user2 = TestUserModel('User 2');
+      final userDoc = TestUserModel.store.doc('1');
+      final userDoc2 = TestUserModel.store.doc('2');
+
+      userDoc.create(user);
+      userDoc2.create(user2);
+
+      final namesComputation = Loon.compute2<List<String>,
+          DocumentSnapshot<TestUserModel>?, DocumentSnapshot<TestUserModel>?>(
+        [],
+        userDoc,
+        userDoc2,
+        (userSnap, userSnap2) {
+          return [userSnap, userSnap2]
+              .whereType<DocumentSnapshot<TestUserModel>>()
+              .map((snap) => snap.data.name)
+              .toList();
+        },
+      );
+
+      final matchingNameComputation = Loon.compute2<String?,
+          DocumentSnapshot<TestUserModel>?, List<String>>(
+        null,
+        userDoc,
+        namesComputation,
+        (userSnap, userNames) {
+          return userNames.firstWhere((name) => name == userSnap?.data.name);
+        },
+      );
+
+      expect(matchingNameComputation.get(), 'User 1');
+    });
   });
 
   group('Clear collection', () {
