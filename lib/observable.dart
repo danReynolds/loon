@@ -9,14 +9,17 @@ mixin Observable<T> {
   late T value;
   late T prevValue;
 
-  init(T initialValue) {
+  init([T? initialValue]) {
     _controller =
         StreamController<ObservableChangeRecord<T>>(onCancel: dispose);
     _valueStream = _controller.stream.asBroadcastStream().map((record) {
       final (_, next) = record;
       return next;
     });
-    prevValue = value = initialValue;
+
+    if (initialValue != null) {
+      prevValue = value = initialValue;
+    }
 
     add(get());
   }

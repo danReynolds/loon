@@ -445,51 +445,51 @@ class Loon {
   }
 
   static Computation<T> compute2<T, S1, S2>(
-    T initialValue,
     Computable<S1> computable1,
     Computable<S2> computable2,
-    T Function(S1 computable1, S2 computable2) compute,
-  ) {
+    T Function(S1 computable1, S2 computable2) compute, {
+    T? initialValue,
+  }) {
     return Computation.compute2<T, S1, S2>(
-      initialValue,
       computable1,
       computable2,
       compute,
+      initialValue: initialValue,
     );
   }
 
   static Computation<T> compute3<T, S1, S2, S3>(
-    T initialValue,
     Computable<S1> computable1,
     Computable<S2> computable2,
     Computable<S3> computable3,
-    T Function(S1 computable1, S2 computable2, S3 computable3) compute,
-  ) {
+    T Function(S1 computable1, S2 computable2, S3 computable3) compute, {
+    T? initialValue,
+  }) {
     return Computation.compute3<T, S1, S2, S3>(
-      initialValue,
       computable1,
       computable2,
       computable3,
       compute,
+      initialValue: initialValue,
     );
   }
 
   static Computation<T> compute4<T, S1, S2, S3, S4>(
-    T initialValue,
     Computable<S1> computable1,
     Computable<S2> computable2,
     Computable<S3> computable3,
     Computable<S3> computable4,
     T Function(S1 computable1, S2 computable2, S3 computable3, S4 computable4)
-        compute,
-  ) {
+        compute, {
+    T? initialValue,
+  }) {
     return Computation.compute4<T, S1, S2, S3, S4>(
-      initialValue,
       computable1,
       computable2,
       computable3,
       computable4,
       compute,
+      initialValue: initialValue,
     );
   }
 

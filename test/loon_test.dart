@@ -506,7 +506,6 @@ void main() {
 
       final namesComputation = Loon.compute2<List<String>,
           DocumentSnapshot<TestUserModel>?, DocumentSnapshot<TestUserModel>?>(
-        [],
         userDoc,
         userDoc2,
         (userSnap, userSnap2) {
@@ -531,7 +530,6 @@ void main() {
 
       final namesComputation = Loon.compute2<List<String>,
           DocumentSnapshot<TestUserModel>?, DocumentSnapshot<TestUserModel>?>(
-        [],
         userDoc,
         userDoc2,
         (userSnap, userSnap2) {
@@ -555,7 +553,6 @@ void main() {
 
       final namesComputation = Loon.compute2<List<String>,
           DocumentSnapshot<TestUserModel>?, DocumentSnapshot<TestUserModel>?>(
-        [],
         userDoc,
         userDoc2,
         (userSnap, userSnap2) {
@@ -604,7 +601,6 @@ void main() {
           DocumentSnapshot<TestUserModel>?,
           DocumentSnapshot<TestUserModel>?,
           List<DocumentSnapshot<TestUserModel>>>(
-        null,
         userDoc,
         userQuery,
         (userSnap, usersSnap) {
@@ -627,7 +623,6 @@ void main() {
 
       final namesComputation = Loon.compute2<List<String>,
           DocumentSnapshot<TestUserModel>?, DocumentSnapshot<TestUserModel>?>(
-        [],
         userDoc,
         userDoc2,
         (userSnap, userSnap2) {
@@ -640,7 +635,6 @@ void main() {
 
       final matchingNameComputation = Loon.compute2<String?,
           DocumentSnapshot<TestUserModel>?, List<String>>(
-        null,
         userDoc,
         namesComputation,
         (userSnap, userNames) {

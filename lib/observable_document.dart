@@ -11,7 +11,7 @@ class ObservableDocument<T> extends Document<T>
     super.toJson,
     super.persistorSettings,
   }) {
-    init(null);
+    init();
   }
 
   /// Observing a document just involves checking if it is included in the latest broadcast

@@ -7,11 +7,13 @@ class ObservableComputation<T> extends Computation<T> with Observable<T> {
   bool _hasScheduledRecomputation = false;
 
   ObservableComputation({
-    required super.initialValue,
     required super.computables,
     required super.compute,
+    super.initialValue,
   }) {
-    init(initialValue);
+    if (initialValue != null) {
+      init(initialValue);
+    }
   }
 
   void _scheduleRecomputation() {
@@ -26,7 +28,7 @@ class ObservableComputation<T> extends Computation<T> with Observable<T> {
   }
 
   @override
-  init(initialValue) {
+  init([initialValue]) {
     super.init(initialValue);
 
     _computableValues = List.filled(computables.length, null);
