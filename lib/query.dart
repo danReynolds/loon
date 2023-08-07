@@ -53,7 +53,7 @@ class Query<T> implements Computable<List<DocumentSnapshot<T>>> {
   }
 
   @override
-  ObservableQuery<T> asObservable() {
+  ObservableQuery<T> toObservable() {
     return ObservableQuery<T>(
       collection,
       filters: filters,
@@ -66,12 +66,12 @@ class Query<T> implements Computable<List<DocumentSnapshot<T>>> {
 
   @override
   stream() {
-    return asObservable().stream();
+    return toObservable().stream();
   }
 
   @override
   streamChanges() {
-    return asObservable().streamChanges();
+    return toObservable().streamChanges();
   }
 
   Query<T> sortBy(SortFn<T> sort) {

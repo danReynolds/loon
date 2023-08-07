@@ -74,7 +74,7 @@ class Document<T> implements Computable<DocumentSnapshot<T>?> {
   }
 
   @override
-  ObservableDocument<T> asObservable() {
+  ObservableDocument<T> toObservable() {
     return ObservableDocument<T>(
       id: id,
       collection: collection,
@@ -86,12 +86,12 @@ class Document<T> implements Computable<DocumentSnapshot<T>?> {
 
   @override
   stream() {
-    return asObservable().stream();
+    return toObservable().stream();
   }
 
   @override
   streamChanges() {
-    return asObservable().streamChanges();
+    return toObservable().streamChanges();
   }
 
   Json? getJson() {

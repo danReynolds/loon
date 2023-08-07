@@ -11,12 +11,21 @@ class Computation<T> extends Computable<T> {
     required this.compute,
   });
 
+  static Computation<T> compute1<T, S1>(
+    Computable<S1> computable1,
+    T Function(S1 computable1) compute,
+  ) {
+    return Computation<T>(
+      computables: [computable1],
+      compute: (inputs) => compute(inputs[0]),
+    );
+  }
+
   static Computation<T> compute2<T, S1, S2>(
     Computable<S1> computable1,
     Computable<S2> computable2,
-    T Function(S1 computable1, S2 computable2) compute, {
-    T? initialValue,
-  }) {
+    T Function(S1 computable1, S2 computable2) compute,
+  ) {
     return Computation<T>(
       computables: [computable1, computable2],
       compute: (inputs) => compute(inputs[0], inputs[1]),
@@ -27,9 +36,8 @@ class Computation<T> extends Computable<T> {
     Computable<S1> computable1,
     Computable<S2> computable2,
     Computable<S3> computable3,
-    T Function(S1 computable1, S2 computable2, S3 computable3) compute, {
-    T? initialValue,
-  }) {
+    T Function(S1 computable1, S2 computable2, S3 computable3) compute,
+  ) {
     return Computation<T>(
       computables: [computable1, computable2, computable3],
       compute: (inputs) => compute(inputs[0], inputs[1], inputs[2]),
@@ -46,9 +54,8 @@ class Computation<T> extends Computable<T> {
       S2 computable2,
       S3 computable3,
       S4 computable4,
-    ) compute, {
-    T? initialValue,
-  }) {
+    ) compute,
+  ) {
     return Computation<T>(
       computables: [computable1, computable2, computable3, computable4],
       compute: (inputs) => compute(inputs[0], inputs[1], inputs[2], inputs[3]),
@@ -61,7 +68,7 @@ class Computation<T> extends Computable<T> {
   }
 
   @override
-  asObservable() {
+  toObservable() {
     return ObservableComputation<T>(
       computables: computables,
       compute: compute,
@@ -70,11 +77,11 @@ class Computation<T> extends Computable<T> {
 
   @override
   stream() {
-    return asObservable().stream();
+    return toObservable().stream();
   }
 
   @override
   streamChanges() {
-    return asObservable().streamChanges();
+    return toObservable().streamChanges();
   }
 }

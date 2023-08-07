@@ -24,7 +24,7 @@ class StreamQueryState<T> extends State<QueryStreamBuilder<T>> {
 
     if (oldWidget.query != widget.query) {
       _observableQuery.dispose();
-      _observableQuery = widget.query.asObservable();
+      _observableQuery = widget.query.toObservable();
     }
   }
 
@@ -32,7 +32,7 @@ class StreamQueryState<T> extends State<QueryStreamBuilder<T>> {
   void initState() {
     super.initState();
 
-    _observableQuery = widget.query.asObservable();
+    _observableQuery = widget.query.toObservable();
   }
 
   @override

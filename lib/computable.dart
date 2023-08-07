@@ -9,5 +9,5 @@ abstract interface class Computable<T> {
 
   Stream<ObservableChangeRecord<T>> streamChanges();
 
-  Observable<T> asObservable();
+  Observable<T> toObservable();
 }

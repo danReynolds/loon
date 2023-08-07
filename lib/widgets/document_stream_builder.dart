@@ -24,7 +24,7 @@ class DocumentStreamState<T> extends State<DocumentStreamBuilder<T>> {
 
     if (oldWidget.doc != widget.doc) {
       _observableDoc.dispose();
-      _observableDoc = widget.doc.asObservable();
+      _observableDoc = widget.doc.toObservable();
     }
   }
 
@@ -32,7 +32,7 @@ class DocumentStreamState<T> extends State<DocumentStreamBuilder<T>> {
   void initState() {
     super.initState();
 
-    _observableDoc = widget.doc.asObservable();
+    _observableDoc = widget.doc.toObservable();
   }
 
   @override
