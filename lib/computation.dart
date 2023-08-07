@@ -3,14 +3,12 @@ part of 'loon.dart';
 /// A [Computation] is used to derive data from the composition of multiple computable inputs
 /// consisting of [Document], [Query] and other [Computation] objects.
 class Computation<T> extends Computable<T> {
-  final T? initialValue;
   final List<Computable> computables;
   final T Function(List inputs) compute;
 
   Computation({
     required this.computables,
     required this.compute,
-    this.initialValue,
   });
 
   static Computation<T> compute2<T, S1, S2>(
@@ -22,7 +20,6 @@ class Computation<T> extends Computable<T> {
     return Computation<T>(
       computables: [computable1, computable2],
       compute: (inputs) => compute(inputs[0], inputs[1]),
-      initialValue: initialValue,
     );
   }
 
@@ -36,7 +33,6 @@ class Computation<T> extends Computable<T> {
     return Computation<T>(
       computables: [computable1, computable2, computable3],
       compute: (inputs) => compute(inputs[0], inputs[1], inputs[2]),
-      initialValue: initialValue,
     );
   }
 
@@ -56,7 +52,6 @@ class Computation<T> extends Computable<T> {
     return Computation<T>(
       computables: [computable1, computable2, computable3, computable4],
       compute: (inputs) => compute(inputs[0], inputs[1], inputs[2], inputs[3]),
-      initialValue: initialValue,
     );
   }
 
@@ -68,7 +63,6 @@ class Computation<T> extends Computable<T> {
   @override
   asObservable() {
     return ObservableComputation<T>(
-      initialValue: initialValue,
       computables: computables,
       compute: compute,
     );

@@ -45,7 +45,7 @@ class StreamQueryState<T> extends State<QueryStreamBuilder<T>> {
   build(context) {
     return StreamBuilder<List<DocumentSnapshot<T>>>(
       key: ObjectKey(_observableQuery),
-      initialData: _observableQuery.value,
+      initialData: _observableQuery.get(),
       stream: _observableQuery.stream(),
       builder: (context, snap) => widget.builder(context, snap.requireData),
     );

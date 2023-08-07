@@ -45,7 +45,7 @@ class DocumentStreamState<T> extends State<DocumentStreamBuilder<T>> {
   build(context) {
     return StreamBuilder<DocumentSnapshot<T>?>(
       key: ObjectKey(_observableDoc),
-      initialData: _observableDoc.value,
+      initialData: _observableDoc.get(),
       stream: _observableDoc.stream(),
       builder: (context, snap) => widget.builder(context, snap.data),
     );

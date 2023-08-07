@@ -4,7 +4,7 @@ part of loon;
 /// for receiving [Document] broadcasts.
 mixin BroadcastObservable<T> on Observable<T> {
   @override
-  void init([T? initialValue]) {
+  void init(initialValue) {
     super.init(initialValue);
     Loon._instance._addBroadcastObserver(this);
   }

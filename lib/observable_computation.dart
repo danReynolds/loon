@@ -9,28 +9,7 @@ class ObservableComputation<T> extends Computation<T> with Observable<T> {
   ObservableComputation({
     required super.computables,
     required super.compute,
-    super.initialValue,
   }) {
-    if (initialValue != null) {
-      init(initialValue);
-    }
-  }
-
-  void _scheduleRecomputation() {
-    if (!_hasScheduledRecomputation) {
-      _hasScheduledRecomputation = true;
-
-      scheduleMicrotask(() {
-        _hasScheduledRecomputation = false;
-        add(compute(_computableValues));
-      });
-    }
-  }
-
-  @override
-  init([initialValue]) {
-    super.init(initialValue);
-
     _computableValues = List.filled(computables.length, null);
 
     for (int i = 0; i < computables.length; i++) {
@@ -45,6 +24,21 @@ class ObservableComputation<T> extends Computation<T> with Observable<T> {
         ),
       );
     }
+    init(super.get());
+  }
+
+  void _scheduleRecomputation() {
+    if (!_hasScheduledRecomputation) {
+      _hasScheduledRecomputation = true;
+      scheduleMicrotask(_recompute);
+    }
+  }
+
+  T _recompute() {
+    _hasScheduledRecomputation = false;
+    final updatedValue = compute(_computableValues);
+    add(updatedValue);
+    return updatedValue;
   }
 
   @override
@@ -53,5 +47,16 @@ class ObservableComputation<T> extends Computation<T> with Observable<T> {
     for (final subscription in _subscriptions) {
       subscription.cancel();
     }
+  }
+
+  /// Since this is a hot observable, if there isn't a pending rebroadcast, then it has the latest updated value already
+  /// and that value can be immediately returned without recomputation. If there is a pending recomputation scheduled, then we must
+  /// recompute immediately to return the latest value.
+  @override
+  get() {
+    if (_hasScheduledRecomputation) {
+      return _recompute();
+    }
+    return _value;
   }
 }
