@@ -387,6 +387,39 @@ void main() {
         ]),
       );
     });
+
+    test('Defaults to non-multicast observables', () {
+      final userDoc = TestUserModel.store.doc('1');
+      final userDocObservable = userDoc.observe();
+      userDocObservable.stream().listen(null);
+
+      expect(
+        // A second subscription to the non-multicast observable should throw.
+        () => userDocObservable.stream().listen(null),
+        throwsStateError,
+      );
+    });
+
+    test('Automatically disposes non-multicast observables', () {
+      final userDoc = TestUserModel.store.doc('1');
+      final userDocObservable = userDoc.observe();
+      final subscription = userDocObservable.stream().listen(null);
+      subscription.cancel();
+      expect(userDocObservable.isClosed, true);
+    });
+
+    test('Requires manual disposal of multi cast observables', () {
+      final userDoc = TestUserModel.store.doc('1');
+      final userDocObservable = userDoc.observe(multicast: true);
+      final subscription = userDocObservable.stream().listen(null);
+      final subscription2 = userDocObservable.stream().listen(null);
+      subscription.cancel();
+      subscription2.cancel();
+
+      expect(userDocObservable.isClosed, false);
+      userDocObservable.dispose();
+      expect(userDocObservable.isClosed, true);
+    });
   });
 
   group('Query documents', () {
@@ -643,6 +676,33 @@ void main() {
       );
 
       expect(matchingNameComputation.get(), 'User 1');
+    });
+
+    test('mapTo computes correctly', () {
+      final user = TestUserModel('User 1');
+      final user2 = TestUserModel('User 2');
+      final userDoc = TestUserModel.store.doc('1');
+      final userDoc2 = TestUserModel.store.doc('2');
+
+      userDoc.create(user);
+      userDoc2.create(user2);
+
+      final namesComputation = Loon.compute2<List<String>,
+          DocumentSnapshot<TestUserModel>?, DocumentSnapshot<TestUserModel>?>(
+        userDoc,
+        userDoc2,
+        (userSnap, userSnap2) {
+          return [userSnap, userSnap2]
+              .whereType<DocumentSnapshot<TestUserModel>>()
+              .map((snap) => snap.data.name)
+              .toList();
+        },
+      );
+
+      final joinedNamesComputation =
+          namesComputation.map<String>((names) => names.join(', '));
+
+      expect(joinedNamesComputation.get(), 'User 1, User 2');
     });
   });
 

@@ -8,7 +8,6 @@ export 'persistor/file_persistor.dart';
 export 'persistor/encrypted_file_persistor.dart';
 
 part 'observable.dart';
-part 'broadcast_observable.dart';
 part 'query.dart';
 part 'observable_query.dart';
 part 'collection.dart';
@@ -20,6 +19,8 @@ part 'persistor/persistor.dart';
 part 'computable.dart';
 part 'computation.dart';
 part 'observable_computation.dart';
+part 'observable_value.dart';
+part 'broadcast_observer.dart';
 
 typedef CollectionStore = Map<String, Map<String, DocumentSnapshot>>;
 typedef BroadcastCollectionStore = Map<String, Map<String, BroadcastDocument>>;
@@ -40,7 +41,7 @@ class Loon {
   final BroadcastCollectionStore _broadcastCollectionStore = {};
 
   /// The list of observers, either document or query observers, that should be notified on broadcast.
-  final Set<BroadcastObservable> _broadcastObservers = {};
+  final Set<BroadcastObserver> _broadcastObservers = {};
 
   bool _hasPendingBroadcast = false;
 
@@ -235,11 +236,11 @@ class Loon {
     }).toList();
   }
 
-  void _addBroadcastObserver(BroadcastObservable observer) {
+  void _addBroadcastObserver(BroadcastObserver observer) {
     _broadcastObservers.add(observer);
   }
 
-  void _removeBroadcastObserver(BroadcastObservable observer) {
+  void _removeBroadcastObserver(BroadcastObserver observer) {
     _broadcastObservers.remove(observer);
   }
 
@@ -249,19 +250,23 @@ class Loon {
 
       // Schedule a broadcast event to be run on the microtask queue.
       scheduleMicrotask(() {
-        _broadcastQueries();
+        _broadcast();
         _hasPendingBroadcast = false;
       });
     }
   }
 
-  bool _isScheduledForBroadcast<T>(Document<T> doc) {
+  bool _isQueryPendingBroadcast<T>(Query<T> query) {
+    return _instance._broadcastCollectionStore.containsKey(query.collection);
+  }
+
+  bool _isDocumentPendingBroadcast<T>(Document<T> doc) {
     return _instance._broadcastCollectionStore[doc.collection]
             ?.containsKey(doc.id) ??
         false;
   }
 
-  void _broadcastQueries({
+  void _broadcast({
     bool broadcastPersistor = true,
   }) {
     for (final observer in _broadcastObservers) {
@@ -413,7 +418,7 @@ class Loon {
       // ignore: avoid_print
       print('Loon: Error hydrating');
     }
-    _instance._broadcastQueries(broadcastPersistor: false);
+    _instance._broadcast(broadcastPersistor: false);
   }
 
   static Collection<T> collection<T>(
@@ -442,16 +447,6 @@ class Loon {
       toJson: toJson,
       persistorSettings: persistorSettings,
     ).doc(id);
-  }
-
-  static Computation<T> compute1<T, S1>(
-    Computable<S1> computable1,
-    T Function(S1 computable1) compute,
-  ) {
-    return Computation.compute1<T, S1>(
-      computable1,
-      compute,
-    );
   }
 
   static Computation<T> compute2<T, S1, S2>(
@@ -505,7 +500,7 @@ class Loon {
   static void rebroadcast<T>(Document<T> doc) {
     // If the document is already scheduled for broadcast, then manually touching it for rebroadcast is a no-op, since it
     // is already enqueued for broadcast.
-    if (!_instance._isScheduledForBroadcast(doc)) {
+    if (!_instance._isDocumentPendingBroadcast(doc)) {
       _instance._writeBroadcastDocument<T>(
         doc,
         BroadcastEventTypes.touched,

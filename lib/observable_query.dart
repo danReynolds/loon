@@ -3,7 +3,7 @@ part of loon;
 class ObservableQuery<T> extends Query<T>
     with
         Observable<List<DocumentSnapshot<T>>>,
-        BroadcastObservable<List<DocumentSnapshot<T>>> {
+        BroadcastObserver<List<DocumentSnapshot<T>>> {
   /// A cache of the snapshots broadcasted by the query indexed by their [Document] ID.
   final Map<String, DocumentSnapshot<T>> _index = {};
 
@@ -14,8 +14,9 @@ class ObservableQuery<T> extends Query<T>
     required super.fromJson,
     required super.toJson,
     required super.persistorSettings,
+    required bool multicast,
   }) {
-    init([]);
+    init(super.get(), multicast: multicast);
   }
 
   /// On broadcast, the [ObservableQuery] examines the documents that have been added, removed or modified
@@ -108,5 +109,13 @@ class ObservableQuery<T> extends Query<T>
       final snaps = _sortQuery(_index.values.toList());
       add(snaps);
     }
+  }
+
+  @override
+  get() {
+    if (Loon._instance._isQueryPendingBroadcast(this)) {
+      return super.get();
+    }
+    return _value;
   }
 }

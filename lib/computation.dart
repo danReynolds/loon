@@ -11,9 +11,9 @@ class Computation<T> extends Computable<T> {
     required this.compute,
   });
 
-  static Computation<T> compute1<T, S1>(
+  static Computation<T> _compute1<T, S1>(
     Computable<S1> computable1,
-    T Function(S1 computable1) compute,
+    T Function(S1 input1) compute,
   ) {
     return Computation<T>(
       computables: [computable1],
@@ -24,7 +24,7 @@ class Computation<T> extends Computable<T> {
   static Computation<T> compute2<T, S1, S2>(
     Computable<S1> computable1,
     Computable<S2> computable2,
-    T Function(S1 computable1, S2 computable2) compute,
+    T Function(S1 input1, S2 input2) compute,
   ) {
     return Computation<T>(
       computables: [computable1, computable2],
@@ -36,7 +36,7 @@ class Computation<T> extends Computable<T> {
     Computable<S1> computable1,
     Computable<S2> computable2,
     Computable<S3> computable3,
-    T Function(S1 computable1, S2 computable2, S3 computable3) compute,
+    T Function(S1 input1, S2 input2, S3 input3) compute,
   ) {
     return Computation<T>(
       computables: [computable1, computable2, computable3],
@@ -50,10 +50,10 @@ class Computation<T> extends Computable<T> {
     Computable<S3> computable3,
     Computable<S3> computable4,
     T Function(
-      S1 computable1,
-      S2 computable2,
-      S3 computable3,
-      S4 computable4,
+      S1 input1,
+      S2 input2,
+      S3 input3,
+      S4 input4,
     ) compute,
   ) {
     return Computation<T>(
@@ -67,21 +67,47 @@ class Computation<T> extends Computable<T> {
     return compute(computables.map((computable) => computable.get()).toList());
   }
 
-  @override
-  toObservable() {
+  ObservableComputation<T> observe({
+    bool multicast = false,
+  }) {
     return ObservableComputation<T>(
       computables: computables,
       compute: compute,
+      multicast: multicast,
     );
   }
 
   @override
   stream() {
-    return toObservable().stream();
+    return observe().stream();
   }
 
   @override
   streamChanges() {
-    return toObservable().streamChanges();
+    return observe().streamChanges();
+  }
+
+  Computation<S> map<S>(S Function(T input) transform) {
+    return _compute1<S, T>(this, transform);
+  }
+
+  Computation<S> switchMap<S>(Computation<S> Function(T input) transform) {
+    final transformedComputation = map<Computation<S>>(transform);
+    final outputComputable =
+        ObservableValue<S>(transformedComputation.get().get());
+
+    StreamSubscription<Computation<S>>? sourceSubscription;
+    StreamSubscription<S>? innerSubscription;
+
+    sourceSubscription =
+        transformedComputation.stream().listen((outputComputation) {
+      innerSubscription?.cancel();
+      innerSubscription =
+          outputComputation.stream().listen(outputComputable.add);
+    }, onDone: () {
+      sourceSubscription!.cancel();
+    });
+
+    return _compute1(outputComputable, (input) => input);
   }
 }

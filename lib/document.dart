@@ -73,25 +73,27 @@ class Document<T> implements Computable<DocumentSnapshot<T>?> {
     return Loon._instance._getSnapshot<T>(this);
   }
 
-  @override
-  ObservableDocument<T> toObservable() {
+  ObservableDocument<T> observe({
+    bool multicast = false,
+  }) {
     return ObservableDocument<T>(
       id: id,
       collection: collection,
       fromJson: fromJson,
       toJson: toJson,
       persistorSettings: persistorSettings,
+      multicast: multicast,
     );
   }
 
   @override
   stream() {
-    return toObservable().stream();
+    return observe().stream();
   }
 
   @override
   streamChanges() {
-    return toObservable().streamChanges();
+    return observe().streamChanges();
   }
 
   Json? getJson() {

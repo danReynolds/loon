@@ -4,11 +4,12 @@ class ObservableComputation<T> extends Computation<T> with Observable<T> {
   final List<StreamSubscription> _subscriptions = [];
   late List _computableValues;
 
-  bool _hasScheduledRecomputation = false;
+  bool _hasPendingRecomputation = false;
 
   ObservableComputation({
     required super.computables,
     required super.compute,
+    required bool multicast,
   }) {
     _computableValues = List.filled(computables.length, null);
 
@@ -24,21 +25,19 @@ class ObservableComputation<T> extends Computation<T> with Observable<T> {
         ),
       );
     }
-    init(super.get());
+    init(super.get(), multicast: multicast);
   }
 
   void _scheduleRecomputation() {
-    if (!_hasScheduledRecomputation) {
-      _hasScheduledRecomputation = true;
+    if (!_hasPendingRecomputation) {
+      _hasPendingRecomputation = true;
       scheduleMicrotask(_recompute);
     }
   }
 
   T _recompute() {
-    _hasScheduledRecomputation = false;
-    final updatedValue = compute(_computableValues);
-    add(updatedValue);
-    return updatedValue;
+    _hasPendingRecomputation = false;
+    return add(compute(_computableValues));
   }
 
   @override
@@ -49,12 +48,9 @@ class ObservableComputation<T> extends Computation<T> with Observable<T> {
     }
   }
 
-  /// Since this is a hot observable, if there isn't a pending rebroadcast, then it has the latest updated value already
-  /// and that value can be immediately returned without recomputation. If there is a pending recomputation scheduled, then we must
-  /// recompute immediately to return the latest value.
   @override
   get() {
-    if (_hasScheduledRecomputation) {
+    if (_hasPendingRecomputation) {
       return _recompute();
     }
     return _value;

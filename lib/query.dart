@@ -52,8 +52,9 @@ class Query<T> implements Computable<List<DocumentSnapshot<T>>> {
     );
   }
 
-  @override
-  ObservableQuery<T> toObservable() {
+  ObservableQuery<T> observe({
+    bool multicast = false,
+  }) {
     return ObservableQuery<T>(
       collection,
       filters: filters,
@@ -61,17 +62,18 @@ class Query<T> implements Computable<List<DocumentSnapshot<T>>> {
       fromJson: fromJson,
       toJson: toJson,
       persistorSettings: persistorSettings,
+      multicast: multicast,
     );
   }
 
   @override
   stream() {
-    return toObservable().stream();
+    return observe().stream();
   }
 
   @override
   streamChanges() {
-    return toObservable().streamChanges();
+    return observe().streamChanges();
   }
 
   Query<T> sortBy(SortFn<T> sort) {
