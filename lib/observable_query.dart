@@ -16,7 +16,12 @@ class ObservableQuery<T> extends Query<T>
     required super.persistorSettings,
     required bool multicast,
   }) {
-    init(super.get(), multicast: multicast);
+    final snaps = super.get();
+    for (final snap in snaps) {
+      _index[snap.id] = snap;
+    }
+
+    init(snaps, multicast: multicast);
   }
 
   /// On broadcast, the [ObservableQuery] examines the documents that have been added, removed or modified

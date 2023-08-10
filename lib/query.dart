@@ -1,6 +1,6 @@
 part of loon;
 
-class Query<T> implements Computable<List<DocumentSnapshot<T>>> {
+class Query<T> with Computable<List<DocumentSnapshot<T>>> {
   final String collection;
   final List<FilterFn<T>> filters;
   final SortFn<T>? sort;

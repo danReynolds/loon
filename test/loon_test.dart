@@ -522,12 +522,12 @@ void main() {
     });
   });
 
-  group('Computations', () {
+  group('Computables', () {
     tearDown(() {
       Loon.clearAll();
     });
 
-    test('are computed correctly', () {
+    test('Execute computations correctly', () {
       final user = TestUserModel('User 1');
       final user2 = TestUserModel('User 2');
       final userDoc = TestUserModel.store.doc('1');
@@ -551,7 +551,7 @@ void main() {
       expect(namesComputation.get(), ['User 1', 'User 2']);
     });
 
-    test('recompute correctly', () {
+    test('Execute recomputations correctly', () {
       final user = TestUserModel('User 1');
       final user2 = TestUserModel('User 2');
       final userDoc = TestUserModel.store.doc('1');
@@ -577,7 +577,7 @@ void main() {
       expect(namesComputation.get(), ['Updated User 1', 'User 2']);
     });
 
-    test('recomputes stream correctly', () async {
+    test('Execute stream recomputations correctly', () async {
       final user = TestUserModel('User 1');
       final user2 = TestUserModel('User 2');
       final userDoc = TestUserModel.store.doc('1');
@@ -648,7 +648,7 @@ void main() {
       expect(matchUserComputation.get()?.data.toJson(), user.toJson());
     });
 
-    test('supports nested computations', () {
+    test('supports composing computations', () {
       final user = TestUserModel('User 1');
       final user2 = TestUserModel('User 2');
       final userDoc = TestUserModel.store.doc('1');
@@ -708,7 +708,7 @@ void main() {
       expect(joinedNamesComputation.get(), 'User 1, User 2');
     });
 
-    test('switchMap computes correctly', () async {
+    test('switchMap supports mapping computations', () async {
       final user = TestUserModel('User 1');
       final user2 = TestUserModel('User 2');
       final user3 = TestUserModel('User 3');
@@ -734,7 +734,7 @@ void main() {
         },
       );
 
-      final composedComputation =
+      final mappedComputation =
           namesComputation.switchMap<List<String>>((names) {
         return Loon.compute2<List<String>, DocumentSnapshot<TestUserModel>?,
             DocumentSnapshot<TestUserModel>?>(
@@ -749,7 +749,7 @@ void main() {
         );
       });
 
-      final observableComposedComputation = composedComputation.observe();
+      final observableMappedComputation = mappedComputation.observe();
 
       await asyncEvent();
 
@@ -761,10 +761,10 @@ void main() {
 
       await asyncEvent();
 
-      observableComposedComputation.dispose();
+      observableMappedComputation.dispose();
 
       await expectLater(
-        observableComposedComputation.stream(),
+        observableMappedComputation.stream(),
         emitsInOrder([
           [
             'User 2',
@@ -778,6 +778,140 @@ void main() {
             'User 2',
             'User 3 Updated',
           ],
+          emitsDone,
+        ]),
+      );
+    });
+
+    test('switchMap supports mapping to queries', () async {
+      final user = TestUserModel('User 1');
+      final user2 = TestUserModel('User 2');
+      final user3 = TestUserModel('User 2');
+      final userDoc = TestUserModel.store.doc('1');
+      final userDoc2 = TestUserModel.store.doc('2');
+      final userDoc3 = TestUserModel.store.doc('3');
+
+      userDoc.create(user);
+      userDoc2.create(user2);
+      userDoc3.create(user3);
+
+      await asyncEvent();
+
+      final userIdsComputation = Loon.compute2<List<String>,
+          DocumentSnapshot<TestUserModel>?, DocumentSnapshot<TestUserModel>?>(
+        userDoc,
+        userDoc2,
+        (userSnap, userSnap2) {
+          return [userSnap, userSnap2]
+              .whereType<DocumentSnapshot<TestUserModel>>()
+              .map((snap) => snap.id)
+              .toList();
+        },
+      );
+
+      final otherUserIdsComputation = userIdsComputation.switchMap((ids) {
+        return TestUserModel.store.where((snap) {
+          return !ids.contains(snap.id);
+        }).map((snaps) => snaps.map((snap) => snap.id).toList());
+      });
+
+      final observableOtherUserIdsComputation =
+          otherUserIdsComputation.observe();
+
+      await asyncEvent();
+
+      userDoc.update(TestUserModel('User 1 Updated'));
+
+      await asyncEvent();
+
+      userDoc3.delete();
+
+      await asyncEvent();
+
+      observableOtherUserIdsComputation.dispose();
+
+      await expectLater(
+        observableOtherUserIdsComputation.stream(),
+        emitsInOrder([
+          ['3'],
+          ['3'],
+          [],
+          emitsDone,
+        ]),
+      );
+    });
+
+    test('switchMap supports mapping to documents', () async {
+      final user = TestUserModel('User 1');
+      final user2 = TestUserModel('User 2');
+      final userDoc = TestUserModel.store.doc('1');
+      final userDoc2 = TestUserModel.store.doc('2');
+
+      userDoc.create(user);
+      userDoc2.create(user2);
+
+      await asyncEvent();
+
+      final mappedUserComputable = userDoc.switchMap((userSnap) {
+        return userDoc2;
+      }).map((snap) => snap!.data.name);
+
+      final observableMappedUserComputable = mappedUserComputable.observe();
+
+      await asyncEvent();
+
+      userDoc.update(TestUserModel('User 1 Updated'));
+
+      await asyncEvent();
+
+      userDoc2.update(TestUserModel('User 2 Updated'));
+
+      await asyncEvent();
+
+      observableMappedUserComputable.dispose();
+
+      await expectLater(
+        observableMappedUserComputable.stream(),
+        emitsInOrder([
+          'User 2',
+          'User 2',
+          'User 2 Updated',
+          emitsDone,
+        ]),
+      );
+    });
+
+    test('switchMap supports mapping to computable values', () async {
+      final user = TestUserModel('User 1');
+      final userDoc = TestUserModel.store.doc('1');
+
+      userDoc.create(user);
+
+      await asyncEvent();
+
+      final mappedUserComputable =
+          userDoc.switchMap((_) => Computable.value('Test'));
+
+      final observableMappedUserComputable = mappedUserComputable.observe();
+
+      await asyncEvent();
+
+      userDoc.update(TestUserModel('User 1 Updated'));
+
+      await asyncEvent();
+
+      userDoc.update(TestUserModel('User 1 Updated Again'));
+
+      await asyncEvent();
+
+      observableMappedUserComputable.dispose();
+
+      await expectLater(
+        observableMappedUserComputable.stream(),
+        emitsInOrder([
+          'Test',
+          'Test',
+          'Test',
           emitsDone,
         ]),
       );

@@ -1,26 +1,24 @@
 part of 'loon.dart';
 
-/// An [ObservableComputationSwitcher] is a higher-order [Computable] that is necessary to support the
-/// [Computation.switchMap] operator, which switches to emitting computed values from the most recent
-/// inner computation whenever a new outer computation is created.
-class ObservableComputationSwitcher<T> extends ComputationSwitcher<T>
-    with Observable<T>
-    implements Computable<T> {
-  late StreamSubscription<Computation<T>> outerStreamSubscription;
+/// An [ObservableComputableSwitcher] is a higher-order [Computable] that is necessary to support the
+/// [Computable.switchMap] operator, which switches to emitting values from the most recent
+/// inner computable whenever a new outer computable is created.
+class ObservableComputableSwitcher<T> extends ComputableSwitcher<T>
+    with Observable<T> {
+  late StreamSubscription<Computable<T>> outerStreamSubscription;
   StreamSubscription<T>? innerStreamSubscription;
 
-  ObservableComputationSwitcher(
-    super.computation, {
+  ObservableComputableSwitcher(
+    super.computable, {
     required bool multicast,
   }) {
-    final observableComputation = computation.observe();
-    final initialObservableInnerComputation =
-        observableComputation.get().observe();
+    final observedComputable = computable.observe();
+    final initialObservedInnerComputable = observedComputable.get().observe();
 
     outerStreamSubscription =
         // Skip the first outer computation event as it is precomputed above as the
         // inintial inner computation.
-        observableComputation.stream().skip(1).listen((innerComputation) {
+        observedComputable.stream().skip(1).listen((innerComputation) {
       innerStreamSubscription?.cancel();
       innerStreamSubscription =
           innerComputation.stream().listen(add, onDone: () {
@@ -30,7 +28,7 @@ class ObservableComputationSwitcher<T> extends ComputationSwitcher<T>
       dispose();
     });
 
-    innerStreamSubscription = initialObservableInnerComputation
+    innerStreamSubscription = initialObservedInnerComputable
         .stream()
         // Skip the first inner computation event as it is emitted on the composed computable stream
         // by the call to [init].
@@ -40,7 +38,7 @@ class ObservableComputationSwitcher<T> extends ComputationSwitcher<T>
     });
 
     init(
-      initialObservableInnerComputation.get(),
+      initialObservedInnerComputable.get(),
       multicast: multicast,
     );
   }
@@ -53,7 +51,7 @@ class ObservableComputationSwitcher<T> extends ComputationSwitcher<T>
   }
 
   @override
-  ObservableComputationSwitcher<T> observe({bool multicast = false}) {
+  ObservableComputableSwitcher<T> observe({bool multicast = false}) {
     return this;
   }
 

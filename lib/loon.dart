@@ -19,9 +19,10 @@ part 'persistor/persistor.dart';
 part 'computable.dart';
 part 'computation.dart';
 part 'observable_computation.dart';
-part 'computation_switcher.dart';
-part 'observable_computation_switcher.dart';
+part 'computable_switcher.dart';
+part 'observable_computable_switcher.dart';
 part 'broadcast_observer.dart';
+part 'computed_value.dart';
 
 typedef CollectionStore = Map<String, Map<String, DocumentSnapshot>>;
 typedef BroadcastCollectionStore = Map<String, Map<String, BroadcastDocument>>;

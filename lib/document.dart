@@ -1,6 +1,6 @@
 part of loon;
 
-class Document<T> implements Computable<DocumentSnapshot<T>?> {
+class Document<T> with Computable<DocumentSnapshot<T>?> {
   final String collection;
   final String id;
   final FromJson<T>? fromJson;
