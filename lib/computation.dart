@@ -94,9 +94,7 @@ class Computation<T> extends Computable<T> {
 
   Computation<S> switchMap<S>(Computation<S> Function(T input) transform) {
     return _compute1(
-      ComposedComputable<S>(
-        map<Computation<S>>(transform),
-      ),
+      ComputationSwitcher<S>(map<Computation<S>>(transform)),
       (value) => value,
     );
   }

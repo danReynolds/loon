@@ -1,12 +1,15 @@
 part of 'loon.dart';
 
-class ObservableComposedComputable<T> extends ComposedComputable<T>
+/// An [ObservableComputationSwitcher] is a higher-order [Computable] that is necessary to support the
+/// [Computation.switchMap] operator, which switches to emitting computed values from the most recent
+/// inner computation whenever a new outer computation is created.
+class ObservableComputationSwitcher<T> extends ComputationSwitcher<T>
     with Observable<T>
     implements Computable<T> {
   late StreamSubscription<Computation<T>> outerStreamSubscription;
   StreamSubscription<T>? innerStreamSubscription;
 
-  ObservableComposedComputable(
+  ObservableComputationSwitcher(
     super.computation, {
     required bool multicast,
   }) {
@@ -50,7 +53,7 @@ class ObservableComposedComputable<T> extends ComposedComputable<T>
   }
 
   @override
-  ObservableComposedComputable<T> observe({bool multicast = false}) {
+  ObservableComputationSwitcher<T> observe({bool multicast = false}) {
     return this;
   }
 
