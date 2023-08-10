@@ -1,6 +1,10 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:loon/loon.dart';
 
+Future<void> asyncEvent() {
+  return Future.delayed(const Duration(milliseconds: 1), () => null);
+}
+
 bool mapsEqual(Map<dynamic, dynamic> map1, Map<dynamic, dynamic> map2) {
   if (map1.length != map2.length) return false;
 
@@ -348,27 +352,22 @@ void main() {
       final updatedUser = TestUserModel('Updated User 1');
       final userDoc = TestUserModel.store.doc('1');
 
-      final userStream = userDoc.stream();
+      final userObs = userDoc.observe();
 
       userDoc.create(user);
 
-      // Wait for the enqueued micro-task broadcast to emit the user on the stream and then perform the next update.
-      await Future.delayed(
-        const Duration(milliseconds: 1),
-        () {
-          userDoc.update(updatedUser);
-        },
-      );
+      await asyncEvent();
+      userDoc.update(updatedUser);
 
-      await Future.delayed(
-        const Duration(milliseconds: 1),
-        () {
-          userDoc.delete();
-        },
-      );
+      await asyncEvent();
+      userDoc.delete();
+
+      await asyncEvent();
+
+      userObs.dispose();
 
       expectLater(
-        userStream,
+        userObs.stream(),
         emitsInOrder([
           null,
           DocumentSnapshotMatcher(
@@ -384,6 +383,7 @@ void main() {
             ),
           ),
           null,
+          emitsDone,
         ]),
       );
     });
@@ -500,9 +500,8 @@ void main() {
           // care about this intermediary broadcast and just compare the first/last result.
           .take(3);
 
-      await Future.delayed(const Duration(milliseconds: 1), () {
-        userDoc.update(user2);
-      });
+      await asyncEvent();
+      userDoc.update(user2);
 
       final querySnaps = await queryStream.toList();
       final firstSnap = querySnaps.first;
@@ -596,18 +595,21 @@ void main() {
         },
       );
 
-      final namesStream = namesComputation.stream();
+      final namesObs = namesComputation.observe();
+      final namesStream = namesObs.stream();
 
-      // Recomputations are grouped by the current event loop tick so to de-lineate them
-      // we separate updates by a micro task.
-      await Future.microtask(() => null);
+      await asyncEvent();
 
       userDoc.create(user);
       userDoc2.create(user2);
 
-      await Future.microtask(() => null);
+      await asyncEvent();
 
       userDoc.update(TestUserModel('Updated User 1'));
+
+      await asyncEvent();
+
+      namesObs.dispose();
 
       expectLater(
         namesStream,
@@ -615,6 +617,7 @@ void main() {
           [],
           ['User 1', 'User 2'],
           ['Updated User 1', 'User 2'],
+          emitsDone,
         ]),
       );
     });
@@ -678,7 +681,7 @@ void main() {
       expect(matchingNameComputation.get(), 'User 1');
     });
 
-    test('mapTo computes correctly', () {
+    test('map computes correctly', () {
       final user = TestUserModel('User 1');
       final user2 = TestUserModel('User 2');
       final userDoc = TestUserModel.store.doc('1');
@@ -703,6 +706,81 @@ void main() {
           namesComputation.map<String>((names) => names.join(', '));
 
       expect(joinedNamesComputation.get(), 'User 1, User 2');
+    });
+
+    test('switchMap computes correctly', () async {
+      final user = TestUserModel('User 1');
+      final user2 = TestUserModel('User 2');
+      final user3 = TestUserModel('User 3');
+      final userDoc = TestUserModel.store.doc('1');
+      final userDoc2 = TestUserModel.store.doc('2');
+      final userDoc3 = TestUserModel.store.doc('3');
+
+      userDoc.create(user);
+      userDoc2.create(user2);
+      userDoc3.create(user3);
+
+      await asyncEvent();
+
+      final namesComputation = Loon.compute2<List<String>,
+          DocumentSnapshot<TestUserModel>?, DocumentSnapshot<TestUserModel>?>(
+        userDoc,
+        userDoc2,
+        (userSnap, userSnap2) {
+          return [userSnap, userSnap2]
+              .whereType<DocumentSnapshot<TestUserModel>>()
+              .map((snap) => snap.data.name)
+              .toList();
+        },
+      );
+
+      final composedComputation =
+          namesComputation.switchMap<List<String>>((names) {
+        return Loon.compute2<List<String>, DocumentSnapshot<TestUserModel>?,
+            DocumentSnapshot<TestUserModel>?>(
+          userDoc2,
+          userDoc3,
+          (userSnap2, userSnap3) {
+            return [userSnap2, userSnap3]
+                .whereType<DocumentSnapshot<TestUserModel>>()
+                .map((snap) => snap.data.name)
+                .toList();
+          },
+        );
+      });
+
+      final observableComposedComputation = composedComputation.observe();
+
+      await asyncEvent();
+
+      userDoc.update(TestUserModel('User 1 Updated'));
+
+      await asyncEvent();
+
+      userDoc3.update(TestUserModel('User 3 Updated'));
+
+      await asyncEvent();
+
+      observableComposedComputation.dispose();
+
+      await expectLater(
+        observableComposedComputation.stream(),
+        emitsInOrder([
+          [
+            'User 2',
+            'User 3',
+          ],
+          [
+            'User 2',
+            'User 3',
+          ],
+          [
+            'User 2',
+            'User 3 Updated',
+          ],
+          emitsDone,
+        ]),
+      );
     });
   });
 

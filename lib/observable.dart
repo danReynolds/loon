@@ -12,13 +12,13 @@ mixin Observable<T> {
   late T _prevValue;
   late final bool multicast;
 
-  init(
+  void init(
     T initialValue, {
     /// Whether the [Observable] can have more than one observable subscription. A single-subscription
-    /// observable will release its resources automatically when its single subscription is canceled.
+    /// observable will allow one listener and release its resources automatically when its listener cancels its subscription.
     /// A multicast observable must have its resources released manually by calling [dispose].
     /// The term *multicast* is used to refer to a a multi-subscription observable since it is common observable terminology and
-    /// the term broadcast is used differently in the library compared to its usage in the underlying Dart [Stream] implementation.
+    /// the term broadcast is to mean something different in the library compared to its usage in the underlying Dart [Stream] implementation.
     required bool multicast,
   }) {
     this.multicast = multicast;
@@ -48,6 +48,10 @@ mixin Observable<T> {
   }
 
   T add(T updatedValue) {
+    if (_controller.isClosed) {
+      return _value;
+    }
+
     _prevValue = _value;
     _value = updatedValue;
     _controller.add((_prevValue, _value));

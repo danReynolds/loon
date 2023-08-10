@@ -112,6 +112,11 @@ class ObservableQuery<T> extends Query<T>
   }
 
   @override
+  ObservableQuery<T> observe({bool multicast = false}) {
+    return this;
+  }
+
+  @override
   get() {
     if (Loon._instance._isQueryPendingBroadcast(this)) {
       return super.get();

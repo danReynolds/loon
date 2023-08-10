@@ -67,6 +67,7 @@ class Computation<T> extends Computable<T> {
     return compute(computables.map((computable) => computable.get()).toList());
   }
 
+  @override
   ObservableComputation<T> observe({
     bool multicast = false,
   }) {
@@ -92,22 +93,11 @@ class Computation<T> extends Computable<T> {
   }
 
   Computation<S> switchMap<S>(Computation<S> Function(T input) transform) {
-    final transformedComputation = map<Computation<S>>(transform);
-    final outputComputable =
-        ObservableValue<S>(transformedComputation.get().get());
-
-    StreamSubscription<Computation<S>>? sourceSubscription;
-    StreamSubscription<S>? innerSubscription;
-
-    sourceSubscription =
-        transformedComputation.stream().listen((outputComputation) {
-      innerSubscription?.cancel();
-      innerSubscription =
-          outputComputation.stream().listen(outputComputable.add);
-    }, onDone: () {
-      sourceSubscription!.cancel();
-    });
-
-    return _compute1(outputComputable, (input) => input);
+    return _compute1(
+      ComposedComputable<S>(
+        map<Computation<S>>(transform),
+      ),
+      (value) => value,
+    );
   }
 }

@@ -25,6 +25,11 @@ class ObservableDocument<T> extends Document<T>
   }
 
   @override
+  ObservableDocument<T> observe({bool multicast = false}) {
+    return this;
+  }
+
+  @override
   get() {
     if (Loon._instance._isDocumentPendingBroadcast(this)) {
       return super.get();

@@ -7,5 +7,9 @@ abstract interface class Computable<T> {
 
   Stream<T> stream();
 
+  Observable<T> observe({
+    bool multicast = false,
+  });
+
   Stream<ObservableChangeRecord<T>> streamChanges();
 }

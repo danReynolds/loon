@@ -73,6 +73,7 @@ class Document<T> implements Computable<DocumentSnapshot<T>?> {
     return Loon._instance._getSnapshot<T>(this);
   }
 
+  @override
   ObservableDocument<T> observe({
     bool multicast = false,
   }) {

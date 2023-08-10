@@ -52,6 +52,7 @@ class Query<T> implements Computable<List<DocumentSnapshot<T>>> {
     );
   }
 
+  @override
   ObservableQuery<T> observe({
     bool multicast = false,
   }) {
