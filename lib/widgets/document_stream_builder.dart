@@ -18,10 +18,6 @@ class DocumentStreamBuilder<T> extends StatefulWidget {
 class DocumentStreamState<T> extends State<DocumentStreamBuilder<T>> {
   late ObservableDocument<T> _observableDoc;
 
-  ObservableDocument<T> _buildDocument(Document<T> doc) {
-    return doc is ObservableDocument<T> ? doc : doc.observe();
-  }
-
   @override
   void didUpdateWidget(covariant DocumentStreamBuilder<T> oldWidget) {
     super.didUpdateWidget(oldWidget);
@@ -35,7 +31,7 @@ class DocumentStreamState<T> extends State<DocumentStreamBuilder<T>> {
   @override
   void initState() {
     super.initState();
-    _observableDoc = _buildDocument(widget.doc);
+    _observableDoc = widget.doc.observe();
   }
 
   @override

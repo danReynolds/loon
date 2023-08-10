@@ -23,18 +23,14 @@ class StreamQueryState<T> extends State<QueryStreamBuilder<T>> {
     super.didUpdateWidget(oldWidget);
 
     if (oldWidget.query != widget.query) {
-      _observableQuery = _buildQuery(widget.query);
+      _observableQuery = widget.query.observe();
     }
-  }
-
-  ObservableQuery<T> _buildQuery(Query<T> query) {
-    return query is ObservableQuery<T> ? query : query.observe();
   }
 
   @override
   void initState() {
     super.initState();
-    _observableQuery = _buildQuery(widget.query);
+    _observableQuery = widget.query.observe();
   }
 
   @override
