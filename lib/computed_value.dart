@@ -2,7 +2,7 @@ part of 'loon.dart';
 
 /// A simple [Computable] used to wrap an arbitrary value when needing to return work with a [Computable]
 /// such as when return a value from [Computable.switchMap] or as an input to a [Computation].
-class ComputedValue<T> with Observable<T>, Computable<T> {
+class ComputedValue<T> with Computable<T>, Observable<T> {
   ComputedValue(
     T value, {
     required bool multicast,

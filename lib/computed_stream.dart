@@ -1,6 +1,6 @@
 part of 'loon.dart';
 
-class ComputedStream<T> with Observable<T>, Computable<T> {
+class ComputedStream<T> with Computable<T>, Observable<T> {
   final Stream<T> sourceStream;
   late final StreamSubscription<T> _sourceStreamSubscription;
 

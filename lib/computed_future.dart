@@ -1,6 +1,6 @@
 part of 'loon.dart';
 
-class ComputedFuture<T> with Observable<T>, Computable<T> {
+class ComputedFuture<T> with Computable<T>, Observable<T> {
   final Future<T> future;
 
   ComputedFuture(
