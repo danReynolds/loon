@@ -12,13 +12,13 @@ class ObservableComputableSwitcher<T> extends ComputableSwitcher<T>
     super.computable, {
     required bool multicast,
   }) {
-    final observedComputable = computable.observe();
-    final initialInnerObservedComputable = observedComputable.get().observe();
+    final outerComputable = computable.observe();
+    final initialInnerComputable = outerComputable.get().observe();
 
     outerStreamSubscription =
         // Skip the first emitted inner computation as it is precomputed above as the
         // initial inner computable.
-        observedComputable.stream().skip(1).listen(
+        outerComputable.stream().skip(1).listen(
       (innerComputable) {
         innerStreamSubscription?.cancel();
         innerStreamSubscription =
@@ -29,17 +29,17 @@ class ObservableComputableSwitcher<T> extends ComputableSwitcher<T>
       onDone: dispose,
     );
 
-    innerStreamSubscription = initialInnerObservedComputable
+    innerStreamSubscription = initialInnerComputable
         .stream()
         // Skip the first emitted inner computation event as it is emitted on the computable stream
-        // by the call to [init].
+        // by the call to [init]
         .skip(1)
         .listen(add, onDone: () {
       innerStreamSubscription!.cancel();
     });
 
     init(
-      initialInnerObservedComputable.get(),
+      initialInnerComputable.get(),
       multicast: multicast,
     );
   }

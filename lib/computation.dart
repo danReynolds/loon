@@ -1,7 +1,7 @@
 part of 'loon.dart';
 
-/// A [Computation] is used to derive data from the composition of multiple computable inputs
-/// consisting of [Document], [Query] and other [Computation] objects.
+/// A [Computation] is used to derive data from the composition of multiple [Computable] inputs
+/// such as [Document], [Query] and [ComputedValue] implementations.
 class Computation<T> with Computable<T> {
   final List<Computable> computables;
   final T Function(List inputs) compute;
