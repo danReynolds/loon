@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:loon/loon.dart';
 
@@ -890,7 +892,7 @@ void main() {
       await asyncEvent();
 
       final mappedUserComputable =
-          userDoc.switchMap((_) => Computable.value('Test'));
+          userDoc.switchMap((_) => Computable.fromValue('Test'));
 
       final observableMappedUserComputable = mappedUserComputable.observe();
 
@@ -911,6 +913,83 @@ void main() {
         emitsInOrder([
           'Test',
           'Test',
+          'Test',
+          emitsDone,
+        ]),
+      );
+    });
+
+    test('switchMap supports mapping to computable streams', () async {
+      final user = TestUserModel('User 1');
+      final userDoc = TestUserModel.store.doc('1');
+
+      final streamController = StreamController<String>();
+
+      userDoc.create(user);
+
+      await asyncEvent();
+
+      final mappedUserComputable = userDoc
+          .switchMap(
+            (_) => Computable.fromStream(
+              streamController.stream,
+              initialValue: '',
+            ),
+          )
+          .observe();
+
+      final computableStream = mappedUserComputable.stream();
+
+      await asyncEvent();
+
+      streamController.add('Test 1');
+
+      await asyncEvent();
+
+      streamController.add('Test 2');
+
+      await asyncEvent();
+
+      mappedUserComputable.dispose();
+
+      await expectLater(
+        computableStream,
+        emitsInOrder([
+          '',
+          'Test 1',
+          'Test 2',
+          emitsDone,
+        ]),
+      );
+    });
+
+    test('switchMap supports mapping to computable futures', () async {
+      final user = TestUserModel('User 1');
+      final userDoc = TestUserModel.store.doc('1');
+
+      userDoc.create(user);
+
+      await asyncEvent();
+
+      final mappedUserComputable = userDoc
+          .switchMap(
+            (_) => Computable.fromFuture<String>(
+              Future.sync(() => 'Test'),
+              initialValue: '',
+            ),
+          )
+          .observe();
+
+      final computableStream = mappedUserComputable.stream();
+
+      await asyncEvent();
+
+      mappedUserComputable.dispose();
+
+      await expectLater(
+        computableStream,
+        emitsInOrder([
+          '',
           'Test',
           emitsDone,
         ]),

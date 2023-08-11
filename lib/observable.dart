@@ -1,9 +1,5 @@
 part of loon;
 
-typedef ObservableChangeRecord<T> = (T prev, T next);
-
-typedef Optional<T> = T?;
-
 /// A mixin that provides an observable interface for the access and streaming of stored values.
 mixin Observable<T> {
   late final StreamController<ObservableChangeRecord<T>> _controller;
@@ -58,6 +54,8 @@ mixin Observable<T> {
     return _value;
   }
 
+  /// [get] is left unimplemented since it has variable logic based on the type of [Observable] like an [ObservableDocument],
+  /// [ObservableQuery], and others.
   T get();
 
   Stream<T> stream() {

@@ -13,24 +13,25 @@ class ObservableComputableSwitcher<T> extends ComputableSwitcher<T>
     required bool multicast,
   }) {
     final observedComputable = computable.observe();
-    final initialObservedInnerComputable = observedComputable.get().observe();
+    final initialInnerObservedComputable = observedComputable.get().observe();
 
     outerStreamSubscription =
-        // Skip the first outer computation event as it is precomputed above as the
-        // inintial inner computation.
-        observedComputable.stream().skip(1).listen((innerComputation) {
-      innerStreamSubscription?.cancel();
-      innerStreamSubscription =
-          innerComputation.stream().listen(add, onDone: () {
-        innerStreamSubscription!.cancel();
-      });
-    }, onDone: () {
-      dispose();
-    });
+        // Skip the first emitted inner computation as it is precomputed above as the
+        // initial inner computable.
+        observedComputable.stream().skip(1).listen(
+      (innerComputable) {
+        innerStreamSubscription?.cancel();
+        innerStreamSubscription =
+            innerComputable.stream().listen(add, onDone: () {
+          innerStreamSubscription!.cancel();
+        });
+      },
+      onDone: dispose,
+    );
 
-    innerStreamSubscription = initialObservedInnerComputable
+    innerStreamSubscription = initialInnerObservedComputable
         .stream()
-        // Skip the first inner computation event as it is emitted on the composed computable stream
+        // Skip the first emitted inner computation event as it is emitted on the computable stream
         // by the call to [init].
         .skip(1)
         .listen(add, onDone: () {
@@ -38,7 +39,7 @@ class ObservableComputableSwitcher<T> extends ComputableSwitcher<T>
     });
 
     init(
-      initialObservedInnerComputable.get(),
+      initialInnerObservedComputable.get(),
       multicast: multicast,
     );
   }

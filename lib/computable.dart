@@ -1,7 +1,7 @@
 part of 'loon.dart';
 
 /// A computable is an object that exposes an interface for the accessing and streaming of stored value.
-/// Computables include the [Document], [Query], [Computation] and [ComputableValue] implementations.
+/// Computables include the [Document], [Query], [Computation] and [ComputedValue] implementations.
 mixin Computable<T> {
   T get();
 
@@ -27,7 +27,37 @@ mixin Computable<T> {
     );
   }
 
-  static Computable<T> value<T>(T value) {
-    return ComputedValue(value);
+  static Computable<T> fromValue<T>(
+    T value, {
+    bool multicast = false,
+  }) {
+    return ComputedValue(
+      value,
+      multicast: multicast,
+    );
+  }
+
+  static Computable<T> fromStream<T>(
+    Stream<T> stream, {
+    T? initialValue,
+    bool multicast = false,
+  }) {
+    return ComputedStream<T>(
+      stream,
+      initialValue: initialValue,
+      multicast: multicast,
+    );
+  }
+
+  static Computable<T> fromFuture<T>(
+    Future<T> future, {
+    T? initialValue,
+    bool multicast = false,
+  }) {
+    return ComputedFuture<T>(
+      future,
+      initialValue: initialValue,
+      multicast: multicast,
+    );
   }
 }
