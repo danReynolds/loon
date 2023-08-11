@@ -10,7 +10,7 @@ class ComputedFuture<T> with Observable<T>, Computable<T> {
   }) {
     assert(
       initialValue != null || T == Optional<T>,
-      'ComputedStream must specify a nullable type or an initial value.',
+      'ComputedFuture must specify a nullable type or an initial value.',
     );
 
     future.then(add);

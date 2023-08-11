@@ -327,7 +327,7 @@ typedef DocumentDataStore = Map<String, Json>;
 typedef CollectionDataStore = Map<String, DocumentDataStore>;
 
 class MyPersistor extends Persistor {
-  Future<void> persist(List<DocumentNotification> docs);
+  Future<void> persist(List<BroadcastDocument> docs);
 
   Future<CollectionDataStore> hydrate();
 
