@@ -20,7 +20,7 @@ part 'computable.dart';
 part 'computation.dart';
 part 'observable_computation.dart';
 part 'computable_switcher.dart';
-part 'observable_computable_switcher.dart';
+part 'observable_switcher.dart';
 part 'broadcast_observer.dart';
 part 'computed_value.dart';
 part 'computed_stream.dart';

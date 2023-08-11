@@ -1,14 +1,13 @@
 part of 'loon.dart';
 
-/// An [ObservableComputableSwitcher] is a higher-order [Computable] that is necessary to support the
+/// An [ObservableSwitcher] is a higher-order [Computable] that is necessary to support the
 /// [Computable.switchMap] operator, which switches to emitting values from the most recent
 /// inner computable whenever a new outer computable is created.
-class ObservableComputableSwitcher<T> extends ComputableSwitcher<T>
-    with Observable<T> {
+class ObservableSwitcher<T> extends ComputableSwitcher<T> with Observable<T> {
   late StreamSubscription<Computable<T>> outerStreamSubscription;
   StreamSubscription<T>? innerStreamSubscription;
 
-  ObservableComputableSwitcher(
+  ObservableSwitcher(
     super.computable, {
     required bool multicast,
   }) {
@@ -52,7 +51,7 @@ class ObservableComputableSwitcher<T> extends ComputableSwitcher<T>
   }
 
   @override
-  ObservableComputableSwitcher<T> observe({bool multicast = false}) {
+  ObservableSwitcher<T> observe({bool multicast = false}) {
     return this;
   }
 

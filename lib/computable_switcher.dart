@@ -14,10 +14,10 @@ class ComputableSwitcher<T> with Computable<T> {
   }
 
   @override
-  ObservableComputableSwitcher<T> observe({
+  ObservableSwitcher<T> observe({
     bool multicast = false,
   }) {
-    return ObservableComputableSwitcher(computable, multicast: multicast);
+    return ObservableSwitcher(computable, multicast: multicast);
   }
 
   @override
