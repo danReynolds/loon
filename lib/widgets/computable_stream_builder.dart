@@ -14,10 +14,9 @@ class ComputableStreamBuilder<T> extends StatelessWidget {
   @override
   build(context) {
     return StreamBuilder<T>(
-      key: ObjectKey(computable),
       initialData: computable.get(),
       stream: computable.stream(),
-      builder: (context, snap) => builder(context, snap.requireData),
+      builder: (context, snap) => builder(context, snap.data as T),
     );
   }
 }

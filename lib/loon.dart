@@ -99,6 +99,15 @@ class Loon {
     return _collectionStore.containsKey(collection);
   }
 
+  bool get _isGlobalPersistenceEnabled {
+    return _instance.persistor?.persistorSettings.persistenceEnabled ?? false;
+  }
+
+  bool _isDocumentPersistenceEnabled(Document doc) {
+    return doc.persistorSettings?.persistenceEnabled ??
+        _isGlobalPersistenceEnabled;
+  }
+
   /// Clears the given collection name from the collection data store.
   Future<void> _clearCollection(String collection) async {
     if (_hasCollection(collection)) {
@@ -220,11 +229,13 @@ class Loon {
       } else {
         // If the broadcast document was created through the hydration process, then it would have been added
         // as a Json document, and we must now convert it to a document of the given type.
-        _validateDataSerialization<T>(
-          fromJson: fromJson,
-          toJson: toJson,
-          data: doc.get()?.data,
-        );
+        if (_isDocumentPersistenceEnabled(doc)) {
+          _validateDataSerialization<T>(
+            fromJson: fromJson,
+            toJson: toJson,
+            data: doc.get()?.data,
+          );
+        }
 
         return BroadcastDocument<T>(
           Document<T>(
@@ -297,7 +308,7 @@ class Loon {
     T data, {
     bool broadcast = true,
   }) {
-    if (data is! Json) {
+    if (data is! Json && _isDocumentPersistenceEnabled(doc)) {
       _validateDataSerialization<T>(
         fromJson: doc.fromJson,
         toJson: doc.toJson,
