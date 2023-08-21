@@ -1,21 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:loon/loon.dart';
 
-class ComputableStreamBuilder<T> extends StatelessWidget {
-  final Computable<T> computable;
+class ObservableStreamBuilder<T> extends StatelessWidget {
+  final Observable<T> observable;
   final Widget Function(BuildContext, T) builder;
 
-  const ComputableStreamBuilder({
+  const ObservableStreamBuilder({
     super.key,
-    required this.computable,
+    required this.observable,
     required this.builder,
   });
 
   @override
   build(context) {
     return StreamBuilder<T>(
-      initialData: computable.get(),
-      stream: computable.stream(),
+      initialData: observable.get(),
+      stream: observable.stream(),
       builder: (context, snap) => builder(context, snap.data as T),
     );
   }

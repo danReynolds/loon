@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:loon/loon.dart';
-import 'package:loon/widgets/computable_stream_builder.dart';
+import 'package:loon/widgets/observable_stream_builder.dart';
 
 class DocumentStreamBuilder<T> extends StatelessWidget {
   final Document<T> doc;
@@ -14,8 +14,8 @@ class DocumentStreamBuilder<T> extends StatelessWidget {
 
   @override
   build(context) {
-    return ComputableStreamBuilder(
-      computable: doc.observe(),
+    return ObservableStreamBuilder(
+      observable: doc.observe(),
       builder: builder,
     );
   }

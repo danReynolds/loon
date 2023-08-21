@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:loon/loon.dart';
-import 'package:loon/widgets/computable_stream_builder.dart';
+import 'package:loon/widgets/observable_stream_builder.dart';
 
 class QueryStreamBuilder<T> extends StatelessWidget {
   final Query<T> query;
@@ -14,8 +14,8 @@ class QueryStreamBuilder<T> extends StatelessWidget {
 
   @override
   build(context) {
-    return ComputableStreamBuilder(
-      computable: query.observe(),
+    return ObservableStreamBuilder(
+      observable: query.observe(),
       builder: builder,
     );
   }

@@ -1,6 +1,6 @@
 part of loon;
 
-class Query<T> with Computable<List<DocumentSnapshot<T>>> {
+class Query<T> {
   final String collection;
   final List<FilterFn<T>> filters;
   final SortFn<T>? sort;
@@ -38,7 +38,6 @@ class Query<T> with Computable<List<DocumentSnapshot<T>>> {
     return snaps;
   }
 
-  @override
   List<DocumentSnapshot<T>> get() {
     return _sortQuery(
       _filterQuery(
@@ -52,7 +51,6 @@ class Query<T> with Computable<List<DocumentSnapshot<T>>> {
     );
   }
 
-  @override
   ObservableQuery<T> observe({
     bool multicast = false,
   }) {
@@ -67,13 +65,12 @@ class Query<T> with Computable<List<DocumentSnapshot<T>>> {
     );
   }
 
-  @override
-  stream() {
+  Stream<List<DocumentSnapshot<T>>> stream() {
     return observe().stream();
   }
 
-  @override
-  streamChanges() {
+  Stream<(List<DocumentSnapshot<T>>, List<DocumentSnapshot<T>>)>
+      streamChanges() {
     return observe().streamChanges();
   }
 

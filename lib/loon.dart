@@ -16,15 +16,7 @@ part 'observable_document.dart';
 part 'types.dart';
 part 'document_snapshot.dart';
 part 'persistor/persistor.dart';
-part 'computable.dart';
-part 'computation.dart';
-part 'observable_computation.dart';
-part 'computable_switcher.dart';
-part 'observable_switcher.dart';
 part 'broadcast_observer.dart';
-part 'computed_value.dart';
-part 'computed_stream.dart';
-part 'computed_future.dart';
 
 typedef CollectionStore = Map<String, Map<String, DocumentSnapshot>>;
 typedef BroadcastCollectionStore = Map<String, Map<String, BroadcastDocument>>;
@@ -462,49 +454,6 @@ class Loon {
       toJson: toJson,
       persistorSettings: persistorSettings,
     ).doc(id);
-  }
-
-  static Computation<T> compute2<T, S1, S2>(
-    Computable<S1> computable1,
-    Computable<S2> computable2,
-    T Function(S1 computable1, S2 computable2) compute,
-  ) {
-    return Computation.compute2<T, S1, S2>(
-      computable1,
-      computable2,
-      compute,
-    );
-  }
-
-  static Computation<T> compute3<T, S1, S2, S3>(
-    Computable<S1> computable1,
-    Computable<S2> computable2,
-    Computable<S3> computable3,
-    T Function(S1 computable1, S2 computable2, S3 computable3) compute,
-  ) {
-    return Computation.compute3<T, S1, S2, S3>(
-      computable1,
-      computable2,
-      computable3,
-      compute,
-    );
-  }
-
-  static Computation<T> compute4<T, S1, S2, S3, S4>(
-    Computable<S1> computable1,
-    Computable<S2> computable2,
-    Computable<S3> computable3,
-    Computable<S3> computable4,
-    T Function(S1 computable1, S2 computable2, S3 computable3, S4 computable4)
-        compute,
-  ) {
-    return Computation.compute4<T, S1, S2, S3, S4>(
-      computable1,
-      computable2,
-      computable3,
-      computable4,
-      compute,
-    );
   }
 
   static Future<void> clearAll() {

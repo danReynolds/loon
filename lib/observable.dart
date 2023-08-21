@@ -1,7 +1,7 @@
 part of loon;
 
 /// A mixin that provides an observable interface for the access and streaming of stored values.
-mixin Observable<T> on Computable<T> {
+mixin Observable<T> {
   late final StreamController<ObservableChangeRecord<T>> _controller;
   late final Stream<T> _valueStream;
   late T _value;
@@ -56,15 +56,12 @@ mixin Observable<T> on Computable<T> {
 
   /// [get] is left unimplemented since it has variable logic based on the type of [Observable] like an [ObservableDocument],
   /// [ObservableQuery], and others.
-  @override
   T get();
 
-  @override
   Stream<T> stream() {
     return _valueStream;
   }
 
-  @override
   Stream<ObservableChangeRecord<T>> streamChanges() {
     return _controller.stream;
   }
