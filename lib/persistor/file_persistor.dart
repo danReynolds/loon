@@ -113,7 +113,7 @@ class FilePersistor extends Persistor {
   /// An index of [FileDataStore] entries by the data store collection name.
   Map<String, FileDataStore> _fileDataStoreIndex = {};
 
-  /// An index of which file data store each document is stored in by document ID.
+  /// An index of which file data store each document is stored in by key Collection:ID.
   final Map<String, FileDataStore> _documentFileDataStoreIndex = {};
 
   late final Directory fileDataStoreDirectory;
@@ -123,6 +123,10 @@ class FilePersistor extends Persistor {
   FilePersistor({
     super.persistorSettings,
   });
+
+  String _getIndexId(String collection, String id) {
+    return '$collection:$id';
+  }
 
   Future<void> _initStorageDirectory() async {
     final applicationDirectory = await getApplicationDocumentsDirectory();
@@ -189,6 +193,7 @@ class FilePersistor extends Persistor {
     for (final doc in docs) {
       final collection = doc.collection;
       final persistorSettings = doc.persistorSettings ?? this.persistorSettings;
+      final indexId = _getIndexId(collection, doc.id);
 
       if (!persistorSettings.persistenceEnabled) {
         continue;
@@ -243,13 +248,13 @@ class FilePersistor extends Persistor {
 
       // If the document has changed the file data store it is to be persisted in, it should be removed
       // from its previous data store.
-      final prevDocumentDataStore = _documentFileDataStoreIndex[doc.id];
+      final prevDocumentDataStore = _documentFileDataStoreIndex[indexId];
       if (prevDocumentDataStore != null &&
           documentDataStore != prevDocumentDataStore) {
         prevDocumentDataStore.removeDocument(doc.id);
       }
 
-      _documentFileDataStoreIndex[doc.id] = documentDataStore;
+      _documentFileDataStoreIndex[indexId] = documentDataStore;
       documentDataStore.updateDocument(doc);
     }
 
@@ -283,7 +288,8 @@ class FilePersistor extends Persistor {
       final documentIds = fileDataStore.data.keys.toList();
 
       for (final documentId in documentIds) {
-        _documentFileDataStoreIndex[documentId] = fileDataStore;
+        final indexId = _getIndexId(fileDataStore.collection, documentId);
+        _documentFileDataStoreIndex[indexId] = fileDataStore;
       }
     }
 
