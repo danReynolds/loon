@@ -29,8 +29,10 @@ class Document<T> {
     );
   }
 
-  void delete() {
-    Loon._instance._deleteDocument<T>(this);
+  void delete({
+    bool broadcast = true,
+  }) {
+    Loon._instance._deleteDocument<T>(this, broadcast: broadcast);
   }
 
   DocumentSnapshot<T> update(

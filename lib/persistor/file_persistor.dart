@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
@@ -118,11 +119,15 @@ class FilePersistor extends Persistor {
 
   late final Directory fileDataStoreDirectory;
 
+  final _initializedCompleter = Completer<void>();
+
   final filenameRegex = RegExp(r'^loon_(\w+)(?:\.(shard_\w+))?\.json$');
 
   FilePersistor({
     super.persistorSettings,
-  });
+  }) {
+    _initStorageDirectory();
+  }
 
   String _getIndexId(String collection, String id) {
     return '$collection:$id';
@@ -132,6 +137,12 @@ class FilePersistor extends Persistor {
     final applicationDirectory = await getApplicationDocumentsDirectory();
     fileDataStoreDirectory = Directory('${applicationDirectory.path}/loon');
     await fileDataStoreDirectory.create();
+    _initializedCompleter.complete();
+  }
+
+  Future<bool> get isInitialized async {
+    await _initializedCompleter.future;
+    return true;
   }
 
   Future<List<File>> _readDataStoreFiles() async {
@@ -190,6 +201,8 @@ class FilePersistor extends Persistor {
 
   @override
   persist(docs) async {
+    await isInitialized;
+
     for (final doc in docs) {
       final collection = doc.collection;
       final persistorSettings = doc.persistorSettings ?? this.persistorSettings;
@@ -274,7 +287,7 @@ class FilePersistor extends Persistor {
 
   @override
   hydrate() async {
-    await _initStorageDirectory();
+    await isInitialized;
 
     final files = await _readDataStoreFiles();
     final fileDataStores =
