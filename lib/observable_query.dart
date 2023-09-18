@@ -1,7 +1,9 @@
 part of loon;
 
 class ObservableQuery<T> extends Query<T>
-    with BroadcastObservable<List<DocumentSnapshot<T>>> {
+    with
+        Observable<List<DocumentSnapshot<T>>>,
+        BroadcastObserver<List<DocumentSnapshot<T>>> {
   /// A cache of the snapshots broadcasted by the query indexed by their [Document] ID.
   final Map<String, DocumentSnapshot<T>> _index = {};
 
@@ -12,11 +14,17 @@ class ObservableQuery<T> extends Query<T>
     required super.fromJson,
     required super.toJson,
     required super.persistorSettings,
+    required bool multicast,
   }) {
-    observe([]);
+    final snaps = super.get();
+    for (final snap in snaps) {
+      _index[snap.id] = snap;
+    }
+
+    init(snaps, multicast: multicast);
   }
 
-  /// On broadcast, the query examines the documents that have been added, removed or modified
+  /// On broadcast, the [ObservableQuery] examines the documents that have been added, removed or modified
   /// since the last broadcast and determines if the query needs to rebroadcast to its observers.
   /// The conditions for rebroadcasting the updated query are as follows:
   /// 1. A new document has been added that satisfies the query filter.
@@ -33,7 +41,7 @@ class ObservableQuery<T> extends Query<T>
     // If the entire collection has been deleted, then clear the snapshot.
     if (!Loon._instance._hasCollection(collection)) {
       _index.clear();
-      rebroadcast([]);
+      add([]);
       return;
     }
 
@@ -104,8 +112,20 @@ class ObservableQuery<T> extends Query<T>
 
     if (shouldBroadcast) {
       final snaps = _sortQuery(_index.values.toList());
-
-      rebroadcast(snaps);
+      add(snaps);
     }
+  }
+
+  @override
+  ObservableQuery<T> observe({bool multicast = false}) {
+    return this;
+  }
+
+  @override
+  get() {
+    if (Loon._instance._isQueryPendingBroadcast(this)) {
+      return super.get();
+    }
+    return _value;
   }
 }

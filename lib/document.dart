@@ -29,8 +29,10 @@ class Document<T> {
     );
   }
 
-  void delete() {
-    Loon._instance._deleteDocument<T>(this);
+  void delete({
+    bool broadcast = true,
+  }) {
+    Loon._instance._deleteDocument<T>(this, broadcast: broadcast);
   }
 
   DocumentSnapshot<T> update(
@@ -72,23 +74,25 @@ class Document<T> {
     return Loon._instance._getSnapshot<T>(this);
   }
 
-  ObservableDocument<T> asObservable() {
+  ObservableDocument<T> observe({
+    bool multicast = false,
+  }) {
     return ObservableDocument<T>(
       id: id,
       collection: collection,
       fromJson: fromJson,
       toJson: toJson,
       persistorSettings: persistorSettings,
+      multicast: multicast,
     );
   }
 
   Stream<DocumentSnapshot<T>?> stream() {
-    return asObservable().stream();
+    return observe().stream();
   }
 
-  Stream<BroadcastObservableChangeRecord<DocumentSnapshot<T>?>>
-      streamChanges() {
-    return asObservable().streamChanges();
+  Stream<(DocumentSnapshot<T>?, DocumentSnapshot<T>?)> streamChanges() {
+    return observe().streamChanges();
   }
 
   Json? getJson() {

@@ -1,6 +1,10 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:loon/loon.dart';
 
+Future<void> asyncEvent() {
+  return Future.delayed(const Duration(milliseconds: 1), () => null);
+}
+
 bool mapsEqual(Map<dynamic, dynamic> map1, Map<dynamic, dynamic> map2) {
   if (map1.length != map2.length) return false;
 
@@ -104,9 +108,13 @@ void main() {
       );
     });
 
-    test('Instance document added without serializer throws error', () {
+    test('Persisted instance document added without serializer throws error',
+        () {
       expect(
-        () => Loon.collection('users').doc('1').create(TestUserModel('1')),
+        () => Loon.collection(
+          'users',
+          persistorSettings: const PersistorSettings(),
+        ).doc('1').create(TestUserModel('1')),
         throwsException,
       );
     });
@@ -226,9 +234,13 @@ void main() {
       );
     });
 
-    test('Instance document updated without serializer throws error', () {
+    test('Persisted instance document updated without serializer throws error',
+        () {
       expect(
-        () => Loon.collection('users').doc('1').update(TestUserModel('1')),
+        () => Loon.collection(
+          'users',
+          persistorSettings: const PersistorSettings(),
+        ).doc('1').update(TestUserModel('1')),
         throwsException,
       );
     });
@@ -291,11 +303,13 @@ void main() {
       );
     });
 
-    test('Instance document modified without serializer throws error', () {
+    test('Persisted instance document modified without serializer throws error',
+        () {
       expect(
-        () => Loon.collection('users')
-            .doc('1')
-            .modify((userSnap) => TestUserModel('1')),
+        () => Loon.collection(
+          'users',
+          persistorSettings: const PersistorSettings(),
+        ).doc('1').modify((userSnap) => TestUserModel('1')),
         throwsException,
       );
     });
@@ -348,27 +362,22 @@ void main() {
       final updatedUser = TestUserModel('Updated User 1');
       final userDoc = TestUserModel.store.doc('1');
 
-      final userStream = userDoc.stream();
+      final userObs = userDoc.observe();
 
       userDoc.create(user);
 
-      // Wait for the enqueued micro-task broadcast to emit the user on the stream and then perform the next update.
-      await Future.delayed(
-        const Duration(milliseconds: 1),
-        () {
-          userDoc.update(updatedUser);
-        },
-      );
+      await asyncEvent();
+      userDoc.update(updatedUser);
 
-      await Future.delayed(
-        const Duration(milliseconds: 1),
-        () {
-          userDoc.delete();
-        },
-      );
+      await asyncEvent();
+      userDoc.delete();
+
+      await asyncEvent();
+
+      userObs.dispose();
 
       expectLater(
-        userStream,
+        userObs.stream(),
         emitsInOrder([
           null,
           DocumentSnapshotMatcher(
@@ -384,8 +393,42 @@ void main() {
             ),
           ),
           null,
+          emitsDone,
         ]),
       );
+    });
+
+    test('Defaults to non-multicast observables', () {
+      final userDoc = TestUserModel.store.doc('1');
+      final userDocObservable = userDoc.observe();
+      userDocObservable.stream().listen(null);
+
+      expect(
+        // A second subscription to the non-multicast observable should throw.
+        () => userDocObservable.stream().listen(null),
+        throwsStateError,
+      );
+    });
+
+    test('Automatically disposes non-multicast observables', () {
+      final userDoc = TestUserModel.store.doc('1');
+      final userDocObservable = userDoc.observe();
+      final subscription = userDocObservable.stream().listen(null);
+      subscription.cancel();
+      expect(userDocObservable.isClosed, true);
+    });
+
+    test('Requires manual disposal of multi cast observables', () {
+      final userDoc = TestUserModel.store.doc('1');
+      final userDocObservable = userDoc.observe(multicast: true);
+      final subscription = userDocObservable.stream().listen(null);
+      final subscription2 = userDocObservable.stream().listen(null);
+      subscription.cancel();
+      subscription2.cancel();
+
+      expect(userDocObservable.isClosed, false);
+      userDocObservable.dispose();
+      expect(userDocObservable.isClosed, true);
     });
   });
 
@@ -467,9 +510,8 @@ void main() {
           // care about this intermediary broadcast and just compare the first/last result.
           .take(3);
 
-      await Future.delayed(const Duration(milliseconds: 1), () {
-        userDoc.update(user2);
-      });
+      await asyncEvent();
+      userDoc.update(user2);
 
       final querySnaps = await queryStream.toList();
       final firstSnap = querySnaps.first;
@@ -562,7 +604,7 @@ void main() {
 
       final rootSnap = rootDoc.get();
 
-      expect(rootSnap?.collection, '__ROOT__1');
+      expect(rootSnap?.collection, '__ROOT__');
       expect(rootSnap?.id, '1');
       expect(rootSnap?.data, data);
     });

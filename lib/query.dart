@@ -51,7 +51,9 @@ class Query<T> {
     );
   }
 
-  ObservableQuery<T> asObservable() {
+  ObservableQuery<T> observe({
+    bool multicast = false,
+  }) {
     return ObservableQuery<T>(
       collection,
       filters: filters,
@@ -59,16 +61,17 @@ class Query<T> {
       fromJson: fromJson,
       toJson: toJson,
       persistorSettings: persistorSettings,
+      multicast: multicast,
     );
   }
 
   Stream<List<DocumentSnapshot<T>>> stream() {
-    return asObservable().stream();
+    return observe().stream();
   }
 
-  Stream<BroadcastObservableChangeRecord<List<DocumentSnapshot<T>>>>
+  Stream<(List<DocumentSnapshot<T>>, List<DocumentSnapshot<T>>)>
       streamChanges() {
-    return asObservable().streamChanges();
+    return observe().streamChanges();
   }
 
   Query<T> sortBy(SortFn<T> sort) {

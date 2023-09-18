@@ -1,6 +1,6 @@
 name: loon
-description: Loon is a reactive, collection data store for Dart & Flutter.
-version: 0.0.2
+description: Loon is a reactive collection data store for Dart & Flutter.
+version: 0.0.3
 homepage: https://github.com/danReynolds/loon
 
 environment:

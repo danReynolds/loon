@@ -7,7 +7,7 @@ export 'widgets/document_stream_builder.dart';
 export 'persistor/file_persistor.dart';
 export 'persistor/encrypted_file_persistor.dart';
 
-part 'broadcast_observable.dart';
+part 'observable.dart';
 part 'query.dart';
 part 'observable_query.dart';
 part 'collection.dart';
@@ -16,6 +16,7 @@ part 'observable_document.dart';
 part 'types.dart';
 part 'document_snapshot.dart';
 part 'persistor/persistor.dart';
+part 'broadcast_observer.dart';
 
 typedef CollectionStore = Map<String, Map<String, DocumentSnapshot>>;
 typedef BroadcastCollectionStore = Map<String, Map<String, BroadcastDocument>>;
@@ -36,7 +37,7 @@ class Loon {
   final BroadcastCollectionStore _broadcastCollectionStore = {};
 
   /// The list of observers, either document or query observers, that should be notified on broadcast.
-  final Set<BroadcastObservable> _broadcastObservers = {};
+  final Set<BroadcastObserver> _broadcastObservers = {};
 
   bool _hasPendingBroadcast = false;
 
@@ -88,6 +89,15 @@ class Loon {
   /// Returns whether a collection name exists in the collection data store.
   bool _hasCollection(String collection) {
     return _collectionStore.containsKey(collection);
+  }
+
+  bool get _isGlobalPersistenceEnabled {
+    return _instance.persistor?.persistorSettings.persistenceEnabled ?? false;
+  }
+
+  bool _isDocumentPersistenceEnabled(Document doc) {
+    return doc.persistorSettings?.persistenceEnabled ??
+        _isGlobalPersistenceEnabled;
   }
 
   /// Clears the given collection name from the collection data store.
@@ -211,11 +221,13 @@ class Loon {
       } else {
         // If the broadcast document was created through the hydration process, then it would have been added
         // as a Json document, and we must now convert it to a document of the given type.
-        _validateDataSerialization<T>(
-          fromJson: fromJson,
-          toJson: toJson,
-          data: doc.get()?.data,
-        );
+        if (_isDocumentPersistenceEnabled(doc)) {
+          _validateDataSerialization<T>(
+            fromJson: fromJson,
+            toJson: toJson,
+            data: doc.get()?.data,
+          );
+        }
 
         return BroadcastDocument<T>(
           Document<T>(
@@ -231,11 +243,11 @@ class Loon {
     }).toList();
   }
 
-  void _addBroadcastObserver(BroadcastObservable observer) {
+  void _addBroadcastObserver(BroadcastObserver observer) {
     _broadcastObservers.add(observer);
   }
 
-  void _removeBroadcastObserver(BroadcastObservable observer) {
+  void _removeBroadcastObserver(BroadcastObserver observer) {
     _broadcastObservers.remove(observer);
   }
 
@@ -245,19 +257,23 @@ class Loon {
 
       // Schedule a broadcast event to be run on the microtask queue.
       scheduleMicrotask(() {
-        _broadcastQueries();
+        _broadcast();
         _hasPendingBroadcast = false;
       });
     }
   }
 
-  bool _isScheduledForBroadcast<T>(Document<T> doc) {
+  bool _isQueryPendingBroadcast<T>(Query<T> query) {
+    return _instance._broadcastCollectionStore.containsKey(query.collection);
+  }
+
+  bool _isDocumentPendingBroadcast<T>(Document<T> doc) {
     return _instance._broadcastCollectionStore[doc.collection]
             ?.containsKey(doc.id) ??
         false;
   }
 
-  void _broadcastQueries({
+  void _broadcast({
     bool broadcastPersistor = true,
   }) {
     for (final observer in _broadcastObservers) {
@@ -284,7 +300,7 @@ class Loon {
     T data, {
     bool broadcast = true,
   }) {
-    if (data is! Json) {
+    if (data is! Json && _isDocumentPersistenceEnabled(doc)) {
       _validateDataSerialization<T>(
         fromJson: doc.fromJson,
         toJson: doc.toJson,
@@ -409,7 +425,7 @@ class Loon {
       // ignore: avoid_print
       print('Loon: Error hydrating');
     }
-    _instance._broadcastQueries(broadcastPersistor: false);
+    _instance._broadcast(broadcastPersistor: false);
   }
 
   static Collection<T> collection<T>(
@@ -433,7 +449,7 @@ class Loon {
     PersistorSettings<T>? persistorSettings,
   }) {
     return collection<T>(
-      '__ROOT__$id',
+      '__ROOT__',
       fromJson: fromJson,
       toJson: toJson,
       persistorSettings: persistorSettings,
@@ -448,7 +464,7 @@ class Loon {
   static void rebroadcast<T>(Document<T> doc) {
     // If the document is already scheduled for broadcast, then manually touching it for rebroadcast is a no-op, since it
     // is already enqueued for broadcast.
-    if (!_instance._isScheduledForBroadcast(doc)) {
+    if (!_instance._isDocumentPendingBroadcast(doc)) {
       _instance._writeBroadcastDocument<T>(
         doc,
         BroadcastEventTypes.touched,

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
@@ -113,21 +114,35 @@ class FilePersistor extends Persistor {
   /// An index of [FileDataStore] entries by the data store collection name.
   Map<String, FileDataStore> _fileDataStoreIndex = {};
 
-  /// An index of which file data store each document is stored in by document ID.
+  /// An index of which file data store each document is stored in by key Collection:ID.
   final Map<String, FileDataStore> _documentFileDataStoreIndex = {};
 
   late final Directory fileDataStoreDirectory;
+
+  final _initializedCompleter = Completer<void>();
 
   final filenameRegex = RegExp(r'^loon_(\w+)(?:\.(shard_\w+))?\.json$');
 
   FilePersistor({
     super.persistorSettings,
-  });
+  }) {
+    _initStorageDirectory();
+  }
+
+  String _getIndexId(String collection, String id) {
+    return '$collection:$id';
+  }
 
   Future<void> _initStorageDirectory() async {
     final applicationDirectory = await getApplicationDocumentsDirectory();
     fileDataStoreDirectory = Directory('${applicationDirectory.path}/loon');
     await fileDataStoreDirectory.create();
+    _initializedCompleter.complete();
+  }
+
+  Future<bool> get isInitialized async {
+    await _initializedCompleter.future;
+    return true;
   }
 
   Future<List<File>> _readDataStoreFiles() async {
@@ -186,9 +201,12 @@ class FilePersistor extends Persistor {
 
   @override
   persist(docs) async {
+    await isInitialized;
+
     for (final doc in docs) {
       final collection = doc.collection;
       final persistorSettings = doc.persistorSettings ?? this.persistorSettings;
+      final indexId = _getIndexId(collection, doc.id);
 
       if (!persistorSettings.persistenceEnabled) {
         continue;
@@ -243,13 +261,13 @@ class FilePersistor extends Persistor {
 
       // If the document has changed the file data store it is to be persisted in, it should be removed
       // from its previous data store.
-      final prevDocumentDataStore = _documentFileDataStoreIndex[doc.id];
+      final prevDocumentDataStore = _documentFileDataStoreIndex[indexId];
       if (prevDocumentDataStore != null &&
           documentDataStore != prevDocumentDataStore) {
         prevDocumentDataStore.removeDocument(doc.id);
       }
 
-      _documentFileDataStoreIndex[doc.id] = documentDataStore;
+      _documentFileDataStoreIndex[indexId] = documentDataStore;
       documentDataStore.updateDocument(doc);
     }
 
@@ -269,7 +287,7 @@ class FilePersistor extends Persistor {
 
   @override
   hydrate() async {
-    await _initStorageDirectory();
+    await isInitialized;
 
     final files = await _readDataStoreFiles();
     final fileDataStores =
@@ -283,7 +301,8 @@ class FilePersistor extends Persistor {
       final documentIds = fileDataStore.data.keys.toList();
 
       for (final documentId in documentIds) {
-        _documentFileDataStoreIndex[documentId] = fileDataStore;
+        final indexId = _getIndexId(fileDataStore.collection, documentId);
+        _documentFileDataStoreIndex[indexId] = fileDataStore;
       }
     }
 
