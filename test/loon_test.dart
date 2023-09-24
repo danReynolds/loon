@@ -40,8 +40,8 @@ class TestUserModel {
 }
 
 class DocumentSnapshotMatcher extends Matcher {
-  DocumentSnapshot<TestUserModel> expected;
-  late DocumentSnapshot<TestUserModel> actual;
+  DocumentSnapshot<TestUserModel?> expected;
+  late DocumentSnapshot<TestUserModel?> actual;
   DocumentSnapshotMatcher(this.expected);
 
   @override
@@ -70,7 +70,7 @@ class DocumentSnapshotMatcher extends Matcher {
     return actual.id == expected.id &&
         mapsEqual(
           actual.data.toJson(),
-          expected.data.toJson(),
+          expected.data?.toJson(),
         );
   }
 }
@@ -432,6 +432,93 @@ void main() {
     });
   });
 
+  group('Stream document changes', () {
+    tearDown(() {
+      Loon.clearAll();
+    });
+
+    test('Emits changes to the document', () async {
+      final user = TestUserModel('User 1');
+      final userUpdated = TestUserModel('User 1 Updated');
+      final userDoc = TestUserModel.store.doc('1');
+
+      final changesStream = userDoc.streamChanges().take(3);
+      userDoc.create(user);
+      await asyncEvent();
+      userDoc.update(userUpdated);
+
+      final snaps = await changesStream.toList();
+
+      final (prev1, next1) = snaps[0];
+      expect(prev1, null);
+      expect(next1, null);
+
+      final (prev2, next2) = snaps[1];
+      expect(
+        prev2,
+        null,
+      );
+      expect(
+        next2,
+        DocumentSnapshotMatcher(
+          DocumentSnapshot(
+            doc: userDoc,
+            data: user,
+          ),
+        ),
+      );
+
+      final (prev3, next3) = snaps[2];
+      expect(
+        prev3,
+        DocumentSnapshotMatcher(
+          DocumentSnapshot(
+            doc: userDoc,
+            data: user,
+          ),
+        ),
+      );
+      expect(
+        next3,
+        DocumentSnapshotMatcher(
+          DocumentSnapshot(
+            doc: userDoc,
+            data: userUpdated,
+          ),
+        ),
+      );
+    });
+  });
+
+  group('Stream document meta-changes', () {
+    tearDown(() {
+      Loon.clearAll();
+    });
+
+    test('Emits meta changes to the document', () async {
+      final user = TestUserModel('User 1');
+      final userUpdated = TestUserModel('User 1 Updated');
+      final userDoc = TestUserModel.store.doc('1');
+
+      final metaChangesStream = userDoc.streamMetaChanges().take(2);
+
+      userDoc.create(user);
+      await asyncEvent();
+      userDoc.update(userUpdated);
+
+      final snaps = await metaChangesStream.toList();
+
+      expect(
+        snaps[0].type,
+        BroadcastEventTypes.added,
+      );
+      expect(
+        snaps[1].type,
+        BroadcastEventTypes.modified,
+      );
+    });
+  });
+
   group('Query documents', () {
     tearDown(() {
       Loon.clearAll();
@@ -529,6 +616,144 @@ void main() {
       );
 
       expect(lastSnap.isEmpty, true);
+    });
+  });
+
+  group('Stream query changes', () {
+    tearDown(() {
+      Loon.clearAll();
+    });
+
+    test('Returns a stream of changes to documents', () async {
+      final user = TestUserModel('User 1');
+      final userUpdated = TestUserModel('User 1 updated');
+      final user2 = TestUserModel('User 2');
+      final userDoc = TestUserModel.store.doc('1');
+      final userDoc2 = TestUserModel.store.doc('2');
+
+      userDoc.create(user);
+      userDoc2.create(user2);
+
+      final queryStream = TestUserModel.store
+          .where((snap) => snap.id == '1')
+          .streamChanges()
+          .take(2);
+
+      userDoc.update(TestUserModel('User 1 updated'));
+
+      final snaps = await queryStream.toList();
+
+      final (prev1, next1) = snaps[0];
+      expect(
+        prev1,
+        [
+          DocumentSnapshotMatcher(
+            DocumentSnapshot(
+              doc: userDoc,
+              data: user,
+            ),
+          )
+        ],
+      );
+      expect(
+        next1,
+        [
+          DocumentSnapshotMatcher(
+            DocumentSnapshot(
+              doc: userDoc,
+              data: user,
+            ),
+          )
+        ],
+      );
+
+      final (prev2, next2) = snaps[1];
+      expect(
+        prev2,
+        [
+          DocumentSnapshotMatcher(
+            DocumentSnapshot(
+              doc: userDoc,
+              data: user,
+            ),
+          )
+        ],
+      );
+      expect(
+        next2,
+        [
+          DocumentSnapshotMatcher(
+            DocumentSnapshot(
+              doc: userDoc,
+              data: userUpdated,
+            ),
+          )
+        ],
+      );
+    });
+  });
+
+  group('Stream query meta changes', () {
+    tearDown(() {
+      Loon.clearAll();
+    });
+
+    test('Returns a stream of meta changes to documents', () async {
+      final user = TestUserModel('User 1');
+      final user2 = TestUserModel('User 2');
+      final userDoc = TestUserModel.store.doc('1');
+      final userDoc2 = TestUserModel.store.doc('2');
+
+      userDoc.create(user);
+      userDoc2.create(user2);
+
+      final queryStream = TestUserModel.store.streamMetaChanges().take(2);
+
+      await asyncEvent();
+      userDoc.update(TestUserModel('User 1 updated'));
+
+      final snaps = await queryStream.toList();
+
+      expect(snaps[0].length, 2);
+      expect(
+        snaps[0].first.type,
+        BroadcastEventTypes.added,
+      );
+      expect(
+        snaps[0].last.type,
+        BroadcastEventTypes.added,
+      );
+
+      expect(snaps[1].length, 1);
+      expect(
+        snaps[1].first.type,
+        BroadcastEventTypes.modified,
+      );
+    });
+
+    test('Localizes meta broadcast event to the query', () async {
+      final user = TestUserModel('User 1');
+      final userDoc = TestUserModel.store.doc('1');
+
+      final queryStream = TestUserModel.store
+          .where((snap) => snap.data.name == 'User 1 Updated')
+          .streamMetaChanges()
+          .take(1);
+
+      userDoc.create(user);
+      await asyncEvent();
+      userDoc.update(TestUserModel('User 1 updated'));
+
+      final snaps = await queryStream.toList();
+
+      expect(snaps[0].length, 1);
+      expect(
+        snaps[0].first.type,
+        // The global event is a [BroadcastEventTypes.modified] when the user is updated,
+        // but to this query, it should be a [BroadcastEventTypes.added] event since previously
+        // it was not included and now it is.
+        BroadcastEventTypes.added,
+      );
     });
   });
 

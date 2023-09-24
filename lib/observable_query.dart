@@ -3,7 +3,8 @@ part of loon;
 class ObservableQuery<T> extends Query<T>
     with
         Observable<List<DocumentSnapshot<T>>>,
-        BroadcastObserver<List<DocumentSnapshot<T>>> {
+        BroadcastObserver<List<DocumentSnapshot<T>>,
+            List<BroadcastDocument<T>>> {
   /// A cache of the snapshots broadcasted by the query indexed by their [Document] ID.
   final Map<String, DocumentSnapshot<T>> _index = {};
 
@@ -56,6 +57,13 @@ class ObservableQuery<T> extends Query<T>
       return;
     }
 
+    /// The list of meta changes to the query. Note that the [BroadcastEventTypes] of the document
+    /// local to the query is different from the globally broadcast event. For example, if a document
+    /// was modified globally such that now it should be included in the query and before was not,
+    /// then its event type reported by the query is [BroadcastEventTypes.added] and its global event was
+    /// [BroadcastEventTypes.modified].
+    final List<BroadcastDocument<T>> metaBroadcastDocs = [];
+
     for (final broadcastDoc in broadcastDocs) {
       final docId = broadcastDoc.id;
 
@@ -65,6 +73,10 @@ class ObservableQuery<T> extends Query<T>
 
           // 1. Add new documents that satisfy the query filter.
           if (_filter(snap)) {
+            metaBroadcastDocs.add(
+              BroadcastDocument(broadcastDoc, BroadcastEventTypes.added),
+            );
+
             shouldBroadcast = true;
             _index[docId] = snap;
           }
@@ -72,6 +84,10 @@ class ObservableQuery<T> extends Query<T>
         case BroadcastEventTypes.removed:
           // 2. Remove old documents that previously satisfied the query filter and have been removed.
           if (_index.containsKey(docId)) {
+            metaBroadcastDocs.add(
+              BroadcastDocument(broadcastDoc, BroadcastEventTypes.removed),
+            );
+
             _index.remove(docId);
             shouldBroadcast = true;
           }
@@ -87,11 +103,23 @@ class ObservableQuery<T> extends Query<T>
             // a) Previously satisfied the query filter and still does (updated value must still be rebroadcast on the query).
             if (_filter(updatedSnap)) {
               _index[docId] = updatedSnap;
+
+              metaBroadcastDocs.add(
+                BroadcastDocument(broadcastDoc, BroadcastEventTypes.modified),
+              );
             } else {
+              metaBroadcastDocs.add(
+                BroadcastDocument(broadcastDoc, BroadcastEventTypes.removed),
+              );
+
               /// b) Previously satisfied the query filter and now does not.
               _index.remove(docId);
             }
           } else {
+            metaBroadcastDocs.add(
+              BroadcastDocument(broadcastDoc, BroadcastEventTypes.added),
+            );
+
             // c) Previously did not satisfy the query filter and now does.
             if (_filter(updatedSnap)) {
               _index[docId] = updatedSnap;
@@ -103,11 +131,19 @@ class ObservableQuery<T> extends Query<T>
         // result set, then the query should be rebroadcasted.
         case BroadcastEventTypes.touched:
           if (_index.containsKey(docId)) {
+            metaBroadcastDocs.add(
+              BroadcastDocument(broadcastDoc, BroadcastEventTypes.touched),
+            );
+
             _index[docId] = broadcastDoc.get()!;
             shouldBroadcast = true;
           }
           break;
       }
+    }
+
+    if (metaBroadcastDocs.isNotEmpty) {
+      _metaChangesController.add(metaBroadcastDocs);
     }
 
     if (shouldBroadcast) {

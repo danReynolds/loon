@@ -204,6 +204,49 @@ class Loon {
     }).toList();
   }
 
+  BroadcastDocument<T>? _getBroadcastDocument<T>(
+    String collection,
+    String id, {
+    FromJson<T>? fromJson,
+    ToJson<T>? toJson,
+    PersistorSettings? persistorSettings,
+  }) {
+    if (!_broadcastCollectionStore.containsKey(collection)) {
+      return null;
+    }
+
+    final doc = _broadcastCollectionStore[collection]![id];
+
+    if (doc == null) {
+      return null;
+    }
+
+    if (doc is BroadcastDocument<T>) {
+      return doc;
+    } else {
+      // If the broadcast document was created through the hydration process, then it would have been added
+      // as a Json document, and we must now convert it to a document of the given type.
+      if (_isDocumentPersistenceEnabled(doc)) {
+        _validateDataSerialization<T>(
+          fromJson: fromJson,
+          toJson: toJson,
+          data: doc.get()?.data,
+        );
+      }
+
+      return BroadcastDocument<T>(
+        Document<T>(
+          collection: collection,
+          id: doc.id,
+          fromJson: fromJson,
+          toJson: toJson,
+          persistorSettings: persistorSettings,
+        ),
+        doc.type,
+      );
+    }
+  }
+
   /// Returns the list of documents in the given collection that have been added, removed or modified since the last broadcast.
   List<BroadcastDocument<T>> _getBroadcastDocuments<T>(
     String collection, {
@@ -216,30 +259,13 @@ class Loon {
     }
 
     return _broadcastCollectionStore[collection]!.values.map((doc) {
-      if (doc is BroadcastDocument<T>) {
-        return doc;
-      } else {
-        // If the broadcast document was created through the hydration process, then it would have been added
-        // as a Json document, and we must now convert it to a document of the given type.
-        if (_isDocumentPersistenceEnabled(doc)) {
-          _validateDataSerialization<T>(
-            fromJson: fromJson,
-            toJson: toJson,
-            data: doc.get()?.data,
-          );
-        }
-
-        return BroadcastDocument<T>(
-          Document<T>(
-            collection: collection,
-            id: doc.id,
-            fromJson: fromJson,
-            toJson: toJson,
-            persistorSettings: persistorSettings,
-          ),
-          doc.type,
-        );
-      }
+      return _getBroadcastDocument<T>(
+        collection,
+        doc.id,
+        fromJson: fromJson,
+        toJson: toJson,
+        persistorSettings: persistorSettings,
+      )!;
     }).toList();
   }
 

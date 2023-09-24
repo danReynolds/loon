@@ -95,6 +95,10 @@ class Document<T> {
     return observe().streamChanges();
   }
 
+  Stream<BroadcastDocument<T>> streamMetaChanges() {
+    return observe().streamMetaChanges();
+  }
+
   Json? getJson() {
     final data = Loon._instance._getSnapshot<T>(this)?.data;
 

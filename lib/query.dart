@@ -74,6 +74,10 @@ class Query<T> {
     return observe().streamChanges();
   }
 
+  Stream<List<BroadcastDocument<T>>> streamMetaChanges() {
+    return observe().streamMetaChanges();
+  }
+
   Query<T> sortBy(SortFn<T> sort) {
     return Query<T>(
       collection,

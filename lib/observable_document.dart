@@ -3,7 +3,7 @@ part of loon;
 class ObservableDocument<T> extends Document<T>
     with
         Observable<DocumentSnapshot<T>?>,
-        BroadcastObserver<DocumentSnapshot<T>?> {
+        BroadcastObserver<DocumentSnapshot<T>?, BroadcastDocument<T>> {
   ObservableDocument({
     required super.collection,
     required super.id,
@@ -19,7 +19,16 @@ class ObservableDocument<T> extends Document<T>
   /// and if so, emitting an update to observers.
   @override
   void _onBroadcast() {
-    if (Loon._instance._isDocumentPendingBroadcast(this)) {
+    final broadcastDoc = Loon._instance._getBroadcastDocument<T>(
+      collection,
+      id,
+      fromJson: fromJson,
+      toJson: toJson,
+      persistorSettings: persistorSettings,
+    );
+
+    if (broadcastDoc != null) {
+      _metaChangesController.add(broadcastDoc);
       add(super.get());
     }
   }
