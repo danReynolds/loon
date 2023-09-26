@@ -490,7 +490,7 @@ void main() {
     });
   });
 
-  group('Stream document meta-changes', () {
+  group('Stream document meta changes', () {
     tearDown(() {
       Loon.clearAll();
     });
@@ -500,11 +500,13 @@ void main() {
       final userUpdated = TestUserModel('User 1 Updated');
       final userDoc = TestUserModel.store.doc('1');
 
-      final metaChangesStream = userDoc.streamMetaChanges().take(2);
+      final metaChangesStream = userDoc.streamMetaChanges().take(3);
 
       userDoc.create(user);
       await asyncEvent();
       userDoc.update(userUpdated);
+      await asyncEvent();
+      userDoc.delete();
 
       final snaps = await metaChangesStream.toList();
 
@@ -513,8 +515,36 @@ void main() {
         BroadcastEventTypes.added,
       );
       expect(
+        snaps[0].prevSnap,
+        null,
+      );
+      expect(
+        snaps[0].snap?.data,
+        user,
+      );
+      expect(
         snaps[1].type,
         BroadcastEventTypes.modified,
+      );
+      expect(
+        snaps[1].prevSnap?.data,
+        user,
+      );
+      expect(
+        snaps[1].snap?.data,
+        userUpdated,
+      );
+      expect(
+        snaps[2].type,
+        BroadcastEventTypes.removed,
+      );
+      expect(
+        snaps[2].prevSnap?.data,
+        userUpdated,
+      );
+      expect(
+        snaps[2].snap?.data,
+        null,
       );
     });
   });

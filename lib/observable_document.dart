@@ -3,7 +3,7 @@ part of loon;
 class ObservableDocument<T> extends Document<T>
     with
         Observable<DocumentSnapshot<T>?>,
-        BroadcastObserver<DocumentSnapshot<T>?, BroadcastDocument<T>> {
+        BroadcastObserver<DocumentSnapshot<T>?, BroadcastMetaDocument<T>> {
   ObservableDocument({
     required super.collection,
     required super.id,
@@ -28,8 +28,17 @@ class ObservableDocument<T> extends Document<T>
     );
 
     if (broadcastDoc != null) {
-      _metaChangesController.add(broadcastDoc);
-      add(super.get());
+      final updatedSnap = super.get();
+
+      _metaChangesController.add(
+        BroadcastMetaDocument(
+          broadcastDoc,
+          broadcastDoc.type,
+          prevSnap: _value,
+          snap: updatedSnap,
+        ),
+      );
+      add(updatedSnap);
     }
   }
 
@@ -40,7 +49,7 @@ class ObservableDocument<T> extends Document<T>
 
   @override
   get() {
-    if (Loon._instance._isDocumentPendingBroadcast(this)) {
+    if (isPendingBroadcast()) {
       return super.get();
     }
     return _value;

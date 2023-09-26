@@ -74,7 +74,7 @@ class Query<T> {
     return observe().streamChanges();
   }
 
-  Stream<List<BroadcastDocument<T>>> streamMetaChanges() {
+  Stream<List<BroadcastMetaDocument<T>>> streamMetaChanges() {
     return observe().streamMetaChanges();
   }
 

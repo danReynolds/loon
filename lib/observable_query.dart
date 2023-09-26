@@ -4,7 +4,7 @@ class ObservableQuery<T> extends Query<T>
     with
         Observable<List<DocumentSnapshot<T>>>,
         BroadcastObserver<List<DocumentSnapshot<T>>,
-            List<BroadcastDocument<T>>> {
+            List<BroadcastMetaDocument<T>>> {
   /// A cache of the snapshots broadcasted by the query indexed by their [Document] ID.
   final Map<String, DocumentSnapshot<T>> _index = {};
 
@@ -62,10 +62,11 @@ class ObservableQuery<T> extends Query<T>
     /// was modified globally such that now it should be included in the query and before was not,
     /// then its event type reported by the query is [BroadcastEventTypes.added] and its global event was
     /// [BroadcastEventTypes.modified].
-    final List<BroadcastDocument<T>> metaBroadcastDocs = [];
+    final List<BroadcastMetaDocument<T>> metaBroadcastDocs = [];
 
     for (final broadcastDoc in broadcastDocs) {
       final docId = broadcastDoc.id;
+      final prevSnap = _index[docId];
 
       switch (broadcastDoc.type) {
         case BroadcastEventTypes.added:
@@ -74,7 +75,12 @@ class ObservableQuery<T> extends Query<T>
           // 1. Add new documents that satisfy the query filter.
           if (_filter(snap)) {
             metaBroadcastDocs.add(
-              BroadcastDocument(broadcastDoc, BroadcastEventTypes.added),
+              BroadcastMetaDocument(
+                broadcastDoc,
+                BroadcastEventTypes.added,
+                prevSnap: prevSnap,
+                snap: snap,
+              ),
             );
 
             shouldBroadcast = true;
@@ -85,7 +91,12 @@ class ObservableQuery<T> extends Query<T>
           // 2. Remove old documents that previously satisfied the query filter and have been removed.
           if (_index.containsKey(docId)) {
             metaBroadcastDocs.add(
-              BroadcastDocument(broadcastDoc, BroadcastEventTypes.removed),
+              BroadcastMetaDocument(
+                broadcastDoc,
+                BroadcastEventTypes.removed,
+                prevSnap: prevSnap,
+                snap: null,
+              ),
             );
 
             _index.remove(docId);
@@ -105,11 +116,21 @@ class ObservableQuery<T> extends Query<T>
               _index[docId] = updatedSnap;
 
               metaBroadcastDocs.add(
-                BroadcastDocument(broadcastDoc, BroadcastEventTypes.modified),
+                BroadcastMetaDocument(
+                  broadcastDoc,
+                  BroadcastEventTypes.modified,
+                  prevSnap: prevSnap,
+                  snap: updatedSnap,
+                ),
               );
             } else {
               metaBroadcastDocs.add(
-                BroadcastDocument(broadcastDoc, BroadcastEventTypes.removed),
+                BroadcastMetaDocument(
+                  broadcastDoc,
+                  BroadcastEventTypes.removed,
+                  prevSnap: prevSnap,
+                  snap: null,
+                ),
               );
 
               /// b) Previously satisfied the query filter and now does not.
@@ -117,7 +138,12 @@ class ObservableQuery<T> extends Query<T>
             }
           } else {
             metaBroadcastDocs.add(
-              BroadcastDocument(broadcastDoc, BroadcastEventTypes.added),
+              BroadcastMetaDocument(
+                broadcastDoc,
+                BroadcastEventTypes.added,
+                prevSnap: prevSnap,
+                snap: updatedSnap,
+              ),
             );
 
             // c) Previously did not satisfy the query filter and now does.
@@ -131,11 +157,18 @@ class ObservableQuery<T> extends Query<T>
         // result set, then the query should be rebroadcasted.
         case BroadcastEventTypes.touched:
           if (_index.containsKey(docId)) {
+            final updatedSnap = broadcastDoc.get()!;
+
             metaBroadcastDocs.add(
-              BroadcastDocument(broadcastDoc, BroadcastEventTypes.touched),
+              BroadcastMetaDocument(
+                broadcastDoc,
+                BroadcastEventTypes.modified,
+                prevSnap: prevSnap,
+                snap: updatedSnap,
+              ),
             );
 
-            _index[docId] = broadcastDoc.get()!;
+            _index[docId] = updatedSnap;
             shouldBroadcast = true;
           }
           break;
@@ -159,8 +192,10 @@ class ObservableQuery<T> extends Query<T>
 
   @override
   get() {
+    // If the query is pending a broadcast when its data is accessed, we must immediately
+    // run the broadcast instead of waiting until the next micro-task and return the updated value.
     if (Loon._instance._isQueryPendingBroadcast(this)) {
-      return super.get();
+      _onBroadcast();
     }
     return _value;
   }

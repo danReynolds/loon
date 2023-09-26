@@ -95,7 +95,7 @@ class Document<T> {
     return observe().streamChanges();
   }
 
-  Stream<BroadcastDocument<T>> streamMetaChanges() {
+  Stream<BroadcastMetaDocument<T>> streamMetaChanges() {
     return observe().streamMetaChanges();
   }
 
@@ -111,6 +111,10 @@ class Document<T> {
 
   bool exists() {
     return Loon._instance._hasDocument(this);
+  }
+
+  bool isPendingBroadcast() {
+    return Loon._instance._isDocumentPendingBroadcast(this);
   }
 }
 

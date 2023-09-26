@@ -2,6 +2,8 @@ library loon;
 
 import 'dart:async';
 
+import 'package:loon/broadcast_meta_document.dart';
+
 export 'widgets/query_stream_builder.dart';
 export 'widgets/document_stream_builder.dart';
 export 'persistor/file_persistor.dart';
@@ -490,7 +492,7 @@ class Loon {
   static void rebroadcast<T>(Document<T> doc) {
     // If the document is already scheduled for broadcast, then manually touching it for rebroadcast is a no-op, since it
     // is already enqueued for broadcast.
-    if (!_instance._isDocumentPendingBroadcast(doc)) {
+    if (!doc.isPendingBroadcast()) {
       _instance._writeBroadcastDocument<T>(
         doc,
         BroadcastEventTypes.touched,
