@@ -4,7 +4,7 @@ class ObservableQuery<T> extends Query<T>
     with
         Observable<List<DocumentSnapshot<T>>>,
         BroadcastObserver<List<DocumentSnapshot<T>>,
-            List<BroadcastMetaDocument<T>>> {
+            List<DocumentChangeSnapshot<T>>> {
   /// A cache of the snapshots broadcasted by the query indexed by their [Document] ID.
   final Map<String, DocumentSnapshot<T>> _index = {};
 
@@ -37,8 +37,6 @@ class ObservableQuery<T> extends Query<T>
   /// 4. A document that has been manually touched to be rebroadcasted.
   @override
   void _onBroadcast() {
-    bool shouldBroadcast = false;
-
     // If the entire collection has been deleted, then clear the snapshot.
     if (!Loon._instance._hasCollection(collection)) {
       _index.clear();
@@ -57,12 +55,13 @@ class ObservableQuery<T> extends Query<T>
       return;
     }
 
-    /// The list of meta changes to the query. Note that the [BroadcastEventTypes] of the document
+    /// The list of changes to the query. Note that the [BroadcastEventTypes] of the document
     /// local to the query is different from the globally broadcast event. For example, if a document
     /// was modified globally such that now it should be included in the query and before was not,
     /// then its event type reported by the query is [BroadcastEventTypes.added] and its global event was
     /// [BroadcastEventTypes.modified].
-    final List<BroadcastMetaDocument<T>> metaBroadcastDocs = [];
+    final List<DocumentChangeSnapshot<T>> changeSnaps = [];
+    bool shouldBroadcast = false;
 
     for (final broadcastDoc in broadcastDocs) {
       final docId = broadcastDoc.id;
@@ -74,33 +73,37 @@ class ObservableQuery<T> extends Query<T>
 
           // 1. Add new documents that satisfy the query filter.
           if (_filter(snap)) {
-            metaBroadcastDocs.add(
-              BroadcastMetaDocument(
-                broadcastDoc,
-                BroadcastEventTypes.added,
-                prevSnap: prevSnap,
-                snap: snap,
-              ),
-            );
-
-            shouldBroadcast = true;
             _index[docId] = snap;
+            shouldBroadcast = true;
+
+            if (hasChangeListener) {
+              changeSnaps.add(
+                DocumentChangeSnapshot(
+                  doc: broadcastDoc,
+                  type: BroadcastEventTypes.added,
+                  prevData: prevSnap?.data,
+                  data: snap.data,
+                ),
+              );
+            }
           }
           break;
         case BroadcastEventTypes.removed:
           // 2. Remove old documents that previously satisfied the query filter and have been removed.
           if (_index.containsKey(docId)) {
-            metaBroadcastDocs.add(
-              BroadcastMetaDocument(
-                broadcastDoc,
-                BroadcastEventTypes.removed,
-                prevSnap: prevSnap,
-                snap: null,
-              ),
-            );
-
             _index.remove(docId);
             shouldBroadcast = true;
+
+            if (hasChangeListener) {
+              changeSnaps.add(
+                DocumentChangeSnapshot(
+                  doc: broadcastDoc,
+                  type: BroadcastEventTypes.removed,
+                  prevData: prevSnap?.data,
+                  data: null,
+                ),
+              );
+            }
           }
           break;
 
@@ -115,41 +118,47 @@ class ObservableQuery<T> extends Query<T>
             if (_filter(updatedSnap)) {
               _index[docId] = updatedSnap;
 
-              metaBroadcastDocs.add(
-                BroadcastMetaDocument(
-                  broadcastDoc,
-                  BroadcastEventTypes.modified,
-                  prevSnap: prevSnap,
-                  snap: updatedSnap,
-                ),
-              );
+              if (hasChangeListener) {
+                changeSnaps.add(
+                  DocumentChangeSnapshot(
+                    doc: broadcastDoc,
+                    type: BroadcastEventTypes.modified,
+                    prevData: prevSnap?.data,
+                    data: updatedSnap.data,
+                  ),
+                );
+              }
             } else {
-              metaBroadcastDocs.add(
-                BroadcastMetaDocument(
-                  broadcastDoc,
-                  BroadcastEventTypes.removed,
-                  prevSnap: prevSnap,
-                  snap: null,
-                ),
-              );
-
               /// b) Previously satisfied the query filter and now does not.
               _index.remove(docId);
+
+              if (hasChangeListener) {
+                changeSnaps.add(
+                  DocumentChangeSnapshot(
+                    doc: broadcastDoc,
+                    type: BroadcastEventTypes.removed,
+                    prevData: prevSnap?.data,
+                    data: null,
+                  ),
+                );
+              }
             }
           } else {
-            metaBroadcastDocs.add(
-              BroadcastMetaDocument(
-                broadcastDoc,
-                BroadcastEventTypes.added,
-                prevSnap: prevSnap,
-                snap: updatedSnap,
-              ),
-            );
-
             // c) Previously did not satisfy the query filter and now does.
             if (_filter(updatedSnap)) {
               _index[docId] = updatedSnap;
               shouldBroadcast = true;
+
+              if (hasChangeListener) {
+                changeSnaps.add(
+                  DocumentChangeSnapshot(
+                    doc: broadcastDoc,
+                    type: BroadcastEventTypes.added,
+                    prevData: prevSnap?.data,
+                    data: updatedSnap.data,
+                  ),
+                );
+              }
             }
           }
           break;
@@ -158,30 +167,30 @@ class ObservableQuery<T> extends Query<T>
         case BroadcastEventTypes.touched:
           if (_index.containsKey(docId)) {
             final updatedSnap = broadcastDoc.get()!;
-
-            metaBroadcastDocs.add(
-              BroadcastMetaDocument(
-                broadcastDoc,
-                BroadcastEventTypes.modified,
-                prevSnap: prevSnap,
-                snap: updatedSnap,
-              ),
-            );
-
             _index[docId] = updatedSnap;
             shouldBroadcast = true;
+
+            if (hasChangeListener) {
+              changeSnaps.add(
+                DocumentChangeSnapshot(
+                  doc: broadcastDoc,
+                  type: BroadcastEventTypes.touched,
+                  prevData: prevSnap?.data,
+                  data: updatedSnap.data,
+                ),
+              );
+            }
           }
           break;
       }
     }
 
-    if (metaBroadcastDocs.isNotEmpty) {
-      _metaChangesController.add(metaBroadcastDocs);
-    }
-
     if (shouldBroadcast) {
-      final snaps = _sortQuery(_index.values.toList());
-      add(snaps);
+      add(_sortQuery(_index.values.toList()));
+
+      if (changeSnaps.isNotEmpty) {
+        broadcastChanges(changeSnaps);
+      }
     }
   }
 

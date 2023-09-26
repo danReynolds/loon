@@ -2,10 +2,8 @@ part of loon;
 
 /// A mixin that provides an observable interface for the access and streaming of stored values.
 mixin Observable<T> {
-  late final StreamController<ObservableChangeRecord<T>> _controller;
-  late final Stream<T> _valueStream;
+  late final StreamController<T> _controller;
   late T _value;
-  late T _prevValue;
   late final bool multicast;
 
   void init(
@@ -20,19 +18,13 @@ mixin Observable<T> {
     this.multicast = multicast;
 
     if (multicast) {
-      _controller = StreamController<ObservableChangeRecord<T>>.broadcast();
+      _controller = StreamController<T>.broadcast();
     } else {
-      _controller =
-          StreamController<ObservableChangeRecord<T>>(onCancel: dispose);
+      _controller = StreamController<T>(onCancel: dispose);
     }
 
-    _valueStream = _controller.stream.map((record) {
-      final (_, next) = record;
-      return next;
-    });
-
-    _prevValue = _value = initialValue;
-    _controller.add((_prevValue, _value));
+    _value = initialValue;
+    _controller.add(_value);
   }
 
   void dispose() {
@@ -48,21 +40,16 @@ mixin Observable<T> {
       return _value;
     }
 
-    _prevValue = _value;
     _value = updatedValue;
-    _controller.add((_prevValue, _value));
+    _controller.add(_value);
     return _value;
   }
 
-  /// [get] is left unimplemented since it has variable logic based on the type of [Observable] like an [ObservableDocument],
-  /// [ObservableQuery], and others.
+  /// [get] is left unimplemented since it has variable logic based on the type of [Observable] like an [ObservableDocument]
+  /// and [ObservableQuery].
   T get();
 
   Stream<T> stream() {
-    return _valueStream;
-  }
-
-  Stream<ObservableChangeRecord<T>> streamChanges() {
     return _controller.stream;
   }
 }

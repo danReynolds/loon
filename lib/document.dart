@@ -91,12 +91,8 @@ class Document<T> {
     return observe().stream();
   }
 
-  Stream<(DocumentSnapshot<T>?, DocumentSnapshot<T>?)> streamChanges() {
+  Stream<DocumentChangeSnapshot<T>> streamChanges() {
     return observe().streamChanges();
-  }
-
-  Stream<BroadcastMetaDocument<T>> streamMetaChanges() {
-    return observe().streamMetaChanges();
   }
 
   Json? getJson() {

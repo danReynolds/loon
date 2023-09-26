@@ -2,8 +2,6 @@ library loon;
 
 import 'dart:async';
 
-import 'package:loon/broadcast_meta_document.dart';
-
 export 'widgets/query_stream_builder.dart';
 export 'widgets/document_stream_builder.dart';
 export 'persistor/file_persistor.dart';
@@ -19,6 +17,7 @@ part 'types.dart';
 part 'document_snapshot.dart';
 part 'persistor/persistor.dart';
 part 'broadcast_observer.dart';
+part 'document_change_snapshot.dart';
 
 typedef CollectionStore = Map<String, Map<String, DocumentSnapshot>>;
 typedef BroadcastCollectionStore = Map<String, Map<String, BroadcastDocument>>;

@@ -437,114 +437,44 @@ void main() {
       Loon.clearAll();
     });
 
-    test('Emits changes to the document', () async {
-      final user = TestUserModel('User 1');
-      final userUpdated = TestUserModel('User 1 Updated');
+    test('Returns a stream of changes to the document', () async {
       final userDoc = TestUserModel.store.doc('1');
+      final user = TestUserModel('User 1');
+      final userUpdated = TestUserModel('User 1 updated');
 
-      final changesStream = userDoc.streamChanges().take(3);
+      final queryFuture = userDoc.streamChanges().take(2).toList();
+
       userDoc.create(user);
+
       await asyncEvent();
       userDoc.update(userUpdated);
 
-      final snaps = await changesStream.toList();
-
-      final (prev1, next1) = snaps[0];
-      expect(prev1, null);
-      expect(next1, null);
-
-      final (prev2, next2) = snaps[1];
-      expect(
-        prev2,
-        null,
-      );
-      expect(
-        next2,
-        DocumentSnapshotMatcher(
-          DocumentSnapshot(
-            doc: userDoc,
-            data: user,
-          ),
-        ),
-      );
-
-      final (prev3, next3) = snaps[2];
-      expect(
-        prev3,
-        DocumentSnapshotMatcher(
-          DocumentSnapshot(
-            doc: userDoc,
-            data: user,
-          ),
-        ),
-      );
-      expect(
-        next3,
-        DocumentSnapshotMatcher(
-          DocumentSnapshot(
-            doc: userDoc,
-            data: userUpdated,
-          ),
-        ),
-      );
-    });
-  });
-
-  group('Stream document meta changes', () {
-    tearDown(() {
-      Loon.clearAll();
-    });
-
-    test('Emits meta changes to the document', () async {
-      final user = TestUserModel('User 1');
-      final userUpdated = TestUserModel('User 1 Updated');
-      final userDoc = TestUserModel.store.doc('1');
-
-      final metaChangesStream = userDoc.streamMetaChanges().take(3);
-
-      userDoc.create(user);
-      await asyncEvent();
-      userDoc.update(userUpdated);
-      await asyncEvent();
-      userDoc.delete();
-
-      final snaps = await metaChangesStream.toList();
+      final snaps = await queryFuture;
 
       expect(
         snaps[0].type,
         BroadcastEventTypes.added,
       );
       expect(
-        snaps[0].prevSnap,
+        snaps[0].prevData,
         null,
       );
       expect(
-        snaps[0].snap?.data,
+        snaps[0].data,
         user,
       );
+
       expect(
         snaps[1].type,
         BroadcastEventTypes.modified,
       );
       expect(
-        snaps[1].prevSnap?.data,
+        snaps[1].prevData,
         user,
       );
       expect(
-        snaps[1].snap?.data,
+        snaps[1].data,
         userUpdated,
-      );
-      expect(
-        snaps[2].type,
-        BroadcastEventTypes.removed,
-      );
-      expect(
-        snaps[2].prevSnap?.data,
-        userUpdated,
-      );
-      expect(
-        snaps[2].snap?.data,
-        null,
       );
     });
   });
@@ -656,125 +586,72 @@ void main() {
 
     test('Returns a stream of changes to documents', () async {
       final user = TestUserModel('User 1');
-      final userUpdated = TestUserModel('User 1 updated');
       final user2 = TestUserModel('User 2');
       final userDoc = TestUserModel.store.doc('1');
       final userDoc2 = TestUserModel.store.doc('2');
+      final updatedUser = TestUserModel('User 1 updated');
+
+      final queryFuture = TestUserModel.store.streamChanges().take(2).toList();
 
       userDoc.create(user);
       userDoc2.create(user2);
-
-      final queryStream = TestUserModel.store
-          .where((snap) => snap.id == '1')
-          .streamChanges()
-          .take(2);
-
-      userDoc.update(TestUserModel('User 1 updated'));
-
-      final snaps = await queryStream.toList();
-
-      final (prev1, next1) = snaps[0];
-      expect(
-        prev1,
-        [
-          DocumentSnapshotMatcher(
-            DocumentSnapshot(
-              doc: userDoc,
-              data: user,
-            ),
-          )
-        ],
-      );
-      expect(
-        next1,
-        [
-          DocumentSnapshotMatcher(
-            DocumentSnapshot(
-              doc: userDoc,
-              data: user,
-            ),
-          )
-        ],
-      );
-
-      final (prev2, next2) = snaps[1];
-      expect(
-        prev2,
-        [
-          DocumentSnapshotMatcher(
-            DocumentSnapshot(
-              doc: userDoc,
-              data: user,
-            ),
-          )
-        ],
-      );
-      expect(
-        next2,
-        [
-          DocumentSnapshotMatcher(
-            DocumentSnapshot(
-              doc: userDoc,
-              data: userUpdated,
-            ),
-          )
-        ],
-      );
-    });
-  });
-
-  group('Stream query meta changes', () {
-    tearDown(() {
-      Loon.clearAll();
-    });
-
-    test('Returns a stream of meta changes to documents', () async {
-      final user = TestUserModel('User 1');
-      final user2 = TestUserModel('User 2');
-      final userDoc = TestUserModel.store.doc('1');
-      final userDoc2 = TestUserModel.store.doc('2');
-
-      userDoc.create(user);
-      userDoc2.create(user2);
-
-      final queryStream = TestUserModel.store.streamMetaChanges().take(2);
 
       await asyncEvent();
-      userDoc.update(TestUserModel('User 1 updated'));
+      userDoc.update(updatedUser);
 
-      final snaps = await queryStream.toList();
+      final snaps = await queryFuture;
 
       expect(snaps[0].length, 2);
+
       expect(
         snaps[0].first.type,
         BroadcastEventTypes.added,
       );
       expect(
+        snaps[0].first.data,
+        user,
+      );
+
+      expect(
         snaps[0].last.type,
         BroadcastEventTypes.added,
       );
+      expect(
+        snaps[0].last.data,
+        user2,
+      );
 
       expect(snaps[1].length, 1);
+
       expect(
         snaps[1].first.type,
         BroadcastEventTypes.modified,
       );
+      expect(
+        snaps[1].first.prevData,
+        user,
+      );
+      expect(
+        snaps[1].first.data,
+        updatedUser,
+      );
     });
 
-    test('Localizes meta broadcast event to the query', () async {
+    test('Localizes change broadcast event types to the query', () async {
       final user = TestUserModel('User 1');
       final userDoc = TestUserModel.store.doc('1');
 
-      final queryStream = TestUserModel.store
-          .where((snap) => snap.data.name == 'User 1 Updated')
-          .streamMetaChanges()
-          .take(1);
+      final queryFuture = TestUserModel.store
+          .where((snap) => snap.data.name == 'User 1 updated')
+          .streamChanges()
+          .take(1)
+          .toList();
 
       userDoc.create(user);
       await asyncEvent();
       userDoc.update(TestUserModel('User 1 updated'));
 
-      final snaps = await queryStream.toList();
+      final snaps = await queryFuture;
 
       expect(snaps[0].length, 1);
       expect(
