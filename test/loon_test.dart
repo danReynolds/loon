@@ -637,7 +637,7 @@ void main() {
       );
     });
 
-    test('Localizes change broadcast event types to the query', () async {
+    test('Localizes broadcast event change types to the query', () async {
       final user = TestUserModel('User 1');
       final userDoc = TestUserModel.store.doc('1');
 

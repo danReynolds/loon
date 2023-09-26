@@ -1,3 +1,7 @@
+## 0.0.4
+
+* Migrate `streamChanges` to a more useful, meta change API.
+
 ## 0.0.3
 
 * Small fixes from more testing.
