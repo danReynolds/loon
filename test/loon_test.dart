@@ -39,6 +39,41 @@ class TestUserModel {
   }
 }
 
+class TestPersistor extends Persistor {
+  final List<TestUserModel> seedData;
+
+  TestPersistor({
+    required this.seedData,
+  });
+
+  @override
+  Future<void> clear(String collection) {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<void> clearAll() {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<SerializedCollectionStore> hydrate() async {
+    return {
+      "users": seedData.fold({}, (acc, user) {
+        return {
+          ...acc,
+          user.name: user.toJson(),
+        };
+      }),
+    };
+  }
+
+  @override
+  Future<void> persist(List<BroadcastDocument> docs) {
+    throw UnimplementedError();
+  }
+}
+
 class DocumentSnapshotMatcher extends Matcher {
   DocumentSnapshot<TestUserModel?> expected;
   late DocumentSnapshot<TestUserModel?> actual;
@@ -739,6 +774,22 @@ void main() {
       expect(friendSnap?.data.toJson(), friendData.toJson());
       expect(friendSnap?.doc.collection, 'users_1_friends');
       expect(friendSnap?.doc.id, '1');
+    });
+  });
+
+  group('Hydration', () {
+    test('Adds documents with event type hydrated', () async {
+      final user = TestUserModel('User 1');
+      Loon.configure(persistor: TestPersistor(seedData: [user]));
+      final changesStream = Loon.collection('users').streamChanges();
+
+      final snapsFuture = changesStream.first;
+      await Loon.hydrate();
+      final snaps = await snapsFuture;
+
+      expect(snaps.length, 1);
+      expect(snaps[0].type, BroadcastEventTypes.hydrated);
+      expect(snaps[0].data, user.toJson());
     });
   });
 }

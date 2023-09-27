@@ -41,6 +41,8 @@ class Loon {
 
   bool _hasPendingBroadcast = false;
 
+  static bool _isHydrating = false;
+
   /// Validates that data is either already in a serializable format or comes with a serializer.
   static void _validateDataSerialization<T>({
     required FromJson<T>? fromJson,
@@ -340,12 +342,16 @@ class Loon {
       _collectionStore[collection] = {};
     }
 
-    _writeBroadcastDocument<T>(
-      doc,
-      _hasDocument(doc)
-          ? BroadcastEventTypes.modified
-          : BroadcastEventTypes.added,
-    );
+    final BroadcastEventTypes eventType;
+    if (_isHydrating) {
+      eventType = BroadcastEventTypes.hydrated;
+    } else if (doc.exists()) {
+      eventType = BroadcastEventTypes.modified;
+    } else {
+      eventType = BroadcastEventTypes.added;
+    }
+
+    _writeBroadcastDocument<T>(doc, eventType);
 
     final snap = _collectionStore[doc.collection]![doc.id] =
         DocumentSnapshot<T>(doc: doc, data: data);
@@ -433,6 +439,7 @@ class Loon {
       return;
     }
     try {
+      _isHydrating = true;
       final data = await _instance.persistor!.hydrate();
 
       for (final collectionDataStoreEntry in data.entries) {
@@ -450,6 +457,8 @@ class Loon {
     } catch (e) {
       // ignore: avoid_print
       print('Loon: Error hydrating');
+    } finally {
+      _isHydrating = false;
     }
     _instance._broadcast(broadcastPersistor: false);
   }

@@ -1,6 +1,6 @@
 part of loon;
 
-/// A mixin that provides an observable interface for the access and streaming of stored values.
+/// A mixin that provides an observable interface for the access and streaming of data broadcasted from the store.
 mixin BroadcastObserver<T, S> {
   late final StreamController<T> _controller;
   late final StreamController<S> _changeController;

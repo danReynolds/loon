@@ -126,6 +126,9 @@ enum BroadcastEventTypes {
 
   /// The document has been manually touched for rebroadcast.
   touched,
+
+  /// The document has been hydrated from persisted storage.
+  hydrated,
 }
 
 class BroadcastDocument<T> extends Document<T> {

@@ -69,6 +69,7 @@ class ObservableQuery<T> extends Query<T>
 
       switch (broadcastDoc.type) {
         case BroadcastEventTypes.added:
+        case BroadcastEventTypes.hydrated:
           final snap = broadcastDoc.get()!;
 
           // 1. Add new documents that satisfy the query filter.
@@ -80,7 +81,7 @@ class ObservableQuery<T> extends Query<T>
               changeSnaps.add(
                 DocumentChangeSnapshot(
                   doc: broadcastDoc,
-                  type: BroadcastEventTypes.added,
+                  type: broadcastDoc.type,
                   prevData: prevSnap?.data,
                   data: snap.data,
                 ),
