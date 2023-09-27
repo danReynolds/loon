@@ -69,13 +69,8 @@ class Query<T> {
     return observe().stream();
   }
 
-  Stream<(List<DocumentSnapshot<T>>, List<DocumentSnapshot<T>>)>
-      streamChanges() {
+  Stream<List<DocumentChangeSnapshot<T>>> streamChanges() {
     return observe().streamChanges();
-  }
-
-  Stream<List<BroadcastDocument<T>>> streamMetaChanges() {
-    return observe().streamMetaChanges();
   }
 
   Query<T> sortBy(SortFn<T> sort) {

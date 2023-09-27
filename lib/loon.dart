@@ -7,7 +7,7 @@ export 'widgets/document_stream_builder.dart';
 export 'persistor/file_persistor.dart';
 export 'persistor/encrypted_file_persistor.dart';
 
-part 'observable.dart';
+part 'broadcast_observer.dart';
 part 'query.dart';
 part 'observable_query.dart';
 part 'collection.dart';
@@ -16,7 +16,7 @@ part 'observable_document.dart';
 part 'types.dart';
 part 'document_snapshot.dart';
 part 'persistor/persistor.dart';
-part 'broadcast_observer.dart';
+part 'document_change_snapshot.dart';
 
 typedef CollectionStore = Map<String, Map<String, DocumentSnapshot>>;
 typedef BroadcastCollectionStore = Map<String, Map<String, BroadcastDocument>>;
@@ -36,10 +36,12 @@ class Loon {
   /// The collection store of documents that are pending a scheduled broadcast.
   final BroadcastCollectionStore _broadcastCollectionStore = {};
 
-  /// The list of observers, either document or query observers, that should be notified on broadcast.
+  /// The list of observers, either document or query observables, that should be notified on broadcast.
   final Set<BroadcastObserver> _broadcastObservers = {};
 
   bool _hasPendingBroadcast = false;
+
+  static bool _isHydrating = false;
 
   /// Validates that data is either already in a serializable format or comes with a serializer.
   static void _validateDataSerialization<T>({
@@ -340,12 +342,16 @@ class Loon {
       _collectionStore[collection] = {};
     }
 
-    _writeBroadcastDocument<T>(
-      doc,
-      _hasDocument(doc)
-          ? BroadcastEventTypes.modified
-          : BroadcastEventTypes.added,
-    );
+    final BroadcastEventTypes eventType;
+    if (_isHydrating) {
+      eventType = BroadcastEventTypes.hydrated;
+    } else if (doc.exists()) {
+      eventType = BroadcastEventTypes.modified;
+    } else {
+      eventType = BroadcastEventTypes.added;
+    }
+
+    _writeBroadcastDocument<T>(doc, eventType);
 
     final snap = _collectionStore[doc.collection]![doc.id] =
         DocumentSnapshot<T>(doc: doc, data: data);
@@ -433,6 +439,7 @@ class Loon {
       return;
     }
     try {
+      _isHydrating = true;
       final data = await _instance.persistor!.hydrate();
 
       for (final collectionDataStoreEntry in data.entries) {
@@ -450,6 +457,8 @@ class Loon {
     } catch (e) {
       // ignore: avoid_print
       print('Loon: Error hydrating');
+    } finally {
+      _isHydrating = false;
     }
     _instance._broadcast(broadcastPersistor: false);
   }
@@ -490,7 +499,7 @@ class Loon {
   static void rebroadcast<T>(Document<T> doc) {
     // If the document is already scheduled for broadcast, then manually touching it for rebroadcast is a no-op, since it
     // is already enqueued for broadcast.
-    if (!_instance._isDocumentPendingBroadcast(doc)) {
+    if (!doc.isPendingBroadcast()) {
       _instance._writeBroadcastDocument<T>(
         doc,
         BroadcastEventTypes.touched,

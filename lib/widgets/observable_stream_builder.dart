@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:loon/loon.dart';
 
-class ObservableStreamBuilder<T> extends StatelessWidget {
-  final Observable<T> observable;
+class ObservableStreamBuilder<T, S> extends StatelessWidget {
+  final BroadcastObserver<T, S> observable;
   final Widget Function(BuildContext, T) builder;
 
   const ObservableStreamBuilder({

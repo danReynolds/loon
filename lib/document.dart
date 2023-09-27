@@ -91,12 +91,8 @@ class Document<T> {
     return observe().stream();
   }
 
-  Stream<(DocumentSnapshot<T>?, DocumentSnapshot<T>?)> streamChanges() {
+  Stream<DocumentChangeSnapshot<T>> streamChanges() {
     return observe().streamChanges();
-  }
-
-  Stream<BroadcastDocument<T>> streamMetaChanges() {
-    return observe().streamMetaChanges();
   }
 
   Json? getJson() {
@@ -112,6 +108,10 @@ class Document<T> {
   bool exists() {
     return Loon._instance._hasDocument(this);
   }
+
+  bool isPendingBroadcast() {
+    return Loon._instance._isDocumentPendingBroadcast(this);
+  }
 }
 
 enum BroadcastEventTypes {
@@ -126,6 +126,9 @@ enum BroadcastEventTypes {
 
   /// The document has been manually touched for rebroadcast.
   touched,
+
+  /// The document has been hydrated from persisted storage.
+  hydrated,
 }
 
 class BroadcastDocument<T> extends Document<T> {
