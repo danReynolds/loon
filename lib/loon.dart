@@ -7,7 +7,7 @@ export 'widgets/document_stream_builder.dart';
 export 'persistor/file_persistor.dart';
 export 'persistor/encrypted_file_persistor.dart';
 
-part 'observable.dart';
+part 'broadcast_observer.dart';
 part 'query.dart';
 part 'observable_query.dart';
 part 'collection.dart';
@@ -16,7 +16,6 @@ part 'observable_document.dart';
 part 'types.dart';
 part 'document_snapshot.dart';
 part 'persistor/persistor.dart';
-part 'broadcast_observer.dart';
 part 'document_change_snapshot.dart';
 
 typedef CollectionStore = Map<String, Map<String, DocumentSnapshot>>;
@@ -37,7 +36,7 @@ class Loon {
   /// The collection store of documents that are pending a scheduled broadcast.
   final BroadcastCollectionStore _broadcastCollectionStore = {};
 
-  /// The list of observers, either document or query observers, that should be notified on broadcast.
+  /// The list of observers, either document or query observables, that should be notified on broadcast.
   final Set<BroadcastObserver> _broadcastObservers = {};
 
   bool _hasPendingBroadcast = false;

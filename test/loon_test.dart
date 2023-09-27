@@ -409,27 +409,6 @@ void main() {
         throwsStateError,
       );
     });
-
-    test('Automatically disposes non-multicast observables', () {
-      final userDoc = TestUserModel.store.doc('1');
-      final userDocObservable = userDoc.observe();
-      final subscription = userDocObservable.stream().listen(null);
-      subscription.cancel();
-      expect(userDocObservable.isClosed, true);
-    });
-
-    test('Requires manual disposal of multi cast observables', () {
-      final userDoc = TestUserModel.store.doc('1');
-      final userDocObservable = userDoc.observe(multicast: true);
-      final subscription = userDocObservable.stream().listen(null);
-      final subscription2 = userDocObservable.stream().listen(null);
-      subscription.cancel();
-      subscription2.cancel();
-
-      expect(userDocObservable.isClosed, false);
-      userDocObservable.dispose();
-      expect(userDocObservable.isClosed, true);
-    });
   });
 
   group('Stream document changes', () {

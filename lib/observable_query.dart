@@ -2,7 +2,6 @@ part of loon;
 
 class ObservableQuery<T> extends Query<T>
     with
-        Observable<List<DocumentSnapshot<T>>>,
         BroadcastObserver<List<DocumentSnapshot<T>>,
             List<DocumentChangeSnapshot<T>>> {
   /// A cache of the snapshots broadcasted by the query indexed by their [Document] ID.
@@ -66,6 +65,7 @@ class ObservableQuery<T> extends Query<T>
     for (final broadcastDoc in broadcastDocs) {
       final docId = broadcastDoc.id;
       final prevSnap = _index[docId];
+      final hasChangeListener = _changeController.hasListener;
 
       switch (broadcastDoc.type) {
         case BroadcastEventTypes.added:
@@ -189,7 +189,7 @@ class ObservableQuery<T> extends Query<T>
       add(_sortQuery(_index.values.toList()));
 
       if (changeSnaps.isNotEmpty) {
-        broadcastChanges(changeSnaps);
+        _changeController.add(changeSnaps);
       }
     }
   }

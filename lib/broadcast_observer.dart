@@ -1,42 +1,60 @@
 part of loon;
 
-/// Extends an [Observable] by registering it to receive document broadcasts.
-mixin BroadcastObserver<T, S> on Observable<T> {
-  late final StreamController<S> _changesController;
+/// A mixin that provides an observable interface for the access and streaming of stored values.
+mixin BroadcastObserver<T, S> {
+  late final StreamController<T> _controller;
+  late final StreamController<S> _changeController;
+  late T _value;
+  late final bool multicast;
 
-  @override
   void init(
     T initialValue, {
+    /// Whether the [Observable] can have more than one observable subscription. A single-subscription
+    /// observable will allow one listener and release its resources automatically when its listener cancels its subscription.
+    /// A multicast observable must have its resources released manually by calling [dispose].
+    /// The term *multicast* is used to refer to a a multi-subscription observable since it is common observable terminology and
+    /// the term broadcast is to mean something different in the library compared to its usage in the underlying Dart [Stream] implementation.
     required bool multicast,
   }) {
+    this.multicast = multicast;
+
     if (multicast) {
-      _changesController = StreamController<S>.broadcast();
+      _controller = StreamController<T>.broadcast();
+      _changeController = StreamController<S>.broadcast();
     } else {
-      _changesController = StreamController<S>();
+      _controller = StreamController<T>(onCancel: dispose);
+      _changeController = StreamController<S>(onCancel: dispose);
     }
 
-    super.init(initialValue, multicast: multicast);
+    _value = initialValue;
+    _controller.add(_value);
+
     Loon._instance._addBroadcastObserver(this);
   }
 
-  @override
   void dispose() {
-    super.dispose();
-    _changesController.close();
+    _controller.close();
+    _changeController.close();
     Loon._instance._removeBroadcastObserver(this);
   }
 
-  void _onBroadcast();
-
-  bool get hasChangeListener {
-    return _changesController.hasListener;
+  T add(T updatedValue) {
+    _value = updatedValue;
+    _controller.add(_value);
+    return _value;
   }
 
-  void broadcastChanges(S changes) {
-    _changesController.add(changes);
+  /// [get] is left unimplemented since it has variable logic based on the type of [Observable] like an [ObservableDocument]
+  /// and [ObservableQuery].
+  T get();
+
+  Stream<T> stream() {
+    return _controller.stream;
   }
 
   Stream<S> streamChanges() {
-    return _changesController.stream;
+    return _changeController.stream;
   }
+
+  void _onBroadcast();
 }

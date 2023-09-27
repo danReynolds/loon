@@ -1,9 +1,7 @@
 part of loon;
 
 class ObservableDocument<T> extends Document<T>
-    with
-        Observable<DocumentSnapshot<T>?>,
-        BroadcastObserver<DocumentSnapshot<T>?, DocumentChangeSnapshot<T>> {
+    with BroadcastObserver<DocumentSnapshot<T>?, DocumentChangeSnapshot<T>> {
   ObservableDocument({
     required super.collection,
     required super.id,
@@ -33,8 +31,8 @@ class ObservableDocument<T> extends Document<T>
 
     final snap = super.get();
 
-    if (_changesController.hasListener) {
-      _changesController.add(
+    if (_changeController.hasListener) {
+      _changeController.add(
         DocumentChangeSnapshot(
           doc: broadcastDoc,
           type: broadcastDoc.type,
