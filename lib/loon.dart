@@ -84,8 +84,8 @@ class Loon {
     );
 
     // Upon first read of serialized data using a serializer, the parsed representation
-    // of the document is cached for efficient repeat access.
-    return _writeSnapshot<T>(doc, fromJson!(snap.data));
+    // of the document is cached for efficient repeat access. It does not need to be rebroadcast.
+    return _writeSnapshot<T>(doc, fromJson!(snap.data), broadcast: false);
   }
 
   /// Returns whether a collection name exists in the collection data store.
@@ -202,6 +202,7 @@ class Loon {
           persistorSettings: persistorSettings,
         ),
         fromJson!(snap.data),
+        broadcast: false,
       );
     }).toList();
   }
@@ -351,13 +352,11 @@ class Loon {
       eventType = BroadcastEventTypes.added;
     }
 
-    _writeBroadcastDocument<T>(doc, eventType);
-
     final snap = _collectionStore[doc.collection]![doc.id] =
         DocumentSnapshot<T>(doc: doc, data: data);
 
     if (broadcast) {
-      _scheduleBroadcast();
+      _writeBroadcastDocument<T>(doc, eventType);
     }
 
     return snap;
@@ -380,7 +379,13 @@ class Loon {
     T data, {
     bool broadcast = true,
   }) {
-    return _writeSnapshot<T>(doc, data, broadcast: broadcast);
+    return _writeSnapshot<T>(
+      doc,
+      data,
+      // As an optimization, broadcasting is skipped when updating a document if the document
+      // data is unchanged.
+      broadcast: broadcast && doc.get()?.data != data,
+    );
   }
 
   DocumentSnapshot<T> _modifyDocument<T>(
@@ -388,7 +393,7 @@ class Loon {
     ModifyFn<T> modifyFn, {
     bool broadcast = true,
   }) {
-    return _writeSnapshot<T>(doc, modifyFn(doc.get()), broadcast: broadcast);
+    return _updateDocument<T>(doc, modifyFn(doc.get()), broadcast: broadcast);
   }
 
   void _deleteDocument<T>(
@@ -397,10 +402,9 @@ class Loon {
   }) {
     if (doc.exists()) {
       _collectionStore[doc.collection]!.remove(doc.id);
-      _writeBroadcastDocument<T>(doc, BroadcastEventTypes.removed);
 
       if (broadcast) {
-        _scheduleBroadcast();
+        _writeBroadcastDocument<T>(doc, BroadcastEventTypes.removed);
       }
     }
   }
@@ -424,6 +428,8 @@ class Loon {
       doc,
       eventType,
     );
+
+    _scheduleBroadcast();
   }
 
   static void configure({
@@ -504,7 +510,6 @@ class Loon {
         doc,
         BroadcastEventTypes.touched,
       );
-      _instance._scheduleBroadcast();
     }
   }
 }
