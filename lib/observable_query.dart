@@ -14,6 +14,7 @@ class ObservableQuery<T> extends Query<T>
     required super.fromJson,
     required super.toJson,
     required super.persistorSettings,
+    required super.dependenciesBuilder,
     required bool multicast,
   }) {
     final snaps = super.get();

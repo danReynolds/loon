@@ -6,6 +6,7 @@ class Collection<T> extends Query<T> {
     required super.fromJson,
     required super.toJson,
     required super.persistorSettings,
+    required super.dependenciesBuilder,
   }) : super(filters: [], sort: null);
 
   Document<T> doc(String id) {
@@ -15,6 +16,7 @@ class Collection<T> extends Query<T> {
       fromJson: fromJson,
       toJson: toJson,
       persistorSettings: persistorSettings,
+      dependenciesBuilder: dependenciesBuilder,
     );
   }
 

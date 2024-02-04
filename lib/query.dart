@@ -7,6 +7,7 @@ class Query<T> {
   final FromJson<T>? fromJson;
   final ToJson<T>? toJson;
   final PersistorSettings<T>? persistorSettings;
+  final Set<Document> Function()? dependenciesBuilder;
 
   Query(
     this.collection, {
@@ -15,6 +16,7 @@ class Query<T> {
     required this.fromJson,
     required this.toJson,
     required this.persistorSettings,
+    required this.dependenciesBuilder,
   });
 
   bool _filter(DocumentSnapshot<T> snap) {
@@ -61,6 +63,7 @@ class Query<T> {
       fromJson: fromJson,
       toJson: toJson,
       persistorSettings: persistorSettings,
+      dependenciesBuilder: dependenciesBuilder,
       multicast: multicast,
     );
   }
@@ -81,6 +84,7 @@ class Query<T> {
       fromJson: fromJson,
       toJson: toJson,
       persistorSettings: persistorSettings,
+      dependenciesBuilder: dependenciesBuilder,
     );
   }
 
@@ -92,6 +96,7 @@ class Query<T> {
       fromJson: fromJson,
       toJson: toJson,
       persistorSettings: persistorSettings,
+      dependenciesBuilder: dependenciesBuilder,
     );
   }
 }

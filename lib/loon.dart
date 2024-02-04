@@ -39,6 +39,10 @@ class Loon {
   /// The list of observers, either document or query observables, that should be notified on broadcast.
   final Set<BroadcastObserver> _broadcastObservers = {};
 
+  /// The index of a document to the documents that depend on it. Whenever a document is updated, it schedules
+  /// each of its dependents for a broadcast so that they can receive its updated value.
+  final Map<Document, Set<Document>> _depsStore = {};
+
   bool _hasPendingBroadcast = false;
 
   static bool _isHydrating = false;
@@ -352,8 +356,14 @@ class Loon {
       eventType = BroadcastEventTypes.added;
     }
 
-    final snap = _collectionStore[doc.collection]![doc.id] =
-        DocumentSnapshot<T>(doc: doc, data: data);
+    final snap =
+        _collectionStore[doc.collection]![doc.id] = DocumentSnapshot<T>(
+      doc: doc,
+      data: data,
+    );
+
+    // Build the updated set of dependencies for this document.
+    _buildDependencies(doc);
 
     if (broadcast) {
       _writeBroadcastDocument<T>(doc, eventType);
@@ -413,9 +423,11 @@ class Loon {
     Document<T> doc,
     BroadcastEventTypes eventType,
   ) {
-    if ((eventType == BroadcastEventTypes.modified ||
-            eventType == BroadcastEventTypes.touched) &&
-        !doc.exists()) {
+    final pendingBroadcastDoc =
+        _broadcastCollectionStore[doc.collection]?[doc.id];
+
+    // Ignore writing a duplicate broadcast event for a document already pending broadcast.
+    if (pendingBroadcastDoc != null && pendingBroadcastDoc.type == eventType) {
       return;
     }
 
@@ -423,13 +435,46 @@ class Loon {
       _broadcastCollectionStore[doc.collection] = {};
     }
 
-    _instance._broadcastCollectionStore[doc.collection]![doc.id] =
-        BroadcastDocument<T>(
+    _broadcastCollectionStore[doc.collection]![doc.id] = BroadcastDocument<T>(
       doc,
       eventType,
     );
 
+    _rebroadcastDeps(doc);
+
     _scheduleBroadcast();
+  }
+
+  void _buildDependencies<T>(Document<T> doc) {
+    final dependenciesBuilder = doc.dependenciesBuilder;
+
+    if (dependenciesBuilder != null) {
+      final dependencies = dependenciesBuilder();
+
+      for (final doc in dependencies) {
+        if (!_depsStore.containsKey(doc)) {
+          _depsStore[doc] = {};
+        }
+        _depsStore[doc]!.add(doc);
+      }
+    }
+  }
+
+  /// Schedules all documents that depend on the given document for rebroadcast. This should occur
+  /// for any type of broadcast (added, modified, removed or touched).
+  void _rebroadcastDeps(Document doc) {
+    final deps = _depsStore[doc];
+    if (deps != null) {
+      for (final dep in deps) {
+        if (dep.exists()) {
+          rebroadcast(dep);
+          // If the document that registered as a dependency no longer exits, then it is lazily
+          // removed from this document's dependents.
+        } else {
+          deps.remove(dep);
+        }
+      }
+    }
   }
 
   static void configure({
@@ -474,12 +519,14 @@ class Loon {
     FromJson<T>? fromJson,
     ToJson<T>? toJson,
     PersistorSettings<T>? persistorSettings,
+    Set<Document> Function()? dependenciesBuilder,
   }) {
     return Collection<T>(
       collection,
       fromJson: fromJson,
       toJson: toJson,
       persistorSettings: persistorSettings,
+      dependenciesBuilder: dependenciesBuilder,
     );
   }
 
@@ -503,13 +550,9 @@ class Loon {
 
   /// Enqueues a document to be rebroadcasted, updating all streams that are subscribed to that document.
   static void rebroadcast<T>(Document<T> doc) {
-    // If the document is already scheduled for broadcast, then manually touching it for rebroadcast is a no-op, since it
-    // is already enqueued for broadcast.
-    if (!doc.isPendingBroadcast()) {
-      _instance._writeBroadcastDocument<T>(
-        doc,
-        BroadcastEventTypes.touched,
-      );
-    }
+    _instance._writeBroadcastDocument<T>(
+      doc,
+      BroadcastEventTypes.touched,
+    );
   }
 }

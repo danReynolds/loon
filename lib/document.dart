@@ -6,6 +6,7 @@ class Document<T> {
   final FromJson<T>? fromJson;
   final ToJson<T>? toJson;
   final PersistorSettings? persistorSettings;
+  final Set<Document> Function()? dependenciesBuilder;
 
   Document({
     required this.collection,
@@ -13,19 +14,36 @@ class Document<T> {
     this.fromJson,
     this.toJson,
     this.persistorSettings,
+    this.dependenciesBuilder,
   });
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) {
+      return true;
+    }
+    if (other is Document) {
+      return id == other.id && collection == other.collection;
+    }
+    return false;
+  }
+
+  @override
+  int get hashCode => Object.hashAll([id, collection]);
 
   Collection<S> subcollection<S>(
     String subcollection, {
     FromJson<S>? fromJson,
     ToJson<S>? toJson,
     PersistorSettings<S>? persistorSettings,
+    Set<Document> Function()? dependenciesBuilder,
   }) {
     return Collection<S>(
       "${collection}_${id}_$subcollection",
       fromJson: fromJson,
       toJson: toJson,
       persistorSettings: persistorSettings,
+      dependenciesBuilder: dependenciesBuilder,
     );
   }
 
