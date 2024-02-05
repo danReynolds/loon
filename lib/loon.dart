@@ -440,13 +440,13 @@ class Loon {
     final broadcastDoc = _broadcastCollectionStore[doc.collection]![doc.id] =
         doc.toBroadcast(eventType);
 
-    _rebroadcastDeps(broadcastDoc);
+    _rebroadcastDependents(broadcastDoc);
 
     _scheduleBroadcast();
   }
 
-  /// Adds the document associated with the given snapshot as a dependency of all of its
-  /// resolved dependencies as determined dynamically by the updated snapshot.
+  /// Rebuilds a set of dependencies that the snapshot's document is dependent on
+  /// whenever a document emits a new snapshot.
   void _buildDependencies<T>(DocumentSnapshot<T> snap) {
     final dependenciesBuilder = snap.doc.dependenciesBuilder;
 
@@ -462,21 +462,21 @@ class Loon {
     }
   }
 
-  /// Schedules all documents that depend on the given document for rebroadcast. This should occur
+  /// Schedules all documents that depend on the given document for rebroadcast. This occurs
   /// for any type of broadcast (added, modified, removed or touched).
-  void _rebroadcastDeps(BroadcastDocument doc) {
+  void _rebroadcastDependents(BroadcastDocument doc) {
     final eventType = doc.type;
-    final deps = _dependenciesStore[doc];
+    final dependentDocs = _dependenciesStore[doc];
 
-    if (deps != null) {
+    if (dependentDocs != null) {
       // Clone the dependencies set to a list so that the set can be altered during iteration.
-      for (final dep in deps.toList()) {
-        if (dep.exists()) {
-          rebroadcast(dep);
+      for (final doc in dependentDocs.toList()) {
+        if (doc.exists()) {
+          rebroadcast(doc);
           // If the document that registered as a dependency no longer exits, then it is lazily
           // removed from this document's dependents.
         } else if (eventType == BroadcastEventTypes.removed) {
-          deps.remove(dep);
+          dependentDocs.remove(doc);
         }
       }
     }
