@@ -130,6 +130,10 @@ class Document<T> {
   bool isPendingBroadcast() {
     return Loon._instance._isDocumentPendingBroadcast(this);
   }
+
+  BroadcastDocument<T> toBroadcast(BroadcastEventTypes type) {
+    return BroadcastDocument<T>(this, type);
+  }
 }
 
 enum BroadcastEventTypes {

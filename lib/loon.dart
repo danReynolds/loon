@@ -426,8 +426,10 @@ class Loon {
     final pendingBroadcastDoc =
         _broadcastCollectionStore[doc.collection]?[doc.id];
 
-    // Ignore writing a duplicate broadcast event for a document already pending broadcast.
-    if (pendingBroadcastDoc != null && pendingBroadcastDoc.type == eventType) {
+    // Ignore writing a duplicate broadcast event type or overwriting a pending mutative event type with a touched event.
+    if (pendingBroadcastDoc != null &&
+        (pendingBroadcastDoc.type == eventType ||
+            eventType == BroadcastEventTypes.touched)) {
       return;
     }
 
@@ -436,16 +438,15 @@ class Loon {
     }
 
     final broadcastDoc = _broadcastCollectionStore[doc.collection]![doc.id] =
-        BroadcastDocument<T>(
-      doc,
-      eventType,
-    );
+        doc.toBroadcast(eventType);
 
     _rebroadcastDeps(broadcastDoc);
 
     _scheduleBroadcast();
   }
 
+  /// Adds the document associated with the given snapshot as a dependency of all of its
+  /// resolved dependencies as determined dynamically by the updated snapshot.
   void _buildDependencies<T>(DocumentSnapshot<T> snap) {
     final dependenciesBuilder = snap.doc.dependenciesBuilder;
 
@@ -456,7 +457,7 @@ class Loon {
         if (!_dependenciesStore.containsKey(doc)) {
           _dependenciesStore[doc] = {};
         }
-        _dependenciesStore[doc]!.add(doc);
+        _dependenciesStore[doc]!.add(snap.doc);
       }
     }
   }
@@ -467,31 +468,24 @@ class Loon {
     final eventType = doc.type;
     final deps = _dependenciesStore[doc];
 
-    final isRemovalEvent = eventType == BroadcastEventTypes.removed;
-
     if (deps != null) {
-      for (final dep in deps) {
+      // Clone the dependencies set to a list so that the set can be altered during iteration.
+      for (final dep in deps.toList()) {
         if (dep.exists()) {
           rebroadcast(dep);
           // If the document that registered as a dependency no longer exits, then it is lazily
           // removed from this document's dependents.
-        } else if (!isRemovalEvent) {
+        } else if (eventType == BroadcastEventTypes.removed) {
           deps.remove(dep);
         }
       }
-    }
-
-    if (isRemovalEvent) {
-      _dependenciesStore.remove(doc);
     }
   }
 
   static void configure({
     Persistor? persistor,
   }) {
-    if (persistor != null) {
-      _instance.persistor = persistor;
-    }
+    _instance.persistor = persistor;
   }
 
   static Future<void> hydrate() async {
@@ -558,8 +552,8 @@ class Loon {
   }
 
   /// Enqueues a document to be rebroadcasted, updating all streams that are subscribed to that document.
-  static void rebroadcast<T>(Document<T> doc) {
-    _instance._writeBroadcastDocument<T>(
+  static void rebroadcast(Document doc) {
+    _instance._writeBroadcastDocument(
       doc,
       BroadcastEventTypes.touched,
     );

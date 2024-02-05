@@ -7,6 +7,9 @@ class Query<T> {
   final FromJson<T>? fromJson;
   final ToJson<T>? toJson;
   final PersistorSettings<T>? persistorSettings;
+
+  /// Returns the set of documents that the document associated with the given
+  /// [DocumentSnapshot] is dependent on.
   final DependenciesBuilder<T>? dependenciesBuilder;
 
   Query(

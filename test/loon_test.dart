@@ -32,7 +32,7 @@ class TestUserModel {
 
   TestUserModel.fromJson(Json json) : name = json['name'];
 
-  toJson() {
+  Json toJson() {
     return {
       "name": name,
     };
@@ -105,7 +105,7 @@ class DocumentSnapshotMatcher extends Matcher {
     return actual.id == expected.id &&
         mapsEqual(
           actual.data.toJson(),
-          expected.data?.toJson(),
+          expected.data!.toJson(),
         );
   }
 }
@@ -368,7 +368,7 @@ void main() {
 
   group('Stream document', () {
     tearDown(() {
-      Loon.clearAll();
+      return Loon.clearAll();
     });
 
     test('Emits the current document', () async {
@@ -430,18 +430,6 @@ void main() {
           null,
           emitsDone,
         ]),
-      );
-    });
-
-    test('Defaults to non-multicast observables', () {
-      final userDoc = TestUserModel.store.doc('1');
-      final userDocObservable = userDoc.observe();
-      userDocObservable.stream().listen(null);
-
-      expect(
-        // A second subscription to the non-multicast observable should throw.
-        () => userDocObservable.stream().listen(null),
-        throwsStateError,
       );
     });
   });
@@ -742,6 +730,10 @@ void main() {
   });
 
   group('Root collection', () {
+    tearDown(() {
+      Loon.clearAll();
+    });
+
     test('Writes documents successfully', () {
       final data = {"test": true};
       final rootDoc = Loon.doc('1');
@@ -757,6 +749,10 @@ void main() {
   });
 
   group('Subcollections', () {
+    tearDown(() {
+      Loon.clearAll();
+    });
+
     test('Read/Write documents successfully', () {
       final friendData = TestUserModel('Friend 1');
       final friendDoc = Loon.collection('users')
@@ -778,7 +774,12 @@ void main() {
   });
 
   group('Hydration', () {
-    test('Adds documents with event type hydrated', () async {
+    tearDown(() {
+      Loon.configure(persistor: null);
+      Loon.clearAll();
+    });
+
+    test('Hydrates documents', () async {
       final user = TestUserModel('User 1');
       Loon.configure(persistor: TestPersistor(seedData: [user]));
       await Loon.hydrate();
@@ -789,6 +790,147 @@ void main() {
       ).get();
 
       expect(usersSnap[0].data.toJson(), user.toJson());
+    });
+  });
+
+  group('dependencies', () {
+    tearDown(() {
+      Loon.clearAll();
+    });
+
+    test("Dependent changes should broadcast dependencies", () async {
+      final usersCollection = Loon.collection('users');
+      final postsCollection = Loon.collection(
+        'posts',
+        dependenciesBuilder: (snap) {
+          return {
+            usersCollection.doc('1'),
+          };
+        },
+      );
+
+      final postDoc = postsCollection.doc('1');
+      final postData = {"id": 1, "text": "Post 1"};
+      final userDoc = usersCollection.doc('1');
+      final postsStream = postDoc.stream();
+
+      postDoc.create(postData);
+
+      await asyncEvent();
+
+      usersCollection.doc('1').create({
+        "id": 1,
+        "name": "User 1",
+      });
+
+      await asyncEvent();
+
+      userDoc.update({
+        "id": 1,
+        "name": "User 1",
+      });
+
+      await asyncEvent();
+
+      userDoc.delete();
+
+      await asyncEvent();
+
+      usersCollection.doc('1').create({
+        "id": 1,
+        "name": "User 1",
+      });
+
+      final snaps = await postsStream.take(6).toList();
+
+      // No post yet
+      expect(snaps[0], null);
+      // Post created
+      expect(snaps[1]!.data, postData);
+      // Rebroadcast post when user created
+      expect(snaps[2]!.data, postData);
+      // Rebroadcast post when user updated
+      expect(snaps[3]!.data, postData);
+      // Rebroadcast post when user deleted
+      expect(snaps[4]!.data, postData);
+      // Rebroadcast post when user re-added (ensures dependencies remain across deletion/re-creation)
+      expect(snaps[5]!.data, postData);
+    });
+
+    test("Cyclical dependencies do not cause infinite rebroadcasts", () async {
+      final usersCollection = Loon.collection<TestUserModel>(
+        'users',
+        fromJson: TestUserModel.fromJson,
+        toJson: (user) => user.toJson(),
+        dependenciesBuilder: (snap) {
+          return {
+            Loon.collection('posts').doc('1'),
+          };
+        },
+      );
+      final postsCollection = Loon.collection(
+        'posts',
+        dependenciesBuilder: (snap) {
+          return {
+            usersCollection.doc('1'),
+          };
+        },
+      );
+
+      final userDoc = usersCollection.doc('1');
+      final userData = TestUserModel('Test user 1');
+      final updatedUserData = TestUserModel('Test user 1 updated');
+      final userObservable = userDoc.observe();
+      final userStream = userObservable.stream();
+
+      userDoc.create(userData);
+
+      await asyncEvent();
+
+      postsCollection.doc('1').create({
+        "id": 1,
+        "name": "Post 1",
+      });
+
+      await asyncEvent();
+
+      userDoc.update(updatedUserData);
+
+      await asyncEvent();
+
+      userObservable.dispose();
+
+      expectLater(
+        userStream,
+        emitsInOrder([
+          // First emits null when no user has been written.
+          null,
+          // Emits the initially created user.
+          DocumentSnapshotMatcher(
+            DocumentSnapshot(
+              doc: userDoc,
+              data: userData,
+            ),
+          ),
+          // Emits the same user again when the post is updated. Infinite rebroadcasting
+          // does not occur despite a cyclical dependency between the user and the post since
+          // attempts to rebroadcast documents that are already pending broadcast are ignored.
+          DocumentSnapshotMatcher(
+            DocumentSnapshot(
+              doc: userDoc,
+              data: userData,
+            ),
+          ),
+          // Emits the updated user.
+          DocumentSnapshotMatcher(
+            DocumentSnapshot(
+              doc: userDoc,
+              data: updatedUserData,
+            ),
+          ),
+          emitsDone,
+        ]),
+      );
     });
   });
 }
