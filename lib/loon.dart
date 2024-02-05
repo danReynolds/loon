@@ -41,7 +41,7 @@ class Loon {
 
   /// The index of a document to the documents that depend on it. Whenever a document is updated, it schedules
   /// each of its dependents for a broadcast so that they can receive its updated value.
-  final Map<Document, Set<Document>> _depsStore = {};
+  final Map<Document, Set<Document>> _dependenciesStore = {};
 
   bool _hasPendingBroadcast = false;
 
@@ -363,7 +363,7 @@ class Loon {
     );
 
     // Build the updated set of dependencies for this document.
-    _buildDependencies(doc);
+    _buildDependencies(snap);
 
     if (broadcast) {
       _writeBroadcastDocument<T>(doc, eventType);
@@ -435,45 +435,54 @@ class Loon {
       _broadcastCollectionStore[doc.collection] = {};
     }
 
-    _broadcastCollectionStore[doc.collection]![doc.id] = BroadcastDocument<T>(
+    final broadcastDoc = _broadcastCollectionStore[doc.collection]![doc.id] =
+        BroadcastDocument<T>(
       doc,
       eventType,
     );
 
-    _rebroadcastDeps(doc);
+    _rebroadcastDeps(broadcastDoc);
 
     _scheduleBroadcast();
   }
 
-  void _buildDependencies<T>(Document<T> doc) {
-    final dependenciesBuilder = doc.dependenciesBuilder;
+  void _buildDependencies<T>(DocumentSnapshot<T> snap) {
+    final dependenciesBuilder = snap.doc.dependenciesBuilder;
 
     if (dependenciesBuilder != null) {
-      final dependencies = dependenciesBuilder();
+      final dependencies = dependenciesBuilder(snap);
 
       for (final doc in dependencies) {
-        if (!_depsStore.containsKey(doc)) {
-          _depsStore[doc] = {};
+        if (!_dependenciesStore.containsKey(doc)) {
+          _dependenciesStore[doc] = {};
         }
-        _depsStore[doc]!.add(doc);
+        _dependenciesStore[doc]!.add(doc);
       }
     }
   }
 
   /// Schedules all documents that depend on the given document for rebroadcast. This should occur
   /// for any type of broadcast (added, modified, removed or touched).
-  void _rebroadcastDeps(Document doc) {
-    final deps = _depsStore[doc];
+  void _rebroadcastDeps(BroadcastDocument doc) {
+    final eventType = doc.type;
+    final deps = _dependenciesStore[doc];
+
+    final isRemovalEvent = eventType == BroadcastEventTypes.removed;
+
     if (deps != null) {
       for (final dep in deps) {
         if (dep.exists()) {
           rebroadcast(dep);
           // If the document that registered as a dependency no longer exits, then it is lazily
           // removed from this document's dependents.
-        } else {
+        } else if (!isRemovalEvent) {
           deps.remove(dep);
         }
       }
+    }
+
+    if (isRemovalEvent) {
+      _dependenciesStore.remove(doc);
     }
   }
 
@@ -519,7 +528,7 @@ class Loon {
     FromJson<T>? fromJson,
     ToJson<T>? toJson,
     PersistorSettings<T>? persistorSettings,
-    Set<Document> Function()? dependenciesBuilder,
+    DependenciesBuilder<T>? dependenciesBuilder,
   }) {
     return Collection<T>(
       collection,

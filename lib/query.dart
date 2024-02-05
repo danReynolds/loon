@@ -7,7 +7,7 @@ class Query<T> {
   final FromJson<T>? fromJson;
   final ToJson<T>? toJson;
   final PersistorSettings<T>? persistorSettings;
-  final Set<Document> Function()? dependenciesBuilder;
+  final DependenciesBuilder<T>? dependenciesBuilder;
 
   Query(
     this.collection, {

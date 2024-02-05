@@ -6,7 +6,7 @@ class Document<T> {
   final FromJson<T>? fromJson;
   final ToJson<T>? toJson;
   final PersistorSettings? persistorSettings;
-  final Set<Document> Function()? dependenciesBuilder;
+  final DependenciesBuilder<T>? dependenciesBuilder;
 
   Document({
     required this.collection,
@@ -36,7 +36,7 @@ class Document<T> {
     FromJson<S>? fromJson,
     ToJson<S>? toJson,
     PersistorSettings<S>? persistorSettings,
-    Set<Document> Function()? dependenciesBuilder,
+    DependenciesBuilder<S>? dependenciesBuilder,
   }) {
     return Collection<S>(
       "${collection}_${id}_$subcollection",

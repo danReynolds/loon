@@ -12,3 +12,7 @@ typedef FromJson<T> = T Function(Json json);
 typedef ToJson<T> = Json Function(T model);
 
 typedef Optional<T> = T?;
+
+typedef DependenciesBuilder<T> = Set<Document<T>> Function(
+  DocumentSnapshot<T> snap,
+);
