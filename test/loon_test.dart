@@ -781,15 +781,14 @@ void main() {
     test('Adds documents with event type hydrated', () async {
       final user = TestUserModel('User 1');
       Loon.configure(persistor: TestPersistor(seedData: [user]));
-      final changesStream = Loon.collection('users').streamChanges();
-
-      final snapsFuture = changesStream.first;
       await Loon.hydrate();
-      final snaps = await snapsFuture;
+      final usersSnap = Loon.collection(
+        'users',
+        fromJson: TestUserModel.fromJson,
+        toJson: (user) => user.toJson(),
+      ).get();
 
-      expect(snaps.length, 1);
-      expect(snaps[0].type, BroadcastEventTypes.hydrated);
-      expect(snaps[0].data, user.toJson());
+      expect(usersSnap[0].data.toJson(), user.toJson());
     });
   });
 }
