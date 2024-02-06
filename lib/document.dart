@@ -102,6 +102,7 @@ class Document<T> {
       toJson: toJson,
       persistorSettings: persistorSettings,
       multicast: multicast,
+      dependenciesBuilder: dependenciesBuilder,
     );
   }
 

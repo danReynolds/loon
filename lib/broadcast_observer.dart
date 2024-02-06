@@ -40,11 +40,14 @@ mixin BroadcastObserver<T, S> {
 
   T add(T updatedValue) {
     _value = updatedValue;
-    _controller.add(_value);
+
+    if (_controller.hasListener) {
+      _controller.add(_value);
+    }
     return _value;
   }
 
-  /// [get] is left unimplemented since it has variable logic based on the type of [Observable] like an [ObservableDocument]
+  /// [get] is left unimplemented since it has variable logic based on the type of observer like an [ObservableDocument]
   /// and [ObservableQuery].
   T get();
 

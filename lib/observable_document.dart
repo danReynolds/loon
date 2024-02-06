@@ -8,6 +8,7 @@ class ObservableDocument<T> extends Document<T>
     super.fromJson,
     super.toJson,
     super.persistorSettings,
+    super.dependenciesBuilder,
     required bool multicast,
   }) {
     init(super.get(), multicast: multicast);

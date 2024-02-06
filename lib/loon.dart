@@ -551,7 +551,7 @@ class Loon {
     return Loon._instance._clearAll();
   }
 
-  /// Enqueues a document to be rebroadcasted, updating all streams that are subscribed to that document.
+  /// Enqueues a document to be rebroadcasted, updating all listeners that are subscribed to that document.
   static void rebroadcast(Document doc) {
     _instance._writeBroadcastDocument(
       doc,
