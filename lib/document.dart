@@ -31,6 +31,10 @@ class Document<T> {
   @override
   int get hashCode => Object.hashAll([id, collection]);
 
+  String get path {
+    return "${collection}_$id";
+  }
+
   Collection<S> subcollection<S>(
     String subcollection, {
     FromJson<S>? fromJson,

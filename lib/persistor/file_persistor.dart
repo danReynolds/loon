@@ -38,7 +38,6 @@ class FileDataStore {
 
   Map<String, Json> data = {};
   bool shouldPersist = false;
-  bool isDeleting = false;
 
   FileDataStore({
     required this.file,
@@ -46,19 +45,17 @@ class FileDataStore {
     required this.shard,
   });
 
-  void updateDocument(BroadcastDocument doc) {
+  void updateDocument(Document doc) {
     final docId = doc.id;
     final docData = doc.getJson();
 
     if (docData == null) {
       if (data.containsKey(docId)) {
         data.remove(docId);
+        shouldPersist = true;
       }
     } else {
       data[docId] = docData;
-    }
-
-    if (!shouldPersist) {
       shouldPersist = true;
     }
   }
@@ -66,10 +63,7 @@ class FileDataStore {
   void removeDocument(String docId) {
     if (data.containsKey(docId)) {
       data.remove(docId);
-
-      if (!shouldPersist) {
-        shouldPersist = true;
-      }
+      shouldPersist = true;
     }
   }
 

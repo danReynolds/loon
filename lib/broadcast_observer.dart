@@ -40,10 +40,7 @@ mixin BroadcastObserver<T, S> {
 
   T add(T updatedValue) {
     _value = updatedValue;
-
-    if (_controller.hasListener) {
-      _controller.add(_value);
-    }
+    _controller.add(_value);
     return _value;
   }
 

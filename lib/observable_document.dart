@@ -14,10 +14,16 @@ class ObservableDocument<T> extends Document<T>
     init(super.get(), multicast: multicast);
   }
 
-  /// Observing a document just involves checking if it is included in the latest broadcast
+  /// Observing a document involves checking if it is included in the latest broadcast
   /// and if so, emitting an update to observers.
   @override
   void _onBroadcast() {
+    // If the document's collection has been cleared, then clear the document's snapshot.
+    if (!Loon._instance._hasCollection(collection) && _value != null) {
+      add(null);
+      return;
+    }
+
     final broadcastDoc = Loon._instance._getBroadcastDocument<T>(
       collection,
       id,
@@ -30,7 +36,7 @@ class ObservableDocument<T> extends Document<T>
       return;
     }
 
-    final snap = super.get();
+    final snap = get();
 
     if (_changeController.hasListener) {
       _changeController.add(
@@ -49,13 +55,5 @@ class ObservableDocument<T> extends Document<T>
   @override
   ObservableDocument<T> observe({bool multicast = false}) {
     return this;
-  }
-
-  @override
-  get() {
-    if (isPendingBroadcast()) {
-      return super.get();
-    }
-    return _value;
   }
 }

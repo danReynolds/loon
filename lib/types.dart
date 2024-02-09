@@ -15,6 +15,6 @@ typedef Optional<T> = T?;
 
 /// Returns a set of documents that the document associated with the given [DocumentSnapshot]
 /// is dependent on.
-typedef DependenciesBuilder<T> = Set<Document> Function(
+typedef DependenciesBuilder<T> = Set<Document>? Function(
   DocumentSnapshot<T> snap,
 );

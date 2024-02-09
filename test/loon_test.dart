@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:loon/loon.dart';
 
@@ -37,10 +38,24 @@ class TestUserModel {
       "name": name,
     };
   }
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) {
+      return true;
+    }
+    if (other is TestUserModel) {
+      return name == other.name;
+    }
+    return false;
+  }
+
+  @override
+  int get hashCode => Object.hashAll([name]);
 }
 
 class TestPersistor extends Persistor {
-  final List<TestUserModel> seedData;
+  final List<DocumentSnapshot<TestUserModel>> seedData;
 
   TestPersistor({
     required this.seedData,
@@ -59,10 +74,10 @@ class TestPersistor extends Persistor {
   @override
   Future<SerializedCollectionStore> hydrate() async {
     return {
-      "users": seedData.fold({}, (acc, user) {
+      "users": seedData.fold({}, (acc, doc) {
         return {
           ...acc,
-          user.name: user.toJson(),
+          doc.id: doc.data.toJson(),
         };
       }),
     };
@@ -74,15 +89,15 @@ class TestPersistor extends Persistor {
   }
 }
 
-class DocumentSnapshotMatcher extends Matcher {
-  DocumentSnapshot<TestUserModel?> expected;
-  late DocumentSnapshot<TestUserModel?> actual;
+class DocumentSnapshotMatcher<T> extends Matcher {
+  DocumentSnapshot<T?>? expected;
+  late DocumentSnapshot<T?>? actual;
   DocumentSnapshotMatcher(this.expected);
 
   @override
   Description describe(Description description) {
     return description.add(
-      "has expected document ID: ${expected.id}, data: ${expected.data}",
+      "has expected document ID: ${expected?.id}, data: ${expected?.data}",
     );
   }
 
@@ -100,13 +115,25 @@ class DocumentSnapshotMatcher extends Matcher {
 
   @override
   bool matches(actual, Map matchState) {
-    final actual0 = actual as DocumentSnapshot<TestUserModel>;
+    final actual0 = actual as DocumentSnapshot<T>?;
     this.actual = actual0;
-    return actual.id == expected.id &&
-        mapsEqual(
-          actual.data.toJson(),
-          expected.data!.toJson(),
-        );
+
+    final actualData = actual?.data;
+    final expectedData = expected?.data;
+
+    if (expectedData == null) {
+      return actualData == null;
+    }
+
+    if (expectedData is Json) {
+      return actualData is Json && mapEquals(actualData, expectedData);
+    }
+
+    if (expectedData is TestUserModel) {
+      return actualData is TestUserModel && expectedData == actualData;
+    }
+
+    return false;
   }
 }
 
@@ -780,16 +807,46 @@ void main() {
     });
 
     test('Hydrates documents', () async {
-      final user = TestUserModel('User 1');
-      Loon.configure(persistor: TestPersistor(seedData: [user]));
-      await Loon.hydrate();
-      final usersSnap = Loon.collection(
+      final userCollection = Loon.collection<TestUserModel>(
         'users',
         fromJson: TestUserModel.fromJson,
         toJson: (user) => user.toJson(),
-      ).get();
+      );
+      final userDoc = userCollection.doc('User 1');
+      final userData = TestUserModel('User 1');
 
-      expect(usersSnap[0].data.toJson(), user.toJson());
+      expectLater(
+        userDoc.stream(),
+        emitsInOrder(
+          [
+            null,
+            DocumentSnapshotMatcher(
+              DocumentSnapshot(
+                doc: userDoc,
+                data: userData,
+              ),
+            ),
+          ],
+        ),
+      );
+
+      Loon.configure(
+        persistor: TestPersistor(
+          seedData: [
+            DocumentSnapshot(
+              doc: userDoc,
+              data: userData,
+            )
+          ],
+        ),
+      );
+
+      await Loon.hydrate();
+
+      expect(
+        userDoc.get()?.data,
+        userData,
+      );
     });
   });
 
@@ -800,17 +857,22 @@ void main() {
 
     test("Dependent changes should broadcast dependencies", () async {
       final usersCollection = Loon.collection('users');
-      final postsCollection = Loon.collection(
+      final postsCollection = Loon.collection<Json>(
         'posts',
         dependenciesBuilder: (snap) {
-          return {
-            usersCollection.doc('1'),
-          };
+          if (snap.data['text'] == 'Post 1') {
+            return {
+              usersCollection.doc('1'),
+            };
+          }
+          return {};
         },
       );
 
       final postDoc = postsCollection.doc('1');
       final postData = {"id": 1, "text": "Post 1"};
+      final updatedPostData1 = {"text": "Post 1 updated"};
+      final updatedPostData2 = {"text": "Post 1 updated again"};
       final userDoc = usersCollection.doc('1');
       final postsStream = postDoc.stream();
 
@@ -841,7 +903,22 @@ void main() {
         "name": "User 1",
       });
 
-      final snaps = await postsStream.take(6).toList();
+      await asyncEvent();
+
+      postDoc.update(updatedPostData1);
+
+      await asyncEvent();
+
+      userDoc.update({
+        "id": 1,
+        "name": "User 1 updated",
+      });
+
+      await asyncEvent();
+
+      postDoc.update(updatedPostData2);
+
+      final snaps = await postsStream.take(8).toList();
 
       // No post yet
       expect(snaps[0], null);
@@ -855,6 +932,10 @@ void main() {
       expect(snaps[4]!.data, postData);
       // Rebroadcast post when user re-added (ensures dependencies remain across deletion/re-creation)
       expect(snaps[5]!.data, postData);
+      // Rebroadcast when post data is updated
+      expect(snaps[6]!.data, updatedPostData1);
+      // Skips the update to user doc, since the last update caused the user doc to be removed as a dependency.
+      expect(snaps[7]!.data, updatedPostData2);
     });
 
     test("Cyclical dependencies do not cause infinite rebroadcasts", () async {

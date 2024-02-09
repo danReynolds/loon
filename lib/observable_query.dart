@@ -38,7 +38,7 @@ class ObservableQuery<T> extends Query<T>
   @override
   void _onBroadcast() {
     // If the entire collection has been deleted, then clear the snapshot.
-    if (!Loon._instance._hasCollection(collection)) {
+    if (!Loon._instance._hasCollection(collection) && _value.isNotEmpty) {
       _index.clear();
       add([]);
       return;
@@ -61,7 +61,7 @@ class ObservableQuery<T> extends Query<T>
     /// then its event type reported by the query is [BroadcastEventTypes.added] and its global event was
     /// [BroadcastEventTypes.modified].
     final List<DocumentChangeSnapshot<T>> changeSnaps = [];
-    bool shouldBroadcast = false;
+    bool shouldUpdate = false;
 
     for (final broadcastDoc in broadcastDocs) {
       final docId = broadcastDoc.id;
@@ -76,7 +76,7 @@ class ObservableQuery<T> extends Query<T>
           // 1. Add new documents that satisfy the query filter.
           if (_filter(snap)) {
             _index[docId] = snap;
-            shouldBroadcast = true;
+            shouldUpdate = true;
 
             if (hasChangeListener) {
               changeSnaps.add(
@@ -94,7 +94,7 @@ class ObservableQuery<T> extends Query<T>
           // 2. Remove old documents that previously satisfied the query filter and have been removed.
           if (_index.containsKey(docId)) {
             _index.remove(docId);
-            shouldBroadcast = true;
+            shouldUpdate = true;
 
             if (hasChangeListener) {
               changeSnaps.add(
@@ -114,7 +114,7 @@ class ObservableQuery<T> extends Query<T>
           final updatedSnap = broadcastDoc.get()!;
 
           if (_index.containsKey(docId)) {
-            shouldBroadcast = true;
+            shouldUpdate = true;
 
             // a) Previously satisfied the query filter and still does (updated value must still be rebroadcast on the query).
             if (_filter(updatedSnap)) {
@@ -149,7 +149,7 @@ class ObservableQuery<T> extends Query<T>
             // c) Previously did not satisfy the query filter and now does.
             if (_filter(updatedSnap)) {
               _index[docId] = updatedSnap;
-              shouldBroadcast = true;
+              shouldUpdate = true;
 
               if (hasChangeListener) {
                 changeSnaps.add(
@@ -170,7 +170,7 @@ class ObservableQuery<T> extends Query<T>
           if (_index.containsKey(docId)) {
             final updatedSnap = broadcastDoc.get()!;
             _index[docId] = updatedSnap;
-            shouldBroadcast = true;
+            shouldUpdate = true;
 
             if (hasChangeListener) {
               changeSnaps.add(
@@ -187,7 +187,7 @@ class ObservableQuery<T> extends Query<T>
       }
     }
 
-    if (shouldBroadcast) {
+    if (shouldUpdate) {
       add(_sortQuery(_index.values.toList()));
 
       if (changeSnaps.isNotEmpty) {

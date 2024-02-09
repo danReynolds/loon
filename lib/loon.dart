@@ -41,7 +41,11 @@ class Loon {
 
   /// The index of a document to the documents that depend on it. Whenever a document is updated, it schedules
   /// each of its dependents for a broadcast so that they can receive its updated value.
-  final Map<Document, Set<Document>> _dependenciesStore = {};
+  final Map<Document, Set<Document>> _dependentsStore = {};
+
+  /// The index of a document to the documents that it depends on. Whenever a document is updated, it records
+  /// the updated set of documents that it now depends on.
+  final Map<Document, Set<Document>?> _dependenciesStore = {};
 
   bool _hasPendingBroadcast = false;
 
@@ -76,20 +80,18 @@ class Loon {
       return null;
     }
 
-    if (snap is DocumentSnapshot<T>) {
-      return snap;
+    if (snap is DocumentSnapshot<Json> && T != Json) {
+      _validateTypeSerialization<T>(
+        fromJson: doc.fromJson,
+        toJson: doc.toJson,
+      );
+
+      // Upon first read of serialized data using a serializer, the parsed representation
+      // of the document is cached for efficient repeat access. It does not need to be rebroadcast.
+      return _writeSnapshot<T>(doc, doc.fromJson!(snap.data), broadcast: false);
     }
 
-    final fromJson = doc.fromJson;
-
-    _validateTypeSerialization<T>(
-      fromJson: doc.fromJson,
-      toJson: doc.toJson,
-    );
-
-    // Upon first read of serialized data using a serializer, the parsed representation
-    // of the document is cached for efficient repeat access. It does not need to be rebroadcast.
-    return _writeSnapshot<T>(doc, fromJson!(snap.data), broadcast: false);
+    return snap as DocumentSnapshot<T>;
   }
 
   /// Returns whether a collection name exists in the collection data store.
@@ -106,7 +108,7 @@ class Loon {
         _isGlobalPersistenceEnabled;
   }
 
-  /// Clears the given collection name from the collection data store.
+  /// Clears the given collection data.
   Future<void> _clearCollection(String collection) async {
     if (_hasCollection(collection)) {
       _collectionStore.remove(collection);
@@ -231,16 +233,8 @@ class Loon {
     if (doc is BroadcastDocument<T>) {
       return doc;
     } else {
-      // If the broadcast document was created through the hydration process, then it would have been added
-      // as a Json document, and we must now convert it to a document of the given type.
-      if (_isDocumentPersistenceEnabled(doc)) {
-        _validateDataSerialization<T>(
-          fromJson: fromJson,
-          toJson: toJson,
-          data: doc.get()?.data,
-        );
-      }
-
+      // If the broadcast document was created through the hydration process, then its broadcast document is likely Json assuming
+      // it hasn't modified since hydration already. In this case, it can now lazily be converted to the provided collection type.
       return BroadcastDocument<T>(
         Document<T>(
           collection: collection,
@@ -306,24 +300,15 @@ class Loon {
         false;
   }
 
-  void _broadcast({
-    bool broadcastPersistor = true,
-  }) {
+  void _broadcast() {
     for (final observer in _broadcastObservers) {
       observer._onBroadcast();
     }
 
     for (final broadcastCollection in _broadcastCollectionStore.values) {
-      if (persistor != null && broadcastPersistor) {
-        persistor!.onBroadcast(
-          broadcastCollection.values
-              // Touched documents do not need to be re-persisted since their data has not changed.
-              .where((broadcastDoc) =>
-                  broadcastDoc.type != BroadcastEventTypes.touched)
-              .toList(),
-        );
+      if (persistor != null) {
+        persistor!.onBroadcast(broadcastCollection.values.toList());
       }
-
       broadcastCollection.clear();
     }
   }
@@ -363,7 +348,7 @@ class Loon {
     );
 
     // Build the updated set of dependencies for this document.
-    _buildDependencies(snap);
+    _rebuildDependencies(snap);
 
     if (broadcast) {
       _writeBroadcastDocument<T>(doc, eventType);
@@ -412,6 +397,7 @@ class Loon {
   }) {
     if (doc.exists()) {
       _collectionStore[doc.collection]!.remove(doc.id);
+      _dependenciesStore.remove(doc);
 
       if (broadcast) {
         _writeBroadcastDocument<T>(doc, BroadcastEventTypes.removed);
@@ -447,26 +433,47 @@ class Loon {
 
   /// Rebuilds a set of dependencies that the snapshot's document is dependent on
   /// whenever a document emits a new snapshot.
-  void _buildDependencies<T>(DocumentSnapshot<T> snap) {
-    final dependenciesBuilder = snap.doc.dependenciesBuilder;
+  void _rebuildDependencies<T>(DocumentSnapshot<T> snap) {
+    final doc = snap.doc;
+    final dependenciesBuilder = doc.dependenciesBuilder;
 
-    if (dependenciesBuilder != null) {
-      final dependencies = dependenciesBuilder(snap);
+    if (dependenciesBuilder == null) {
+      return;
+    }
 
-      for (final doc in dependencies) {
-        if (!_dependenciesStore.containsKey(doc)) {
-          _dependenciesStore[doc] = {};
+    final prevDependencies = _dependenciesStore[doc];
+    final dependencies = _dependenciesStore[doc] = dependenciesBuilder(snap);
+
+    // Remove the document from the dependents index of any documents that it no longer depends on.
+    if (prevDependencies != null) {
+      if (dependencies == null) {
+        for (final prevDoc in prevDependencies) {
+          _dependentsStore[prevDoc]!.remove(doc);
         }
-        _dependenciesStore[doc]!.add(snap.doc);
+      } else {
+        final staleDependencies = prevDependencies.difference(dependencies);
+        for (final staleDoc in staleDependencies) {
+          _dependentsStore[staleDoc]!.remove(doc);
+        }
+      }
+    }
+
+    if (dependencies != null) {
+      // Update each of the document's dependents stores to include the document.
+      for (final depDoc in dependencies) {
+        if (!_dependentsStore.containsKey(depDoc)) {
+          _dependentsStore[depDoc] = {};
+        }
+        _dependentsStore[depDoc]!.add(doc);
       }
     }
   }
 
-  /// Schedules all documents that depend on the given document for rebroadcast. This occurs
+  /// Schedules all dependents of the given document for rebroadcast. This occurs
   /// for any type of broadcast (added, modified, removed or touched).
   void _rebroadcastDependents(BroadcastDocument doc) {
     final eventType = doc.type;
-    final dependentDocs = _dependenciesStore[doc];
+    final dependentDocs = _dependentsStore[doc];
 
     if (dependentDocs != null) {
       // Clone the dependencies set to a list so that the set can be altered during iteration.
@@ -504,7 +511,6 @@ class Loon {
           _instance._writeSnapshot<Json>(
             Document<Json>(collection: collection, id: documentDataEntry.key),
             documentDataEntry.value,
-            broadcast: false,
           );
         }
       }
@@ -514,7 +520,6 @@ class Loon {
     } finally {
       _isHydrating = false;
     }
-    _instance._broadcast(broadcastPersistor: false);
   }
 
   static Collection<T> collection<T>(
