@@ -132,6 +132,11 @@ class Document<T> {
     return Loon._instance._hasDocument(this);
   }
 
+  bool isPersistenceEnabled() {
+    return persistorSettings?.persistenceEnabled ??
+        Loon._instance._isGlobalPersistenceEnabled;
+  }
+
   bool isPendingBroadcast() {
     return Loon._instance._isDocumentPendingBroadcast(this);
   }

@@ -95,42 +95,65 @@ class Loon {
   }
 
   /// Returns whether a collection name exists in the collection data store.
-  bool _hasCollection(String collection) {
-    return _collectionStore.containsKey(collection);
+  bool _hasCollection(String name) {
+    return _collectionStore.containsKey(name);
   }
 
   bool get _isGlobalPersistenceEnabled {
     return _instance.persistor?.persistorSettings.persistenceEnabled ?? false;
   }
 
-  bool _isDocumentPersistenceEnabled(Document doc) {
-    return doc.persistorSettings?.persistenceEnabled ??
-        _isGlobalPersistenceEnabled;
-  }
+  /// Clears the given collection from the store.
+  void _clearCollection(
+    Collection collection, {
+    bool broadcast = true,
+  }) {
+    final collectionName = collection.name;
 
-  /// Clears the given collection data.
-  Future<void> _clearCollection(String collection) async {
-    if (_hasCollection(collection)) {
-      _collectionStore.remove(collection);
-      _scheduleBroadcast();
+    // Clear any documents scheduled for broadcast, as whatever event happened prior to the clear is now irrelevant.
+    _broadcastCollectionStore[collectionName]?.clear();
 
-      if (persistor != null) {
-        return persistor!.clear(collection);
+    // If the clear should broadcast, then we need to go through every document in the collection and schedule
+    // it for broadcast.
+    if (broadcast) {
+      final snaps = _getSnapshots(collectionName);
+      for (final snap in snaps) {
+        snap.doc.delete();
       }
+      // Otherwise, we can shortcut clearing each document individually and just clear the collection.
+    } else {
+      _collectionStore[collectionName]!.clear();
+    }
+
+    if (collection.isPersistenceEnabled()) {
+      persistor!.clear(collection.name);
     }
   }
 
-  /// Clears the entire collection data store.
-  Future<void> _clearAll() async {
-    if (_collectionStore.isEmpty) {
-      return;
-    }
+  /// Clears all data from the store.
+  void _clearAll({
+    bool broadcast = true,
+  }) {
+    // Clear any documents scheduled for broadcast, as whatever event happened prior to the clear is now irrelevant.
+    _broadcastCollectionStore.clear();
 
-    _collectionStore.clear();
-    _scheduleBroadcast();
+    // If the clear should broadcast, then we need to go through every document that is being
+    // cleared and schedule it for broadcast.
+    if (broadcast) {
+      for (final collectionName in _collectionStore.keys) {
+        final snaps = _getSnapshots(collectionName);
+
+        for (final snap in snaps) {
+          snap.doc.delete();
+        }
+      }
+      // Otherwise we can shortcut clearing each document from the collection store individually and just clear the entire store.
+    } else {
+      _collectionStore.clear();
+    }
 
     if (persistor != null) {
-      return persistor!.clearAll();
+      persistor!.clearAll();
     }
   }
 
@@ -188,28 +211,28 @@ class Loon {
     }
 
     return _collectionStore[collection]!.values.map((snap) {
-      if (snap is DocumentSnapshot<T>) {
-        return snap;
-      }
-
-      _validateTypeSerialization<T>(
-        fromJson: fromJson,
-        toJson: toJson,
-      );
-
-      // Upon first read of serialized data using a serializer, the parsed representation
-      // of the document is cached for efficient repeat access.
-      return _writeSnapshot<T>(
-        Document<T>(
-          id: snap.doc.id,
-          collection: collection,
+      if (snap is DocumentSnapshot<Json> && T != Json) {
+        _validateTypeSerialization<T>(
           fromJson: fromJson,
           toJson: toJson,
-          persistorSettings: persistorSettings,
-        ),
-        fromJson!(snap.data),
-        broadcast: false,
-      );
+        );
+
+        // Upon first read of serialized data using a serializer, the parsed representation
+        // of the document is cached for efficient repeat access.
+        return _writeSnapshot<T>(
+          Document<T>(
+            id: snap.doc.id,
+            collection: collection,
+            fromJson: fromJson,
+            toJson: toJson,
+            persistorSettings: persistorSettings,
+          ),
+          fromJson!(snap.data),
+          broadcast: false,
+        );
+      }
+
+      return snap as DocumentSnapshot<T>;
     }).toList();
   }
 
@@ -306,9 +329,6 @@ class Loon {
     }
 
     for (final broadcastCollection in _broadcastCollectionStore.values) {
-      if (persistor != null) {
-        persistor!.onBroadcast(broadcastCollection.values.toList());
-      }
       broadcastCollection.clear();
     }
   }
@@ -352,6 +372,10 @@ class Loon {
 
     if (broadcast) {
       _writeBroadcastDocument<T>(doc, eventType);
+    }
+
+    if (_isDocumentPersistenceEnabled(doc)) {
+      persistor!._persistDoc(doc);
     }
 
     return snap;
@@ -552,8 +576,10 @@ class Loon {
     ).doc(id);
   }
 
-  static Future<void> clearAll() {
-    return Loon._instance._clearAll();
+  static void clearAll({
+    bool broadcast = true,
+  }) {
+    Loon._instance._clearAll(broadcast: broadcast);
   }
 
   /// Enqueues a document to be rebroadcasted, updating all listeners that are subscribed to that document.

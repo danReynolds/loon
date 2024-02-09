@@ -10,7 +10,7 @@ class DebugFilePersistor extends FilePersistor {
   }
 
   @override
-  persist(List<BroadcastDocument> docs) async {
+  persist(docs) async {
     await super.persist(docs);
     _controller.add(getFileDataStores());
   }
@@ -20,11 +20,5 @@ class DebugFilePersistor extends FilePersistor {
     final value = await super.hydrate();
     _controller.add(getFileDataStores());
     return value;
-  }
-
-  @override
-  clear(String collection) async {
-    await super.clear(collection);
-    _controller.add(getFileDataStores());
   }
 }

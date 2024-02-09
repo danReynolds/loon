@@ -32,12 +32,14 @@ class FilePersistorSettings<T> extends PersistorSettings<T> {
 }
 
 class FileDataStore {
-  final File file;
+  File file;
   final String collection;
   final String? shard;
 
   Map<String, Json> data = {};
-  bool shouldPersist = false;
+
+  /// Whether the file data store has pending changes that should be persisted.
+  bool isDirty = false;
 
   FileDataStore({
     required this.file,
@@ -52,18 +54,18 @@ class FileDataStore {
     if (docData == null) {
       if (data.containsKey(docId)) {
         data.remove(docId);
-        shouldPersist = true;
+        isDirty = true;
       }
     } else {
       data[docId] = docData;
-      shouldPersist = true;
+      isDirty = true;
     }
   }
 
   void removeDocument(String docId) {
     if (data.containsKey(docId)) {
       data.remove(docId);
-      shouldPersist = true;
+      isDirty = true;
     }
   }
 
@@ -71,20 +73,17 @@ class FileDataStore {
     return file.readAsString();
   }
 
-  Future<void> writeFile(String value) async {
-    await file.writeAsString(value);
+  Future<void> writeFile(String value) {
+    return file.writeAsString(value);
   }
 
   Future<void> delete() async {
-    data = {};
-    await file.delete();
+    if (file.existsSync()) {
+      file.deleteSync();
+    }
   }
 
   Future<void> hydrate() async {
-    if (!file.existsSync()) {
-      return;
-    }
-
     final Map<String, dynamic> fileJson = jsonDecode(await readFile());
     data = fileJson.map(
       (key, dynamic value) => MapEntry(
@@ -95,8 +94,16 @@ class FileDataStore {
   }
 
   Future<void> persist() async {
-    await writeFile(jsonEncode(data));
-    shouldPersist = false;
+    if (data.isEmpty) {
+      await delete();
+    } else {
+      if (!file.existsSync()) {
+        file = File(file.path);
+      }
+      writeFile(jsonEncode(data));
+    }
+
+    isDirty = false;
   }
 
   String get filename {
@@ -139,7 +146,7 @@ class FilePersistor extends Persistor {
     return true;
   }
 
-  Future<List<File>> _readDataStoreFiles() async {
+  List<File> _readDataStoreFiles() {
     return fileDataStoreDirectory
         .listSync()
         .whereType<File>()
@@ -266,16 +273,14 @@ class FilePersistor extends Persistor {
     }
 
     final fileDataStoresToPersist = _fileDataStoreIndex.values
-        .where((fileDataStore) => fileDataStore.shouldPersist)
+        .where((fileDataStore) => fileDataStore.isDirty)
         .toList();
 
     // If for some reason one or more writes fail, then that is still recoverable as the file data store collections
     // maintains in-memory the latest state of the world, so on next broadcast, any data stores that still
     // require writing will retry at that time.
     await Future.wait(
-      fileDataStoresToPersist.map(
-        (dataStore) => dataStore.persist(),
-      ),
+      fileDataStoresToPersist.map((dataStore) => dataStore.persist()),
     );
   }
 
@@ -283,7 +288,7 @@ class FilePersistor extends Persistor {
   hydrate() async {
     await isInitialized;
 
-    final files = await _readDataStoreFiles();
+    final files = _readDataStoreFiles();
     final fileDataStores =
         files.map((file) => parseFileDataStore(file: file)).toList();
 
@@ -342,12 +347,7 @@ class FilePersistor extends Persistor {
       collectionDataStores.map(
         (dataStore) async {
           await dataStore.delete();
-
-          // If new data was added to the data store while the file was being deleted,
-          // then do not remove the store from the index.
-          if (dataStore.data.isEmpty) {
-            _fileDataStoreIndex.remove(dataStore.filename);
-          }
+          _fileDataStoreIndex.remove(dataStore.filename);
         },
       ),
     );
@@ -358,6 +358,7 @@ class FilePersistor extends Persistor {
     final clearCollectionFutures = _fileDataStoreIndex.values
         .map((fileDataStore) => fileDataStore.delete())
         .toList();
+    _fileDataStoreIndex.clear();
     return Future.wait(clearCollectionFutures);
   }
 }

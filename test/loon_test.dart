@@ -62,16 +62,6 @@ class TestPersistor extends Persistor {
   });
 
   @override
-  Future<void> clear(String collection) {
-    throw UnimplementedError();
-  }
-
-  @override
-  Future<void> clearAll() {
-    throw UnimplementedError();
-  }
-
-  @override
   Future<SerializedCollectionStore> hydrate() async {
     return {
       "users": seedData.fold({}, (acc, doc) {
