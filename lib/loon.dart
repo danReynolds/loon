@@ -17,6 +17,7 @@ part 'types.dart';
 part 'document_snapshot.dart';
 part 'persistor/persistor.dart';
 part 'document_change_snapshot.dart';
+part 'dependency_store.dart';
 
 typedef CollectionStore = Map<String, Map<String, DocumentSnapshot>>;
 typedef BroadcastCollectionStore = Map<String, Map<String, BroadcastDocument>>;
@@ -39,13 +40,7 @@ class Loon {
   /// The list of observers, either document or query observables, that should be notified on broadcast.
   final Set<BroadcastObserver> _broadcastObservers = {};
 
-  /// The index of a document to the documents that depend on it. Whenever a document is updated, it schedules
-  /// each of its dependents for a broadcast so that they can receive its updated value.
-  final Map<Document, Set<Document>> _dependentsStore = {};
-
-  /// The index of a document to the documents that it depends on. Whenever a document is updated, it records
-  /// the updated set of documents that it now depends on.
-  final Map<Document, Set<Document>?> _dependenciesStore = {};
+  final _dependencyStore = _DependencyStore();
 
   bool _hasPendingBroadcast = false;
 
@@ -110,7 +105,8 @@ class Loon {
   }) {
     final collectionName = collection.name;
 
-    // Clear any documents scheduled for broadcast, as whatever event happened prior to the clear is now irrelevant.
+    // Clear any documents in the collection scheduled for broadcast, as whatever event happened prior to the clear
+    // in the collection are now irrelevant.
     _broadcastCollectionStore[collectionName]?.clear();
 
     // If the clear should broadcast, then we need to go through every document in the collection and schedule
@@ -134,7 +130,7 @@ class Loon {
   void _clearAll({
     bool broadcast = true,
   }) {
-    // Clear any documents scheduled for broadcast, as whatever event happened prior to the clear is now irrelevant.
+    // Clear any documents scheduled for broadcast, as whatever events happened prior to the clear are now irrelevant.
     _broadcastCollectionStore.clear();
 
     // If the clear should broadcast, then we need to go through every document that is being
@@ -367,8 +363,7 @@ class Loon {
       data: data,
     );
 
-    // Build the updated set of dependencies for this document.
-    _rebuildDependencies(snap);
+    _dependencyStore.rebuildDependencies(snap);
 
     if (broadcast) {
       _writeBroadcastDocument<T>(doc, eventType);
@@ -424,7 +419,7 @@ class Loon {
     }
 
     _collectionStore[doc.collection]!.remove(doc.id);
-    _dependenciesStore.remove(doc);
+    _dependencyStore.clearDependencies(doc);
 
     if (broadcast) {
       _writeBroadcastDocument<T>(doc, BroadcastEventTypes.removed);
@@ -461,60 +456,14 @@ class Loon {
     _scheduleBroadcast();
   }
 
-  /// Rebuilds a set of dependencies that the snapshot's document is dependent on
-  /// whenever a document emits a new snapshot.
-  void _rebuildDependencies<T>(DocumentSnapshot<T> snap) {
-    final doc = snap.doc;
-    final dependenciesBuilder = doc.dependenciesBuilder;
-
-    if (dependenciesBuilder == null) {
-      return;
-    }
-
-    final prevDependencies = _dependenciesStore[doc];
-    final dependencies = _dependenciesStore[doc] = dependenciesBuilder(snap);
-
-    // Remove the document from the dependents index of any documents that it no longer depends on.
-    if (prevDependencies != null) {
-      if (dependencies == null) {
-        for (final prevDoc in prevDependencies) {
-          _dependentsStore[prevDoc]!.remove(doc);
-        }
-      } else {
-        final staleDependencies = prevDependencies.difference(dependencies);
-        for (final staleDoc in staleDependencies) {
-          _dependentsStore[staleDoc]!.remove(doc);
-        }
-      }
-    }
-
-    if (dependencies != null) {
-      // Update each of the document's dependents stores to include the document.
-      for (final depDoc in dependencies) {
-        if (!_dependentsStore.containsKey(depDoc)) {
-          _dependentsStore[depDoc] = {};
-        }
-        _dependentsStore[depDoc]!.add(doc);
-      }
-    }
-  }
-
   /// Schedules all dependents of the given document for rebroadcast. This occurs
   /// for any type of broadcast (added, modified, removed or touched).
   void _rebroadcastDependents(BroadcastDocument doc) {
-    final eventType = doc.type;
-    final dependentDocs = _dependentsStore[doc];
+    final dependents = _dependencyStore.getDependents(doc);
 
-    if (dependentDocs != null) {
-      // Clone the dependencies set to a list so that the set can be altered during iteration.
-      for (final doc in dependentDocs.toList()) {
-        if (doc.exists()) {
-          rebroadcast(doc);
-          // If the document that registered as a dependency no longer exits, then it is lazily
-          // removed from this document's dependents.
-        } else if (eventType == BroadcastEventTypes.removed) {
-          dependentDocs.remove(doc);
-        }
+    if (dependents != null) {
+      for (final dependent in dependents) {
+        rebroadcast(dependent);
       }
     }
   }
