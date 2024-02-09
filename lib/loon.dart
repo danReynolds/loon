@@ -314,7 +314,7 @@ class Loon {
   }
 
   bool _isQueryPendingBroadcast<T>(Query<T> query) {
-    return _instance._broadcastCollectionStore.containsKey(query.collection);
+    return _instance._broadcastCollectionStore.containsKey(query.name);
   }
 
   bool _isDocumentPendingBroadcast<T>(Document<T> doc) {
@@ -338,7 +338,7 @@ class Loon {
     T data, {
     bool broadcast = true,
   }) {
-    if (data is! Json && _isDocumentPersistenceEnabled(doc)) {
+    if (data is! Json && doc.isPersistenceEnabled()) {
       _validateDataSerialization<T>(
         fromJson: doc.fromJson,
         toJson: doc.toJson,
@@ -374,7 +374,7 @@ class Loon {
       _writeBroadcastDocument<T>(doc, eventType);
     }
 
-    if (_isDocumentPersistenceEnabled(doc)) {
+    if (doc.isPersistenceEnabled()) {
       persistor!._persistDoc(doc);
     }
 
@@ -419,13 +419,19 @@ class Loon {
     Document<T> doc, {
     bool broadcast = true,
   }) {
-    if (doc.exists()) {
-      _collectionStore[doc.collection]!.remove(doc.id);
-      _dependenciesStore.remove(doc);
+    if (!doc.exists()) {
+      return;
+    }
 
-      if (broadcast) {
-        _writeBroadcastDocument<T>(doc, BroadcastEventTypes.removed);
-      }
+    _collectionStore[doc.collection]!.remove(doc.id);
+    _dependenciesStore.remove(doc);
+
+    if (broadcast) {
+      _writeBroadcastDocument<T>(doc, BroadcastEventTypes.removed);
+    }
+
+    if (doc.isPersistenceEnabled()) {
+      persistor!._persistDoc(doc);
     }
   }
 

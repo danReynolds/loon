@@ -41,6 +41,8 @@ class FileDataStore {
   /// Whether the file data store has pending changes that should be persisted.
   bool isDirty = false;
 
+  final List<Completer> _operationQueue = [];
+
   FileDataStore({
     required this.file,
     required this.collection,
@@ -77,33 +79,57 @@ class FileDataStore {
     return file.writeAsString(value);
   }
 
-  Future<void> delete() async {
-    if (file.existsSync()) {
-      file.deleteSync();
+  Future<void> _runOperation(Future<void> Function() operation) async {
+    if (_operationQueue.isNotEmpty) {
+      final completer = Completer();
+      _operationQueue.add(completer);
+      return completer.future;
     }
-  }
 
-  Future<void> hydrate() async {
-    final Map<String, dynamic> fileJson = jsonDecode(await readFile());
-    data = fileJson.map(
-      (key, dynamic value) => MapEntry(
-        key,
-        Map<String, dynamic>.from(value),
-      ),
-    );
-  }
-
-  Future<void> persist() async {
-    if (data.isEmpty) {
-      await delete();
-    } else {
-      if (!file.existsSync()) {
-        file = File(file.path);
+    try {
+      await operation();
+    } finally {
+      if (_operationQueue.isNotEmpty) {
+        final completer = _operationQueue.removeAt(0);
+        completer.complete();
       }
-      writeFile(jsonEncode(data));
     }
+  }
 
-    isDirty = false;
+  Future<void> delete() {
+    return _runOperation(() async {
+      if (file.existsSync()) {
+        file.deleteSync();
+      }
+      isDirty = false;
+    });
+  }
+
+  Future<void> hydrate() {
+    return _runOperation(() async {
+      final Map<String, dynamic> fileJson = jsonDecode(await readFile());
+      data = fileJson.map(
+        (key, dynamic value) => MapEntry(
+          key,
+          Map<String, dynamic>.from(value),
+        ),
+      );
+    });
+  }
+
+  Future<void> persist() {
+    return _runOperation(() async {
+      if (data.isEmpty) {
+        await delete();
+      } else {
+        if (!file.existsSync()) {
+          file = File(file.path);
+        }
+        writeFile(jsonEncode(data));
+      }
+
+      isDirty = false;
+    });
   }
 
   String get filename {
@@ -354,11 +380,13 @@ class FilePersistor extends Persistor {
   }
 
   @override
-  clearAll() {
-    final clearCollectionFutures = _fileDataStoreIndex.values
-        .map((fileDataStore) => fileDataStore.delete())
-        .toList();
-    _fileDataStoreIndex.clear();
-    return Future.wait(clearCollectionFutures);
+  clearAll() async {
+    final clearCollectionFutures = _fileDataStoreIndex.values.map(
+      (dataStore) async {
+        await dataStore.delete();
+        _fileDataStoreIndex.remove(dataStore.filename);
+      },
+    ).toList();
+    await Future.wait(clearCollectionFutures);
   }
 }

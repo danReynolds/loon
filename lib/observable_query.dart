@@ -37,15 +37,8 @@ class ObservableQuery<T> extends Query<T>
   /// 4. A document that has been manually touched to be rebroadcasted.
   @override
   void _onBroadcast() {
-    // If the entire collection has been deleted, then clear the snapshot.
-    if (!Loon._instance._hasCollection(collection) && _value.isNotEmpty) {
-      _index.clear();
-      add([]);
-      return;
-    }
-
     final broadcastDocs = Loon._instance._getBroadcastDocuments<T>(
-      collection,
+      name,
       fromJson: fromJson,
       toJson: toJson,
       persistorSettings: persistorSettings,

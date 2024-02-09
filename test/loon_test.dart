@@ -74,7 +74,17 @@ class TestPersistor extends Persistor {
   }
 
   @override
-  Future<void> persist(List<BroadcastDocument> docs) {
+  persist(docs) {
+    throw UnimplementedError();
+  }
+
+  @override
+  clear(collection) {
+    throw UnimplementedError();
+  }
+
+  @override
+  clearAll() {
     throw UnimplementedError();
   }
 }

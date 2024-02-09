@@ -18,12 +18,6 @@ class ObservableDocument<T> extends Document<T>
   /// and if so, emitting an update to observers.
   @override
   void _onBroadcast() {
-    // If the document's collection has been cleared, then clear the document's snapshot.
-    if (!Loon._instance._hasCollection(collection) && _value != null) {
-      add(null);
-      return;
-    }
-
     final broadcastDoc = Loon._instance._getBroadcastDocument<T>(
       collection,
       id,
