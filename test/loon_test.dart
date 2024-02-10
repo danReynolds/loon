@@ -6,18 +6,6 @@ Future<void> asyncEvent() {
   return Future.delayed(const Duration(milliseconds: 1), () => null);
 }
 
-bool mapsEqual(Map<dynamic, dynamic> map1, Map<dynamic, dynamic> map2) {
-  if (map1.length != map2.length) return false;
-
-  for (var key in map1.keys) {
-    if (!map2.containsKey(key) || map1[key] != map2[key]) {
-      return false;
-    }
-  }
-
-  return true;
-}
-
 class TestUserModel {
   final String name;
 

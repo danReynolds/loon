@@ -62,7 +62,7 @@ class Loon {
     required FromJson<T>? fromJson,
     required ToJson<T>? toJson,
   }) {
-    if (T != Json && T != dynamic && (fromJson == null || toJson == null)) {
+    if (T != Json && T != dynamic && (fromJson == null && toJson == null)) {
       throw Exception('Missing fromJson/toJson serializer');
     }
   }
@@ -75,7 +75,7 @@ class Loon {
       return null;
     }
 
-    if (snap is DocumentSnapshot<Json> && T != Json) {
+    if (snap is DocumentSnapshot<Json> && T != Json && T != dynamic) {
       _validateTypeSerialization<T>(
         fromJson: doc.fromJson,
         toJson: doc.toJson,
@@ -207,7 +207,7 @@ class Loon {
     }
 
     return _collectionStore[collection]!.values.map((snap) {
-      if (snap is DocumentSnapshot<Json> && T != Json) {
+      if (snap is DocumentSnapshot<Json> && T != Json && T != dynamic) {
         _validateTypeSerialization<T>(
           fromJson: fromJson,
           toJson: toJson,

@@ -71,7 +71,7 @@ class _DependencyStore {
       return;
     }
 
-    for (final dependency in dependencies) {
+    for (final dependency in dependencies.toList()) {
       removeDependency(doc, dependency);
     }
   }
@@ -79,7 +79,7 @@ class _DependencyStore {
   /// Rebuilds a document's set of dependencies (if any), storing updates in two different collections:
   /// 1. A mapping of a document to its dependencies (necessary for efficient calculation prev/next dependencies in rebuild)
   /// 2. A mapping of a document to the documents that depend on it (used to trigger rebroadcasts of dependent documents)
-  void rebuildDependencies(DocumentSnapshot snap) {
+  void rebuildDependencies<T>(DocumentSnapshot<T> snap) {
     final doc = snap.doc;
     final dependenciesBuilder = doc.dependenciesBuilder;
 
