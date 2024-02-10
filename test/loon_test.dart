@@ -40,6 +40,11 @@ class TestUserModel {
 
   @override
   int get hashCode => Object.hashAll([name]);
+
+  @override
+  toString() {
+    return "TestUserModel:$name";
+  }
 }
 
 class TestPersistor extends Persistor {
@@ -97,17 +102,20 @@ class DocumentSnapshotMatcher<T> extends Matcher {
     bool verbose,
   ) {
     return mismatchDescription.add(
-      "has expected document ID: ${matchState['actual'].id}, data: ${matchState['actual'].data}",
+      "Expected: $item, Actual: ${matchState['actual']}",
     );
   }
 
   @override
   bool matches(actual, Map matchState) {
-    final actual0 = actual as DocumentSnapshot<T>?;
-    this.actual = actual0;
+    this.actual = actual;
 
     final actualData = actual?.data;
     final expectedData = expected?.data;
+
+    if (actual.doc.path != expected?.doc.path) {
+      return false;
+    }
 
     if (expectedData == null) {
       return actualData == null;
@@ -131,17 +139,29 @@ void main() {
       Loon.clearAll();
     });
 
-    test('Instance user document created successfully', () {
-      final user = TestUserModel('User 1');
-      final userDoc = TestUserModel.store.doc('1');
+    test(
+      'User document created successfully',
+      () {
+        final user = TestUserModel('User 1');
+        final userDoc = TestUserModel.store.doc('1');
 
-      userDoc.create(user);
+        userDoc.create(user);
 
-      expect(
-        userDoc.getJson(),
-        user.toJson(),
-      );
-    });
+        expect(
+          Loon.extract()['collectionStore'],
+          {
+            "users": {
+              "1": DocumentSnapshotMatcher(
+                DocumentSnapshot(
+                  doc: userDoc,
+                  data: user,
+                ),
+              ),
+            }
+          },
+        );
+      },
+    );
 
     test('JSON user document created successfully', () {
       final userCollection = Loon.collection('users');
@@ -153,8 +173,17 @@ void main() {
       userDoc.create(userJson);
 
       expect(
-        userDoc.getJson(),
-        userJson,
+        Loon.extract()['collectionStore'],
+        {
+          "users": {
+            "2": DocumentSnapshotMatcher(
+              DocumentSnapshot(
+                doc: userDoc,
+                data: userJson,
+              ),
+            ),
+          }
+        },
       );
     });
 
@@ -192,16 +221,15 @@ void main() {
       final userDoc = TestUserModel.store.doc('1');
 
       userDoc.create(user);
-      final userSnap = userDoc.get();
 
       expect(
-        userSnap?.id,
-        '1',
-      );
-
-      expect(
-        userSnap?.data.toJson(),
-        user.toJson(),
+        userDoc.get(),
+        DocumentSnapshotMatcher(
+          DocumentSnapshot(
+            doc: userDoc,
+            data: user,
+          ),
+        ),
       );
     });
 
@@ -213,16 +241,15 @@ void main() {
       };
 
       userDoc.create(userJson);
-      final userSnap = userDoc.get();
 
       expect(
-        userSnap?.id,
-        '2',
-      );
-
-      expect(
-        userSnap?.data,
-        userJson,
+        userDoc.get(),
+        DocumentSnapshotMatcher(
+          DocumentSnapshot(
+            doc: userDoc,
+            data: userJson,
+          ),
+        ),
       );
     });
   });
@@ -232,55 +259,55 @@ void main() {
       Loon.clearAll();
     });
 
-    test('Existing instance user document updated successfully', () {
+    test('Deserialized document updated successfully', () {
       final updatedUser = TestUserModel('User 1 updated');
       final userDoc = TestUserModel.store.doc('1');
 
       userDoc.create(TestUserModel('User 1'));
       userDoc.update(updatedUser);
-      final userSnap = userDoc.get();
 
       expect(
-        userSnap?.id,
-        '1',
-      );
-
-      expect(
-        userSnap?.data.toJson(),
-        updatedUser.toJson(),
-      );
-    });
-
-    test('New instance user document updated successfully', () {
-      final updatedUser = TestUserModel('User 1');
-      final userDoc = TestUserModel.store.doc('1');
-
-      userDoc.update(updatedUser);
-      final userSnap = userDoc.get();
-
-      expect(
-        userSnap?.id,
-        '1',
-      );
-
-      expect(
-        userSnap?.data.toJson(),
-        updatedUser.toJson(),
+        userDoc.get(),
+        DocumentSnapshotMatcher(
+          DocumentSnapshot(
+            doc: userDoc,
+            data: updatedUser,
+          ),
+        ),
       );
     });
 
-    test('JSON user document updated successfully', () {
+    test('JSON document updated successfully', () {
       final userCollection = Loon.collection('users');
       final userDoc = userCollection.doc('2');
       final userJson = {
         "name": "User 2",
       };
+      final updatedUserJson = {
+        "name": "User 2 updated",
+      };
 
       userDoc.create(userJson);
+      userDoc.update(updatedUserJson);
 
       expect(
-        userDoc.getJson(),
-        userJson,
+        userDoc.get(),
+        DocumentSnapshotMatcher(
+          DocumentSnapshot(
+            doc: userDoc,
+            data: updatedUserJson,
+          ),
+        ),
+      );
+    });
+
+    test('Updating a non-existent document throws an error', () {
+      final updatedUser = TestUserModel('User 1');
+      final userDoc = TestUserModel.store.doc('1');
+
+      expect(
+        () => userDoc.update(updatedUser),
+        throwsException,
       );
     });
 
@@ -301,55 +328,55 @@ void main() {
       Loon.clearAll();
     });
 
-    test('Existing instance user document modified successfully', () {
+    test('Deserialized document modified successfully', () {
       final updatedUser = TestUserModel('User 1 updated');
       final userDoc = TestUserModel.store.doc('1');
 
       userDoc.create(TestUserModel('User 1'));
       userDoc.modify((userSnap) => updatedUser);
-      final userSnap = userDoc.get();
 
       expect(
-        userSnap?.id,
-        '1',
-      );
-
-      expect(
-        userSnap?.data.toJson(),
-        updatedUser.toJson(),
+        userDoc.get(),
+        DocumentSnapshotMatcher(
+          DocumentSnapshot(
+            doc: userDoc,
+            data: updatedUser,
+          ),
+        ),
       );
     });
 
-    test('New instance user document modified successfully', () {
+    test('Modifinyg a non-existent document throws an error', () {
       final updatedUser = TestUserModel('User 1');
       final userDoc = TestUserModel.store.doc('1');
 
-      userDoc.modify((userSnap) => updatedUser);
-      final userSnap = userDoc.get();
-
       expect(
-        userSnap?.id,
-        '1',
-      );
-
-      expect(
-        userSnap?.data.toJson(),
-        updatedUser.toJson(),
+        () => userDoc.modify((_) => updatedUser),
+        throwsException,
       );
     });
 
-    test('JSON user document modified successfully', () {
+    test('JSON document modified successfully', () {
       final userCollection = Loon.collection('users');
       final userDoc = userCollection.doc('2');
       final userJson = {
         "name": "User 2",
       };
+      final updatedUserJson = {
+        "name": "User 2 updated",
+      };
 
-      userDoc.modify((userSnap) => userJson);
+      userDoc.create(userJson);
+      userDoc.modify((userSnap) => updatedUserJson);
 
       expect(
-        userDoc.getJson(),
-        userJson,
+        userDoc.get(),
+        DocumentSnapshotMatcher(
+          DocumentSnapshot(
+            doc: userDoc,
+            data: updatedUserJson,
+          ),
+        ),
       );
     });
 
@@ -378,6 +405,11 @@ void main() {
       userDoc.delete();
 
       expect(userDoc.exists(), false);
+
+      expect(
+        Loon.extract()['collectionStore'],
+        {"users": {}},
+      );
     });
   });
 
@@ -464,10 +496,12 @@ void main() {
       userDoc.create(user);
 
       await asyncEvent();
+
       userDoc.update(userUpdated);
 
       final snaps = await queryFuture;
 
+      // Add document
       expect(
         snaps[0].type,
         BroadcastEventTypes.added,
@@ -481,6 +515,7 @@ void main() {
         user,
       );
 
+      // Update document
       expect(
         snaps[1].type,
         BroadcastEventTypes.modified,
@@ -564,17 +599,17 @@ void main() {
 
       userDoc.create(user);
 
+      await asyncEvent();
+
       final queryStream = TestUserModel.store
           .where((snap) {
             return snap.data.name == 'User 1';
           })
           .stream()
-          // We take 3 changes instead of 2 here because the stream first immediately emits its current value,
-          // and then the broadcast scheduled by the create call re-executes the query and emits the updated value. We don't
-          // care about this intermediary broadcast and just compare the first/last result.
-          .take(3);
+          .take(2);
 
       await asyncEvent();
+
       userDoc.update(user2);
 
       final querySnaps = await queryStream.toList();
@@ -614,6 +649,7 @@ void main() {
       userDoc2.create(user2);
 
       await asyncEvent();
+
       userDoc.update(updatedUser);
 
       final snaps = await queryFuture;
@@ -690,13 +726,38 @@ void main() {
       final userDoc = TestUserModel.store.doc('1');
       final userDoc2 = TestUserModel.store.doc('2');
 
-      userDoc.create(TestUserModel('User 1'));
-      userDoc2.create(TestUserModel('User 2'));
+      final userData = TestUserModel('User 1');
+      final userData2 = TestUserModel('User 2');
+
+      userDoc.create(userData);
+      userDoc2.create(userData2);
+
+      expect(
+        Loon.extract()['collectionStore'],
+        {
+          "users": {
+            "1": DocumentSnapshotMatcher(
+              DocumentSnapshot(
+                doc: userDoc,
+                data: userData,
+              ),
+            ),
+            "2": DocumentSnapshotMatcher(
+              DocumentSnapshot(
+                doc: userDoc2,
+                data: userData2,
+              ),
+            ),
+          }
+        },
+      );
 
       TestUserModel.store.clear();
 
-      expect(userDoc.get(), null);
-      expect(userDoc2.get(), null);
+      expect(
+        Loon.extract()['collectionStore'],
+        {"users": {}},
+      );
     });
   });
 
@@ -709,15 +770,54 @@ void main() {
       final userDoc = TestUserModel.store.doc('1');
       final userDoc2 = TestUserModel.store.doc('2');
 
-      userDoc.create(TestUserModel('User 1'));
-      userDoc2.create(TestUserModel('User 2'));
+      final userData = TestUserModel('User 1');
+      final userData2 = TestUserModel('User 2');
+
+      userDoc.create(userData);
+      userDoc2.create(userData2);
+
+      expect(
+        Loon.extract()['collectionStore'],
+        {
+          "users": {
+            "1": DocumentSnapshotMatcher(
+              DocumentSnapshot(
+                doc: userDoc,
+                data: userData,
+              ),
+            ),
+            "2": DocumentSnapshotMatcher(
+              DocumentSnapshot(
+                doc: userDoc2,
+                data: userData2,
+              ),
+            ),
+          }
+        },
+      );
+
+      final userData3 = TestUserModel('User 3');
 
       TestUserModel.store.replace([
-        DocumentSnapshot(doc: userDoc, data: TestUserModel('User 3')),
+        DocumentSnapshot(
+          doc: userDoc,
+          data: userData3,
+        ),
       ]);
 
-      expect(userDoc.get()?.data.toJson(), TestUserModel('User 3').toJson());
-      expect(userDoc2.get(), null);
+      expect(
+        Loon.extract()['collectionStore'],
+        {
+          "users": {
+            "1": DocumentSnapshotMatcher(
+              DocumentSnapshot(
+                doc: userDoc,
+                data: userData3,
+              ),
+            ),
+          }
+        },
+      );
     });
   });
 
@@ -728,19 +828,40 @@ void main() {
 
     test('Clears all documents across all collections', () {
       final userDoc = TestUserModel.store.doc('1');
-      final userDoc2 = Loon.collection<TestUserModel>(
-        'users2',
-        fromJson: TestUserModel.fromJson,
-        toJson: (user) => user.toJson(),
-      ).doc('2');
+      final userDoc2 = TestUserModel.store.doc('2');
 
-      userDoc.create(TestUserModel('User 1'));
-      userDoc2.create(TestUserModel('User 2'));
+      final userData = TestUserModel('User 1');
+      final userData2 = TestUserModel('User 2');
+
+      userDoc.create(userData);
+      userDoc2.create(userData2);
+
+      expect(
+        Loon.extract()['collectionStore'],
+        {
+          "users": {
+            "1": DocumentSnapshotMatcher(
+              DocumentSnapshot(
+                doc: userDoc,
+                data: userData,
+              ),
+            ),
+            "2": DocumentSnapshotMatcher(
+              DocumentSnapshot(
+                doc: userDoc2,
+                data: userData2,
+              ),
+            ),
+          }
+        },
+      );
 
       Loon.clearAll();
 
-      expect(userDoc.get(), null);
-      expect(userDoc2.get(), null);
+      expect(
+        Loon.extract()['collectionStore'],
+        {"users": {}},
+      );
     });
   });
 
@@ -755,11 +876,19 @@ void main() {
 
       rootDoc.create(data);
 
-      final rootSnap = rootDoc.get();
-
-      expect(rootSnap?.collection, '__ROOT__');
-      expect(rootSnap?.id, '1');
-      expect(rootSnap?.data, data);
+      expect(
+        Loon.extract()['collectionStore'],
+        {
+          "__ROOT__": {
+            "1": DocumentSnapshotMatcher(
+              DocumentSnapshot(
+                doc: rootDoc,
+                data: data,
+              ),
+            ),
+          }
+        },
+      );
     });
   });
 
@@ -772,19 +901,24 @@ void main() {
       final friendData = TestUserModel('Friend 1');
       final friendDoc = Loon.collection('users')
           .doc('1')
-          .subcollection<TestUserModel>(
-            'friends',
-            fromJson: TestUserModel.fromJson,
-            toJson: (friend) => friend.toJson(),
-          )
+          .subcollection<TestUserModel>('friends')
           .doc('1');
 
       friendDoc.create(friendData);
-      final friendSnap = friendDoc.get();
 
-      expect(friendSnap?.data.toJson(), friendData.toJson());
-      expect(friendSnap?.doc.collection, 'users_1_friends');
-      expect(friendSnap?.doc.id, '1');
+      expect(
+        Loon.extract()['collectionStore'],
+        {
+          "users_1_friends": {
+            "1": DocumentSnapshotMatcher(
+              DocumentSnapshot(
+                doc: friendDoc,
+                data: friendData,
+              ),
+            ),
+          }
+        },
+      );
     });
   });
 
@@ -800,7 +934,7 @@ void main() {
         fromJson: TestUserModel.fromJson,
         toJson: (user) => user.toJson(),
       );
-      final userDoc = userCollection.doc('User 1');
+      final userDoc = userCollection.doc('1');
       final userData = TestUserModel('User 1');
 
       expectLater(
@@ -831,9 +965,45 @@ void main() {
 
       await Loon.hydrate();
 
+      // The data is hydrated as Json
       expect(
-        userDoc.get()?.data,
-        userData,
+        Loon.extract()['collectionStore'],
+        {
+          "users": {
+            "1": DocumentSnapshotMatcher(
+              DocumentSnapshot(
+                doc: userDoc,
+                data: userData.toJson(),
+              ),
+            ),
+          }
+        },
+      );
+
+      // It is then de-serialized when it is first accessed.
+      expect(
+        userDoc.get(),
+        DocumentSnapshotMatcher(
+          DocumentSnapshot(
+            doc: userDoc,
+            data: userData,
+          ),
+        ),
+      );
+
+      // Afterwards first read, it is stored de-serialized.
+      expect(
+        Loon.extract()['collectionStore'],
+        {
+          "users": {
+            "1": DocumentSnapshotMatcher(
+              DocumentSnapshot(
+                doc: userDoc,
+                data: userData,
+              ),
+            ),
+          }
+        },
       );
     });
   });
@@ -868,6 +1038,22 @@ void main() {
 
       await asyncEvent();
 
+      expect(
+        Loon.extract()['dependencyStore'],
+        {
+          "dependencies": {
+            postDoc: {
+              userDoc,
+            }
+          },
+          "dependents": {
+            userDoc: {
+              postDoc,
+            }
+          },
+        },
+      );
+
       usersCollection.doc('1').create({
         "id": 1,
         "name": "User 1",
@@ -884,6 +1070,24 @@ void main() {
 
       userDoc.delete();
 
+      // Deleting the user doc should not alter the dependencies, as the post doc remains
+      // dependent on the user doc, even when it is no longer in the store, since it could be added back later.
+      expect(
+        Loon.extract()['dependencyStore'],
+        {
+          "dependencies": {
+            postDoc: {
+              userDoc,
+            }
+          },
+          "dependents": {
+            userDoc: {
+              postDoc,
+            }
+          },
+        },
+      );
+
       await asyncEvent();
 
       usersCollection.doc('1').create({
@@ -894,6 +1098,19 @@ void main() {
       await asyncEvent();
 
       postDoc.update(updatedPostData1);
+
+      // Now the post doc has been updated and is no longer dependent on the user doc.
+      expect(
+        Loon.extract()['dependencyStore'],
+        {
+          "dependencies": {
+            postDoc: <dynamic>{},
+          },
+          "dependents": {
+            userDoc: <dynamic>{},
+          },
+        },
+      );
 
       await asyncEvent();
 
@@ -947,6 +1164,7 @@ void main() {
       );
 
       final userDoc = usersCollection.doc('1');
+      final postDoc = postsCollection.doc('1');
       final userData = TestUserModel('Test user 1');
       final updatedUserData = TestUserModel('Test user 1 updated');
       final userObservable = userDoc.observe();
@@ -956,10 +1174,48 @@ void main() {
 
       await asyncEvent();
 
-      postsCollection.doc('1').create({
+      expect(
+        Loon.extract()['dependencyStore'],
+        {
+          "dependencies": {
+            userDoc: {
+              postDoc,
+            }
+          },
+          "dependents": {
+            postDoc: {
+              userDoc,
+            }
+          },
+        },
+      );
+
+      postDoc.create({
         "id": 1,
         "name": "Post 1",
       });
+
+      expect(
+        Loon.extract()['dependencyStore'],
+        {
+          "dependencies": {
+            userDoc: {
+              postDoc,
+            },
+            postDoc: {
+              userDoc,
+            }
+          },
+          "dependents": {
+            postDoc: {
+              userDoc,
+            },
+            userDoc: {
+              postDoc,
+            }
+          },
+        },
+      );
 
       await asyncEvent();
 

@@ -105,20 +105,13 @@ class Loon {
   }) {
     final collectionName = collection.name;
 
-    // Clear any documents in the collection scheduled for broadcast, as whatever event happened prior to the clear
+    // Immediately clear any documents in the collection scheduled for broadcast, as whatever event happened prior to the clear
     // in the collection are now irrelevant.
     _broadcastCollectionStore[collectionName]?.clear();
 
-    // If the clear should broadcast, then we need to go through every document in the collection and schedule
-    // it for broadcast.
-    if (broadcast) {
-      final snaps = _getSnapshots(collectionName);
-      for (final snap in snaps) {
-        snap.doc.delete();
-      }
-      // Otherwise, we can shortcut clearing each document individually and just clear the collection.
-    } else {
-      _collectionStore[collectionName]!.clear();
+    final snaps = _getSnapshots(collectionName);
+    for (final snap in snaps) {
+      snap.doc.delete(broadcast: broadcast);
     }
 
     if (collection.isPersistenceEnabled()) {
@@ -130,23 +123,24 @@ class Loon {
   void _clearAll({
     bool broadcast = true,
   }) {
-    // Clear any documents scheduled for broadcast, as whatever events happened prior to the clear are now irrelevant.
+    // Immediately clear any documents scheduled for broadcast, as whatever events happened prior to the clear are now irrelevant.
     _broadcastCollectionStore.clear();
+    // Immediately clear all dependencies of documents, since all documents are being removed and will be broadcast if indicated.
+    _dependencyStore.clearAll();
 
-    // If the clear should broadcast, then we need to go through every document that is being
+    // If it should broadcast, then we need to go through every document that is being
     // cleared and schedule it for broadcast.
     if (broadcast) {
       for (final collectionName in _collectionStore.keys) {
         final snaps = _getSnapshots(collectionName);
 
         for (final snap in snaps) {
-          snap.doc.delete();
+          _writeBroadcastDocument(snap.doc, BroadcastEventTypes.removed);
         }
       }
-      // Otherwise we can shortcut clearing each document from the collection store individually and just clear the entire store.
-    } else {
-      _collectionStore.clear();
     }
+
+    _collectionStore.clear();
 
     if (persistor != null) {
       persistor!.clearAll();
@@ -181,7 +175,6 @@ class Loon {
     for (final existingSnap in existingSnaps) {
       final docId = existingSnap.id;
       final updatedSnap = snapsById[docId];
-      snapsById.remove(docId);
 
       if (updatedSnap != null) {
         existingSnap.doc.update(updatedSnap.data);
@@ -393,6 +386,10 @@ class Loon {
     T data, {
     bool broadcast = true,
   }) {
+    if (!doc.exists()) {
+      throw Exception('Missing document ${doc.path}');
+    }
+
     return _writeSnapshot<T>(
       doc,
       data,
@@ -543,5 +540,17 @@ class Loon {
       doc,
       BroadcastEventTypes.touched,
     );
+  }
+
+  /// Returns a Map of all of the data and metadata of the store for debugging and inspection purposes.
+  static Json extract() {
+    return {
+      "collectionStore": _instance._collectionStore,
+      "broadcastCollectionStore": _instance._broadcastCollectionStore,
+      "dependencyStore": {
+        "dependencies": _instance._dependencyStore._dependenciesStore,
+        "dependents": _instance._dependencyStore._dependentsStore,
+      },
+    };
   }
 }

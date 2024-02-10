@@ -1,7 +1,5 @@
 part of loon;
 
-typedef DependencyCollectionStore = Map<String, Map<String, Set<Document>>>;
-
 /// The dependency store maintains the dependency/dependent relationship of documents recalculated whenever a document changes (added, updated removed).
 /// using the collection's [Collection.dependenciesBuilder] (if present). Whenever a document changes two things occur:
 ///
@@ -10,20 +8,20 @@ typedef DependencyCollectionStore = Map<String, Map<String, Set<Document>>>;
 class _DependencyStore {
   /// The index of a document to the documents that depend on it. Whenever a document is updated, it schedules
   /// each of its dependents for a broadcast so that they can receive its updated value.
-  final DependencyCollectionStore _dependentsStore = {};
+  final Map<Document, Set<Document>> _dependentsStore = {};
 
   /// The index of a document to the documents that it depends on. Whenever a document is updated, it records
   /// the updated set of documents that it now depends on.
-  final DependencyCollectionStore _dependenciesStore = {};
+  final Map<Document, Set<Document>> _dependenciesStore = {};
 
   /// Returns the set of dependencies (if any) that the given document is dependent on.
   Set<Document>? getDependencies(Document doc) {
-    return _dependenciesStore[doc.collection]?[doc.id];
+    return _dependenciesStore[doc];
   }
 
   /// Returns the set of documents (if any) that are dependent on the given document.
   Set<Document>? getDependents(Document doc) {
-    return _dependentsStore[doc.collection]?[doc.id];
+    return _dependentsStore[doc];
   }
 
   /// Marks the given document as dependent on the given dependency.
@@ -31,24 +29,16 @@ class _DependencyStore {
   /// 1. The dependency should be added to the dependencies store for the given document.
   /// 2. The document should be added to the dependents store for the given dependency.
   void addDependency(Document doc, Document dependency) {
-    if (!_dependenciesStore.containsKey(doc.collection)) {
-      _dependenciesStore[doc.collection] = {};
+    if (!_dependentsStore.containsKey(dependency)) {
+      _dependentsStore[dependency] = {};
     }
 
-    if (!_dependenciesStore[doc.collection]!.containsKey(doc.id)) {
-      _dependenciesStore[doc.collection]![doc.id] = {};
+    if (!_dependenciesStore.containsKey(doc)) {
+      _dependenciesStore[doc] = {};
     }
 
-    if (!_dependentsStore.containsKey(dependency.collection)) {
-      _dependentsStore[dependency.collection] = {};
-    }
-
-    if (!_dependentsStore[dependency.collection]!.containsKey(dependency.id)) {
-      _dependentsStore[dependency.collection]![dependency.id] = {};
-    }
-
-    _dependenciesStore[doc.collection]![doc.id]!.add(dependency);
-    _dependentsStore[dependency.collection]![dependency.id]!.add(doc);
+    _dependenciesStore[doc]!.add(dependency);
+    _dependentsStore[dependency]!.add(doc);
   }
 
   /// Removes the given dependency from the given document.
@@ -56,8 +46,8 @@ class _DependencyStore {
   /// 1. The dependency should be removed from the dependencies store for the given document.
   /// 2. The document should be removed from the dependents store for the given dependency.
   void removeDependency(Document doc, Document dependency) {
-    _dependenciesStore[doc.collection]?[doc.id]?.remove(dependency);
-    _dependentsStore[dependency.collection]?[dependency.id]?.remove(doc);
+    _dependenciesStore[doc]?.remove(dependency);
+    _dependentsStore[dependency]?.remove(doc);
   }
 
   /// Clears all dependencies of the given document.
@@ -110,5 +100,10 @@ class _DependencyStore {
         addDependency(doc, dependency);
       }
     }
+  }
+
+  void clearAll() {
+    _dependenciesStore.clear();
+    _dependentsStore.clear();
   }
 }
