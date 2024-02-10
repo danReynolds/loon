@@ -2,84 +2,11 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:loon/loon.dart';
 
+import 'models/test_persistor.dart';
+import 'models/test_user_model.dart';
+
 Future<void> asyncEvent() {
   return Future.delayed(const Duration(milliseconds: 1), () => null);
-}
-
-class TestUserModel {
-  final String name;
-
-  TestUserModel(this.name);
-
-  static Collection<TestUserModel> get store {
-    return Loon.collection<TestUserModel>(
-      'users',
-      fromJson: TestUserModel.fromJson,
-      toJson: (user) => user.toJson(),
-    );
-  }
-
-  TestUserModel.fromJson(Json json) : name = json['name'];
-
-  Json toJson() {
-    return {
-      "name": name,
-    };
-  }
-
-  @override
-  bool operator ==(Object other) {
-    if (identical(this, other)) {
-      return true;
-    }
-    if (other is TestUserModel) {
-      return name == other.name;
-    }
-    return false;
-  }
-
-  @override
-  int get hashCode => Object.hashAll([name]);
-
-  @override
-  toString() {
-    return "TestUserModel:$name";
-  }
-}
-
-class TestPersistor extends Persistor {
-  final List<DocumentSnapshot<TestUserModel>> seedData;
-
-  TestPersistor({
-    required this.seedData,
-  });
-
-  @override
-  Future<SerializedCollectionStore> hydrate() async {
-    return {
-      "users": seedData.fold({}, (acc, doc) {
-        return {
-          ...acc,
-          doc.id: doc.data.toJson(),
-        };
-      }),
-    };
-  }
-
-  @override
-  persist(docs) {
-    throw UnimplementedError();
-  }
-
-  @override
-  clear(collection) {
-    throw UnimplementedError();
-  }
-
-  @override
-  clearAll() {
-    throw UnimplementedError();
-  }
 }
 
 class DocumentSnapshotMatcher<T> extends Matcher {
