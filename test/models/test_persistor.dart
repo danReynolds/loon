@@ -3,12 +3,11 @@ import 'test_user_model.dart';
 
 class TestPersistor extends Persistor {
   final List<DocumentSnapshot<TestUserModel>> seedData;
-  final void Function(List<Document> batch)? onPersist;
 
   TestPersistor({
     super.persistenceThrottle,
     required this.seedData,
-    this.onPersist,
+    super.onPersist,
   });
 
   @override

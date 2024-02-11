@@ -11,18 +11,22 @@ class PersistorSettings<T> {
 }
 
 abstract class Persistor {
-  final Map<String, Document> _batch = {};
-  Timer? _persistTimer;
-  bool _isPersisting = false;
   final Duration persistenceThrottle;
-
   final PersistorSettings persistorSettings;
+  final void Function(List<Document> batch)? onPersist;
+
+  final Map<String, Document> _batch = {};
+
+  Timer? _persistTimer;
+
+  bool _isPersisting = false;
 
   final _initializedCompleter = Completer<void>();
 
   Persistor({
     this.persistorSettings = const PersistorSettings(),
     this.persistenceThrottle = const Duration(milliseconds: 100),
+    this.onPersist,
   }) {
     _init();
   }
@@ -63,6 +67,8 @@ abstract class Persistor {
 
       await _isInitialized;
       await persist(batchDocs);
+
+      onPersist?.call(batchDocs);
     } finally {
       _isPersisting = false;
 

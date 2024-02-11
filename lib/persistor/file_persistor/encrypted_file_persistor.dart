@@ -106,6 +106,11 @@ class EncryptedFileDataStoreFactory extends FileDataStoreFactory {
 class EncryptedFilePersistor extends FilePersistor {
   late final Encrypter _encrypter;
 
+  EncryptedFilePersistor({
+    super.persistenceThrottle = const Duration(milliseconds: 100),
+    super.persistorSettings,
+  });
+
   Future<void> _initEncrypter() async {
     const storage = FlutterSecureStorage();
     final base64Key = await storage.read(key: _secureStorageKey);

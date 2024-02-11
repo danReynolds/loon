@@ -118,7 +118,7 @@ class FileDataStore {
         return;
       }
 
-      writeFile(jsonEncode(data));
+      await writeFile(jsonEncode(data));
 
       isDirty = false;
     });
@@ -176,7 +176,9 @@ class FilePersistor extends Persistor {
   late final FileDataStoreFactory factory;
 
   FilePersistor({
+    super.persistenceThrottle = const Duration(milliseconds: 100),
     super.persistorSettings,
+    super.onPersist,
   });
 
   static String getDocumentKey(Document doc) {
@@ -203,6 +205,7 @@ class FilePersistor extends Persistor {
 
   @override
   init() async {
+    factory = FileDataStoreFactory();
     await initStorageDirectory();
   }
 
@@ -256,7 +259,7 @@ class FilePersistor extends Persistor {
       documentDataStore.updateDocument(documentKey, doc.getJson());
     }
 
-    sync();
+    return sync();
   }
 
   /// Syncs all dirty file data stores, updating and deleting them as necessary.
