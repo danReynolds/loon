@@ -10,7 +10,7 @@ void main() {
   });
 
   test(
-    'Persistence is throttled',
+    'Persistence batches using the throttle',
     () async {
       List<List<Document>> batches = [];
 

@@ -41,6 +41,7 @@ class FileDataStore {
   /// Whether the file data store has pending changes that should be persisted.
   bool isDirty = false;
 
+  /// The operation queue ensures that only one operation is ever running against a file data store at a time (hydrate, persist, delete).
   final List<Completer> _operationQueue = [];
 
   FileDataStore({
@@ -89,6 +90,7 @@ class FileDataStore {
     try {
       await operation();
     } finally {
+      // Start the next operation after the previous one completes.
       if (_operationQueue.isNotEmpty) {
         final completer = _operationQueue.removeAt(0);
         completer.complete();
@@ -120,13 +122,13 @@ class FileDataStore {
   Future<void> persist() {
     return _runOperation(() async {
       if (data.isEmpty) {
-        await delete();
-      } else {
-        if (!file.existsSync()) {
-          file = File(file.path);
-        }
-        writeFile(jsonEncode(data));
+        return;
       }
+
+      if (!file.existsSync()) {
+        file = File(file.path);
+      }
+      writeFile(jsonEncode(data));
 
       isDirty = false;
     });
