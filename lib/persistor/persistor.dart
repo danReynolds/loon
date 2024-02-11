@@ -18,10 +18,38 @@ abstract class Persistor {
 
   final PersistorSettings persistorSettings;
 
+  final _initializedCompleter = Completer<void>();
+
   Persistor({
     this.persistorSettings = const PersistorSettings(),
     this.persistenceThrottle = const Duration(milliseconds: 100),
-  });
+  }) {
+    _init();
+  }
+
+  Future<void> get _isInitialized {
+    return _initializedCompleter.future;
+  }
+
+  Future<void> _init() async {
+    await init();
+    _initializedCompleter.complete();
+  }
+
+  Future<void> _clear(String collection) async {
+    await _isInitialized;
+    await clear(collection);
+  }
+
+  Future<void> _clearAll() async {
+    await _isInitialized;
+    await clearAll();
+  }
+
+  Future<SerializedCollectionStore> _hydrate() async {
+    await _isInitialized;
+    return hydrate();
+  }
 
   Future<void> _persist() async {
     _isPersisting = true;
@@ -33,6 +61,7 @@ abstract class Persistor {
       // are more documents to persist and schedule another run.
       _batch.clear();
 
+      await _isInitialized;
       await persist(batchDocs);
     } finally {
       _isPersisting = false;
@@ -62,6 +91,8 @@ abstract class Persistor {
     _batch[doc.path] = doc;
     _schedulePersist();
   }
+
+  Future<void> init();
 
   Future<void> persist(List<Document> docs);
 

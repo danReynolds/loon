@@ -33,4 +33,7 @@ class TestPersistor extends Persistor {
 
   @override
   clearAll() async {}
+
+  @override
+  init() async {}
 }

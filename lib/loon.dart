@@ -4,8 +4,6 @@ import 'dart:async';
 
 export 'widgets/query_stream_builder.dart';
 export 'widgets/document_stream_builder.dart';
-export 'persistor/file_persistor.dart';
-export 'persistor/encrypted_file_persistor.dart';
 
 part 'broadcast_observer.dart';
 part 'query.dart';
@@ -115,7 +113,7 @@ class Loon {
     }
 
     if (collection.isPersistenceEnabled()) {
-      persistor!.clear(collection.name);
+      persistor!._clear(collection.name);
     }
   }
 
@@ -143,7 +141,7 @@ class Loon {
     _collectionStore.clear();
 
     if (persistor != null) {
-      persistor!.clearAll();
+      persistor!._clearAll();
     }
   }
 
@@ -477,7 +475,7 @@ class Loon {
     }
     try {
       _isHydrating = true;
-      final data = await _instance.persistor!.hydrate();
+      final data = await _instance.persistor!._hydrate();
 
       for (final collectionDataStoreEntry in data.entries) {
         final collection = collectionDataStoreEntry.key;

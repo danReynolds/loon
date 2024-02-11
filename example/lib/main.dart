@@ -3,7 +3,8 @@ import 'dart:async';
 import 'package:example/models/user.dart';
 import 'package:flutter/material.dart';
 import 'package:loon/loon.dart';
-import 'package:loon/persistor/debug_file_persistor.dart';
+import 'package:loon/persistor/file_persistor/debug_file_persistor.dart';
+import 'package:loon/persistor/file_persistor/file_persistor.dart';
 import 'package:uuid/uuid.dart';
 
 const uuid = Uuid();
@@ -200,7 +201,7 @@ class _MyHomePageState extends State<MyHomePage> {
                                 children: [
                                   const Text('File:'),
                                   const SizedBox(height: 8),
-                                  Text(fileDataStore.filename),
+                                  Text(fileDataStore.name),
                                   const SizedBox(height: 8),
                                   const Text('Document count:'),
                                   const SizedBox(height: 8),

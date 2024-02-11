@@ -1,6 +1,5 @@
 import 'dart:async';
-
-import '../loon.dart';
+import 'package:loon/persistor/file_persistor/file_persistor.dart';
 
 class DebugFilePersistor extends FilePersistor {
   final _controller = StreamController<List<FileDataStore>>.broadcast();
