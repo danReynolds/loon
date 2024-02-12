@@ -98,6 +98,8 @@ abstract class Persistor {
     _schedulePersist();
   }
 
+  /// Public APIs to be implemented by any [Persistor] extension like [FilePersistor].
+
   Future<void> init();
 
   Future<void> persist(List<Document> docs);

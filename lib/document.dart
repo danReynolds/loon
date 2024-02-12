@@ -5,7 +5,7 @@ class Document<T> {
   final String id;
   final FromJson<T>? fromJson;
   final ToJson<T>? toJson;
-  final PersistorSettings? persistorSettings;
+  final PersistorSettings<T>? persistorSettings;
   final DependenciesBuilder<T>? dependenciesBuilder;
 
   Document({

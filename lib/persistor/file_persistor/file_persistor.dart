@@ -11,7 +11,7 @@ class FilePersistorSettings<T> extends PersistorSettings<T> {
   /// If documents in the same collection should be broken into multiple files (due to large collection sizes, etc)
   /// or documents should be grouped together across different collections (due to small collection sizes, etc) then
   /// the persistenc key can be used to group arbitrary documents together into the same persistence file.
-  final String? Function(Document<T> doc)? getPersistenceKey;
+  final String? Function(Document doc)? getPersistenceKey;
 
   FilePersistorSettings({
     this.getPersistenceKey,
@@ -72,9 +72,9 @@ class FileDataStore {
     }
 
     try {
-      // If for some reason the operation fails, then it is still recoverable as the file data store collections
-      // maintains in-memory the latest state of the world, so on next sync, any data stores that are still dirty will
-      // attempt to be synced again.
+      // If the operation fails, then we still move on to the next operation. If it was a persist(),
+      // then it can still be recovered, as the file data store will remain marked as dirty and will attempt
+      // to be persisted again with the next persistence operation.
       await operation();
     } finally {
       // Start the next operation after the previous one completes.
@@ -124,8 +124,8 @@ class FileDataStore {
     });
   }
 
-  /// Syncs the file data store. Does nothing if the store is not dirty, otherwise
-  /// it persists the data store with its new data or deletes it if it is empty.
+  /// Syncs the file data store. Persisting it if it is dirty with data, or deleting
+  /// it if dirty with no data. Does nothing if the data store is not dirty.
   Future<void> sync() async {
     if (!isDirty) {
       return;

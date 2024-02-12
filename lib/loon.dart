@@ -228,7 +228,7 @@ class Loon {
     String id, {
     FromJson<T>? fromJson,
     ToJson<T>? toJson,
-    PersistorSettings? persistorSettings,
+    PersistorSettings<T>? persistorSettings,
   }) {
     if (!_broadcastCollectionStore.containsKey(collection)) {
       return null;
