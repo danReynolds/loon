@@ -14,3 +14,24 @@ class ResetCompleter<T> {
     _completer = Completer<T>();
   }
 }
+
+class PersistorCompleter {
+  final _onPersistCompleter = ResetCompleter();
+  final _onClearCompleter = ResetCompleter();
+
+  void persistComplete() {
+    _onPersistCompleter.complete();
+  }
+
+  void clearComplete() {
+    _onClearCompleter.complete();
+  }
+
+  Future<void> get onPersistComplete {
+    return _onPersistCompleter.future;
+  }
+
+  Future<void> get onClearComplete {
+    return _onClearCompleter.future;
+  }
+}

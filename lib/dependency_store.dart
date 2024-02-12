@@ -102,7 +102,7 @@ class _DependencyStore {
     }
   }
 
-  void clearAll() {
+  void clear() {
     _dependenciesStore.clear();
     _dependentsStore.clear();
   }

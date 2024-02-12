@@ -113,20 +113,16 @@ class Loon {
     for (final snap in snaps) {
       snap.doc.delete(broadcast: broadcast);
     }
-
-    if (collection.isPersistenceEnabled()) {
-      persistor!._clear(collection.name);
-    }
   }
 
   /// Clears all data from the store.
-  void _clearAll({
+  void _clear({
     bool broadcast = true,
   }) {
     // Immediately clear any documents scheduled for broadcast, as whatever events happened prior to the clear are now irrelevant.
     _broadcastCollectionStore.clear();
     // Immediately clear all dependencies of documents, since all documents are being removed and will be broadcast if indicated.
-    _dependencyStore.clearAll();
+    _dependencyStore.clear();
 
     // If it should broadcast, then we need to go through every document that is being
     // cleared and schedule it for broadcast.
@@ -143,7 +139,7 @@ class Loon {
     _collectionStore.clear();
 
     if (persistor != null) {
-      persistor!._clearAll();
+      persistor!._clear();
     }
   }
 
@@ -528,10 +524,10 @@ class Loon {
     ).doc(id);
   }
 
-  static void clearAll({
+  static void clear({
     bool broadcast = true,
   }) {
-    Loon._instance._clearAll(broadcast: broadcast);
+    Loon._instance._clear(broadcast: broadcast);
   }
 
   /// Enqueues a document to be rebroadcasted, updating all listeners that are subscribed to that document.

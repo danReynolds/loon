@@ -14,61 +14,80 @@ abstract class Persistor {
   final Duration persistenceThrottle;
   final PersistorSettings persistorSettings;
   final void Function(List<Document> batch)? onPersist;
+  final void Function()? onClear;
 
   final Set<Document> _batch = {};
+
+  /// The operation queue ensures that operations (init, hydrate, persist, clear) are blocking and
+  /// that only one is ever running at a time, not concurrently.
+  final List<Completer> _operationQueue = [];
 
   Timer? _persistTimer;
 
   bool _isPersisting = false;
 
-  final _initializedCompleter = Completer<void>();
-
   Persistor({
     this.persistorSettings = const PersistorSettings(),
     this.persistenceThrottle = const Duration(milliseconds: 100),
     this.onPersist,
+    this.onClear,
   }) {
-    _init();
+    _runOperation(() {
+      return init();
+    });
   }
 
-  Future<void> get _isInitialized {
-    return _initializedCompleter.future;
+  Future<T> _runOperation<T>(Future<T> Function() operation) async {
+    if (_operationQueue.isNotEmpty) {
+      final completer = Completer();
+      _operationQueue.add(completer);
+      await completer.future;
+    }
+
+    try {
+      // If the operation fails, then we still move on to the next operation. If it was a persist(),
+      // then it can still be recovered, as the file data store will remain marked as dirty and will attempt
+      // to be persisted again with the next persistence operation.
+      final result = await operation();
+      return result;
+    } finally {
+      // Start the next operation after the previous one completes.
+      if (_operationQueue.isNotEmpty) {
+        final completer = _operationQueue.removeAt(0);
+        completer.complete();
+      }
+    }
   }
 
-  Future<void> _init() async {
-    await init();
-    _initializedCompleter.complete();
+  Future<void> _clear() {
+    return _runOperation(() async {
+      await clear();
+      onClear?.call();
+    });
   }
 
-  Future<void> _clear(String collection) async {
-    await _isInitialized;
-    await clear(collection);
-  }
-
-  Future<void> _clearAll() async {
-    await _isInitialized;
-    await clearAll();
-  }
-
-  Future<SerializedCollectionStore> _hydrate() async {
-    await _isInitialized;
-    return hydrate();
+  Future<SerializedCollectionStore> _hydrate() {
+    return _runOperation(() {
+      return hydrate();
+    });
   }
 
   Future<void> _persist() async {
-    _isPersisting = true;
-
     try {
-      final batchDocs = _batch.toList();
+      _runOperation(() async {
+        _persistTimer = null;
+        _isPersisting = true;
 
-      // The current batch is eagerly cleared so that after persistence completes, it can be re-checked to see if there
-      // are more documents to persist and schedule another run.
-      _batch.clear();
+        final batchDocs = _batch.toList();
 
-      await _isInitialized;
-      await persist(batchDocs);
+        // The current batch is eagerly cleared so that after persistence completes, it can be re-checked to see if there
+        // are more documents to persist and schedule another run.
+        _batch.clear();
 
-      onPersist?.call(batchDocs);
+        await persist(batchDocs);
+
+        onPersist?.call(batchDocs);
+      });
     } finally {
       _isPersisting = false;
 
@@ -83,7 +102,6 @@ abstract class Persistor {
   void _schedulePersist() {
     if (_persistTimer == null && !_isPersisting) {
       _persistTimer = Timer(persistenceThrottle, () {
-        _persistTimer = null;
         _persist();
       });
     }
@@ -111,7 +129,5 @@ abstract class Persistor {
 
   Future<SerializedCollectionStore> hydrate();
 
-  Future<void> clear(String collection);
-
-  Future<void> clearAll();
+  Future<void> clear();
 }

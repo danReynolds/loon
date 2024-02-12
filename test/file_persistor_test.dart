@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
@@ -14,7 +13,6 @@ import 'models/test_user_model.dart';
 import 'utils.dart';
 
 late Directory testDirectory;
-Completer onPersistCompleter = Completer();
 
 class MockPathProvider extends Fake
     with MockPlatformInterfaceMixin
@@ -30,27 +28,30 @@ class MockPathProvider extends Fake
 }
 
 void main() {
-  ResetCompleter onPersistCompleter = ResetCompleter<void>();
+  final completer = PersistorCompleter();
 
   setUp(() {
     testDirectory = Directory.systemTemp.createTempSync('test_dir');
     final mockPathProvider = MockPathProvider();
     PathProviderPlatform.instance = mockPathProvider;
-    onPersistCompleter = ResetCompleter<void>();
 
     Loon.configure(
       persistor: FilePersistor(
         persistenceThrottle: const Duration(milliseconds: 1),
         onPersist: (_) {
-          onPersistCompleter.complete();
+          completer.persistComplete();
+        },
+        onClear: () {
+          completer.clearComplete();
         },
       ),
     );
   });
 
-  tearDown(() {
+  tearDown(() async {
     testDirectory.deleteSync(recursive: true);
-    Loon.clearAll();
+    Loon.clear();
+    await completer.onClearComplete;
   });
 
   group('persist', () {
@@ -66,7 +67,7 @@ void main() {
         userCollection.doc('1').create(TestUserModel('User 1'));
         userCollection.doc('2').create(TestUserModel('User 2'));
 
-        await onPersistCompleter.future;
+        await completer.onPersistComplete;
 
         final file = File('${testDirectory.path}/loon/users.json');
         final json = jsonDecode(file.readAsStringSync());
@@ -93,11 +94,11 @@ void main() {
         userCollection.doc('1').create(TestUserModel('User 1'));
         userCollection.doc('2').create(TestUserModel('User 2'));
 
-        await onPersistCompleter.future;
+        await completer.onPersistComplete;
 
         userCollection.doc('2').update(TestUserModel('User 2 updated'));
 
-        await onPersistCompleter.future;
+        await completer.onPersistComplete;
 
         final file = File('${testDirectory.path}/loon/users.json');
         final json = jsonDecode(file.readAsStringSync());
@@ -124,11 +125,11 @@ void main() {
         userCollection.doc('1').create(TestUserModel('User 1'));
         userCollection.doc('2').create(TestUserModel('User 2'));
 
-        await onPersistCompleter.future;
+        await completer.onPersistComplete;
 
         userCollection.doc('2').delete();
 
-        await onPersistCompleter.future;
+        await completer.onPersistComplete;
 
         final file = File('${testDirectory.path}/loon/users.json');
         final json = jsonDecode(file.readAsStringSync());
@@ -156,7 +157,7 @@ void main() {
 
         final file = File('${testDirectory.path}/loon/users.json');
 
-        await onPersistCompleter.future;
+        await completer.onPersistComplete;
 
         expect(
           file.existsSync(),
@@ -167,7 +168,7 @@ void main() {
         userCollection.doc('1').delete();
         userCollection.doc('2').delete();
 
-        await onPersistCompleter.future;
+        await completer.onPersistComplete;
 
         expect(
           file.existsSync(),
@@ -196,7 +197,7 @@ void main() {
         userCollection.doc('1').create(TestUserModel('User 1'));
         userCollection.doc('2').create(TestUserModel('User 2'));
 
-        await onPersistCompleter.future;
+        await completer.onPersistComplete;
 
         final usersFile = File('${testDirectory.path}/loon/users.json');
         final otherUsersFile =
@@ -240,11 +241,11 @@ void main() {
         userCollection.doc('1').create(TestUserModel('User 1'));
         userCollection.doc('2').create(TestUserModel('User 2'));
 
-        await onPersistCompleter.future;
+        await completer.onPersistComplete;
 
         userCollection.doc('2').update(TestUserModel('User 2 updated'));
 
-        await onPersistCompleter.future;
+        await completer.onPersistComplete;
 
         final usersFile = File('${testDirectory.path}/loon/users.json');
         final updatedUsersFile =

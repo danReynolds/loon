@@ -24,29 +24,19 @@ class FileDataStore {
   final String name;
 
   /// A map of documents by key (collection:id) to the document's JSON data.
-  Map<String, Json> data = {};
+  final Map<String, Json> data = {};
 
   /// Whether the file data store has pending changes that should be persisted.
   bool isDirty = false;
-
-  /// The operation queue ensures that only one operation is ever running against a file data store at a time (hydrate, persist, delete).
-  final List<Completer> _operationQueue = [];
 
   FileDataStore({
     required this.file,
     required this.name,
   });
 
-  void updateDocument(String documentKey, Json? docData) {
-    if (docData == null) {
-      if (data.containsKey(documentKey)) {
-        data.remove(documentKey);
-        isDirty = true;
-      }
-    } else {
-      data[documentKey] = docData;
-      isDirty = true;
-    }
+  void updateDocument(String documentKey, Json docData) {
+    data[documentKey] = docData;
+    isDirty = true;
   }
 
   void removeDocument(String documentKey) {
@@ -64,50 +54,28 @@ class FileDataStore {
     return file.writeAsString(value);
   }
 
-  Future<void> _runOperation(Future<void> Function() operation) async {
-    if (_operationQueue.isNotEmpty) {
-      final completer = Completer();
-      _operationQueue.add(completer);
-      return completer.future;
+  Future<void> delete() async {
+    if (!file.existsSync()) {
+      printDebug('Attempted to delete non-existent file');
+      return;
     }
 
-    try {
-      // If the operation fails, then we still move on to the next operation. If it was a persist(),
-      // then it can still be recovered, as the file data store will remain marked as dirty and will attempt
-      // to be persisted again with the next persistence operation.
-      await operation();
-    } finally {
-      // Start the next operation after the previous one completes.
-      if (_operationQueue.isNotEmpty) {
-        final completer = _operationQueue.removeAt(0);
-        completer.complete();
-      }
-    }
-  }
-
-  Future<void> delete() {
-    return _runOperation(() async {
-      if (file.existsSync()) {
-        file.deleteSync();
-      }
-      isDirty = false;
-    });
+    file.deleteSync();
+    isDirty = false;
   }
 
   Future<void> hydrate() async {
     try {
-      await _runOperation(() async {
-        final Map<String, dynamic> fileJson = jsonDecode(await readFile());
-        final hydrationData = fileJson.map(
-          (key, dynamic value) => MapEntry(
-            key,
-            Map<String, dynamic>.from(value),
-          ),
-        );
-        for (final entry in hydrationData.entries) {
-          data[entry.key] = entry.value;
-        }
-      });
+      final Map<String, dynamic> fileJson = jsonDecode(await readFile());
+      final hydrationData = fileJson.map(
+        (key, dynamic value) => MapEntry(
+          key,
+          Map<String, dynamic>.from(value),
+        ),
+      );
+      for (final entry in hydrationData.entries) {
+        data[entry.key] = entry.value;
+      }
     } catch (e) {
       // If hydration fails, then this file data store is corrupt and should be removed from the file data store index.
       printDebug('Corrupt file data store');
@@ -115,30 +83,15 @@ class FileDataStore {
     }
   }
 
-  Future<void> write() {
-    return _runOperation(() async {
-      if (data.isEmpty) {
-        return;
-      }
-
-      await writeFile(jsonEncode(data));
-
-      isDirty = false;
-    });
-  }
-
-  /// Syncs the file data store. Persisting it if it is dirty with data, or deleting
-  /// it if dirty with no data. Does nothing if the data store is not dirty.
-  Future<void> sync() async {
-    if (!isDirty) {
+  Future<void> write() async {
+    if (data.isEmpty) {
+      printDebug('Attempted to write empty data store');
       return;
     }
 
-    if (data.isEmpty) {
-      return delete();
-    }
+    await writeFile(jsonEncode(data));
 
-    return write();
+    isDirty = false;
   }
 }
 
@@ -192,8 +145,7 @@ class FilePersistor extends Persistor {
   /// An index of file data stores by document persistence key.
   final Map<String, FileDataStore> _fileDataStoreIndex = {};
 
-  /// An index of file data stores by collection and document ID.
-  final Map<String, Map<String, FileDataStore>> _documentDataStoreIndex = {};
+  final Map<String, FileDataStore> _documentDataStoreIndex = {};
 
   late final Directory fileDataStoreDirectory;
 
@@ -203,6 +155,7 @@ class FilePersistor extends Persistor {
     super.persistenceThrottle = const Duration(milliseconds: 100),
     super.persistorSettings,
     super.onPersist,
+    super.onClear,
   });
 
   static String getDocumentKey(Document doc) {
@@ -239,8 +192,6 @@ class FilePersistor extends Persistor {
   @override
   persist(docs) async {
     for (final doc in docs) {
-      final documentId = doc.id;
-      final collection = doc.collection;
       final documentKey = getDocumentKey(doc);
       final documentDataStoreName = factory.getDocumentDataStoreName(doc);
       final documentDataStore =
@@ -248,19 +199,19 @@ class FilePersistor extends Persistor {
 
       // If the document has changed the file data store it should be stored in, then it should
       // be removed from its previous file data store (if one exists) and placed in the new one.
-      final prevDocumentDataStore =
-          _documentDataStoreIndex[collection]?[documentId];
+      final prevDocumentDataStore = _documentDataStoreIndex[documentKey];
       if (prevDocumentDataStore != null &&
           documentDataStore != prevDocumentDataStore) {
         prevDocumentDataStore.removeDocument(documentKey);
       }
 
-      if (!_documentDataStoreIndex.containsKey(collection)) {
-        _documentDataStoreIndex[collection] = {};
+      if (doc.exists()) {
+        documentDataStore.updateDocument(documentKey, doc.getJson()!);
+        _documentDataStoreIndex[documentKey] = documentDataStore;
+      } else {
+        documentDataStore.removeDocument(documentKey);
+        _documentDataStoreIndex.remove(documentKey);
       }
-      _documentDataStoreIndex[collection]![documentId] = documentDataStore;
-
-      documentDataStore.updateDocument(documentKey, doc.getJson());
     }
 
     return sync();
@@ -269,7 +220,18 @@ class FilePersistor extends Persistor {
   /// Syncs all dirty file data stores, updating and deleting them as necessary.
   Future<void> sync() {
     return Future.wait(
-      _fileDataStoreIndex.values.map((dataStore) => dataStore.sync()),
+      _fileDataStoreIndex.values.toList().map((dataStore) async {
+        if (!dataStore.isDirty) {
+          return;
+        }
+
+        if (dataStore.data.isEmpty) {
+          _fileDataStoreIndex.remove(dataStore.name);
+          return dataStore.delete();
+        }
+
+        return dataStore.write();
+      }),
     );
   }
 
@@ -302,21 +264,14 @@ class FilePersistor extends Persistor {
     for (final fileDataStore in fileDataStores) {
       _fileDataStoreIndex[fileDataStore.name] = fileDataStore;
 
-      final documentKeys = fileDataStore.data.keys.toList();
-      for (final documentKey in documentKeys) {
+      for (final dataStoreEntry in fileDataStore.data.entries) {
+        final documentKey = dataStoreEntry.key;
         final [collection, documentId] = documentKey.split(':');
 
-        if (!_documentDataStoreIndex.containsKey(collection)) {
-          _documentDataStoreIndex[collection] = {};
-        }
-        _documentDataStoreIndex[collection]![documentId] = fileDataStore;
+        _documentDataStoreIndex[documentKey] = fileDataStore;
 
-        if (!collectionStore.containsKey(collection)) {
-          collectionStore[collection] = {};
-        }
-
-        collectionStore[collection]![documentId] =
-            fileDataStore.data[documentKey]!;
+        final documentCollectionStore = collectionStore[collection] ??= {};
+        documentCollectionStore[documentId] = dataStoreEntry.value;
       }
     }
 
@@ -324,35 +279,9 @@ class FilePersistor extends Persistor {
   }
 
   @override
-  clear(String collection) async {
-    final collectionDataStoreIndex = _documentDataStoreIndex[collection];
-
-    if (collectionDataStoreIndex == null) {
-      return;
-    }
-
-    _documentDataStoreIndex.remove(collection);
-
-    // Since a custom persistence key can result in documents from the same collection
-    // being stored in difference data stores, we need to iterate through the index for the collection
-    // and remove the document from its associated data store individually.
-    for (final entry in collectionDataStoreIndex.entries) {
-      final documentId = entry.key;
-      final documentKey = "$collection:$documentId";
-      final fileDataStore = entry.value;
-
-      fileDataStore.removeDocument(documentKey);
-    }
-
-    // After removing all documents of the collection from their associated data stores,
-    // we sync the data stores, re-persisting any that have been updated and still have data
-    // and deleting any that are now empty.
-    return sync();
-  }
-
-  @override
-  clearAll() async {
+  clear() async {
     _fileDataStoreIndex.clear();
+    _documentDataStoreIndex.clear();
     await Future.wait(
       _fileDataStoreIndex.values.map((dataStore) => dataStore.delete()),
     );

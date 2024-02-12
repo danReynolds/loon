@@ -205,8 +205,6 @@ class _MyHomePageState extends State<MyHomePage> {
                                   const SizedBox(height: 8),
                                   const Text('Document count:'),
                                   const SizedBox(height: 8),
-                                  Text(fileDataStore.data.values.length
-                                      .toString()),
                                 ],
                               );
                             },
