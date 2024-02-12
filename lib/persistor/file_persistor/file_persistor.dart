@@ -96,7 +96,7 @@ class FileDataStore {
 }
 
 class FileDataStoreFactory {
-  final fileRegex = RegExp(r'^loon_(\w+)\.json$');
+  final fileRegex = RegExp(r'^(\w+)\.json$');
 
   /// The global persistor settings.
   final PersistorSettings persistorSettings;
@@ -156,6 +156,7 @@ class FilePersistor extends Persistor {
     super.persistorSettings,
     super.onPersist,
     super.onClear,
+    super.onHydrate,
   });
 
   static String getDocumentKey(Document doc) {

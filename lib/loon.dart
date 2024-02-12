@@ -116,9 +116,9 @@ class Loon {
   }
 
   /// Clears all data from the store.
-  void _clear({
+  Future<void> _clear({
     bool broadcast = true,
-  }) {
+  }) async {
     // Immediately clear any documents scheduled for broadcast, as whatever events happened prior to the clear are now irrelevant.
     _broadcastCollectionStore.clear();
     // Immediately clear all dependencies of documents, since all documents are being removed and will be broadcast if indicated.
@@ -139,7 +139,7 @@ class Loon {
     _collectionStore.clear();
 
     if (persistor != null) {
-      persistor!._clear();
+      return persistor!._clear();
     }
   }
 
@@ -524,10 +524,10 @@ class Loon {
     ).doc(id);
   }
 
-  static void clear({
+  static Future<void> clear({
     bool broadcast = true,
   }) {
-    Loon._instance._clear(broadcast: broadcast);
+    return Loon._instance._clear(broadcast: broadcast);
   }
 
   /// Enqueues a document to be rebroadcasted, updating all listeners that are subscribed to that document.

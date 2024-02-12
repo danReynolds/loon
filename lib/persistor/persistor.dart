@@ -15,6 +15,7 @@ abstract class Persistor {
   final PersistorSettings persistorSettings;
   final void Function(List<Document> batch)? onPersist;
   final void Function()? onClear;
+  final void Function(SerializedCollectionStore data)? onHydrate;
 
   final Set<Document> _batch = {};
 
@@ -24,13 +25,15 @@ abstract class Persistor {
 
   Timer? _persistTimer;
 
-  bool _isPersisting = false;
+  /// Whether the persistor is busy running an operation.
+  bool _isBusy = false;
 
   Persistor({
     this.persistorSettings = const PersistorSettings(),
     this.persistenceThrottle = const Duration(milliseconds: 100),
     this.onPersist,
     this.onClear,
+    this.onHydrate,
   }) {
     _runOperation(() {
       return init();
@@ -38,10 +41,12 @@ abstract class Persistor {
   }
 
   Future<T> _runOperation<T>(Future<T> Function() operation) async {
-    if (_operationQueue.isNotEmpty) {
+    if (_isBusy) {
       final completer = Completer();
       _operationQueue.add(completer);
       await completer.future;
+    } else {
+      _isBusy = true;
     }
 
     try {
@@ -55,6 +60,8 @@ abstract class Persistor {
       if (_operationQueue.isNotEmpty) {
         final completer = _operationQueue.removeAt(0);
         completer.complete();
+      } else {
+        _isBusy = false;
       }
     }
   }
@@ -67,17 +74,16 @@ abstract class Persistor {
   }
 
   Future<SerializedCollectionStore> _hydrate() {
-    return _runOperation(() {
-      return hydrate();
+    return _runOperation(() async {
+      final result = await hydrate();
+      onHydrate?.call(result);
+      return result;
     });
   }
 
   Future<void> _persist() async {
     try {
       _runOperation(() async {
-        _persistTimer = null;
-        _isPersisting = true;
-
         final batchDocs = _batch.toList();
 
         // The current batch is eagerly cleared so that after persistence completes, it can be re-checked to see if there
@@ -89,7 +95,7 @@ abstract class Persistor {
         onPersist?.call(batchDocs);
       });
     } finally {
-      _isPersisting = false;
+      _persistTimer = null;
 
       // If there are more documents that came in while the previous batch was being persisted, then schedule another persist.
       if (_batch.isNotEmpty) {
@@ -100,11 +106,9 @@ abstract class Persistor {
 
   /// Schedules the current batch of documents to be persisted using a timer set to the persistence throttle.
   void _schedulePersist() {
-    if (_persistTimer == null && !_isPersisting) {
-      _persistTimer = Timer(persistenceThrottle, () {
-        _persist();
-      });
-    }
+    _persistTimer ??= Timer(persistenceThrottle, () {
+      _persist();
+    });
   }
 
   void _persistDoc(Document doc) {

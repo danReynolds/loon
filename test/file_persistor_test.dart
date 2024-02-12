@@ -9,6 +9,7 @@ import 'package:path_provider_platform_interface/path_provider_platform_interfac
 // ignore: depend_on_referenced_packages
 import 'package:plugin_platform_interface/plugin_platform_interface.dart';
 
+import 'loon_test.dart';
 import 'models/test_user_model.dart';
 import 'utils.dart';
 
@@ -28,7 +29,7 @@ class MockPathProvider extends Fake
 }
 
 void main() {
-  final completer = PersistorCompleter();
+  final persistCompleter = ResetCompleter();
 
   setUp(() {
     testDirectory = Directory.systemTemp.createTempSync('test_dir');
@@ -39,10 +40,7 @@ void main() {
       persistor: FilePersistor(
         persistenceThrottle: const Duration(milliseconds: 1),
         onPersist: (_) {
-          completer.persistComplete();
-        },
-        onClear: () {
-          completer.clearComplete();
+          persistCompleter.complete();
         },
       ),
     );
@@ -50,8 +48,7 @@ void main() {
 
   tearDown(() async {
     testDirectory.deleteSync(recursive: true);
-    Loon.clear();
-    await completer.onClearComplete;
+    await Loon.clear();
   });
 
   group('persist', () {
@@ -67,7 +64,7 @@ void main() {
         userCollection.doc('1').create(TestUserModel('User 1'));
         userCollection.doc('2').create(TestUserModel('User 2'));
 
-        await completer.onPersistComplete;
+        await persistCompleter.future;
 
         final file = File('${testDirectory.path}/loon/users.json');
         final json = jsonDecode(file.readAsStringSync());
@@ -94,11 +91,11 @@ void main() {
         userCollection.doc('1').create(TestUserModel('User 1'));
         userCollection.doc('2').create(TestUserModel('User 2'));
 
-        await completer.onPersistComplete;
+        await persistCompleter.future;
 
         userCollection.doc('2').update(TestUserModel('User 2 updated'));
 
-        await completer.onPersistComplete;
+        await persistCompleter.future;
 
         final file = File('${testDirectory.path}/loon/users.json');
         final json = jsonDecode(file.readAsStringSync());
@@ -125,11 +122,11 @@ void main() {
         userCollection.doc('1').create(TestUserModel('User 1'));
         userCollection.doc('2').create(TestUserModel('User 2'));
 
-        await completer.onPersistComplete;
+        await persistCompleter.future;
 
         userCollection.doc('2').delete();
 
-        await completer.onPersistComplete;
+        await persistCompleter.future;
 
         final file = File('${testDirectory.path}/loon/users.json');
         final json = jsonDecode(file.readAsStringSync());
@@ -157,7 +154,7 @@ void main() {
 
         final file = File('${testDirectory.path}/loon/users.json');
 
-        await completer.onPersistComplete;
+        await persistCompleter.future;
 
         expect(
           file.existsSync(),
@@ -168,7 +165,7 @@ void main() {
         userCollection.doc('1').delete();
         userCollection.doc('2').delete();
 
-        await completer.onPersistComplete;
+        await persistCompleter.future;
 
         expect(
           file.existsSync(),
@@ -197,7 +194,7 @@ void main() {
         userCollection.doc('1').create(TestUserModel('User 1'));
         userCollection.doc('2').create(TestUserModel('User 2'));
 
-        await completer.onPersistComplete;
+        await persistCompleter.future;
 
         final usersFile = File('${testDirectory.path}/loon/users.json');
         final otherUsersFile =
@@ -241,11 +238,11 @@ void main() {
         userCollection.doc('1').create(TestUserModel('User 1'));
         userCollection.doc('2').create(TestUserModel('User 2'));
 
-        await completer.onPersistComplete;
+        await persistCompleter.future;
 
         userCollection.doc('2').update(TestUserModel('User 2 updated'));
 
-        await completer.onPersistComplete;
+        await persistCompleter.future;
 
         final usersFile = File('${testDirectory.path}/loon/users.json');
         final updatedUsersFile =
@@ -269,5 +266,45 @@ void main() {
         );
       },
     );
+  });
+
+  group('hydrate', () {
+    test('Hydrates data from all files into collections', () async {
+      final userCollection = Loon.collection(
+        'users',
+        fromJson: TestUserModel.fromJson,
+        toJson: (user) => user.toJson(),
+      );
+
+      final file = File('${testDirectory.path}/loon/users.json');
+      file.writeAsStringSync(
+        jsonEncode(
+          {
+            'users:1': {'name': 'User 1'},
+            'users:2': {'name': 'User 2'}
+          },
+        ),
+      );
+
+      await Loon.hydrate();
+
+      expect(
+        userCollection.get(),
+        [
+          DocumentSnapshotMatcher(
+            DocumentSnapshot(
+              doc: userCollection.doc('1'),
+              data: TestUserModel('User 1'),
+            ),
+          ),
+          DocumentSnapshotMatcher(
+            DocumentSnapshot(
+              doc: userCollection.doc('2'),
+              data: TestUserModel('User 2'),
+            ),
+          ),
+        ],
+      );
+    });
   });
 }

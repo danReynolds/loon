@@ -62,7 +62,7 @@ class EncryptedFileDataStoreFactory extends FileDataStoreFactory {
 
   @override
   // ignore: overridden_fields
-  final RegExp fileRegex = RegExp(r'^loon_(\w+)(?:\.(encrypted))?\.json$');
+  final RegExp fileRegex = RegExp(r'^(\w+)(?:\.(encrypted))?\.json$');
 
   EncryptedFileDataStoreFactory({
     required super.directory,
