@@ -90,6 +90,11 @@ abstract class Persistor {
   }
 
   void _persistDoc(Document doc) {
+    if (!doc.isPersistenceEnabled()) {
+      printDebug('Persistence not enabled for document: ${doc.id}');
+      return;
+    }
+
     if (_batch.containsKey(doc.path)) {
       return;
     }

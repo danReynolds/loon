@@ -2,6 +2,8 @@ library loon;
 
 import 'dart:async';
 
+import 'package:loon/logger.dart';
+
 export 'widgets/query_stream_builder.dart';
 export 'widgets/document_stream_builder.dart';
 
@@ -490,7 +492,7 @@ class Loon {
       }
     } catch (e) {
       // ignore: avoid_print
-      print('Loon: Error hydrating');
+      printDebug('Error hydrating');
     } finally {
       _isHydrating = false;
     }

@@ -98,12 +98,15 @@ class FileDataStore {
     try {
       await _runOperation(() async {
         final Map<String, dynamic> fileJson = jsonDecode(await readFile());
-        data = fileJson.map(
+        final hydrationData = fileJson.map(
           (key, dynamic value) => MapEntry(
             key,
             Map<String, dynamic>.from(value),
           ),
         );
+        for (final entry in hydrationData.entries) {
+          data[entry.key] = entry.value;
+        }
       });
     } catch (e) {
       // If hydration fails, then this file data store is corrupt and should be removed from the file data store index.
@@ -142,6 +145,29 @@ class FileDataStore {
 class FileDataStoreFactory {
   final fileRegex = RegExp(r'^loon_(\w+)\.json$');
 
+  /// The global persistor settings.
+  final PersistorSettings persistorSettings;
+
+  final Directory directory;
+
+  FileDataStoreFactory({
+    required this.directory,
+    required this.persistorSettings,
+  });
+
+  /// Returns the name of a file data store name for a given document and its persistor settings.
+  /// Uses the custom persistence key of the document if specified in its persistor settings,
+  /// otherwise it defaults to the document's collection name.
+  String getDocumentDataStoreName(Document doc) {
+    final documentSettings = doc.persistorSettings ?? persistorSettings;
+
+    if (documentSettings is FilePersistorSettings) {
+      return documentSettings.getPersistenceKey?.call(doc) ?? doc.collection;
+    }
+
+    return doc.collection;
+  }
+
   FileDataStore fromFile(File file) {
     final match = fileRegex.firstMatch(path.basename(file.path));
     final name = match!.group(1)!;
@@ -152,11 +178,9 @@ class FileDataStoreFactory {
     );
   }
 
-  FileDataStore fromName({
-    required Directory directory,
-    required String name,
-    required PersistorSettings settings,
-  }) {
+  FileDataStore fromDoc(Document doc) {
+    final name = getDocumentDataStoreName(doc);
+
     return FileDataStore(
       name: name,
       file: File("${directory.path}/$name.json"),
@@ -171,7 +195,7 @@ class FilePersistor extends Persistor {
   /// An index of file data stores by collection and document ID.
   final Map<String, Map<String, FileDataStore>> _documentDataStoreIndex = {};
 
-  late final Directory _fileDataStoreDirectory;
+  late final Directory fileDataStoreDirectory;
 
   late final FileDataStoreFactory factory;
 
@@ -191,12 +215,12 @@ class FilePersistor extends Persistor {
 
   Future<void> initStorageDirectory() async {
     final applicationDirectory = await getApplicationDocumentsDirectory();
-    _fileDataStoreDirectory = Directory('${applicationDirectory.path}/loon');
-    await _fileDataStoreDirectory.create();
+    fileDataStoreDirectory = Directory('${applicationDirectory.path}/loon');
+    await fileDataStoreDirectory.create();
   }
 
   List<File> _getDataStoreFiles() {
-    return _fileDataStoreDirectory
+    return fileDataStoreDirectory
         .listSync()
         .whereType<File>()
         .where((file) => factory.fileRegex.hasMatch(path.basename(file.path)))
@@ -205,8 +229,11 @@ class FilePersistor extends Persistor {
 
   @override
   init() async {
-    factory = FileDataStoreFactory();
     await initStorageDirectory();
+    factory = FileDataStoreFactory(
+      directory: fileDataStoreDirectory,
+      persistorSettings: persistorSettings,
+    );
   }
 
   @override
@@ -215,32 +242,9 @@ class FilePersistor extends Persistor {
       final documentId = doc.id;
       final collection = doc.collection;
       final documentKey = getDocumentKey(doc);
-
-      final persistorSettings = doc.persistorSettings ?? this.persistorSettings;
-      if (!persistorSettings.persistenceEnabled) {
-        continue;
-      }
-
-      final FileDataStore documentDataStore;
-      final String documentDataStoreName;
-
-      if (persistorSettings is FilePersistorSettings) {
-        documentDataStoreName =
-            persistorSettings.getPersistenceKey?.call(doc) ?? doc.collection;
-      } else {
-        documentDataStoreName = doc.collection;
-      }
-
-      if (_fileDataStoreIndex.containsKey(documentDataStoreName)) {
-        documentDataStore = _fileDataStoreIndex[documentDataStoreName]!;
-      } else {
-        documentDataStore =
-            _fileDataStoreIndex[documentDataStoreName] = factory.fromName(
-          name: documentDataStoreName,
-          directory: _fileDataStoreDirectory,
-          settings: persistorSettings,
-        );
-      }
+      final documentDataStoreName = factory.getDocumentDataStoreName(doc);
+      final documentDataStore =
+          _fileDataStoreIndex[documentDataStoreName] ??= factory.fromDoc(doc);
 
       // If the document has changed the file data store it should be stored in, then it should
       // be removed from its previous file data store (if one exists) and placed in the new one.
@@ -283,6 +287,7 @@ class FilePersistor extends Persistor {
           await dataStore.hydrate();
           return dataStore;
         } catch (e) {
+          printDebug('Error hydrating: ${dataStore.name}');
           return null;
         }
       }),
@@ -290,10 +295,13 @@ class FilePersistor extends Persistor {
     final fileDataStores = hydratedDataStores.whereType<FileDataStore>();
 
     // On hydration, the following tasks must be performed for each file data store:
-    // 1. Each of the data store's documents should be indexed into the document data store index by its document
+    // 1. The data store should be added to the data store index.
+    // 2. Each of the data store's documents should be indexed into the document data store index by its document
     //    index ID.
-    // 2. Each of the data store's documents should be grouped into the collection data store by collection.
+    // 3. Each of the data store's documents should be grouped into the collection data store by collection.
     for (final fileDataStore in fileDataStores) {
+      _fileDataStoreIndex[fileDataStore.name] = fileDataStore;
+
       final documentKeys = fileDataStore.data.keys.toList();
       for (final documentKey in documentKeys) {
         final [collection, documentId] = documentKey.split(':');

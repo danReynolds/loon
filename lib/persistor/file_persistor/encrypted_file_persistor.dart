@@ -66,8 +66,21 @@ class EncryptedFileDataStoreFactory extends FileDataStoreFactory {
   final RegExp fileRegex = RegExp(r'^loon_(\w+)(?:\.(encrypted))?\.json$');
 
   EncryptedFileDataStoreFactory({
+    required super.directory,
+    required super.persistorSettings,
     required this.encrypter,
   });
+
+  @override
+  getDocumentDataStoreName(doc) {
+    final documentDataStoreName = super.getDocumentDataStoreName(doc);
+
+    if (doc.isPersistenceEnabled()) {
+      return "$documentDataStoreName.encrypted";
+    }
+
+    return documentDataStoreName;
+  }
 
   @override
   EncryptedFileDataStore fromFile(File file) {
@@ -84,21 +97,14 @@ class EncryptedFileDataStoreFactory extends FileDataStoreFactory {
   }
 
   @override
-  EncryptedFileDataStore fromName({
-    required Directory directory,
-    required String name,
-    required PersistorSettings settings,
-  }) {
-    final encryptionEnabled = settings is EncryptedFilePersistorSettings &&
-        settings.encryptionEnabled;
+  EncryptedFileDataStore fromDoc(doc) {
+    final name = getDocumentDataStoreName(doc);
 
     return EncryptedFileDataStore(
-      file: File(
-        "${directory.path}/$name${encryptionEnabled ? '.encrypted' : ''}.json",
-      ),
+      file: File("${directory.path}/$name.json"),
       name: name,
       encrypter: encrypter,
-      encryptionEnabled: encryptionEnabled,
+      encryptionEnabled: doc.isPersistenceEnabled(),
     );
   }
 }
@@ -132,6 +138,10 @@ class EncryptedFilePersistor extends FilePersistor {
       initStorageDirectory(),
     ]);
 
-    factory = EncryptedFileDataStoreFactory(encrypter: _encrypter);
+    factory = EncryptedFileDataStoreFactory(
+      encrypter: _encrypter,
+      directory: fileDataStoreDirectory,
+      persistorSettings: persistorSettings,
+    );
   }
 }

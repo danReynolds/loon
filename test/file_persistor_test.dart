@@ -52,6 +52,7 @@ void main() {
 
   tearDown(() {
     testDirectory.deleteSync(recursive: true);
+    Loon.clearAll();
   });
 
   group('persist', () {
