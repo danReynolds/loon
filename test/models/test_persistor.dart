@@ -1,13 +1,17 @@
+import 'dart:async';
+
 import 'package:loon/loon.dart';
 import 'test_user_model.dart';
 
+/// A dummy persistor used in the test environment that doesn't actually engage with any persistence storage
+/// mechanism (file system, etc) and is just used to test the base [Persistor] batching and de-duping.
 class TestPersistor extends Persistor {
   final List<DocumentSnapshot<TestUserModel>> seedData;
 
   TestPersistor({
     super.persistenceThrottle,
-    required this.seedData,
     super.onPersist,
+    required this.seedData,
   });
 
   @override
@@ -23,9 +27,7 @@ class TestPersistor extends Persistor {
   }
 
   @override
-  persist(docs) async {
-    onPersist?.call(docs);
-  }
+  persist(docs) async {}
 
   @override
   clear(collection) async {}

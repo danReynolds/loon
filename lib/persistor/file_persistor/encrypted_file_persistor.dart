@@ -2,7 +2,6 @@ import 'dart:io';
 
 import 'package:encrypt/encrypt.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-import 'package:loon/loon.dart';
 import 'package:loon/persistor/file_persistor/file_persistor.dart';
 import 'package:path/path.dart' as path;
 

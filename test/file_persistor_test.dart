@@ -11,6 +11,7 @@ import 'package:path_provider_platform_interface/path_provider_platform_interfac
 import 'package:plugin_platform_interface/plugin_platform_interface.dart';
 
 import 'models/test_user_model.dart';
+import 'utils.dart';
 
 late Directory testDirectory;
 Completer onPersistCompleter = Completer();
@@ -28,17 +29,14 @@ class MockPathProvider extends Fake
   }
 }
 
-Future<void> onPersist() async {
-  await onPersistCompleter.future;
-  onPersistCompleter = Completer();
-}
-
 void main() {
+  ResetCompleter onPersistCompleter = ResetCompleter<void>();
+
   setUp(() {
     testDirectory = Directory.systemTemp.createTempSync('test_dir');
     final mockPathProvider = MockPathProvider();
     PathProviderPlatform.instance = mockPathProvider;
-    onPersistCompleter = Completer();
+    onPersistCompleter = ResetCompleter<void>();
 
     Loon.configure(
       persistor: FilePersistor(
@@ -68,7 +66,7 @@ void main() {
         userCollection.doc('1').create(TestUserModel('User 1'));
         userCollection.doc('2').create(TestUserModel('User 2'));
 
-        await onPersist();
+        await onPersistCompleter.future;
 
         final file = File('${testDirectory.path}/loon/users.json');
         final json = jsonDecode(file.readAsStringSync());
@@ -95,11 +93,11 @@ void main() {
         userCollection.doc('1').create(TestUserModel('User 1'));
         userCollection.doc('2').create(TestUserModel('User 2'));
 
-        await onPersist();
+        await onPersistCompleter.future;
 
         userCollection.doc('2').update(TestUserModel('User 2 updated'));
 
-        await onPersist();
+        await onPersistCompleter.future;
 
         final file = File('${testDirectory.path}/loon/users.json');
         final json = jsonDecode(file.readAsStringSync());
@@ -126,11 +124,11 @@ void main() {
         userCollection.doc('1').create(TestUserModel('User 1'));
         userCollection.doc('2').create(TestUserModel('User 2'));
 
-        await onPersist();
+        await onPersistCompleter.future;
 
         userCollection.doc('2').delete();
 
-        await onPersist();
+        await onPersistCompleter.future;
 
         final file = File('${testDirectory.path}/loon/users.json');
         final json = jsonDecode(file.readAsStringSync());
@@ -158,7 +156,7 @@ void main() {
 
         final file = File('${testDirectory.path}/loon/users.json');
 
-        await onPersist();
+        await onPersistCompleter.future;
 
         expect(
           file.existsSync(),
@@ -169,7 +167,7 @@ void main() {
         userCollection.doc('1').delete();
         userCollection.doc('2').delete();
 
-        await onPersist();
+        await onPersistCompleter.future;
 
         expect(
           file.existsSync(),
@@ -198,7 +196,7 @@ void main() {
         userCollection.doc('1').create(TestUserModel('User 1'));
         userCollection.doc('2').create(TestUserModel('User 2'));
 
-        await onPersist();
+        await onPersistCompleter.future;
 
         final usersFile = File('${testDirectory.path}/loon/users.json');
         final otherUsersFile =
@@ -242,11 +240,11 @@ void main() {
         userCollection.doc('1').create(TestUserModel('User 1'));
         userCollection.doc('2').create(TestUserModel('User 2'));
 
-        await onPersist();
+        await onPersistCompleter.future;
 
         userCollection.doc('2').update(TestUserModel('User 2 updated'));
 
-        await onPersist();
+        await onPersistCompleter.future;
 
         final usersFile = File('${testDirectory.path}/loon/users.json');
         final updatedUsersFile =

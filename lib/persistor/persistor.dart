@@ -15,7 +15,7 @@ abstract class Persistor {
   final PersistorSettings persistorSettings;
   final void Function(List<Document> batch)? onPersist;
 
-  final Map<String, Document> _batch = {};
+  final Set<Document> _batch = {};
 
   Timer? _persistTimer;
 
@@ -59,7 +59,7 @@ abstract class Persistor {
     _isPersisting = true;
 
     try {
-      final batchDocs = _batch.values.toList();
+      final batchDocs = _batch.toList();
 
       // The current batch is eagerly cleared so that after persistence completes, it can be re-checked to see if there
       // are more documents to persist and schedule another run.
@@ -95,11 +95,11 @@ abstract class Persistor {
       return;
     }
 
-    if (_batch.containsKey(doc.path)) {
+    if (_batch.contains(doc)) {
       return;
     }
 
-    _batch[doc.path] = doc;
+    _batch.add(doc);
     _schedulePersist();
   }
 
