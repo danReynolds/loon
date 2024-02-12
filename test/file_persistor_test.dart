@@ -306,5 +306,46 @@ void main() {
         ],
       );
     });
+
+    test('Merges existing collections', () async {
+      final userCollection = Loon.collection(
+        'users',
+        fromJson: TestUserModel.fromJson,
+        toJson: (user) => user.toJson(),
+      );
+
+      userCollection.doc('1').create(TestUserModel('User 1'));
+
+      await persistCompleter.future;
+
+      final file = File('${testDirectory.path}/loon/users.json');
+      file.writeAsStringSync(
+        jsonEncode(
+          {
+            'users:2': {'name': 'User 2'}
+          },
+        ),
+      );
+
+      await Loon.hydrate();
+
+      expect(
+        userCollection.get(),
+        [
+          DocumentSnapshotMatcher(
+            DocumentSnapshot(
+              doc: userCollection.doc('1'),
+              data: TestUserModel('User 1'),
+            ),
+          ),
+          DocumentSnapshotMatcher(
+            DocumentSnapshot(
+              doc: userCollection.doc('2'),
+              data: TestUserModel('User 2'),
+            ),
+          ),
+        ],
+      );
+    });
   });
 }
