@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:loon/loon.dart';
 import 'package:loon/persistor/file_persistor/file_persistor.dart';
+import 'package:loon/utils.dart';
 
 // ignore: depend_on_referenced_packages
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
@@ -10,7 +11,9 @@ import 'package:path_provider_platform_interface/path_provider_platform_interfac
 import 'package:plugin_platform_interface/plugin_platform_interface.dart';
 
 import 'loon_test.dart';
+import 'models/test_large_model.dart';
 import 'models/test_user_model.dart';
+import 'samples/generate_large_model_sample.dart';
 import 'utils.dart';
 
 late Directory testDirectory;
@@ -269,7 +272,7 @@ void main() {
   });
 
   group('hydrate', () {
-    test('Hydrates data from all files into collections', () async {
+    test('Hydrates data from persistence files into collections', () async {
       final userCollection = Loon.collection(
         'users',
         fromJson: TestUserModel.fromJson,
@@ -277,6 +280,7 @@ void main() {
       );
 
       final file = File('${testDirectory.path}/loon/users.json');
+      Directory('${testDirectory.path}/loon').createSync();
       file.writeAsStringSync(
         jsonEncode(
           {
@@ -345,6 +349,40 @@ void main() {
             ),
           ),
         ],
+      );
+    });
+
+    test('Hydrates large persistence files', () async {
+      int size = 20000;
+
+      List<TestLargeModel> models =
+          List.generate(size, (_) => generateRandomModel());
+
+      final collectionJson = models.fold({}, (acc, model) {
+        acc['users:${model.id}'] = model.toJson();
+        return acc;
+      });
+      final file = File('${testDirectory.path}/loon/users.json');
+      file.writeAsStringSync(jsonEncode(collectionJson));
+
+      await Loon.hydrate();
+
+      final largeModelCollection = Loon.collection(
+        'users',
+        fromJson: TestLargeModel.fromJson,
+        toJson: (user) => user.toJson(),
+      );
+
+      final collectionSize = await measureDuration(
+        'Initial collection query',
+        () async {
+          return largeModelCollection.get().length;
+        },
+      );
+
+      expect(
+        collectionSize,
+        size,
       );
     });
   });

@@ -10,6 +10,9 @@ class PersistorSettings<T> {
   });
 }
 
+/// Abstract persistor that implements the base persistence batching, de-duping and locking of
+/// persistence operations and exposes the public persistence APIs for persistence implementations to implement.
+/// See [FilePersistor] as an example implementation.
 abstract class Persistor {
   final Duration persistenceThrottle;
   final PersistorSettings persistorSettings;

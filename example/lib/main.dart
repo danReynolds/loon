@@ -4,7 +4,6 @@ import 'package:example/models/user.dart';
 import 'package:flutter/material.dart';
 import 'package:loon/loon.dart';
 import 'package:loon/persistor/file_persistor/debug_file_persistor.dart';
-import 'package:loon/persistor/file_persistor/file_persistor.dart';
 import 'package:uuid/uuid.dart';
 
 const uuid = Uuid();
@@ -179,40 +178,40 @@ class _MyHomePageState extends State<MyHomePage> {
                       ],
                     ),
                   ),
-                  Flexible(
-                    flex: 2,
-                    child: Container(
-                      padding: const EdgeInsets.only(top: 16),
-                      child: StreamBuilder<List<FileDataStore>>(
-                        stream: _persistor.stream,
-                        builder: (context, snap) {
-                          if (!snap.hasData) {
-                            return const CircularProgressIndicator();
-                          }
-                          final fileDataStores = snap.requireData;
+                  // Flexible(
+                  //   flex: 2,
+                  //   child: Container(
+                  //     padding: const EdgeInsets.only(top: 16),
+                  //     child: StreamBuilder<List<FileDataStore>>(
+                  //       stream: _persistor.stream,
+                  //       builder: (context, snap) {
+                  //         if (!snap.hasData) {
+                  //           return const CircularProgressIndicator();
+                  //         }
+                  //         final fileDataStores = snap.requireData;
 
-                          return ListView.builder(
-                            itemCount: fileDataStores.length,
-                            itemBuilder: (context, index) {
-                              final fileDataStore = fileDataStores[index];
+                  //         return ListView.builder(
+                  //           itemCount: fileDataStores.length,
+                  //           itemBuilder: (context, index) {
+                  //             final fileDataStore = fileDataStores[index];
 
-                              return Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  const Text('File:'),
-                                  const SizedBox(height: 8),
-                                  Text(fileDataStore.name),
-                                  const SizedBox(height: 8),
-                                  const Text('Document count:'),
-                                  const SizedBox(height: 8),
-                                ],
-                              );
-                            },
-                          );
-                        },
-                      ),
-                    ),
-                  ),
+                  //             return Column(
+                  //               crossAxisAlignment: CrossAxisAlignment.start,
+                  //               children: [
+                  //                 const Text('File:'),
+                  //                 const SizedBox(height: 8),
+                  //                 Text(fileDataStore.name),
+                  //                 const SizedBox(height: 8),
+                  //                 const Text('Document count:'),
+                  //                 const SizedBox(height: 8),
+                  //               ],
+                  //             );
+                  //           },
+                  //         );
+                  //       },
+                  //     ),
+                  //   ),
+                  // ),
                 ],
               ),
             ),

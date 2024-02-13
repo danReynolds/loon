@@ -8,6 +8,7 @@ environment:
   flutter: ">=1.17.0"
 
 dependencies:
+  uuid: ^3.0.7
   encrypt: ^5.0.1
   flutter:
     sdk: flutter
