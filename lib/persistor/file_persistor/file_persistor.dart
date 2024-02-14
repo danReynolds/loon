@@ -2,8 +2,8 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:isolate';
 import 'package:loon/loon.dart';
-import 'package:loon/persistor/file_persistor/file_persistor_task.dart';
 import 'package:loon/persistor/file_persistor/file_persistor_worker.dart';
+import 'package:loon/persistor/file_persistor/messages.dart';
 import 'package:path_provider/path_provider.dart';
 
 class FilePersistorSettings<T> extends PersistorSettings<T> {
@@ -23,14 +23,14 @@ class FilePersistorSettings<T> extends PersistorSettings<T> {
 class FilePersistor extends Persistor {
   late final Isolate _isolate;
 
-  /// The task runner's receive port
+  /// This persistor's receive port
   late final ReceivePort receivePort;
 
   /// The worker's send port
   late final SendPort sendPort;
 
   /// An index of task IDs to the task completer that is resolved when they are completed on the worker.
-  final Map<String, Completer> _taskIndex = {};
+  final Map<String, Completer> _messageRequestIndex = {};
 
   FilePersistor({
     super.persistenceThrottle = const Duration(milliseconds: 100),
@@ -48,14 +48,14 @@ class FilePersistor extends Persistor {
 
   void _onMessage(dynamic message) {
     switch (message) {
-      case TaskResponse taskResponse:
-        _taskIndex[taskResponse.id]!.complete(taskResponse);
+      case MessageResponse messageResponse:
+        _messageRequestIndex[messageResponse.id]!.complete(messageResponse);
     }
   }
 
-  Future<T> _sendTaskRequest<T extends TaskResponse>(TaskRequest<T> task) {
-    final completer = _taskIndex[task.id] = Completer<T>();
-    sendPort.send(task);
+  Future<T> _sendMessage<T extends MessageResponse>(MessageRequest<T> message) {
+    final completer = _messageRequestIndex[message.id] = Completer<T>();
+    sendPort.send(message);
     return completer.future;
   }
 
@@ -67,17 +67,21 @@ class FilePersistor extends Persistor {
     receivePort = ReceivePort();
     receivePort.listen(_onMessage);
 
-    final initTaskRequest = InitTaskRequest(
-      persistorSettings: persistorSettings,
+    // The initial message request to the worker contains three necessary values:
+    // 1. The persistor's send port that will allow for message passing from the worker.
+    // 2. The persistor settings that the worker uses to manage file data stores.
+    // 3. The directory in which to store files. This is created on the main isolate since it uses
+    //    APIs like `getApplicationDocumentsDirectory` that are not easily available on an isolate.
+    final initMessage = InitMessageRequest(
       sendPort: receivePort.sendPort,
+      persistorSettings: persistorSettings,
       directory: directory,
     );
 
     final completer =
-        _taskIndex[initTaskRequest.id] = Completer<InitTaskResponse>();
+        _messageRequestIndex[initMessage.id] = Completer<InitMessageResponse>();
 
-    // Spawn the worker isolate, providing the main isolate's send port for 2-way communication.
-    _isolate = await Isolate.spawn(FilePersistorWorker.init, initTaskRequest);
+    _isolate = await Isolate.spawn(FilePersistorWorker.init, initMessage);
 
     final response = await completer.future;
     sendPort = response.sendPort;
@@ -85,7 +89,7 @@ class FilePersistor extends Persistor {
 
   @override
   Future<SerializedCollectionStore> hydrate() async {
-    final response = await _sendTaskRequest(HydrateTaskRequest());
+    final response = await _sendMessage(HydrateMessageRequest());
     return response.data;
   }
 
@@ -98,11 +102,11 @@ class FilePersistor extends Persistor {
         return acc;
       },
     );
-    await _sendTaskRequest(PersistTaskRequest(data: json));
+    await _sendMessage(PersistMessageRequest(data: json));
   }
 
   @override
   Future<void> clear() async {
-    await _sendTaskRequest(ClearTaskRequest());
+    await _sendMessage(ClearMessageRequest());
   }
 }

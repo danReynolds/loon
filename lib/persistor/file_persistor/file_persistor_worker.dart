@@ -4,23 +4,23 @@ import 'dart:isolate';
 import 'package:loon/logger.dart';
 import 'package:loon/loon.dart';
 import 'package:loon/persistor/file_persistor/file_data_store.dart';
-import 'package:loon/persistor/file_persistor/file_persistor_task.dart';
+import 'package:loon/persistor/file_persistor/messages.dart';
 import 'package:path/path.dart' as path;
 
 class FilePersistorWorker {
   final PersistorSettings persistorSettings;
 
-  /// The task runner's send port
+  /// The persistor's send port
   final SendPort sendPort;
 
-  /// The worker's receive port
+  /// This worker's receive port
   final receivePort = ReceivePort();
 
   /// An index of file data stores by name.
   final Map<String, FileDataStore> _fileDataStoreIndex = {};
   final Map<String, FileDataStore> _documentDataStoreIndex = {};
 
-  late final Directory _fileDirectory;
+  late final Directory _directory;
   late final FileDataStoreFactory factory;
 
   FilePersistorWorker._({
@@ -28,43 +28,38 @@ class FilePersistorWorker {
     required this.persistorSettings,
   });
 
-  static late final FilePersistorWorker instance;
-
-  static init(InitTaskRequest request) {
-    instance = FilePersistorWorker._(
+  static init(InitMessageRequest request) {
+    FilePersistorWorker._(
       sendPort: request.sendPort,
       persistorSettings: request.persistorSettings,
-    );
-    instance.onMessage(request);
-
-    instance.receivePort.listen(instance.onMessage);
+    ).onMessage(request);
   }
 
-  _sendTaskResponse(TaskResponse response) {
+  _sendMessageResponse(MessageResponse response) {
     sendPort.send(response);
   }
 
   void onMessage(dynamic message) {
     switch (message) {
-      case InitTaskRequest request:
+      case InitMessageRequest request:
         _init(request);
-      case HydrateTaskRequest request:
+      case HydrateMessageRequest request:
         _hydrate(request);
-      case PersistTaskRequest request:
+      case PersistMessageRequest request:
         _persist(request);
-      case ClearTaskRequest request:
+      case ClearMessageRequest request:
         _clear(request);
       default:
         break;
     }
   }
 
-  static String getDocumentKey(Document doc) {
+  static String _getDocumentKey(Document doc) {
     return '${doc.collection}:${doc.id}';
   }
 
   List<File> _getDataStoreFiles() {
-    return _fileDirectory
+    return _directory
         .listSync()
         .whereType<File>()
         .where((file) => factory.fileRegex.hasMatch(path.basename(file.path)))
@@ -90,23 +85,26 @@ class FilePersistorWorker {
   }
 
   ///
-  /// Task request handlers
+  /// Message request handlers
   ///
 
-  Future<void> _init(InitTaskRequest request) async {
-    _fileDirectory = request.directory;
+  Future<void> _init(InitMessageRequest request) async {
+    _directory = request.directory;
 
     factory = FileDataStoreFactory(
-      directory: _fileDirectory,
+      directory: _directory,
       persistorSettings: persistorSettings,
     );
 
-    _sendTaskResponse(
-      InitTaskResponse(id: request.id, sendPort: receivePort.sendPort),
+    // Start listening to messages from the persistor on the worker's receive port.
+    receivePort.listen(onMessage);
+
+    _sendMessageResponse(
+      InitMessageResponse(id: request.id, sendPort: receivePort.sendPort),
     );
   }
 
-  _hydrate(HydrateTaskRequest request) async {
+  _hydrate(HydrateMessageRequest request) async {
     final SerializedCollectionStore collectionStore = {};
 
     final files = _getDataStoreFiles();
@@ -126,7 +124,7 @@ class FilePersistorWorker {
     );
     final fileDataStores = hydratedDataStores.whereType<FileDataStore>();
 
-    // On hydration, the following tasks must be performed for each file data store:
+    // On hydration, the following Messages must be performed for each file data store:
     // 1. The data store should be added to the data store index.
     // 2. Each of the data store's documents should be indexed into the document data store index by its document
     //    index ID.
@@ -145,19 +143,16 @@ class FilePersistorWorker {
       }
     }
 
-    _sendTaskResponse(
-      HydrateTaskResponse(
-        id: request.id,
-        data: collectionStore,
-      ),
+    _sendMessageResponse(
+      HydrateMessageResponse(id: request.id, data: collectionStore),
     );
   }
 
-  Future<void> _persist(PersistTaskRequest request) async {
+  Future<void> _persist(PersistMessageRequest request) async {
     for (final entry in request.data.entries) {
       final doc = entry.key;
       final json = entry.value;
-      final documentKey = getDocumentKey(doc);
+      final documentKey = _getDocumentKey(doc);
       final documentDataStoreName = factory.getDocumentDataStoreName(doc);
       final documentDataStore =
           _fileDataStoreIndex[documentDataStoreName] ??= factory.fromDoc(doc);
@@ -181,18 +176,16 @@ class FilePersistorWorker {
 
     await _sync();
 
-    _sendTaskResponse(
-      PersistTaskResponse(id: request.id),
-    );
+    _sendMessageResponse(PersistMessageResponse(id: request.id));
   }
 
-  _clear(ClearTaskRequest request) async {
+  _clear(ClearMessageRequest request) async {
     _fileDataStoreIndex.clear();
     _documentDataStoreIndex.clear();
     await Future.wait(
       _fileDataStoreIndex.values.map((dataStore) => dataStore.delete()),
     );
 
-    _sendTaskResponse(ClearTaskResponse(id: request.id));
+    _sendMessageResponse(ClearMessageResponse(id: request.id));
   }
 }
