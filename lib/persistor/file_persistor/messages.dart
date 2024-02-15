@@ -11,6 +11,10 @@ abstract class MessageRequest<T extends MessageResponse> {
   final id = uuid.v4();
 
   MessageRequest();
+
+  ErrorMessageResponse error(String text) {
+    return ErrorMessageResponse(id: id, text: text);
+  }
 }
 
 abstract class MessageResponse {
@@ -31,6 +35,10 @@ class InitMessageRequest extends MessageRequest<InitMessageResponse> {
     required this.directory,
     required this.encrypter,
   });
+
+  InitMessageResponse success(SendPort sendPort) {
+    return InitMessageResponse(id: id, sendPort: sendPort);
+  }
 }
 
 class InitMessageResponse extends MessageResponse {
@@ -42,10 +50,17 @@ class InitMessageResponse extends MessageResponse {
   });
 }
 
-class HydrateMessageRequest extends MessageRequest<HydrateMessageResponse> {}
+class HydrateMessageRequest extends MessageRequest<HydrateMessageResponse> {
+  HydrateMessageResponse success(SerializedCollectionStore data) {
+    return HydrateMessageResponse(
+      id: id,
+      data: data,
+    );
+  }
+}
 
 class HydrateMessageResponse extends MessageResponse {
-  final Map<String, Map<String, Json>> data;
+  final SerializedCollectionStore data;
 
   HydrateMessageResponse({
     required super.id,
@@ -59,6 +74,10 @@ class PersistMessageRequest extends MessageRequest<PersistMessageResponse> {
   PersistMessageRequest({
     required this.data,
   });
+
+  PersistMessageResponse success() {
+    return PersistMessageResponse(id: id);
+  }
 }
 
 class PersistMessageResponse extends MessageResponse {
@@ -67,10 +86,31 @@ class PersistMessageResponse extends MessageResponse {
   });
 }
 
-class ClearMessageRequest extends MessageRequest<ClearMessageResponse> {}
+class ClearMessageRequest extends MessageRequest<ClearMessageResponse> {
+  ClearMessageResponse success() {
+    return ClearMessageResponse(id: id);
+  }
+}
 
 class ClearMessageResponse extends MessageResponse {
   ClearMessageResponse({
     required super.id,
   });
+}
+
+class ErrorMessageResponse extends MessageResponse {
+  final String text;
+
+  ErrorMessageResponse({
+    required super.id,
+    required this.text,
+  });
+}
+
+class DebugMessageResponse extends MessageResponse {
+  final String text;
+
+  DebugMessageResponse({
+    required this.text,
+  }) : super(id: '');
 }

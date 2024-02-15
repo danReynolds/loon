@@ -1,4 +1,5 @@
 import 'package:loon/loon.dart';
+import 'package:loon/persistor/file_persistor/file_persist_document.dart';
 import 'package:loon/persistor/file_persistor/file_persistor.dart';
 
 extension DocumentExtensions<T> on Document<T> {
@@ -27,5 +28,14 @@ extension DocumentExtensions<T> on Document<T> {
   bool isEncryptionEnabled() {
     return persistorSettings is EncryptedFilePersistorSettings &&
         (persistorSettings as EncryptedFilePersistorSettings).encryptionEnabled;
+  }
+
+  FilePersistDocument toPersistenceDoc() {
+    return FilePersistDocument(
+      key: key,
+      encryptionEnabled: isEncryptionEnabled(),
+      dataStoreName: getDatastoreName(),
+      data: getJson(),
+    );
   }
 }

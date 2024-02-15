@@ -6,9 +6,9 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:loon/logger.dart';
 import 'package:loon/loon.dart';
 import 'package:loon/persistor/file_persistor/extensions/document.dart';
-import 'package:loon/persistor/file_persistor/file_persist_document.dart';
 import 'package:loon/persistor/file_persistor/file_persistor_worker.dart';
 import 'package:loon/persistor/file_persistor/messages.dart';
+import 'package:loon/utils.dart';
 import 'package:path_provider/path_provider.dart';
 
 class FilePersistorSettings extends PersistorSettings {
@@ -61,8 +61,24 @@ class FilePersistor extends Persistor {
 
   void _onMessage(dynamic message) {
     switch (message) {
+      case DebugMessageResponse messageResponse:
+        printDebug(messageResponse.text, label: 'Loon worker');
+        break;
       case MessageResponse messageResponse:
-        _messageRequestIndex[messageResponse.id]!.complete(messageResponse);
+        final request = _messageRequestIndex[messageResponse.id];
+
+        // In the case of receiving an error message from the worker, print the error
+        // text message on the main isolate and complete any associated request completer like a failed
+        // persist operation.
+        if (messageResponse is ErrorMessageResponse) {
+          printDebug(messageResponse.text, label: 'Loon worker');
+          if (request != null) {
+            request.completeError(Exception(messageResponse.text));
+          }
+        } else if (request != null) {
+          request.complete(messageResponse);
+        }
+        break;
     }
   }
 
@@ -130,7 +146,13 @@ class FilePersistor extends Persistor {
         _messageRequestIndex[initMessage.id] = Completer<InitMessageResponse>();
 
     try {
-      _isolate = await Isolate.spawn(FilePersistorWorker.init, initMessage);
+      _isolate = await measureDuration('Worker spawn', () async {
+        return Isolate.spawn(
+          FilePersistorWorker.init,
+          initMessage,
+          debugName: 'Loon worker',
+        );
+      });
 
       final response = await completer.future;
       sendPort = response.sendPort;
@@ -150,17 +172,7 @@ class FilePersistor extends Persistor {
   @override
   Future<void> persist(List<Document> docs) async {
     // Marshall file persist documents to be sent to and persisted by the worker isolate.
-    final data = docs
-        .map(
-          (doc) => FilePersistDocument(
-            key: doc.key,
-            encryptionEnabled: doc.isEncryptionEnabled(),
-            dataStoreName: doc.getDatastoreName(),
-            data: doc.getJson(),
-          ),
-        )
-        .toList();
-
+    final data = docs.map((doc) => doc.toPersistenceDoc()).toList();
     await _sendMessage(PersistMessageRequest(data: data));
   }
 

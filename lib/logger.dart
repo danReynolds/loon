@@ -1,7 +1,10 @@
 import 'package:flutter/foundation.dart';
 
-void printDebug(String message) {
+void printDebug(
+  String message, {
+  String? label = 'Loon',
+}) {
   if (kDebugMode) {
-    print('Loon: $message');
+    print('$label: $message');
   }
 }
