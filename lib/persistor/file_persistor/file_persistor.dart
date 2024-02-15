@@ -17,7 +17,7 @@ class FilePersistorSettings extends PersistorSettings {
   /// the persistenc key can be used to group arbitrary documents together into the same persistence file.
   final String? Function(Document doc)? getPersistenceKey;
 
-  FilePersistorSettings({
+  const FilePersistorSettings({
     this.getPersistenceKey,
     super.persistenceEnabled = true,
   });
@@ -50,7 +50,7 @@ class FilePersistor extends Persistor {
 
   FilePersistor({
     super.persistenceThrottle = const Duration(milliseconds: 100),
-    super.persistorSettings,
+    super.persistorSettings = const FilePersistorSettings(),
     super.onPersist,
     super.onClear,
     super.onHydrate,

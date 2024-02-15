@@ -3,17 +3,15 @@ import 'dart:async';
 import 'package:example/models/user.dart';
 import 'package:flutter/material.dart';
 import 'package:loon/loon.dart';
-import 'package:loon/persistor/file_persistor/debug_file_persistor.dart';
+import 'package:loon/persistor/file_persistor/file_data_store.dart';
 import 'package:uuid/uuid.dart';
 
 const uuid = Uuid();
 
-final _persistor = DebugFilePersistor();
-
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  Loon.configure(persistor: _persistor);
+  Loon.configure(persistor: FilePersistor());
 
   await Loon.hydrate();
 
@@ -118,100 +116,57 @@ class _MyHomePageState extends State<MyHomePage> {
               ),
             ),
             Expanded(
-              child: Row(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Flexible(
-                    flex: 8,
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          'Users',
-                          style: Theme.of(context).textTheme.headlineSmall,
-                        ),
-                        const Padding(padding: EdgeInsets.only(top: 16)),
-                        QueryStreamBuilder<UserModel>(
-                          query: UserModel.store.where(
-                            (userSnap) =>
-                                userSnap.data.name.startsWith(_controller.text),
-                          ),
-                          builder: (context, usersSnap) {
-                            return ListView.builder(
-                              shrinkWrap: true,
-                              itemCount: usersSnap.length,
-                              itemBuilder: (context, index) {
-                                final userSnap = usersSnap[index];
-                                final user = userSnap.data;
-
-                                return Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Text(user.name),
-                                    TextButton(
-                                      onPressed: () {
-                                        _showEditDialog(userSnap.doc);
-                                      },
-                                      child: const Text('Edit'),
-                                    ),
-                                    TextButton(
-                                      onPressed: () {
-                                        UserModel.store
-                                            .doc(userSnap.id)
-                                            .delete();
-                                      },
-                                      child: Text(
-                                        'Remove',
-                                        style: Theme.of(context)
-                                            .textTheme
-                                            .bodyMedium!
-                                            .copyWith(
-                                              color: Colors.red,
-                                            ),
-                                      ),
-                                    ),
-                                  ],
-                                );
-                              },
-                            );
-                          },
-                        ),
-                      ],
-                    ),
+                  Text(
+                    'Users',
+                    style: Theme.of(context).textTheme.headlineSmall,
                   ),
-                  // Flexible(
-                  //   flex: 2,
-                  //   child: Container(
-                  //     padding: const EdgeInsets.only(top: 16),
-                  //     child: StreamBuilder<List<FileDataStore>>(
-                  //       stream: _persistor.stream,
-                  //       builder: (context, snap) {
-                  //         if (!snap.hasData) {
-                  //           return const CircularProgressIndicator();
-                  //         }
-                  //         final fileDataStores = snap.requireData;
+                  const Padding(padding: EdgeInsets.only(top: 16)),
+                  QueryStreamBuilder<UserModel>(
+                    query: UserModel.store.where(
+                      (userSnap) =>
+                          userSnap.data.name.startsWith(_controller.text),
+                    ),
+                    builder: (context, usersSnap) {
+                      return ListView.builder(
+                        shrinkWrap: true,
+                        itemCount: usersSnap.length,
+                        itemBuilder: (context, index) {
+                          final userSnap = usersSnap[index];
+                          final user = userSnap.data;
 
-                  //         return ListView.builder(
-                  //           itemCount: fileDataStores.length,
-                  //           itemBuilder: (context, index) {
-                  //             final fileDataStore = fileDataStores[index];
-
-                  //             return Column(
-                  //               crossAxisAlignment: CrossAxisAlignment.start,
-                  //               children: [
-                  //                 const Text('File:'),
-                  //                 const SizedBox(height: 8),
-                  //                 Text(fileDataStore.name),
-                  //                 const SizedBox(height: 8),
-                  //                 const Text('Document count:'),
-                  //                 const SizedBox(height: 8),
-                  //               ],
-                  //             );
-                  //           },
-                  //         );
-                  //       },
-                  //     ),
-                  //   ),
-                  // ),
+                          return Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(user.name),
+                              TextButton(
+                                onPressed: () {
+                                  _showEditDialog(userSnap.doc);
+                                },
+                                child: const Text('Edit'),
+                              ),
+                              TextButton(
+                                onPressed: () {
+                                  UserModel.store.doc(userSnap.id).delete();
+                                },
+                                child: Text(
+                                  'Remove',
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .bodyMedium!
+                                      .copyWith(
+                                        color: Colors.red,
+                                      ),
+                                ),
+                              ),
+                            ],
+                          );
+                        },
+                      );
+                    },
+                  ),
                 ],
               ),
             ),
