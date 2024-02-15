@@ -86,7 +86,7 @@ abstract class Persistor {
 
   Future<void> _persist() async {
     try {
-      _runOperation(() async {
+      await _runOperation(() async {
         final batchDocs = _batch.toList();
 
         // The current batch is eagerly cleared so that after persistence completes, it can be re-checked to see if there

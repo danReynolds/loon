@@ -1,7 +1,5 @@
 import 'dart:io';
 import 'dart:isolate';
-
-import 'package:loon/logger.dart';
 import 'package:loon/loon.dart';
 import 'package:loon/persistor/file_persistor/file_data_store.dart';
 import 'package:loon/persistor/file_persistor/messages.dart';
@@ -69,14 +67,6 @@ class FilePersistorWorker {
     }
   }
 
-  List<File> _getDataStoreFiles() {
-    return factory.directory
-        .listSync()
-        .whereType<File>()
-        .where((file) => factory.fileRegex.hasMatch(path.basename(file.path)))
-        .toList();
-  }
-
   /// Syncs all dirty file data stores, updating and deleting them as necessary.
   Future<void> _sync() {
     return Future.wait(
@@ -110,7 +100,13 @@ class FilePersistorWorker {
     _measureOperation('Hydration operation', () async {
       try {
         final SerializedCollectionStore collectionStore = {};
-        final files = _getDataStoreFiles();
+
+        final files = factory.directory
+            .listSync()
+            .whereType<File>()
+            .where(
+                (file) => factory.fileRegex.hasMatch(path.basename(file.path)))
+            .toList();
 
         // Attempt to hydrate the file data stores. If any are corrupt, they are returned as null and omitted
         // from the document hydration.

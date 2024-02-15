@@ -32,9 +32,10 @@ class MockPathProvider extends Fake
 }
 
 void main() {
-  final persistCompleter = ResetCompleter();
+  ResetCompleter persistCompleter = ResetCompleter();
 
   setUp(() {
+    persistCompleter = ResetCompleter();
     testDirectory = Directory.systemTemp.createTempSync('test_dir');
     final mockPathProvider = MockPathProvider();
     PathProviderPlatform.instance = mockPathProvider;

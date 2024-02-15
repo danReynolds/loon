@@ -1,7 +1,16 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
-import 'package:loon/logger.dart';
+
+void printDebug(
+  String message, {
+  String? label = 'Loon',
+}) {
+  if (const bool.fromEnvironment('ENABLE_LOGGING', defaultValue: false)) {
+    // ignore: avoid_print
+    print('$label: $message');
+  }
+}
 
 Future<T> measureDuration<T>(
   String label,

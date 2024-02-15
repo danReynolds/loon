@@ -1,7 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:encrypt/encrypt.dart';
-import 'package:loon/logger.dart';
 import 'package:loon/loon.dart';
 import 'package:loon/persistor/file_persistor/file_persist_document.dart';
 import 'package:loon/utils.dart';

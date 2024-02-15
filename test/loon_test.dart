@@ -723,11 +723,17 @@ void main() {
         },
       );
 
+      final updatedUser2 = TestUserModel('User 2 updated');
+      final userDoc3 = TestUserModel.store.doc('3');
       final userData3 = TestUserModel('User 3');
 
       TestUserModel.store.replace([
         DocumentSnapshot(
-          doc: userDoc,
+          doc: userDoc2,
+          data: updatedUser2,
+        ),
+        DocumentSnapshot(
+          doc: userDoc3,
           data: userData3,
         ),
       ]);
@@ -736,9 +742,15 @@ void main() {
         Loon.extract()['collectionStore'],
         {
           "users": {
-            "1": DocumentSnapshotMatcher(
+            "2": DocumentSnapshotMatcher(
               DocumentSnapshot(
-                doc: userDoc,
+                doc: userDoc2,
+                data: updatedUser2,
+              ),
+            ),
+            "3": DocumentSnapshotMatcher(
+              DocumentSnapshot(
+                doc: userDoc3,
                 data: userData3,
               ),
             ),
@@ -787,7 +799,14 @@ void main() {
 
       expect(
         Loon.extract()['collectionStore'],
-        {"users": {}},
+        {},
+      );
+      expect(
+        Loon.extract()['dependencyStore'],
+        {
+          'dependencies': {},
+          'dependents': {},
+        },
       );
     });
   });

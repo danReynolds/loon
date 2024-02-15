@@ -3,7 +3,6 @@ import 'dart:io';
 import 'dart:isolate';
 import 'package:encrypt/encrypt.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-import 'package:loon/logger.dart';
 import 'package:loon/loon.dart';
 import 'package:loon/persistor/file_persistor/extensions/document.dart';
 import 'package:loon/persistor/file_persistor/file_persistor_worker.dart';

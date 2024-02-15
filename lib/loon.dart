@@ -2,7 +2,7 @@ library loon;
 
 import 'dart:async';
 
-import 'package:loon/logger.dart';
+import 'package:loon/utils.dart';
 
 export 'widgets/query_stream_builder.dart';
 export 'widgets/document_stream_builder.dart';
@@ -43,8 +43,6 @@ class Loon {
   final _dependencyStore = _DependencyStore();
 
   bool _hasPendingBroadcast = false;
-
-  static bool _isHydrating = false;
 
   /// Validates that data is either already in a serializable format or comes with a serializer.
   static void _validateDataSerialization<T>({
@@ -180,7 +178,9 @@ class Loon {
     }
 
     for (final newSnap in snapsById.values) {
-      newSnap.doc.create(newSnap.data);
+      if (!newSnap.doc.exists()) {
+        newSnap.doc.create(newSnap.data);
+      }
     }
   }
 
@@ -322,6 +322,7 @@ class Loon {
     Document<T> doc,
     T data, {
     bool broadcast = true,
+    bool hydrating = false,
   }) {
     if (data is! Json && doc.isPersistenceEnabled()) {
       _validateDataSerialization<T>(
@@ -338,7 +339,7 @@ class Loon {
     }
 
     final BroadcastEventTypes eventType;
-    if (_isHydrating) {
+    if (hydrating) {
       eventType = BroadcastEventTypes.hydrated;
     } else if (doc.exists()) {
       eventType = BroadcastEventTypes.modified;
@@ -358,7 +359,7 @@ class Loon {
       _writeBroadcastDocument<T>(doc, eventType);
     }
 
-    if (doc.isPersistenceEnabled()) {
+    if (!hydrating && doc.isPersistenceEnabled()) {
       persistor!._persistDoc(doc);
     }
 
@@ -469,10 +470,10 @@ class Loon {
 
   static Future<void> hydrate() async {
     if (_instance.persistor == null) {
+      printDebug('Hydration skipped - no persistor specified');
       return;
     }
     try {
-      _isHydrating = true;
       final data = await _instance.persistor!._hydrate();
 
       for (final collectionDataStoreEntry in data.entries) {
@@ -483,14 +484,14 @@ class Loon {
           _instance._writeSnapshot<Json>(
             Document<Json>(collection: collection, id: documentDataEntry.key),
             documentDataEntry.value,
+            hydrating: true,
           );
         }
       }
     } catch (e) {
       // ignore: avoid_print
       printDebug('Error hydrating');
-    } finally {
-      _isHydrating = false;
+      rethrow;
     }
   }
 
