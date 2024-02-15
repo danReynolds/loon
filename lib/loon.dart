@@ -153,7 +153,7 @@ class Loon {
     required List<DocumentSnapshot<T>> snaps,
     FromJson<T>? fromJson,
     ToJson<T>? toJson,
-    PersistorSettings<T>? persistorSettings,
+    PersistorSettings? persistorSettings,
   }) {
     final snapsById =
         snaps.fold<Map<String, DocumentSnapshot<T>>>({}, (acc, snap) {
@@ -189,7 +189,7 @@ class Loon {
     String collection, {
     FromJson<T>? fromJson,
     ToJson<T>? toJson,
-    PersistorSettings<T>? persistorSettings,
+    PersistorSettings? persistorSettings,
   }) {
     if (!_hasCollection(collection)) {
       return [];
@@ -226,7 +226,7 @@ class Loon {
     String id, {
     FromJson<T>? fromJson,
     ToJson<T>? toJson,
-    PersistorSettings<T>? persistorSettings,
+    PersistorSettings? persistorSettings,
   }) {
     if (!_broadcastCollectionStore.containsKey(collection)) {
       return null;
@@ -261,7 +261,7 @@ class Loon {
     String collection, {
     FromJson<T>? fromJson,
     ToJson<T>? toJson,
-    PersistorSettings<T>? persistorSettings,
+    PersistorSettings? persistorSettings,
   }) {
     if (!_broadcastCollectionStore.containsKey(collection)) {
       return [];
@@ -383,7 +383,7 @@ class Loon {
     bool broadcast = true,
   }) {
     if (!doc.exists()) {
-      throw Exception('Missing document ${doc.path}');
+      throw Exception('Missing document ${doc.key}');
     }
 
     return _writeSnapshot<T>(
@@ -498,7 +498,7 @@ class Loon {
     String collection, {
     FromJson<T>? fromJson,
     ToJson<T>? toJson,
-    PersistorSettings<T>? persistorSettings,
+    PersistorSettings? persistorSettings,
     DependenciesBuilder<T>? dependenciesBuilder,
   }) {
     return Collection<T>(
@@ -514,7 +514,7 @@ class Loon {
     String id, {
     FromJson<T>? fromJson,
     ToJson<T>? toJson,
-    PersistorSettings<T>? persistorSettings,
+    PersistorSettings? persistorSettings,
   }) {
     return collection<T>(
       '__ROOT__',

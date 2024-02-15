@@ -8,8 +8,6 @@ import 'package:loon/persistor/file_persistor/messages.dart';
 import 'package:path/path.dart' as path;
 
 class FilePersistorWorker {
-  final PersistorSettings persistorSettings;
-
   /// The persistor's send port
   final SendPort sendPort;
 
@@ -20,18 +18,20 @@ class FilePersistorWorker {
   final Map<String, FileDataStore> _fileDataStoreIndex = {};
   final Map<String, FileDataStore> _documentDataStoreIndex = {};
 
-  late final Directory _directory;
-  late final FileDataStoreFactory factory;
+  final FileDataStoreFactory factory;
 
   FilePersistorWorker._({
     required this.sendPort,
-    required this.persistorSettings,
+    required this.factory,
   });
 
   static init(InitMessageRequest request) {
     FilePersistorWorker._(
       sendPort: request.sendPort,
-      persistorSettings: request.persistorSettings,
+      factory: FileDataStoreFactory(
+        directory: request.directory,
+        encrypter: request.encrypter,
+      ),
     ).onMessage(request);
   }
 
@@ -54,12 +54,8 @@ class FilePersistorWorker {
     }
   }
 
-  static String _getDocumentKey(Document doc) {
-    return '${doc.collection}:${doc.id}';
-  }
-
   List<File> _getDataStoreFiles() {
-    return _directory
+    return factory.directory
         .listSync()
         .whereType<File>()
         .where((file) => factory.fileRegex.hasMatch(path.basename(file.path)))
@@ -89,13 +85,6 @@ class FilePersistorWorker {
   ///
 
   Future<void> _init(InitMessageRequest request) async {
-    _directory = request.directory;
-
-    factory = FileDataStoreFactory(
-      directory: _directory,
-      persistorSettings: persistorSettings,
-    );
-
     // Start listening to messages from the persistor on the worker's receive port.
     receivePort.listen(onMessage);
 
@@ -149,11 +138,10 @@ class FilePersistorWorker {
   }
 
   Future<void> _persist(PersistMessageRequest request) async {
-    for (final entry in request.data.entries) {
-      final doc = entry.key;
-      final json = entry.value;
-      final documentKey = _getDocumentKey(doc);
-      final documentDataStoreName = factory.getDocumentDataStoreName(doc);
+    for (final doc in request.data) {
+      final documentKey = doc.key;
+      final docJson = doc.data;
+      final documentDataStoreName = doc.dataStoreName;
       final documentDataStore =
           _fileDataStoreIndex[documentDataStoreName] ??= factory.fromDoc(doc);
 
@@ -165,8 +153,8 @@ class FilePersistorWorker {
         prevDocumentDataStore.removeDocument(documentKey);
       }
 
-      if (json != null) {
-        documentDataStore.updateDocument(documentKey, json);
+      if (docJson != null) {
+        documentDataStore.updateDocument(documentKey, docJson);
         _documentDataStoreIndex[documentKey] = documentDataStore;
       } else {
         documentDataStore.removeDocument(documentKey);

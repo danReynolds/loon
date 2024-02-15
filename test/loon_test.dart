@@ -40,7 +40,7 @@ class DocumentSnapshotMatcher<T> extends Matcher {
     final actualData = actual?.data;
     final expectedData = expected?.data;
 
-    if (actual.doc.path != expected?.doc.path) {
+    if (actual.doc.key != expected?.doc.key) {
       return false;
     }
 

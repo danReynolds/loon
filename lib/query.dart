@@ -6,7 +6,7 @@ class Query<T> {
   final SortFn<T>? sort;
   final FromJson<T>? fromJson;
   final ToJson<T>? toJson;
-  final PersistorSettings<T>? persistorSettings;
+  final PersistorSettings? persistorSettings;
 
   /// Returns the set of documents that the document associated with the given
   /// [DocumentSnapshot] is dependent on.

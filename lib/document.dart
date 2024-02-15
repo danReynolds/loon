@@ -5,7 +5,7 @@ class Document<T> {
   final String id;
   final FromJson<T>? fromJson;
   final ToJson<T>? toJson;
-  final PersistorSettings<T>? persistorSettings;
+  final PersistorSettings? _persistorSettings;
   final DependenciesBuilder<T>? dependenciesBuilder;
 
   Document({
@@ -13,9 +13,9 @@ class Document<T> {
     required this.id,
     this.fromJson,
     this.toJson,
-    this.persistorSettings,
+    PersistorSettings? persistorSettings,
     this.dependenciesBuilder,
-  });
+  }) : _persistorSettings = persistorSettings;
 
   @override
   bool operator ==(Object other) {
@@ -31,15 +31,15 @@ class Document<T> {
   @override
   int get hashCode => Object.hashAll([id, collection]);
 
-  String get path {
-    return "${collection}_$id";
+  String get key {
+    return "$collection:$id";
   }
 
   Collection<S> subcollection<S>(
     String subcollection, {
     FromJson<S>? fromJson,
     ToJson<S>? toJson,
-    PersistorSettings<S>? persistorSettings,
+    PersistorSettings? persistorSettings,
     DependenciesBuilder<S>? dependenciesBuilder,
   }) {
     return Collection<S>(
@@ -133,12 +133,15 @@ class Document<T> {
   }
 
   bool isPersistenceEnabled() {
-    return persistorSettings?.persistenceEnabled ??
-        Loon._instance._isGlobalPersistenceEnabled;
+    return persistorSettings?.persistenceEnabled ?? false;
   }
 
   bool isPendingBroadcast() {
     return Loon._instance._isDocumentPendingBroadcast(this);
+  }
+
+  PersistorSettings? get persistorSettings {
+    return _persistorSettings ?? Loon._instance.persistor?.persistorSettings;
   }
 
   BroadcastDocument<T> toBroadcast(BroadcastEventTypes type) {

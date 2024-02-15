@@ -1,12 +1,17 @@
 import 'dart:async';
 import 'dart:io';
 import 'dart:isolate';
+import 'package:encrypt/encrypt.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:loon/logger.dart';
 import 'package:loon/loon.dart';
+import 'package:loon/persistor/file_persistor/extensions/document.dart';
+import 'package:loon/persistor/file_persistor/file_persist_document.dart';
 import 'package:loon/persistor/file_persistor/file_persistor_worker.dart';
 import 'package:loon/persistor/file_persistor/messages.dart';
 import 'package:path_provider/path_provider.dart';
 
-class FilePersistorSettings<T> extends PersistorSettings<T> {
+class FilePersistorSettings extends PersistorSettings {
   /// By default, a document is persisted to a file by its collection name.
   /// If documents in the same collection should be broken into multiple files (due to large collection sizes, etc)
   /// or documents should be grouped together across different collections (due to small collection sizes, etc) then
@@ -16,6 +21,18 @@ class FilePersistorSettings<T> extends PersistorSettings<T> {
   FilePersistorSettings({
     this.getPersistenceKey,
     super.persistenceEnabled = true,
+  });
+}
+
+class EncryptedFilePersistorSettings extends FilePersistorSettings {
+  /// Whether collections should be encrypted as part of persistence. If encryption is only required for certain collections,
+  /// then custom persistor settings can be provided to those specific collections.
+  final bool encryptionEnabled;
+
+  EncryptedFilePersistorSettings({
+    super.getPersistenceKey,
+    super.persistenceEnabled = true,
+    this.encryptionEnabled = true,
   });
 }
 
@@ -32,6 +49,8 @@ class FilePersistor extends Persistor {
   /// An index of task IDs to the task completer that is resolved when they are completed on the worker.
   final Map<String, Completer> _messageRequestIndex = {};
 
+  final secureStorageKey = 'loon_encrypted_file_persistor_key';
+
   FilePersistor({
     super.persistenceThrottle = const Duration(milliseconds: 100),
     super.persistorSettings,
@@ -39,12 +58,6 @@ class FilePersistor extends Persistor {
     super.onClear,
     super.onHydrate,
   });
-
-  Future<Directory> _initStorageDirectory() async {
-    final applicationDirectory = await getApplicationDocumentsDirectory();
-    final fileDirectory = Directory('${applicationDirectory.path}/loon');
-    return fileDirectory.create();
-  }
 
   void _onMessage(dynamic message) {
     switch (message) {
@@ -59,9 +72,44 @@ class FilePersistor extends Persistor {
     return completer.future;
   }
 
+  /// Initializes the encrypter used for encrypting files. This needs to be done on the main isolate
+  /// as opposed to the worker since it requires access to plugins that are not easily available in the worker
+  /// isolate context.
+  Future<Encrypter?> initEncrypter() async {
+    // The encrypter is only initialized if the global settings are encrypted file persistor settings.
+    if (persistorSettings is! EncryptedFilePersistorSettings) {
+      return null;
+    }
+
+    const storage = FlutterSecureStorage();
+    final base64Key = await storage.read(key: secureStorageKey);
+    Key key;
+
+    if (base64Key != null) {
+      key = Key.fromBase64(base64Key);
+    } else {
+      key = Key.fromSecureRandom(32);
+      await storage.write(key: secureStorageKey, value: key.base64);
+    }
+
+    return Encrypter(AES(key, mode: AESMode.cbc));
+  }
+
+  /// Initializes the directory in which files are persisted. This needs to be done on the main isolate
+  /// as opposed to the worker since it requires access to plugins that are not easily available in the worker
+  /// isolate context.
+  Future<Directory> initDirectory() async {
+    final applicationDirectory = await getApplicationDocumentsDirectory();
+    final fileDirectory = Directory('${applicationDirectory.path}/loon');
+    return fileDirectory.create();
+  }
+
   @override
   Future<void> init() async {
-    final directory = await _initStorageDirectory();
+    final [encrypter, directory] = await Future.wait([
+      initEncrypter(),
+      initDirectory(),
+    ]);
 
     // Create a receive port on the main isolatex to receive messages from the worker.
     receivePort = ReceivePort();
@@ -74,17 +122,23 @@ class FilePersistor extends Persistor {
     //    APIs like `getApplicationDocumentsDirectory` that are not easily available on an isolate.
     final initMessage = InitMessageRequest(
       sendPort: receivePort.sendPort,
-      persistorSettings: persistorSettings,
-      directory: directory,
+      directory: directory as Directory,
+      encrypter: encrypter as Encrypter?,
     );
 
     final completer =
         _messageRequestIndex[initMessage.id] = Completer<InitMessageResponse>();
 
-    _isolate = await Isolate.spawn(FilePersistorWorker.init, initMessage);
+    try {
+      _isolate = await Isolate.spawn(FilePersistorWorker.init, initMessage);
 
-    final response = await completer.future;
-    sendPort = response.sendPort;
+      final response = await completer.future;
+      sendPort = response.sendPort;
+    } catch (e) {
+      printDebug("Failed to initialize file persistor worker");
+      receivePort.close();
+      rethrow;
+    }
   }
 
   @override
@@ -95,14 +149,19 @@ class FilePersistor extends Persistor {
 
   @override
   Future<void> persist(List<Document> docs) async {
-    final json = docs.fold<Map<Document, Json?>>(
-      {},
-      (acc, doc) {
-        acc[doc] = doc.getJson();
-        return acc;
-      },
-    );
-    await _sendMessage(PersistMessageRequest(data: json));
+    // Marshall file persist documents to be sent to and persisted by the worker isolate.
+    final data = docs
+        .map(
+          (doc) => FilePersistDocument(
+            key: doc.key,
+            encryptionEnabled: doc.isEncryptionEnabled(),
+            dataStoreName: doc.getDatastoreName(),
+            data: doc.getJson(),
+          ),
+        )
+        .toList();
+
+    await _sendMessage(PersistMessageRequest(data: data));
   }
 
   @override

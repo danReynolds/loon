@@ -1,8 +1,9 @@
 import 'dart:convert';
 import 'dart:io';
+import 'package:encrypt/encrypt.dart';
 import 'package:loon/logger.dart';
 import 'package:loon/loon.dart';
-import 'package:loon/persistor/file_persistor/file_persistor.dart';
+import 'package:loon/persistor/file_persistor/file_persist_document.dart';
 import 'package:loon/utils.dart';
 import 'package:path/path.dart' as path;
 
@@ -95,35 +96,69 @@ class FileDataStore {
   }
 }
 
+class EncryptedFileDataStore extends FileDataStore {
+  final Encrypter encrypter;
+
+  EncryptedFileDataStore({
+    required super.name,
+    required super.file,
+    required this.encrypter,
+  });
+
+  String _encrypt(String plainText) {
+    final iv = IV.fromSecureRandom(16);
+    return iv.base64 + encrypter.encrypt(plainText, iv: iv).base64;
+  }
+
+  String _decrypt(String encrypted) {
+    final iv = IV.fromBase64(encrypted.substring(0, 24));
+    return encrypter.decrypt64(
+      encrypted.substring(24),
+      iv: iv,
+    );
+  }
+
+  @override
+  Future<String> readFile() async {
+    return _decrypt(await super.readFile());
+  }
+
+  @override
+  writeFile(String value) async {
+    return super.writeFile(_encrypt(value));
+  }
+}
+
+/// A factory for building a [FileDataStore] on the worker.
 class FileDataStoreFactory {
-  final fileRegex = RegExp(r'^(\w+)\.json$');
+  final fileRegex = RegExp(r'^(\w+)(?:\.(encrypted))?\.json$');
 
-  /// The global persistor settings.
-  final PersistorSettings persistorSettings;
+  final Encrypter? encrypter;
 
+  /// The directory in which a file data store is persisted.
   final Directory directory;
 
   FileDataStoreFactory({
     required this.directory,
-    required this.persistorSettings,
+    required this.encrypter,
   });
-
-  /// Returns the name of a file data store name for a given document and its persistor settings.
-  /// Uses the custom persistence key of the document if specified in its persistor settings,
-  /// otherwise it defaults to the document's collection name.
-  String getDocumentDataStoreName(Document doc) {
-    final documentSettings = doc.persistorSettings ?? persistorSettings;
-
-    if (documentSettings is FilePersistorSettings) {
-      return documentSettings.getPersistenceKey?.call(doc) ?? doc.collection;
-    }
-
-    return doc.collection;
-  }
 
   FileDataStore fromFile(File file) {
     final match = fileRegex.firstMatch(path.basename(file.path));
     final name = match!.group(1)!;
+    final encryptionEnabled = match.group(2) != null;
+
+    if (encryptionEnabled) {
+      if (encrypter == null) {
+        throw 'Missing encrypter';
+      }
+
+      return EncryptedFileDataStore(
+        name: name,
+        file: file,
+        encrypter: encrypter!,
+      );
+    }
 
     return FileDataStore(
       file: file,
@@ -131,12 +166,25 @@ class FileDataStoreFactory {
     );
   }
 
-  FileDataStore fromDoc(Document doc) {
-    final name = getDocumentDataStoreName(doc);
+  FileDataStore fromDoc(FilePersistDocument doc) {
+    final file = File("${directory.path}/${doc.dataStoreName}.json");
+    final name = doc.dataStoreName;
+
+    if (doc.encryptionEnabled) {
+      if (encrypter == null) {
+        throw 'Missing encrypter';
+      }
+
+      return EncryptedFileDataStore(
+        file: file,
+        name: name,
+        encrypter: encrypter!,
+      );
+    }
 
     return FileDataStore(
+      file: file,
       name: name,
-      file: File("${directory.path}/$name.json"),
     );
   }
 }

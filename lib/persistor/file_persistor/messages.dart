@@ -1,6 +1,8 @@
 import 'dart:io';
 import 'dart:isolate';
+import 'package:encrypt/encrypt.dart';
 import 'package:loon/loon.dart';
+import 'package:loon/persistor/file_persistor/file_persist_document.dart';
 import 'package:uuid/uuid.dart';
 
 const uuid = Uuid();
@@ -21,13 +23,13 @@ abstract class MessageResponse {
 
 class InitMessageRequest extends MessageRequest<InitMessageResponse> {
   final SendPort sendPort;
-  final PersistorSettings persistorSettings;
   final Directory directory;
+  final Encrypter? encrypter;
 
   InitMessageRequest({
     required this.sendPort,
-    required this.persistorSettings,
     required this.directory,
+    required this.encrypter,
   });
 }
 
@@ -52,7 +54,7 @@ class HydrateMessageResponse extends MessageResponse {
 }
 
 class PersistMessageRequest extends MessageRequest<PersistMessageResponse> {
-  final Map<Document, Json?> data;
+  final List<FilePersistDocument> data;
 
   PersistMessageRequest({
     required this.data,
