@@ -1,6 +1,5 @@
 import 'package:loon/loon.dart';
 import 'package:loon/persistor/file_persistor/file_persist_document.dart';
-import 'package:loon/persistor/file_persistor/file_persistor.dart';
 
 extension DocumentExtensions<T> on Document<T> {
   /// Returns the name of a file data store name for a given document and its persistor settings.

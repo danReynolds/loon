@@ -2,7 +2,6 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:loon/loon.dart';
-import 'package:loon/persistor/file_persistor/file_persistor.dart';
 import 'package:loon/utils.dart';
 
 // ignore: depend_on_referenced_packages
@@ -13,7 +12,6 @@ import 'package:plugin_platform_interface/plugin_platform_interface.dart';
 import 'loon_test.dart';
 import 'models/test_large_model.dart';
 import 'models/test_user_model.dart';
-import 'samples/generate_large_model_sample.dart';
 import 'utils.dart';
 
 late Directory testDirectory;

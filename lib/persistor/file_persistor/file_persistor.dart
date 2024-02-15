@@ -37,8 +37,6 @@ class EncryptedFilePersistorSettings extends FilePersistorSettings {
 
 /// A worker abstraction that creates a background worker isolate to process file persistence/hydration.
 class FilePersistor extends Persistor {
-  late final Isolate _isolate;
-
   /// This persistor's receive port
   late final ReceivePort receivePort;
 
@@ -145,7 +143,7 @@ class FilePersistor extends Persistor {
         _messageRequestIndex[initMessage.id] = Completer<InitMessageResponse>();
 
     try {
-      _isolate = await measureDuration('Worker spawn', () async {
+      await measureDuration('Worker spawn', () async {
         return Isolate.spawn(
           FilePersistorWorker.init,
           initMessage,

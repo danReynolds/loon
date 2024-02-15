@@ -6,6 +6,7 @@ import 'package:loon/utils.dart';
 
 export 'widgets/query_stream_builder.dart';
 export 'widgets/document_stream_builder.dart';
+export 'persistor/file_persistor/file_persistor.dart';
 
 part 'broadcast_observer.dart';
 part 'query.dart';
@@ -81,7 +82,12 @@ class Loon {
 
       // Upon first read of serialized data using a serializer, the parsed representation
       // of the document is cached for efficient repeat access. It does not need to be rebroadcast.
-      return _writeSnapshot<T>(doc, doc.fromJson!(snap.data), broadcast: false);
+      return _writeSnapshot<T>(
+        doc,
+        doc.fromJson!(snap.data),
+        broadcast: false,
+        persist: false,
+      );
     }
 
     return snap as DocumentSnapshot<T>;
@@ -214,6 +220,7 @@ class Loon {
           ),
           fromJson!(snap.data),
           broadcast: false,
+          persist: false,
         );
       }
 
@@ -323,6 +330,7 @@ class Loon {
     T data, {
     bool broadcast = true,
     bool hydrating = false,
+    bool persist = true,
   }) {
     if (data is! Json && doc.isPersistenceEnabled()) {
       _validateDataSerialization<T>(
@@ -359,7 +367,7 @@ class Loon {
       _writeBroadcastDocument<T>(doc, eventType);
     }
 
-    if (!hydrating && doc.isPersistenceEnabled()) {
+    if (persist && doc.isPersistenceEnabled()) {
       persistor!._persistDoc(doc);
     }
 
@@ -485,6 +493,7 @@ class Loon {
             Document<Json>(collection: collection, id: documentDataEntry.key),
             documentDataEntry.value,
             hydrating: true,
+            persist: false,
           );
         }
       }
