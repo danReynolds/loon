@@ -29,6 +29,7 @@ class PersistorCompleter {
   final _onPersistCompleter = ResetCompleter();
   final _onClearCompleter = ResetCompleter();
   final _onHydrateCompleter = ResetCompleter();
+  final _onClearAllCompleter = ResetCompleter();
 
   void persistComplete() {
     _onPersistCompleter.complete();
@@ -36,6 +37,10 @@ class PersistorCompleter {
 
   void clearComplete() {
     _onClearCompleter.complete();
+  }
+
+  void clearAllComplete() {
+    _onClearAllCompleter.complete();
   }
 
   void hydrateComplete() {
@@ -48,6 +53,10 @@ class PersistorCompleter {
 
   Future<void> get onClearComplete {
     return _onClearCompleter.future;
+  }
+
+  Future<void> get onClearAllComplete {
+    return _onClearAllCompleter.future;
   }
 
   Future<void> get onHydrateComplete {

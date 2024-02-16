@@ -41,6 +41,7 @@ class _DocumentDependencyStore {
 
   /// Marks the given document as dependent on the given dependency.
   /// This involves adding an entry to both the dependencies and dependents collections:
+  ///
   /// 1. The dependency should be added to the dependencies store for the given document.
   /// 2. The document should be added to the dependents store for the given dependency.
   void addDependency(Document doc, Document dependency) {
@@ -56,6 +57,7 @@ class _DocumentDependencyStore {
 
   /// Removes the given dependency from the given document.
   /// This involves removing an entry from both the dependencies and dependents collections:
+  ///
   /// 1. The dependency should be removed from the dependencies store for the given document.
   /// 2. The document should be removed from the dependents store for the given dependency.
   void removeDependency(Document doc, Document dependency) {
@@ -71,8 +73,9 @@ class _DocumentDependencyStore {
     _dependenciesStore[doc.collection]?.remove(doc.id);
   }
 
-  /// Clears all dependency entries for the given collection.
-  void clearCollection(String collection) {
+  /// Clears dependency entries for the given collection. The documents are *not* removed from the dependents set of each of
+  /// their dependencies at this time, that is instead lazilydone when the dependent is updated and attempts to rebroadcast its dependencies.
+  void clear(String collection) {
     _dependenciesStore.remove(collection);
   }
 
@@ -112,7 +115,7 @@ class _DocumentDependencyStore {
     }
   }
 
-  void clear() {
+  void clearAll() {
     _dependenciesStore.clear();
     _dependentsStore.clear();
   }

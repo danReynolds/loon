@@ -56,6 +56,7 @@ class ObservableQuery<T> extends Query<T>
       final docId = docBroadcast.key;
       final broadcastType = docBroadcast.value;
 
+      final prevSnap = _index[docId];
       final snap = Loon._instance._getSnapshot<T>(
         id: docId,
         collection: name,
@@ -63,8 +64,6 @@ class ObservableQuery<T> extends Query<T>
         toJson: toJson,
         persistorSettings: persistorSettings,
       );
-
-      final prevSnap = _index[docId];
 
       switch (broadcastType) {
         case DocumentBroadcastTypes.added:

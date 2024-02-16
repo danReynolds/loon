@@ -31,6 +31,7 @@ class Collection<T> extends Query<T> {
     Loon._instance._deleteCollection(
       name,
       broadcast: broadcast,
+      persist: isPersistenceEnabled(),
     );
   }
 

@@ -810,7 +810,7 @@ void main() {
     });
   });
 
-  group('Clearing all collections', () {
+  group('clearAll', () {
     tearDown(() {
       Loon.clearAll();
     });
@@ -1174,13 +1174,13 @@ void main() {
         Loon.extract()['dependencyStore'],
         {
           "dependencies": {
-            userDoc: {
-              postDoc,
-            }
+            "users": {
+              "1": {postDoc},
+            },
           },
           "dependents": {
-            postDoc: {
-              userDoc,
+            "posts": {
+              "1": {userDoc},
             }
           },
         },
@@ -1195,19 +1195,27 @@ void main() {
         Loon.extract()['dependencyStore'],
         {
           "dependencies": {
-            userDoc: {
-              postDoc,
+            "users": {
+              "1": {
+                postDoc,
+              }
             },
-            postDoc: {
-              userDoc,
+            "posts": {
+              "1": {
+                userDoc,
+              }
             }
           },
           "dependents": {
-            postDoc: {
-              userDoc,
+            "posts": {
+              "1": {
+                userDoc,
+              }
             },
-            userDoc: {
-              postDoc,
+            "users": {
+              "1": {
+                postDoc,
+              }
             }
           },
         },

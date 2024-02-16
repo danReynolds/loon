@@ -111,18 +111,29 @@ class Loon {
   void _deleteCollection(
     String collection, {
     bool broadcast = true,
+    bool persist = true,
   }) {
-    // Immediately clear any documents in the collection scheduled for broadcast, as whatever broadcasts had previously
+    final collectionStore = _documentStore[collection];
+    if (collectionStore == null) {
+      return;
+    }
+
+    // Immediately clear any documents in the collection scheduled for broadcast, as all broadcasts that had previously
     // been scheduled for documents in the collection are now invalidated.
     _documentBroadcastStore[collection]?.clear();
 
-    final snaps = _getSnapshots(collection);
-    for (final snap in snaps) {
-      _rebroadcastDependents(snap.doc);
+    if (broadcast) {
+      for (final snap in collectionStore.values) {
+        _writeDocumentBroadcast(snap.doc, DocumentBroadcastTypes.removed);
+      }
     }
 
-    _documentStore[collection]?.clear();
-    _documentDependencyStore.clearCollection(collection);
+    _documentDependencyStore.clear(collection);
+    _documentStore.remove(collection);
+
+    if (persist) {
+      persistor!._clear(collection);
+    }
 
     // Delete all subcollections of this collection.
     for (final otherCollection in _documentStore.keys.toList()) {
@@ -131,6 +142,10 @@ class Loon {
         _deleteCollection(
           otherCollection,
           broadcast: broadcast,
+          // Subcollections of the deleted collection do not need to be persisted
+          // as the default behavior of clearing a collection at the persistence layer
+          // is to clear all subcollections as well.
+          persist: false,
         );
       }
     }
@@ -143,15 +158,19 @@ class Loon {
     // Immediately clear any documents scheduled for broadcast, as whatever events happened prior to the clear are now irrelevant.
     _documentBroadcastStore.clear();
     // Immediately clear all dependencies of documents, since all documents are being removed and will be broadcast if indicated.
-    _documentDependencyStore.clear();
+    _documentDependencyStore.clearAll();
 
     // If it should broadcast, then we need to go through every document that is being
     // cleared and schedule it for broadcast.
     if (broadcast) {
       for (final collectionName in _documentStore.keys) {
-        final snaps = _getSnapshots(collectionName);
+        final collectionStore = _documentStore[collectionName];
 
-        for (final snap in snaps) {
+        if (collectionStore == null) {
+          continue;
+        }
+
+        for (final snap in collectionStore.values) {
           _writeDocumentBroadcast(snap.doc, DocumentBroadcastTypes.removed);
         }
       }
@@ -338,7 +357,7 @@ class Loon {
     T data, {
     bool broadcast = true,
   }) {
-    if (_hasDocument(doc)) {
+    if (doc.exists()) {
       throw Exception('Cannot add duplicate document');
     }
 

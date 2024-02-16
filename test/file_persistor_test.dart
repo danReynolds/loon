@@ -30,10 +30,10 @@ class MockPathProvider extends Fake
 }
 
 void main() {
-  ResetCompleter persistCompleter = ResetCompleter();
+  PersistorCompleter completer = PersistorCompleter();
 
   setUp(() {
-    persistCompleter = ResetCompleter();
+    completer = PersistorCompleter();
     testDirectory = Directory.systemTemp.createTempSync('test_dir');
     final mockPathProvider = MockPathProvider();
     PathProviderPlatform.instance = mockPathProvider;
@@ -42,7 +42,13 @@ void main() {
       persistor: FilePersistor(
         persistenceThrottle: const Duration(milliseconds: 1),
         onPersist: (_) {
-          persistCompleter.complete();
+          completer.persistComplete();
+        },
+        onClear: (_) {
+          completer.clearComplete();
+        },
+        onClearAll: () {
+          completer.clearAllComplete();
         },
       ),
     );
@@ -66,7 +72,7 @@ void main() {
         userCollection.doc('1').create(TestUserModel('User 1'));
         userCollection.doc('2').create(TestUserModel('User 2'));
 
-        await persistCompleter.future;
+        await completer.onPersistComplete;
 
         final file = File('${testDirectory.path}/loon/users.json');
         final json = jsonDecode(file.readAsStringSync());
@@ -93,11 +99,11 @@ void main() {
         userCollection.doc('1').create(TestUserModel('User 1'));
         userCollection.doc('2').create(TestUserModel('User 2'));
 
-        await persistCompleter.future;
+        await completer.onPersistComplete;
 
         userCollection.doc('2').update(TestUserModel('User 2 updated'));
 
-        await persistCompleter.future;
+        await completer.onPersistComplete;
 
         final file = File('${testDirectory.path}/loon/users.json');
         final json = jsonDecode(file.readAsStringSync());
@@ -124,11 +130,11 @@ void main() {
         userCollection.doc('1').create(TestUserModel('User 1'));
         userCollection.doc('2').create(TestUserModel('User 2'));
 
-        await persistCompleter.future;
+        await completer.onPersistComplete;
 
         userCollection.doc('2').delete();
 
-        await persistCompleter.future;
+        await completer.onPersistComplete;
 
         final file = File('${testDirectory.path}/loon/users.json');
         final json = jsonDecode(file.readAsStringSync());
@@ -156,7 +162,7 @@ void main() {
 
         final file = File('${testDirectory.path}/loon/users.json');
 
-        await persistCompleter.future;
+        await completer.onPersistComplete;
 
         expect(
           file.existsSync(),
@@ -167,7 +173,7 @@ void main() {
         userCollection.doc('1').delete();
         userCollection.doc('2').delete();
 
-        await persistCompleter.future;
+        await completer.onPersistComplete;
 
         expect(
           file.existsSync(),
@@ -196,7 +202,7 @@ void main() {
         userCollection.doc('1').create(TestUserModel('User 1'));
         userCollection.doc('2').create(TestUserModel('User 2'));
 
-        await persistCompleter.future;
+        await completer.onPersistComplete;
 
         final usersFile = File('${testDirectory.path}/loon/users.json');
         final otherUsersFile =
@@ -240,11 +246,11 @@ void main() {
         userCollection.doc('1').create(TestUserModel('User 1'));
         userCollection.doc('2').create(TestUserModel('User 2'));
 
-        await persistCompleter.future;
+        await completer.onPersistComplete;
 
         userCollection.doc('2').update(TestUserModel('User 2 updated'));
 
-        await persistCompleter.future;
+        await completer.onPersistComplete;
 
         final usersFile = File('${testDirectory.path}/loon/users.json');
         final updatedUsersFile =
@@ -319,7 +325,7 @@ void main() {
 
       userCollection.doc('1').create(TestUserModel('User 1'));
 
-      await persistCompleter.future;
+      await completer.onPersistComplete;
 
       final file = File('${testDirectory.path}/loon/users.json');
       file.writeAsStringSync(
@@ -385,4 +391,167 @@ void main() {
       );
     });
   });
+
+  group(
+    'clear',
+    () {
+      test(
+        "Deletes the collection's data store",
+        () async {
+          final userCollection = Loon.collection(
+            'users',
+            fromJson: TestUserModel.fromJson,
+            toJson: (user) => user.toJson(),
+          );
+
+          userCollection.doc('1').create(TestUserModel('User 1'));
+          userCollection.doc('2').create(TestUserModel('User 2'));
+
+          final file = File('${testDirectory.path}/loon/users.json');
+
+          await completer.onPersistComplete;
+
+          expect(file.existsSync(), true);
+
+          userCollection.delete();
+
+          await completer.onClearComplete;
+
+          expect(file.existsSync(), false);
+        },
+      );
+
+      // In this scenario, the user collection is spread across multiple data stores. Since each of those
+      // data stores are empty after the collection is cleared, they should all be deleted.
+      test(
+        "Deletes all of the collection's data stores",
+        () async {
+          final userCollection = Loon.collection(
+            'users',
+            fromJson: TestUserModel.fromJson,
+            toJson: (user) => user.toJson(),
+            persistorSettings: FilePersistorSettings(
+              getPersistenceKey: (snap) {
+                return 'users${snap.id}';
+              },
+            ),
+          );
+
+          userCollection.doc('1').create(TestUserModel('User 1'));
+          userCollection.doc('2').create(TestUserModel('User 2'));
+          userCollection.doc('3').create(TestUserModel('User 3'));
+
+          final file1 = File('${testDirectory.path}/loon/users1.json');
+          final file2 = File('${testDirectory.path}/loon/users2.json');
+          final file3 = File('${testDirectory.path}/loon/users3.json');
+
+          await completer.onPersistComplete;
+
+          expect(file1.existsSync(), true);
+          expect(file2.existsSync(), true);
+          expect(file3.existsSync(), true);
+
+          userCollection.delete();
+
+          await completer.onClearComplete;
+
+          expect(file1.existsSync(), false);
+          expect(file2.existsSync(), false);
+          expect(file3.existsSync(), false);
+        },
+      );
+
+      test(
+        "Deletes the collection's subcollection data store",
+        () async {
+          final userCollection = Loon.collection(
+            'users',
+            fromJson: TestUserModel.fromJson,
+            toJson: (user) => user.toJson(),
+          );
+          final friendsCollection = userCollection.doc('1').subcollection(
+                'friends',
+                fromJson: TestUserModel.fromJson,
+                toJson: (user) => user.toJson(),
+              );
+
+          userCollection.doc('1').create(TestUserModel('User 1'));
+          userCollection.doc('2').create(TestUserModel('User 2'));
+          friendsCollection.doc('1').create(TestUserModel('Friend 1'));
+
+          final userFile = File('${testDirectory.path}/loon/users.json');
+          final friendsFile =
+              File('${testDirectory.path}/loon/users__1__friends.json');
+
+          await completer.onPersistComplete;
+
+          expect(userFile.existsSync(), true);
+          expect(friendsFile.existsSync(), true);
+
+          userCollection.delete();
+
+          await completer.onClearComplete;
+
+          expect(userFile.existsSync(), false);
+          expect(friendsFile.existsSync(), false);
+        },
+      );
+
+      // In this scenario, multiple collections share data stores and the data store should not be deleted
+      // since it still has documents from another collection.
+      test(
+        'Retains data stores that share collections',
+        () async {
+          final userCollection = Loon.collection(
+            'users',
+            fromJson: TestUserModel.fromJson,
+            toJson: (user) => user.toJson(),
+          );
+          final friendsCollection = Loon.collection(
+            'friends',
+            fromJson: TestUserModel.fromJson,
+            toJson: (user) => user.toJson(),
+            persistorSettings: FilePersistorSettings(
+              getPersistenceKey: (snap) {
+                return 'users';
+              },
+            ),
+          );
+
+          userCollection.doc('1').create(TestUserModel('User 1'));
+          userCollection.doc('2').create(TestUserModel('User 2'));
+          friendsCollection.doc('1').create(TestUserModel('Friend 1'));
+          friendsCollection.doc('2').create(TestUserModel('Friend 2'));
+
+          final file = File('${testDirectory.path}/loon/users.json');
+
+          await completer.onPersistComplete;
+
+          Json json = jsonDecode(file.readAsStringSync());
+          expect(
+            json,
+            {
+              'users:1': {'name': 'User 1'},
+              'users:2': {'name': 'User 2'},
+              'friends:1': {'name': 'Friend 1'},
+              'friends:2': {'name': 'Friend 2'}
+            },
+          );
+
+          userCollection.delete();
+
+          await completer.onClearComplete;
+
+          json = jsonDecode(file.readAsStringSync());
+          expect(
+            json,
+            {
+              'friends:1': {'name': 'Friend 1'},
+              'friends:2': {'name': 'Friend 2'}
+            },
+          );
+        },
+      );
+    },
+  );
 }

@@ -52,6 +52,7 @@ class FilePersistor extends Persistor {
     super.persistenceThrottle = const Duration(milliseconds: 100),
     super.persistorSettings = const FilePersistorSettings(),
     super.onPersist,
+    super.onClear,
     super.onClearAll,
     super.onHydrate,
   });

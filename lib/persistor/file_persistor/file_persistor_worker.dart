@@ -18,7 +18,7 @@ class FilePersistorWorker {
   /// An index of file data stores by name.
   final Map<String, FileDataStore> _fileDataStoreIndex = {};
 
-  /// An index of a documents by collection to the file data store that the document is currently persisted in.
+  /// An index of a documents by collection to the file data store that the document is persisted in.
   final DocumentDataStore _documentDataStoreIndex = {};
 
   final FileDataStoreFactory factory;
@@ -203,26 +203,32 @@ class FilePersistorWorker {
 
     _measureOperation('Clear operation', () async {
       try {
-        final collectionIndex = _documentDataStoreIndex[request.collection];
+        for (final collectionEntry
+            in _documentDataStoreIndex.entries.toList()) {
+          final collectionName = collectionEntry.key;
+          final documentDataStoreIndex = collectionEntry.value;
 
-        if (collectionIndex == null) {
-          return;
+          // Delete all documents from the cleared collection and its subcollections.
+          if (collectionName == collection ||
+              collectionName.startsWith('${collection}__')) {
+            for (final docEntry in documentDataStoreIndex.entries) {
+              final documentId = docEntry.key;
+              final documentDataStore = docEntry.value;
+
+              documentDataStore.removeDocument('$collectionName:$documentId');
+            }
+
+            _documentDataStoreIndex.remove(collection);
+          }
         }
-
-        for (final docEntry in collectionIndex.entries) {
-          final documentId = docEntry.key;
-          final documentDataStore = docEntry.value;
-
-          documentDataStore.removeDocument('$collection:$documentId');
-        }
-
-        _documentDataStoreIndex.remove(collection);
 
         await _sync();
 
         _sendMessageResponse(request.success());
       } catch (e) {
-        _sendMessageResponse(request.error('Clear failed'));
+        _sendMessageResponse(
+          request.error('Clear ${request.collection} failed'),
+        );
       }
     });
   }
