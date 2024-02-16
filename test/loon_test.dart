@@ -686,6 +686,72 @@ void main() {
         {},
       );
     });
+
+    test('Deletes the collection recursively when specified', () {
+      final userDoc = TestUserModel.store.doc('1');
+      final userDoc2 = TestUserModel.store.doc('2');
+
+      final userData = TestUserModel('User 1');
+      final userData2 = TestUserModel('User 2');
+
+      final friendDoc =
+          userDoc.subcollection<TestUserModel>('friends').doc('2');
+
+      userDoc.create(userData);
+      friendDoc.create(userData2);
+      userDoc2.create(userData2);
+
+      expect(
+        Loon.extract()['collectionStore'],
+        {
+          "users": {
+            "1": DocumentSnapshotMatcher(
+              DocumentSnapshot(
+                doc: userDoc,
+                data: userData,
+              ),
+            ),
+            "2": DocumentSnapshotMatcher(
+              DocumentSnapshot(
+                doc: userDoc2,
+                data: userData2,
+              ),
+            ),
+          },
+          "users__1__friends": {
+            "2": DocumentSnapshotMatcher(
+              DocumentSnapshot(
+                doc: friendDoc,
+                data: userData2,
+              ),
+            ),
+          }
+        },
+      );
+
+      TestUserModel.store.delete();
+
+      expect(
+        Loon.extract()['collectionStore'],
+        {
+          "users__1__friends": {
+            "2": DocumentSnapshotMatcher(
+              DocumentSnapshot(
+                doc: friendDoc,
+                data: userData2,
+              ),
+            ),
+          }
+        },
+      );
+
+      TestUserModel.store.delete(recursive: true);
+
+      expect(
+        Loon.extract()['collectionStore'],
+        {},
+      );
+    });
   });
 
   group('Replace collection', () {
@@ -855,7 +921,7 @@ void main() {
       expect(
         Loon.extract()['collectionStore'],
         {
-          "users_1_friends": {
+          "users__1__friends": {
             "1": DocumentSnapshotMatcher(
               DocumentSnapshot(
                 doc: friendDoc,

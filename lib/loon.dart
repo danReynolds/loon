@@ -108,7 +108,6 @@ class Loon {
     return _instance.persistor?.persistorSettings.persistenceEnabled ?? false;
   }
 
-  /// Deletes the given collection from the store.
   void _deleteCollection(
     String collection, {
     bool broadcast = true,
@@ -116,8 +115,8 @@ class Loon {
     /// Whether all subcollections of the collection should also be deleted.
     bool recursive = false,
   }) {
-    // Immediately clear any documents in the collection scheduled for broadcast, as whatever event happened prior to the clear
-    // in the collection are now irrelevant.
+    // Immediately clear any documents in the collection scheduled for broadcast, as whatever broadcasts had previously
+    // been scheduled for documents in the collection are now invalidated.
     _documentBroadcastStore[collection]?.clear();
 
     final snaps = _getSnapshots(collection);
@@ -129,7 +128,7 @@ class Loon {
 
     // If this is a recursive deletion, then all subcollections of the collection are additionally deleted.
     if (recursive) {
-      for (final otherCollection in _documentStore.keys) {
+      for (final otherCollection in _documentStore.keys.toList()) {
         if (collection != otherCollection &&
             otherCollection.startsWith('${collection}__')) {
           _deleteCollection(
