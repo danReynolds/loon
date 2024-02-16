@@ -55,7 +55,7 @@ void main() {
 
   tearDown(() async {
     testDirectory.deleteSync(recursive: true);
-    await Loon.clear();
+    await Loon.clearAll();
   });
 
   group('hydrate', () {

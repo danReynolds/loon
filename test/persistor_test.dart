@@ -9,7 +9,7 @@ void main() {
   final completer = PersistorCompleter();
 
   tearDown(() {
-    Loon.clear();
+    Loon.clearAll();
   });
 
   group('Persistor', () {

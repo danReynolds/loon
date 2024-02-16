@@ -6,6 +6,8 @@ import 'package:loon/persistor/file_persistor/messages.dart';
 import 'package:loon/utils.dart';
 import 'package:path/path.dart' as path;
 
+typedef DocumentDataStore = Map<String, Map<String, FileDataStore>>;
+
 class FilePersistorWorker {
   /// The persistor's send port
   final SendPort sendPort;
@@ -16,8 +18,8 @@ class FilePersistorWorker {
   /// An index of file data stores by name.
   final Map<String, FileDataStore> _fileDataStoreIndex = {};
 
-  /// An index of a document key to the file data store that the document is currently persisted in.
-  final Map<String, FileDataStore> _documentDataStoreIndex = {};
+  /// An index of a documents by collection to the file data store that the document is currently persisted in.
+  final DocumentDataStore _documentDataStoreIndex = {};
 
   final FileDataStoreFactory factory;
 
@@ -62,6 +64,8 @@ class FilePersistorWorker {
         _persist(request);
       case ClearMessageRequest request:
         _clear(request);
+      case ClearAllMessageRequest request:
+        _clearAll(request);
       default:
         break;
     }
@@ -89,14 +93,14 @@ class FilePersistorWorker {
   /// Message request handlers
   ///
 
-  Future<void> _init(InitMessageRequest request) async {
+  void _init(InitMessageRequest request) {
     // Start listening to messages from the persistor on the worker's receive port.
     receivePort.listen(_onMessage);
     // Send a successful message response containing the worker's send port.
     _sendMessageResponse(request.success(receivePort.sendPort));
   }
 
-  _hydrate(HydrateMessageRequest request) async {
+  void _hydrate(HydrateMessageRequest request) {
     _measureOperation('Hydration operation', () async {
       try {
         final SerializedCollectionStore collectionStore = {};
@@ -133,14 +137,16 @@ class FilePersistorWorker {
         for (final fileDataStore in fileDataStores) {
           _fileDataStoreIndex[fileDataStore.name] = fileDataStore;
 
-          for (final dataStoreEntry in fileDataStore.data.entries) {
-            final documentKey = dataStoreEntry.key;
+          for (final documentDataEntry in fileDataStore.data.entries) {
+            final documentKey = documentDataEntry.key;
             final [collection, documentId] = documentKey.split(':');
 
-            _documentDataStoreIndex[documentKey] = fileDataStore;
+            final documentDataStore =
+                _documentDataStoreIndex[collection] ??= {};
+            documentDataStore[documentId] = fileDataStore;
 
             final documentCollectionStore = collectionStore[collection] ??= {};
-            documentCollectionStore[documentId] = dataStoreEntry.value;
+            documentCollectionStore[documentId] = documentDataEntry.value;
           }
         }
 
@@ -151,11 +157,12 @@ class FilePersistorWorker {
     });
   }
 
-  Future<void> _persist(PersistMessageRequest request) async {
+  void _persist(PersistMessageRequest request) {
     try {
       _measureOperation('Persist operation', () async {
         for (final doc in request.data) {
           final documentKey = doc.key;
+          final [collection, documentId] = documentKey.split(':');
           final docJson = doc.data;
           final documentDataStoreName = doc.dataStoreName;
           final documentDataStore =
@@ -164,7 +171,8 @@ class FilePersistorWorker {
 
           // If the document has changed the file data store it should be stored in, then it should
           // be removed from its previous file data store (if one exists) and placed in the new one.
-          final prevDocumentDataStore = _documentDataStoreIndex[documentKey];
+          final prevDocumentDataStore =
+              _documentDataStoreIndex[collection]?[documentId];
           if (prevDocumentDataStore != null &&
               documentDataStore != prevDocumentDataStore) {
             prevDocumentDataStore.removeDocument(documentKey);
@@ -172,10 +180,12 @@ class FilePersistorWorker {
 
           if (docJson != null) {
             documentDataStore.updateDocument(documentKey, docJson);
-            _documentDataStoreIndex[documentKey] = documentDataStore;
+            _documentDataStoreIndex[collection] ??= {};
+            _documentDataStoreIndex[collection]![documentId] =
+                documentDataStore;
           } else {
             documentDataStore.removeDocument(documentKey);
-            _documentDataStoreIndex.remove(documentKey);
+            _documentDataStoreIndex[collection]?.remove(documentKey);
           }
         }
 
@@ -188,8 +198,37 @@ class FilePersistorWorker {
     }
   }
 
-  _clear(ClearMessageRequest request) async {
+  void _clear(ClearMessageRequest request) {
+    final collection = request.collection;
+
     _measureOperation('Clear operation', () async {
+      try {
+        final collectionIndex = _documentDataStoreIndex[request.collection];
+
+        if (collectionIndex == null) {
+          return;
+        }
+
+        for (final docEntry in collectionIndex.entries) {
+          final documentId = docEntry.key;
+          final documentDataStore = docEntry.value;
+
+          documentDataStore.removeDocument('$collection:$documentId');
+        }
+
+        _documentDataStoreIndex.remove(collection);
+
+        await _sync();
+
+        _sendMessageResponse(request.success());
+      } catch (e) {
+        _sendMessageResponse(request.error('Clear failed'));
+      }
+    });
+  }
+
+  void _clearAll(ClearAllMessageRequest request) {
+    _measureOperation('ClearAll operation', () async {
       try {
         _fileDataStoreIndex.clear();
         _documentDataStoreIndex.clear();
@@ -199,7 +238,7 @@ class FilePersistorWorker {
 
         _sendMessageResponse(request.success());
       } catch (e) {
-        _sendMessageResponse(request.error('Clear failed'));
+        _sendMessageResponse(request.error('ClearAll failed'));
       }
     });
   }

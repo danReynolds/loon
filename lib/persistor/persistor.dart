@@ -17,7 +17,7 @@ abstract class Persistor {
   final Duration persistenceThrottle;
   final PersistorSettings persistorSettings;
   final void Function(List<Document> batch)? onPersist;
-  final void Function()? onClear;
+  final void Function()? onClearAll;
   final void Function(SerializedCollectionStore data)? onHydrate;
 
   final Set<Document> _batch = {};
@@ -35,7 +35,7 @@ abstract class Persistor {
     this.persistorSettings = const PersistorSettings(),
     this.persistenceThrottle = const Duration(milliseconds: 100),
     this.onPersist,
-    this.onClear,
+    this.onClearAll,
     this.onHydrate,
   }) {
     _runOperation(() {
@@ -69,10 +69,10 @@ abstract class Persistor {
     }
   }
 
-  Future<void> _clear() {
+  Future<void> _clearAll() {
     return _runOperation(() async {
-      await clear();
-      onClear?.call();
+      await clearAll();
+      onClearAll?.call();
     });
   }
 
@@ -136,5 +136,7 @@ abstract class Persistor {
 
   Future<SerializedCollectionStore> hydrate();
 
-  Future<void> clear();
+  Future<void> clear(String collection);
+
+  Future<void> clearAll();
 }

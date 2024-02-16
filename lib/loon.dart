@@ -111,9 +111,6 @@ class Loon {
   void _deleteCollection(
     String collection, {
     bool broadcast = true,
-
-    /// Whether all subcollections of the collection should also be deleted.
-    bool recursive = false,
   }) {
     // Immediately clear any documents in the collection scheduled for broadcast, as whatever broadcasts had previously
     // been scheduled for documents in the collection are now invalidated.
@@ -121,28 +118,26 @@ class Loon {
 
     final snaps = _getSnapshots(collection);
     for (final snap in snaps) {
-      snap.doc.delete(broadcast: broadcast);
+      _rebroadcastDependents(snap.doc);
     }
 
-    _documentStore.remove(collection);
+    _documentStore[collection]?.clear();
+    _documentDependencyStore.clearCollection(collection);
 
-    // If this is a recursive deletion, then all subcollections of the collection are additionally deleted.
-    if (recursive) {
-      for (final otherCollection in _documentStore.keys.toList()) {
-        if (collection != otherCollection &&
-            otherCollection.startsWith('${collection}__')) {
-          _deleteCollection(
-            otherCollection,
-            broadcast: broadcast,
-            recursive: recursive,
-          );
-        }
+    // Delete all subcollections of this collection.
+    for (final otherCollection in _documentStore.keys.toList()) {
+      if (collection != otherCollection &&
+          otherCollection.startsWith('${collection}__')) {
+        _deleteCollection(
+          otherCollection,
+          broadcast: broadcast,
+        );
       }
     }
   }
 
   /// Clears all data from the store.
-  Future<void> _clear({
+  Future<void> _clearAll({
     bool broadcast = false,
   }) async {
     // Immediately clear any documents scheduled for broadcast, as whatever events happened prior to the clear are now irrelevant.
@@ -165,7 +160,7 @@ class Loon {
     _documentStore.clear();
 
     if (persistor != null) {
-      return persistor!._clear();
+      return persistor!._clearAll();
     }
   }
 
@@ -497,10 +492,10 @@ class Loon {
     ).doc(id);
   }
 
-  static Future<void> clear({
+  static Future<void> clearAll({
     bool broadcast = false,
   }) {
-    return Loon._instance._clear(broadcast: broadcast);
+    return Loon._instance._clearAll(broadcast: broadcast);
   }
 
   /// Enqueues a document to be rebroadcasted, updating all listeners that are subscribed to that document.

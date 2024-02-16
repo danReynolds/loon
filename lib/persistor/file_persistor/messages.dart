@@ -87,6 +87,12 @@ class PersistMessageResponse extends MessageResponse {
 }
 
 class ClearMessageRequest extends MessageRequest<ClearMessageResponse> {
+  final String collection;
+
+  ClearMessageRequest({
+    required this.collection,
+  });
+
   ClearMessageResponse success() {
     return ClearMessageResponse(id: id);
   }
@@ -94,6 +100,18 @@ class ClearMessageRequest extends MessageRequest<ClearMessageResponse> {
 
 class ClearMessageResponse extends MessageResponse {
   ClearMessageResponse({
+    required super.id,
+  });
+}
+
+class ClearAllMessageRequest extends MessageRequest<ClearAllMessageResponse> {
+  ClearAllMessageResponse success() {
+    return ClearAllMessageResponse(id: id);
+  }
+}
+
+class ClearAllMessageResponse extends MessageResponse {
+  ClearAllMessageResponse({
     required super.id,
   });
 }

@@ -49,6 +49,7 @@ class ObservableQuery<T> extends Query<T>
     /// then its event type reported by the query is [DocumentBroadcastTypes.added] and its global event was
     /// [DocumentBroadcastTypes.modified].
     final List<DocumentChangeSnapshot<T>> changeSnaps = [];
+    final hasChangeListener = _changeController.hasListener;
     bool shouldUpdate = false;
 
     for (final docBroadcast in docBroadcasts.entries) {
@@ -64,7 +65,6 @@ class ObservableQuery<T> extends Query<T>
       );
 
       final prevSnap = _index[docId];
-      final hasChangeListener = _changeController.hasListener;
 
       switch (broadcastType) {
         case DocumentBroadcastTypes.added:
@@ -199,7 +199,7 @@ class ObservableQuery<T> extends Query<T>
   @override
   get() {
     // If the query is pending a broadcast when its data is accessed, we must immediately
-    // run the broadcast instead of waiting until the next micro-task and return the updated value.
+    // run the broadcast instead of waiting until the next micro-task in order to return the latest value.
     if (Loon._instance._isQueryPendingBroadcast(this)) {
       _onBroadcast();
     }

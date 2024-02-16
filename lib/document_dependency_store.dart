@@ -6,22 +6,37 @@ part of loon;
 /// 1. The document's dependencies are recalculated, marking new dependencies in the dependency store and removing stale ones.
 /// 2. If the document is marked for broadcast, then its dependents are also rebroadcast.
 class _DocumentDependencyStore {
-  /// The index of a document to the documents that depend on it. Whenever a document is updated, it schedules
+  /// The index of a document by collection to the documents that depend on it. Whenever a document is updated, it schedules
   /// each of its dependents for a broadcast so that they can receive its updated value.
-  final Map<Document, Set<Document>> _dependentsStore = {};
+  final Map<String, Map<String, Set<Document>>> _dependentsStore = {};
 
   /// The index of a document to the documents that it depends on. Whenever a document is updated, it records
   /// the updated set of documents that it now depends on.
-  final Map<Document, Set<Document>> _dependenciesStore = {};
+  final Map<String, Map<String, Set<Document>>> _dependenciesStore = {};
 
   /// Returns the set of dependencies (if any) that the given document is dependent on.
   Set<Document>? getDependencies(Document doc) {
-    return _dependenciesStore[doc];
+    return _dependenciesStore[doc.collection]?[doc.id];
   }
 
   /// Returns the set of documents (if any) that are dependent on the given document.
+  ///
+  /// If there are stale dependents for documents that have been removed since last update,
+  /// then they are lazily removed when accessed.
   Set<Document>? getDependents(Document doc) {
-    return _dependentsStore[doc];
+    final dependents = _dependentsStore[doc.collection]?[doc.id];
+
+    if (dependents == null) {
+      return null;
+    }
+
+    for (final dependent in dependents.toList()) {
+      if (!dependent.exists()) {
+        dependents.remove(dependent.id);
+      }
+    }
+
+    return dependents;
   }
 
   /// Marks the given document as dependent on the given dependency.
@@ -29,16 +44,14 @@ class _DocumentDependencyStore {
   /// 1. The dependency should be added to the dependencies store for the given document.
   /// 2. The document should be added to the dependents store for the given dependency.
   void addDependency(Document doc, Document dependency) {
-    if (!_dependentsStore.containsKey(dependency)) {
-      _dependentsStore[dependency] = {};
-    }
+    _dependentsStore[dependency.collection] ??= {};
+    final dependents =
+        _dependentsStore[dependency.collection]![dependency.id] ??= {};
+    dependents.add(doc);
 
-    if (!_dependenciesStore.containsKey(doc)) {
-      _dependenciesStore[doc] = {};
-    }
-
-    _dependenciesStore[doc]!.add(dependency);
-    _dependentsStore[dependency]!.add(doc);
+    _dependenciesStore[doc.collection] ??= {};
+    final dependencies = _dependenciesStore[doc.collection]![doc.id] ??= {};
+    dependencies.add(dependency);
   }
 
   /// Removes the given dependency from the given document.
@@ -46,24 +59,21 @@ class _DocumentDependencyStore {
   /// 1. The dependency should be removed from the dependencies store for the given document.
   /// 2. The document should be removed from the dependents store for the given dependency.
   void removeDependency(Document doc, Document dependency) {
-    _dependenciesStore[doc]?.remove(dependency);
-    _dependentsStore[dependency]?.remove(doc);
+    _dependenciesStore[doc.collection]?[doc.id]?.remove(dependency);
+    _dependentsStore[dependency.collection]?[dependency.id]?.remove(doc);
   }
 
   /// Clears all dependencies of the given document.
-  /// This involves removing entries from both the dependencies and dependents collections:
-  /// 1. All dependencies should be removed from the dependencies store for the given document.
-  /// 2. The document should be removed from the dependents store of all of its dependencies.
+  ///
+  /// The document is *not* removed from the dependents set of each of its dependencies at this time, that is instead lazily
+  /// done when the dependent is updated and attempts to rebroadcast its dependencies.
   void clearDependencies(Document doc) {
-    final dependencies = getDependencies(doc);
+    _dependenciesStore[doc.collection]?.remove(doc.id);
+  }
 
-    if (dependencies == null) {
-      return;
-    }
-
-    for (final dependency in dependencies.toList()) {
-      removeDependency(doc, dependency);
-    }
+  /// Clears all dependency entries for the given collection.
+  void clearCollection(String collection) {
+    _dependenciesStore.remove(collection);
   }
 
   /// Rebuilds a document's set of dependencies (if any), storing updates in two different collections:

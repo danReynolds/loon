@@ -52,7 +52,7 @@ class FilePersistor extends Persistor {
     super.persistenceThrottle = const Duration(milliseconds: 100),
     super.persistorSettings = const FilePersistorSettings(),
     super.onPersist,
-    super.onClear,
+    super.onClearAll,
     super.onHydrate,
   });
 
@@ -174,7 +174,12 @@ class FilePersistor extends Persistor {
   }
 
   @override
-  Future<void> clear() async {
-    await _sendMessage(ClearMessageRequest());
+  Future<void> clear(collection) async {
+    await _sendMessage(ClearMessageRequest(collection: collection));
+  }
+
+  @override
+  Future<void> clearAll() async {
+    await _sendMessage(ClearAllMessageRequest());
   }
 }

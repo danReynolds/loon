@@ -63,7 +63,7 @@ class DocumentSnapshotMatcher<T> extends Matcher {
 void main() {
   group('Create document', () {
     tearDown(() {
-      Loon.clear();
+      Loon.clearAll();
     });
 
     test(
@@ -140,7 +140,7 @@ void main() {
 
   group('Read document', () {
     tearDown(() {
-      Loon.clear();
+      Loon.clearAll();
     });
 
     test('Instance user document read successfully', () {
@@ -183,7 +183,7 @@ void main() {
 
   group('Update document', () {
     tearDown(() {
-      Loon.clear();
+      Loon.clearAll();
     });
 
     test('Deserialized document updated successfully', () {
@@ -252,7 +252,7 @@ void main() {
 
   group('Modify document', () {
     tearDown(() {
-      Loon.clear();
+      Loon.clearAll();
     });
 
     test('Deserialized document modified successfully', () {
@@ -321,7 +321,7 @@ void main() {
 
   group('Delete document', () {
     tearDown(() {
-      Loon.clear();
+      Loon.clearAll();
     });
 
     test('Document deleted successfully', () {
@@ -342,7 +342,7 @@ void main() {
 
   group('Stream document', () {
     tearDown(() {
-      return Loon.clear();
+      return Loon.clearAll();
     });
 
     test('Emits the current document', () async {
@@ -410,7 +410,7 @@ void main() {
 
   group('Stream document changes', () {
     tearDown(() {
-      Loon.clear();
+      Loon.clearAll();
     });
 
     test('Returns a stream of changes to the document', () async {
@@ -460,7 +460,7 @@ void main() {
 
   group('Query documents', () {
     tearDown(() {
-      Loon.clear();
+      Loon.clearAll();
     });
 
     test('Returns documents that satisfy the query', () {
@@ -490,7 +490,7 @@ void main() {
 
   group('Stream documents', () {
     tearDown(() {
-      Loon.clear();
+      Loon.clearAll();
     });
 
     test('Returns a stream of documents that satisfy the query', () async {
@@ -560,7 +560,7 @@ void main() {
 
   group('Stream query changes', () {
     tearDown(() {
-      Loon.clear();
+      Loon.clearAll();
     });
 
     test('Returns a stream of changes to documents', () async {
@@ -646,7 +646,7 @@ void main() {
 
   group('Delete collection', () {
     tearDown(() {
-      Loon.clear();
+      Loon.clearAll();
     });
 
     test('Deletes the collection', () {
@@ -687,7 +687,7 @@ void main() {
       );
     });
 
-    test('Deletes the collection recursively when specified', () {
+    test('Deletes subcollections of the collection', () {
       final userDoc = TestUserModel.store.doc('1');
       final userDoc2 = TestUserModel.store.doc('2');
 
@@ -733,22 +733,6 @@ void main() {
 
       expect(
         Loon.extract()['collectionStore'],
-        {
-          "users__1__friends": {
-            "2": DocumentSnapshotMatcher(
-              DocumentSnapshot(
-                doc: friendDoc,
-                data: userData2,
-              ),
-            ),
-          }
-        },
-      );
-
-      TestUserModel.store.delete(recursive: true);
-
-      expect(
-        Loon.extract()['collectionStore'],
         {},
       );
     });
@@ -756,7 +740,7 @@ void main() {
 
   group('Replace collection', () {
     tearDown(() {
-      Loon.clear();
+      Loon.clearAll();
     });
 
     test('Replaces all documents in the collection', () {
@@ -828,7 +812,7 @@ void main() {
 
   group('Clearing all collections', () {
     tearDown(() {
-      Loon.clear();
+      Loon.clearAll();
     });
 
     test('Clears all documents across all collections', () {
@@ -861,7 +845,7 @@ void main() {
         },
       );
 
-      Loon.clear();
+      Loon.clearAll();
 
       expect(
         Loon.extract()['collectionStore'],
@@ -879,7 +863,7 @@ void main() {
 
   group('Root collection', () {
     tearDown(() {
-      Loon.clear();
+      Loon.clearAll();
     });
 
     test('Writes documents successfully', () {
@@ -906,7 +890,7 @@ void main() {
 
   group('Subcollections', () {
     tearDown(() {
-      Loon.clear();
+      Loon.clearAll();
     });
 
     test('Read/Write documents successfully', () {
@@ -937,7 +921,7 @@ void main() {
   group('Hydration', () {
     tearDown(() {
       Loon.configure(persistor: null);
-      Loon.clear();
+      Loon.clearAll();
     });
 
     test('Hydrates documents', () async {
@@ -1022,7 +1006,7 @@ void main() {
 
   group('dependencies', () {
     tearDown(() {
-      Loon.clear();
+      Loon.clearAll();
     });
 
     test("Dependent changes should broadcast dependencies", () async {

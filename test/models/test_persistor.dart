@@ -30,7 +30,10 @@ class TestPersistor extends Persistor {
   persist(docs) async {}
 
   @override
-  clear() async {}
+  clear(collection) async {}
+
+  @override
+  clearAll() async {}
 
   @override
   init() async {}
