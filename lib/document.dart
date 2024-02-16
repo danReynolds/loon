@@ -43,7 +43,7 @@ class Document<T> {
     DependenciesBuilder<S>? dependenciesBuilder,
   }) {
     return Collection<S>(
-      "${collection}_${id}_$subcollection",
+      "${collection}__${id}__$subcollection",
       fromJson: fromJson,
       toJson: toJson,
       persistorSettings: persistorSettings,

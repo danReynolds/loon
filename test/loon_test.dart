@@ -649,7 +649,7 @@ void main() {
       Loon.clear();
     });
 
-    test('Clears all documents in the collection', () {
+    test('Deletes the collection', () {
       final userDoc = TestUserModel.store.doc('1');
       final userDoc2 = TestUserModel.store.doc('2');
 
@@ -683,7 +683,7 @@ void main() {
 
       expect(
         Loon.extract()['collectionStore'],
-        {"users": {}},
+        {},
       );
     });
   });

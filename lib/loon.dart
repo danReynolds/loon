@@ -110,18 +110,35 @@ class Loon {
 
   /// Deletes the given collection from the store.
   void _deleteCollection(
-    Collection collection, {
+    String collection, {
     bool broadcast = true,
-  }) {
-    final collectionName = collection.name;
 
+    /// Whether all subcollections of the collection should also be deleted.
+    bool recursive = false,
+  }) {
     // Immediately clear any documents in the collection scheduled for broadcast, as whatever event happened prior to the clear
     // in the collection are now irrelevant.
-    _documentBroadcastStore[collectionName]?.clear();
+    _documentBroadcastStore[collection]?.clear();
 
-    final snaps = _getSnapshots(collectionName);
+    final snaps = _getSnapshots(collection);
     for (final snap in snaps) {
       snap.doc.delete(broadcast: broadcast);
+    }
+
+    _documentStore.remove(collection);
+
+    // If this is a recursive deletion, then all subcollections of the collection are additionally deleted.
+    if (recursive) {
+      for (final otherCollection in _documentStore.keys) {
+        if (collection != otherCollection &&
+            otherCollection.startsWith('${collection}__')) {
+          _deleteCollection(
+            otherCollection,
+            broadcast: broadcast,
+            recursive: recursive,
+          );
+        }
+      }
     }
   }
 

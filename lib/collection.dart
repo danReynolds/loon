@@ -27,8 +27,13 @@ class Collection<T> extends Query<T> {
 
   void delete({
     bool broadcast = true,
+    bool recursive = false,
   }) {
-    Loon._instance._deleteCollection(this, broadcast: broadcast);
+    Loon._instance._deleteCollection(
+      name,
+      broadcast: broadcast,
+      recursive: recursive,
+    );
   }
 
   void replace(List<DocumentSnapshot<T>> snaps) {
