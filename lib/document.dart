@@ -93,7 +93,13 @@ class Document<T> {
   }
 
   DocumentSnapshot<T>? get() {
-    return Loon._instance._getSnapshot<T>(this);
+    return Loon._instance._getSnapshot<T>(
+      id: id,
+      collection: collection,
+      fromJson: fromJson,
+      toJson: toJson,
+      persistorSettings: persistorSettings,
+    );
   }
 
   ObservableDocument<T> observe({
@@ -119,7 +125,7 @@ class Document<T> {
   }
 
   Json? getJson() {
-    final data = Loon._instance._getSnapshot<T>(this)?.data;
+    final data = get()?.data;
 
     if (data is Json?) {
       return data;
@@ -143,13 +149,9 @@ class Document<T> {
   PersistorSettings? get persistorSettings {
     return _persistorSettings ?? Loon._instance.persistor?.persistorSettings;
   }
-
-  BroadcastDocument<T> toBroadcast(BroadcastEventTypes type) {
-    return BroadcastDocument<T>(this, type);
-  }
 }
 
-enum BroadcastEventTypes {
+enum DocumentBroadcastTypes {
   /// The document has been modified.
   modified,
 
@@ -164,19 +166,4 @@ enum BroadcastEventTypes {
 
   /// The document has been hydrated from persisted storage.
   hydrated,
-}
-
-class BroadcastDocument<T> extends Document<T> {
-  final BroadcastEventTypes type;
-
-  BroadcastDocument(
-    Document<T> doc,
-    this.type,
-  ) : super(
-          id: doc.id,
-          collection: doc.collection,
-          fromJson: doc.fromJson,
-          toJson: doc.toJson,
-          persistorSettings: doc.persistorSettings,
-        );
 }

@@ -18,10 +18,11 @@ part 'types.dart';
 part 'document_snapshot.dart';
 part 'persistor/persistor.dart';
 part 'document_change_snapshot.dart';
-part 'dependency_store.dart';
+part 'document_dependency_store.dart';
 
-typedef CollectionStore = Map<String, Map<String, DocumentSnapshot>>;
-typedef BroadcastCollectionStore = Map<String, Map<String, BroadcastDocument>>;
+typedef DocumentStore = Map<String, Map<String, DocumentSnapshot>>;
+typedef DocumentBroadcastStore
+    = Map<String, Map<String, DocumentBroadcastTypes>>;
 
 class Loon {
   Persistor? persistor;
@@ -30,18 +31,16 @@ class Loon {
 
   Loon._();
 
-  /// Document data is stored in a dynamic collection mixing snapshots of both serialized and parsed data. Documents are initially hydrated in their serialized
-  /// representation, since de-serializers cannot be known ahead of time. They are then cached in their parsed representation when they are first accessed
-  /// using a serializer. Caching the parsed document snapshots is necessary in order to improve the performance of repeatedly reading document data.
-  final CollectionStore _collectionStore = {};
+  /// The store of document snapshots indexed by their collections.
+  final DocumentStore _documentStore = {};
 
-  /// The collection store of documents that are pending a scheduled broadcast.
-  final BroadcastCollectionStore _broadcastCollectionStore = {};
+  /// The store of broadcast types for documents scheduled to be broadcast, indexed by their collection.
+  final DocumentBroadcastStore _documentBroadcastStore = {};
 
   /// The list of observers, either document or query observables, that should be notified on broadcast.
   final Set<BroadcastObserver> _broadcastObservers = {};
 
-  final _dependencyStore = _DependencyStore();
+  final _documentDependencyStore = _DocumentDependencyStore();
 
   bool _hasPendingBroadcast = false;
 
@@ -67,8 +66,14 @@ class Loon {
   }
 
   /// Returns a data snapshot for the given document.
-  DocumentSnapshot<T>? _getSnapshot<T>(Document<T> doc) {
-    final snap = _collectionStore[doc.collection]?[doc.id];
+  DocumentSnapshot<T>? _getSnapshot<T>({
+    required String id,
+    required String collection,
+    FromJson<T>? fromJson,
+    ToJson<T>? toJson,
+    PersistorSettings? persistorSettings,
+  }) {
+    final snap = _documentStore[collection]?[id];
 
     if (snap == null) {
       return null;
@@ -76,15 +81,21 @@ class Loon {
 
     if (snap is DocumentSnapshot<Json> && T != Json && T != dynamic) {
       _validateTypeSerialization<T>(
-        fromJson: doc.fromJson,
-        toJson: doc.toJson,
+        fromJson: fromJson,
+        toJson: toJson,
       );
 
-      // Upon first read of serialized data using a serializer, the parsed representation
-      // of the document is cached for efficient repeat access. It does not need to be rebroadcast.
+      // When a document is read, if it is still in JSON format from hydration and is now being accessed
+      // with a serializer, then it is de-serialized at time of access.
       return _writeSnapshot<T>(
-        doc,
-        doc.fromJson!(snap.data),
+        Document<T>(
+          id: id,
+          collection: collection,
+          fromJson: fromJson,
+          toJson: toJson,
+          persistorSettings: persistorSettings,
+        ),
+        fromJson!(snap.data),
         broadcast: false,
         persist: false,
       );
@@ -93,17 +104,12 @@ class Loon {
     return snap as DocumentSnapshot<T>;
   }
 
-  /// Returns whether a collection name exists in the collection data store.
-  bool _hasCollection(String name) {
-    return _collectionStore.containsKey(name);
-  }
-
   bool get _isGlobalPersistenceEnabled {
     return _instance.persistor?.persistorSettings.persistenceEnabled ?? false;
   }
 
-  /// Clears the given collection from the store.
-  void _clearCollection(
+  /// Deletes the given collection from the store.
+  void _deleteCollection(
     Collection collection, {
     bool broadcast = true,
   }) {
@@ -111,7 +117,7 @@ class Loon {
 
     // Immediately clear any documents in the collection scheduled for broadcast, as whatever event happened prior to the clear
     // in the collection are now irrelevant.
-    _broadcastCollectionStore[collectionName]?.clear();
+    _documentBroadcastStore[collectionName]?.clear();
 
     final snaps = _getSnapshots(collectionName);
     for (final snap in snaps) {
@@ -121,26 +127,26 @@ class Loon {
 
   /// Clears all data from the store.
   Future<void> _clear({
-    bool broadcast = true,
+    bool broadcast = false,
   }) async {
     // Immediately clear any documents scheduled for broadcast, as whatever events happened prior to the clear are now irrelevant.
-    _broadcastCollectionStore.clear();
+    _documentBroadcastStore.clear();
     // Immediately clear all dependencies of documents, since all documents are being removed and will be broadcast if indicated.
-    _dependencyStore.clear();
+    _documentDependencyStore.clear();
 
     // If it should broadcast, then we need to go through every document that is being
     // cleared and schedule it for broadcast.
     if (broadcast) {
-      for (final collectionName in _collectionStore.keys) {
+      for (final collectionName in _documentStore.keys) {
         final snaps = _getSnapshots(collectionName);
 
         for (final snap in snaps) {
-          _writeBroadcastDocument(snap.doc, BroadcastEventTypes.removed);
+          _writeDocumentBroadcast(snap.doc, DocumentBroadcastTypes.removed);
         }
       }
     }
 
-    _collectionStore.clear();
+    _documentStore.clear();
 
     if (persistor != null) {
       return persistor!._clear();
@@ -149,7 +155,7 @@ class Loon {
 
   /// Returns whether a document exists in the collection data store.
   bool _hasDocument(Document doc) {
-    return _collectionStore[doc.collection]?.containsKey(doc.id) ?? false;
+    return _documentStore[doc.collection]?.containsKey(doc.id) ?? false;
   }
 
   void _replaceCollection<T>(
@@ -197,19 +203,19 @@ class Loon {
     ToJson<T>? toJson,
     PersistorSettings? persistorSettings,
   }) {
-    if (!_hasCollection(collection)) {
+    if (!_documentStore.containsKey(collection)) {
       return [];
     }
 
-    return _collectionStore[collection]!.values.map((snap) {
+    return _documentStore[collection]!.values.map((snap) {
       if (snap is DocumentSnapshot<Json> && T != Json && T != dynamic) {
         _validateTypeSerialization<T>(
           fromJson: fromJson,
           toJson: toJson,
         );
 
-        // Upon first read of serialized data using a serializer, the parsed representation
-        // of the document is cached for efficient repeat access.
+        // When a document is read, if it is still in JSON format from hydration and is now being accessed
+        // with a serializer, then it is de-serialized at time of access.
         return _writeSnapshot<T>(
           Document<T>(
             id: snap.doc.id,
@@ -225,63 +231,6 @@ class Loon {
       }
 
       return snap as DocumentSnapshot<T>;
-    }).toList();
-  }
-
-  BroadcastDocument<T>? _getBroadcastDocument<T>(
-    String collection,
-    String id, {
-    FromJson<T>? fromJson,
-    ToJson<T>? toJson,
-    PersistorSettings? persistorSettings,
-  }) {
-    if (!_broadcastCollectionStore.containsKey(collection)) {
-      return null;
-    }
-
-    final doc = _broadcastCollectionStore[collection]![id];
-
-    if (doc == null) {
-      return null;
-    }
-
-    if (doc is BroadcastDocument<T>) {
-      return doc;
-    } else {
-      // If the broadcast document was created through the hydration process, then its broadcast document is likely Json assuming
-      // it hasn't modified since hydration already. In this case, it can now lazily be converted to the provided collection type.
-      return BroadcastDocument<T>(
-        Document<T>(
-          collection: collection,
-          id: doc.id,
-          fromJson: fromJson,
-          toJson: toJson,
-          persistorSettings: persistorSettings,
-        ),
-        doc.type,
-      );
-    }
-  }
-
-  /// Returns the list of documents in the given collection that have been added, removed or modified since the last broadcast.
-  List<BroadcastDocument<T>> _getBroadcastDocuments<T>(
-    String collection, {
-    FromJson<T>? fromJson,
-    ToJson<T>? toJson,
-    PersistorSettings? persistorSettings,
-  }) {
-    if (!_broadcastCollectionStore.containsKey(collection)) {
-      return [];
-    }
-
-    return _broadcastCollectionStore[collection]!.values.map((doc) {
-      return _getBroadcastDocument<T>(
-        collection,
-        doc.id,
-        fromJson: fromJson,
-        toJson: toJson,
-        persistorSettings: persistorSettings,
-      )!;
     }).toList();
   }
 
@@ -306,11 +255,11 @@ class Loon {
   }
 
   bool _isQueryPendingBroadcast<T>(Query<T> query) {
-    return _instance._broadcastCollectionStore.containsKey(query.name);
+    return _instance._documentBroadcastStore.containsKey(query.name);
   }
 
   bool _isDocumentPendingBroadcast<T>(Document<T> doc) {
-    return _instance._broadcastCollectionStore[doc.collection]
+    return _instance._documentBroadcastStore[doc.collection]
             ?.containsKey(doc.id) ??
         false;
   }
@@ -320,7 +269,7 @@ class Loon {
       observer._onBroadcast();
     }
 
-    for (final broadcastCollection in _broadcastCollectionStore.values) {
+    for (final broadcastCollection in _documentBroadcastStore.values) {
       broadcastCollection.clear();
     }
   }
@@ -329,8 +278,8 @@ class Loon {
     Document<T> doc,
     T data, {
     bool broadcast = true,
-    bool hydrating = false,
     bool persist = true,
+    bool hydrating = false,
   }) {
     if (data is! Json && doc.isPersistenceEnabled()) {
       _validateDataSerialization<T>(
@@ -342,29 +291,28 @@ class Loon {
 
     final collection = doc.collection;
 
-    if (!_collectionStore.containsKey(collection)) {
-      _collectionStore[collection] = {};
+    if (!_documentStore.containsKey(collection)) {
+      _documentStore[collection] = {};
     }
 
-    final BroadcastEventTypes eventType;
+    final DocumentBroadcastTypes broadcastType;
     if (hydrating) {
-      eventType = BroadcastEventTypes.hydrated;
+      broadcastType = DocumentBroadcastTypes.hydrated;
     } else if (doc.exists()) {
-      eventType = BroadcastEventTypes.modified;
+      broadcastType = DocumentBroadcastTypes.modified;
     } else {
-      eventType = BroadcastEventTypes.added;
+      broadcastType = DocumentBroadcastTypes.added;
     }
 
-    final snap =
-        _collectionStore[doc.collection]![doc.id] = DocumentSnapshot<T>(
+    final snap = _documentStore[doc.collection]![doc.id] = DocumentSnapshot<T>(
       doc: doc,
       data: data,
     );
 
-    _dependencyStore.rebuildDependencies(snap);
+    _documentDependencyStore.rebuildDependencies(snap);
 
     if (broadcast) {
-      _writeBroadcastDocument<T>(doc, eventType);
+      _writeDocumentBroadcast(doc, broadcastType);
     }
 
     if (persist && doc.isPersistenceEnabled()) {
@@ -420,11 +368,11 @@ class Loon {
       return;
     }
 
-    _collectionStore[doc.collection]!.remove(doc.id);
-    _dependencyStore.clearDependencies(doc);
+    _documentStore[doc.collection]!.remove(doc.id);
+    _documentDependencyStore.clearDependencies(doc);
 
     if (broadcast) {
-      _writeBroadcastDocument<T>(doc, BroadcastEventTypes.removed);
+      _writeDocumentBroadcast<T>(doc, DocumentBroadcastTypes.removed);
     }
 
     if (doc.isPersistenceEnabled()) {
@@ -432,36 +380,35 @@ class Loon {
     }
   }
 
-  void _writeBroadcastDocument<T>(
+  void _writeDocumentBroadcast<T>(
     Document<T> doc,
-    BroadcastEventTypes eventType,
+    DocumentBroadcastTypes broadcastType,
   ) {
-    final pendingBroadcastDoc =
-        _broadcastCollectionStore[doc.collection]?[doc.id];
+    final pendingBroadcastType =
+        _documentBroadcastStore[doc.collection]?[doc.id];
 
     // Ignore writing a duplicate broadcast event type or overwriting a pending mutative event type with a touched event.
-    if (pendingBroadcastDoc != null &&
-        (pendingBroadcastDoc.type == eventType ||
-            eventType == BroadcastEventTypes.touched)) {
+    if (pendingBroadcastType != null &&
+        (pendingBroadcastType == broadcastType ||
+            broadcastType == DocumentBroadcastTypes.touched)) {
       return;
     }
 
-    if (!_broadcastCollectionStore.containsKey(doc.collection)) {
-      _broadcastCollectionStore[doc.collection] = {};
+    if (!_documentBroadcastStore.containsKey(doc.collection)) {
+      _documentBroadcastStore[doc.collection] = {};
     }
 
-    final broadcastDoc = _broadcastCollectionStore[doc.collection]![doc.id] =
-        doc.toBroadcast(eventType);
+    _documentBroadcastStore[doc.collection]![doc.id] = broadcastType;
 
-    _rebroadcastDependents(broadcastDoc);
+    _rebroadcastDependents(doc);
 
     _scheduleBroadcast();
   }
 
   /// Schedules all dependents of the given document for rebroadcast. This occurs
   /// for any type of broadcast (added, modified, removed or touched).
-  void _rebroadcastDependents(BroadcastDocument doc) {
-    final dependents = _dependencyStore.getDependents(doc);
+  void _rebroadcastDependents(Document doc) {
+    final dependents = _documentDependencyStore.getDependents(doc);
 
     if (dependents != null) {
       for (final dependent in dependents) {
@@ -484,16 +431,16 @@ class Loon {
     try {
       final data = await _instance.persistor!._hydrate();
 
-      for (final collectionDataStoreEntry in data.entries) {
-        final collection = collectionDataStoreEntry.key;
-        final documentDataStore = collectionDataStoreEntry.value;
+      for (final collectionDataStore in data.entries) {
+        final collection = collectionDataStore.key;
+        final documentDataStore = collectionDataStore.value;
 
         for (final documentDataEntry in documentDataStore.entries) {
           _instance._writeSnapshot<Json>(
-            Document<Json>(collection: collection, id: documentDataEntry.key),
+            Document<Json>(id: documentDataEntry.key, collection: collection),
             documentDataEntry.value,
-            hydrating: true,
             persist: false,
+            hydrating: true,
           );
         }
       }
@@ -535,27 +482,27 @@ class Loon {
   }
 
   static Future<void> clear({
-    bool broadcast = true,
+    bool broadcast = false,
   }) {
     return Loon._instance._clear(broadcast: broadcast);
   }
 
   /// Enqueues a document to be rebroadcasted, updating all listeners that are subscribed to that document.
   static void rebroadcast(Document doc) {
-    _instance._writeBroadcastDocument(
+    _instance._writeDocumentBroadcast(
       doc,
-      BroadcastEventTypes.touched,
+      DocumentBroadcastTypes.touched,
     );
   }
 
   /// Returns a Map of all of the data and metadata of the store for debugging and inspection purposes.
   static Json extract() {
     return {
-      "collectionStore": _instance._collectionStore,
-      "broadcastCollectionStore": _instance._broadcastCollectionStore,
+      "collectionStore": _instance._documentStore,
+      "documentBroadcastStore": _instance._documentBroadcastStore,
       "dependencyStore": {
-        "dependencies": _instance._dependencyStore._dependenciesStore,
-        "dependents": _instance._dependencyStore._dependentsStore,
+        "dependencies": _instance._documentDependencyStore._dependenciesStore,
+        "dependents": _instance._documentDependencyStore._dependentsStore,
       },
     };
   }

@@ -37,45 +37,48 @@ class ObservableQuery<T> extends Query<T>
   /// 4. A document that has been manually touched to be rebroadcasted.
   @override
   void _onBroadcast() {
-    final broadcastDocs = Loon._instance._getBroadcastDocuments<T>(
-      name,
-      fromJson: fromJson,
-      toJson: toJson,
-      persistorSettings: persistorSettings,
-    );
+    final docBroadcasts = Loon._instance._documentBroadcastStore[name];
 
-    if (broadcastDocs.isEmpty) {
+    if (docBroadcasts == null) {
       return;
     }
 
-    /// The list of changes to the query. Note that the [BroadcastEventTypes] of the document
-    /// local to the query is different from the globally broadcast event. For example, if a document
+    /// The list of changes to the query. Note that the [DocumentBroadcastTypes] of the document
+    /// local to the query is different from the global broadcast type. For example, if a document
     /// was modified globally such that now it should be included in the query and before was not,
-    /// then its event type reported by the query is [BroadcastEventTypes.added] and its global event was
-    /// [BroadcastEventTypes.modified].
+    /// then its event type reported by the query is [DocumentBroadcastTypes.added] and its global event was
+    /// [DocumentBroadcastTypes.modified].
     final List<DocumentChangeSnapshot<T>> changeSnaps = [];
     bool shouldUpdate = false;
 
-    for (final broadcastDoc in broadcastDocs) {
-      final docId = broadcastDoc.id;
+    for (final docBroadcast in docBroadcasts.entries) {
+      final docId = docBroadcast.key;
+      final broadcastType = docBroadcast.value;
+
+      final snap = Loon._instance._getSnapshot<T>(
+        id: docId,
+        collection: name,
+        fromJson: fromJson,
+        toJson: toJson,
+        persistorSettings: persistorSettings,
+      );
+
       final prevSnap = _index[docId];
       final hasChangeListener = _changeController.hasListener;
 
-      switch (broadcastDoc.type) {
-        case BroadcastEventTypes.added:
-        case BroadcastEventTypes.hydrated:
-          final snap = broadcastDoc.get()!;
-
+      switch (broadcastType) {
+        case DocumentBroadcastTypes.added:
+        case DocumentBroadcastTypes.hydrated:
           // 1. Add new documents that satisfy the query filter.
-          if (_filter(snap)) {
+          if (_filter(snap!)) {
             _index[docId] = snap;
             shouldUpdate = true;
 
             if (hasChangeListener) {
               changeSnaps.add(
                 DocumentChangeSnapshot(
-                  doc: broadcastDoc,
-                  type: broadcastDoc.type,
+                  doc: snap.doc,
+                  type: broadcastType,
                   prevData: prevSnap?.data,
                   data: snap.data,
                 ),
@@ -83,17 +86,18 @@ class ObservableQuery<T> extends Query<T>
             }
           }
           break;
-        case BroadcastEventTypes.removed:
+        case DocumentBroadcastTypes.removed:
           // 2. Remove old documents that previously satisfied the query filter and have been removed.
           if (_index.containsKey(docId)) {
+            final doc = _index[docId]!.doc;
             _index.remove(docId);
             shouldUpdate = true;
 
             if (hasChangeListener) {
               changeSnaps.add(
                 DocumentChangeSnapshot(
-                  doc: broadcastDoc,
-                  type: BroadcastEventTypes.removed,
+                  doc: doc,
+                  type: DocumentBroadcastTypes.removed,
                   prevData: prevSnap?.data,
                   data: null,
                 ),
@@ -103,35 +107,34 @@ class ObservableQuery<T> extends Query<T>
           break;
 
         // 3.a) Add / remove modified documents.
-        case BroadcastEventTypes.modified:
-          final updatedSnap = broadcastDoc.get()!;
-
+        case DocumentBroadcastTypes.modified:
           if (_index.containsKey(docId)) {
             shouldUpdate = true;
 
             // a) Previously satisfied the query filter and still does (updated value must still be rebroadcast on the query).
-            if (_filter(updatedSnap)) {
-              _index[docId] = updatedSnap;
+            if (_filter(snap!)) {
+              _index[docId] = snap;
 
               if (hasChangeListener) {
                 changeSnaps.add(
                   DocumentChangeSnapshot(
-                    doc: broadcastDoc,
-                    type: BroadcastEventTypes.modified,
+                    doc: snap.doc,
+                    type: DocumentBroadcastTypes.modified,
                     prevData: prevSnap?.data,
-                    data: updatedSnap.data,
+                    data: snap.data,
                   ),
                 );
               }
             } else {
               /// b) Previously satisfied the query filter and now does not.
+              final doc = _index[docId]!.doc;
               _index.remove(docId);
 
               if (hasChangeListener) {
                 changeSnaps.add(
                   DocumentChangeSnapshot(
-                    doc: broadcastDoc,
-                    type: BroadcastEventTypes.removed,
+                    doc: doc,
+                    type: DocumentBroadcastTypes.removed,
                     prevData: prevSnap?.data,
                     data: null,
                   ),
@@ -140,17 +143,17 @@ class ObservableQuery<T> extends Query<T>
             }
           } else {
             // c) Previously did not satisfy the query filter and now does.
-            if (_filter(updatedSnap)) {
-              _index[docId] = updatedSnap;
+            if (_filter(snap!)) {
+              _index[docId] = snap;
               shouldUpdate = true;
 
               if (hasChangeListener) {
                 changeSnaps.add(
                   DocumentChangeSnapshot(
-                    doc: broadcastDoc,
-                    type: BroadcastEventTypes.added,
+                    doc: snap.doc,
+                    type: DocumentBroadcastTypes.added,
                     prevData: prevSnap?.data,
-                    data: updatedSnap.data,
+                    data: snap.data,
                   ),
                 );
               }
@@ -159,19 +162,18 @@ class ObservableQuery<T> extends Query<T>
           break;
         // 4. If the broadcast documents include any documents that were manually touched for rebroadcast and are part of this query's
         // result set, then the query should be rebroadcasted.
-        case BroadcastEventTypes.touched:
+        case DocumentBroadcastTypes.touched:
           if (_index.containsKey(docId)) {
-            final updatedSnap = broadcastDoc.get()!;
-            _index[docId] = updatedSnap;
+            _index[docId] = snap!;
             shouldUpdate = true;
 
             if (hasChangeListener) {
               changeSnaps.add(
                 DocumentChangeSnapshot(
-                  doc: broadcastDoc,
-                  type: BroadcastEventTypes.touched,
+                  doc: snap.doc,
+                  type: DocumentBroadcastTypes.touched,
                   prevData: prevSnap?.data,
-                  data: updatedSnap.data,
+                  data: snap.data,
                 ),
               );
             }

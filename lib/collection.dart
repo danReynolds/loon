@@ -25,10 +25,10 @@ class Collection<T> extends Query<T> {
         Loon._instance._isGlobalPersistenceEnabled;
   }
 
-  void clear({
+  void delete({
     bool broadcast = true,
   }) {
-    Loon._instance._clearCollection(this, broadcast: broadcast);
+    Loon._instance._deleteCollection(this, broadcast: broadcast);
   }
 
   void replace(List<DocumentSnapshot<T>> snaps) {

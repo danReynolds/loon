@@ -1,7 +1,7 @@
 part of loon;
 
 class DocumentChangeSnapshot<T> extends DocumentSnapshot<T?> {
-  final BroadcastEventTypes type;
+  final DocumentBroadcastTypes type;
   final T? prevData;
 
   DocumentChangeSnapshot({

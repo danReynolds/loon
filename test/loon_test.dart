@@ -431,7 +431,7 @@ void main() {
       // Add document
       expect(
         snaps[0].type,
-        BroadcastEventTypes.added,
+        DocumentBroadcastTypes.added,
       );
       expect(
         snaps[0].prevData,
@@ -445,7 +445,7 @@ void main() {
       // Update document
       expect(
         snaps[1].type,
-        BroadcastEventTypes.modified,
+        DocumentBroadcastTypes.modified,
       );
       expect(
         snaps[1].prevData,
@@ -585,7 +585,7 @@ void main() {
 
       expect(
         snaps[0].first.type,
-        BroadcastEventTypes.added,
+        DocumentBroadcastTypes.added,
       );
       expect(
         snaps[0].first.data,
@@ -594,7 +594,7 @@ void main() {
 
       expect(
         snaps[0].last.type,
-        BroadcastEventTypes.added,
+        DocumentBroadcastTypes.added,
       );
       expect(
         snaps[0].last.data,
@@ -605,7 +605,7 @@ void main() {
 
       expect(
         snaps[1].first.type,
-        BroadcastEventTypes.modified,
+        DocumentBroadcastTypes.modified,
       );
       expect(
         snaps[1].first.prevData,
@@ -636,15 +636,15 @@ void main() {
       expect(snaps[0].length, 1);
       expect(
         snaps[0].first.type,
-        // The global event is a [BroadcastEventTypes.modified] when the user is updated,
-        // but to this query, it should be a [BroadcastEventTypes.added] event since previously
+        // The global event is a [DocumentBroadcastTypes.modified] when the user is updated,
+        // but to this query, it should be a [DocumentBroadcastTypes.added] event since previously
         // it was not included and now it is.
-        BroadcastEventTypes.added,
+        DocumentBroadcastTypes.added,
       );
     });
   });
 
-  group('Clear collection', () {
+  group('Delete collection', () {
     tearDown(() {
       Loon.clear();
     });
@@ -679,7 +679,7 @@ void main() {
         },
       );
 
-      TestUserModel.store.clear();
+      TestUserModel.store.delete();
 
       expect(
         Loon.extract()['collectionStore'],

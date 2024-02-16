@@ -18,15 +18,10 @@ class ObservableDocument<T> extends Document<T>
   /// and if so, emitting an update to observers.
   @override
   void _onBroadcast() {
-    final broadcastDoc = Loon._instance._getBroadcastDocument<T>(
-      collection,
-      id,
-      fromJson: fromJson,
-      toJson: toJson,
-      persistorSettings: persistorSettings,
-    );
+    final broadcastType =
+        Loon._instance._documentBroadcastStore[collection]?[id];
 
-    if (broadcastDoc == null) {
+    if (broadcastType == null) {
       return;
     }
 
@@ -35,8 +30,8 @@ class ObservableDocument<T> extends Document<T>
     if (_changeController.hasListener) {
       _changeController.add(
         DocumentChangeSnapshot(
-          doc: broadcastDoc,
-          type: broadcastDoc.type,
+          doc: this,
+          type: broadcastType,
           data: snap?.data,
           prevData: _value?.data,
         ),

@@ -1,11 +1,11 @@
 part of loon;
 
-/// The dependency store maintains the dependency/dependent relationship of documents recalculated whenever a document changes (added, updated removed).
+/// The document dependency store maintains the dependency/dependent relationship of documents recalculated whenever a document changes (added, updated removed).
 /// using the collection's [Collection.dependenciesBuilder] (if present). Whenever a document changes two things occur:
 ///
 /// 1. The document's dependencies are recalculated, marking new dependencies in the dependency store and removing stale ones.
 /// 2. If the document is marked for broadcast, then its dependents are also rebroadcast.
-class _DependencyStore {
+class _DocumentDependencyStore {
   /// The index of a document to the documents that depend on it. Whenever a document is updated, it schedules
   /// each of its dependents for a broadcast so that they can receive its updated value.
   final Map<Document, Set<Document>> _dependentsStore = {};

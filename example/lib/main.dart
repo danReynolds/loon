@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:example/models/user.dart';
 import 'package:flutter/material.dart';
 import 'package:loon/loon.dart';
-import 'package:loon/persistor/file_persistor/file_data_store.dart';
 import 'package:uuid/uuid.dart';
 
 const uuid = Uuid();
@@ -193,7 +192,7 @@ class _MyHomePageState extends State<MyHomePage> {
             const SizedBox(width: 24),
             FloatingActionButton(
               onPressed: () {
-                UserModel.store.clear();
+                UserModel.store.delete();
               },
               child: const Icon(Icons.delete),
             ),
