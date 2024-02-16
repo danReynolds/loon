@@ -1261,5 +1261,78 @@ void main() {
         ]),
       );
     });
+
+    test("Deleting a collection clears its dependencies", () async {
+      final usersCollection = Loon.collection('users');
+      final friendsCollection = Loon.collection<TestUserModel>(
+        'friends',
+        dependenciesBuilder: (snap) {
+          return {
+            usersCollection.doc(snap.doc.id),
+          };
+        },
+      );
+
+      final userDoc = usersCollection.doc('1');
+      final friendDoc = friendsCollection.doc('1');
+      userDoc.create(TestUserModel('User 1'));
+      friendDoc.create(TestUserModel('Friend 1'));
+
+      await asyncEvent();
+
+      expect(
+        Loon.extract()['dependencyStore'],
+        {
+          "dependencies": {
+            "friends": {
+              "1": {
+                userDoc,
+              }
+            }
+          },
+          "dependents": {
+            "users": {
+              "1": {
+                friendDoc,
+              }
+            }
+          },
+        },
+      );
+
+      friendsCollection.delete();
+
+      await asyncEvent();
+
+      expect(
+        Loon.extract()['dependencyStore'],
+        {
+          "dependencies": {},
+          // The dependents are not cleared when a collection is cleared, instead
+          // the dependents are lazily cleared when the dependent is updated.
+          "dependents": {
+            "users": {
+              "1": {
+                friendDoc,
+              }
+            }
+          },
+        },
+      );
+
+      userDoc.update(TestUserModel('User 1 updated'));
+
+      await asyncEvent();
+
+      expect(
+        Loon.extract()['dependencyStore'],
+        {
+          "dependencies": {},
+          "dependents": {
+            "users": {"1": <dynamic>{}}
+          },
+        },
+      );
+    });
   });
 }

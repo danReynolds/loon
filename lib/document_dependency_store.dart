@@ -32,7 +32,7 @@ class _DocumentDependencyStore {
 
     for (final dependent in dependents.toList()) {
       if (!dependent.exists()) {
-        dependents.remove(dependent.id);
+        dependents.remove(dependent);
       }
     }
 
