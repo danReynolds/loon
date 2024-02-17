@@ -43,11 +43,11 @@ class ObservableQuery<T> extends Query<T>
       return;
     }
 
-    /// The list of changes to the query. Note that the [DocumentBroadcastTypes] of the document
+    /// The list of changes to the query. Note that the [BroadcastEventTypes] of the document
     /// local to the query is different from the global broadcast type. For example, if a document
     /// was modified globally such that now it should be included in the query and before was not,
-    /// then its event type reported by the query is [DocumentBroadcastTypes.added] and its global event was
-    /// [DocumentBroadcastTypes.modified].
+    /// then its event type reported by the query is [BroadcastEventTypes.added] and its global event was
+    /// [BroadcastEventTypes.modified].
     final List<DocumentChangeSnapshot<T>> changeSnaps = [];
     final hasChangeListener = _changeController.hasListener;
     bool shouldUpdate = false;
@@ -66,8 +66,8 @@ class ObservableQuery<T> extends Query<T>
       );
 
       switch (broadcastType) {
-        case DocumentBroadcastTypes.added:
-        case DocumentBroadcastTypes.hydrated:
+        case BroadcastEventTypes.added:
+        case BroadcastEventTypes.hydrated:
           // 1. Add new documents that satisfy the query filter.
           if (_filter(snap!)) {
             _index[docId] = snap;
@@ -85,7 +85,7 @@ class ObservableQuery<T> extends Query<T>
             }
           }
           break;
-        case DocumentBroadcastTypes.removed:
+        case BroadcastEventTypes.removed:
           // 2. Remove old documents that previously satisfied the query filter and have been removed.
           if (_index.containsKey(docId)) {
             final doc = _index[docId]!.doc;
@@ -96,7 +96,7 @@ class ObservableQuery<T> extends Query<T>
               changeSnaps.add(
                 DocumentChangeSnapshot(
                   doc: doc,
-                  type: DocumentBroadcastTypes.removed,
+                  type: BroadcastEventTypes.removed,
                   prevData: prevSnap?.data,
                   data: null,
                 ),
@@ -106,7 +106,7 @@ class ObservableQuery<T> extends Query<T>
           break;
 
         // 3.a) Add / remove modified documents.
-        case DocumentBroadcastTypes.modified:
+        case BroadcastEventTypes.modified:
           if (_index.containsKey(docId)) {
             shouldUpdate = true;
 
@@ -118,7 +118,7 @@ class ObservableQuery<T> extends Query<T>
                 changeSnaps.add(
                   DocumentChangeSnapshot(
                     doc: snap.doc,
-                    type: DocumentBroadcastTypes.modified,
+                    type: BroadcastEventTypes.modified,
                     prevData: prevSnap?.data,
                     data: snap.data,
                   ),
@@ -133,7 +133,7 @@ class ObservableQuery<T> extends Query<T>
                 changeSnaps.add(
                   DocumentChangeSnapshot(
                     doc: doc,
-                    type: DocumentBroadcastTypes.removed,
+                    type: BroadcastEventTypes.removed,
                     prevData: prevSnap?.data,
                     data: null,
                   ),
@@ -150,7 +150,7 @@ class ObservableQuery<T> extends Query<T>
                 changeSnaps.add(
                   DocumentChangeSnapshot(
                     doc: snap.doc,
-                    type: DocumentBroadcastTypes.added,
+                    type: BroadcastEventTypes.added,
                     prevData: prevSnap?.data,
                     data: snap.data,
                   ),
@@ -161,7 +161,7 @@ class ObservableQuery<T> extends Query<T>
           break;
         // 4. If the broadcast documents include any documents that were manually touched for rebroadcast and are part of this query's
         // result set, then the query should be rebroadcasted.
-        case DocumentBroadcastTypes.touched:
+        case BroadcastEventTypes.touched:
           if (_index.containsKey(docId)) {
             _index[docId] = snap!;
             shouldUpdate = true;
@@ -170,7 +170,7 @@ class ObservableQuery<T> extends Query<T>
               changeSnaps.add(
                 DocumentChangeSnapshot(
                   doc: snap.doc,
-                  type: DocumentBroadcastTypes.touched,
+                  type: BroadcastEventTypes.touched,
                   prevData: prevSnap?.data,
                   data: snap.data,
                 ),

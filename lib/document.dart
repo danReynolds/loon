@@ -151,7 +151,7 @@ class Document<T> {
   }
 }
 
-enum DocumentBroadcastTypes {
+enum BroadcastEventTypes {
   /// The document has been modified.
   modified,
 

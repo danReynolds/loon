@@ -21,8 +21,7 @@ part 'document_change_snapshot.dart';
 part 'document_dependency_store.dart';
 
 typedef DocumentStore = Map<String, Map<String, DocumentSnapshot>>;
-typedef DocumentBroadcastStore
-    = Map<String, Map<String, DocumentBroadcastTypes>>;
+typedef DocumentBroadcastStore = Map<String, Map<String, BroadcastEventTypes>>;
 
 class Loon {
   Persistor? persistor;
@@ -124,7 +123,7 @@ class Loon {
 
     if (broadcast) {
       for (final snap in collectionStore.values) {
-        _writeDocumentBroadcast(snap.doc, DocumentBroadcastTypes.removed);
+        _writeDocumentBroadcast(snap.doc, BroadcastEventTypes.removed);
       }
     }
 
@@ -168,7 +167,7 @@ class Loon {
         }
 
         for (final snap in collectionStore.values) {
-          _writeDocumentBroadcast(snap.doc, DocumentBroadcastTypes.removed);
+          _writeDocumentBroadcast(snap.doc, BroadcastEventTypes.removed);
         }
       }
     }
@@ -321,13 +320,13 @@ class Loon {
       _documentStore[collection] = {};
     }
 
-    final DocumentBroadcastTypes broadcastType;
+    final BroadcastEventTypes broadcastType;
     if (hydrating) {
-      broadcastType = DocumentBroadcastTypes.hydrated;
+      broadcastType = BroadcastEventTypes.hydrated;
     } else if (doc.exists()) {
-      broadcastType = DocumentBroadcastTypes.modified;
+      broadcastType = BroadcastEventTypes.modified;
     } else {
-      broadcastType = DocumentBroadcastTypes.added;
+      broadcastType = BroadcastEventTypes.added;
     }
 
     final snap = _documentStore[doc.collection]![doc.id] = DocumentSnapshot<T>(
@@ -398,7 +397,7 @@ class Loon {
     _documentDependencyStore.clearDependencies(doc);
 
     if (broadcast) {
-      _writeDocumentBroadcast<T>(doc, DocumentBroadcastTypes.removed);
+      _writeDocumentBroadcast<T>(doc, BroadcastEventTypes.removed);
     }
 
     if (doc.isPersistenceEnabled()) {
@@ -408,7 +407,7 @@ class Loon {
 
   void _writeDocumentBroadcast<T>(
     Document<T> doc,
-    DocumentBroadcastTypes broadcastType,
+    BroadcastEventTypes broadcastType,
   ) {
     final pendingBroadcastType =
         _documentBroadcastStore[doc.collection]?[doc.id];
@@ -416,7 +415,7 @@ class Loon {
     // Ignore writing a duplicate broadcast event type or overwriting a pending mutative event type with a touched event.
     if (pendingBroadcastType != null &&
         (pendingBroadcastType == broadcastType ||
-            broadcastType == DocumentBroadcastTypes.touched)) {
+            broadcastType == BroadcastEventTypes.touched)) {
       return;
     }
 
@@ -514,7 +513,7 @@ class Loon {
   static void rebroadcast(Document doc) {
     _instance._writeDocumentBroadcast(
       doc,
-      DocumentBroadcastTypes.touched,
+      BroadcastEventTypes.touched,
     );
   }
 
