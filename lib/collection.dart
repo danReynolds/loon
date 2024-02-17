@@ -25,6 +25,10 @@ class Collection<T> extends Query<T> {
         Loon._instance._isGlobalPersistenceEnabled;
   }
 
+  bool exists() {
+    return Loon._instance._hasCollection(name);
+  }
+
   void delete({
     bool broadcast = true,
   }) {
@@ -35,13 +39,17 @@ class Collection<T> extends Query<T> {
     );
   }
 
-  void replace(List<DocumentSnapshot<T>> snaps) {
+  void replace(
+    List<DocumentSnapshot<T>> snaps, {
+    bool broadcast = true,
+  }) {
     Loon._instance._replaceCollection<T>(
       name,
       snaps: snaps,
       fromJson: fromJson,
       toJson: toJson,
       persistorSettings: persistorSettings,
+      broadcast: broadcast,
     );
   }
 }

@@ -70,11 +70,9 @@ class FilePersistor extends Persistor {
         // persist operation.
         if (messageResponse is ErrorMessageResponse) {
           printDebug(messageResponse.text, label: 'Loon worker');
-          if (request != null) {
-            request.completeError(Exception(messageResponse.text));
-          }
-        } else if (request != null) {
-          request.complete(messageResponse);
+          request?.completeError(Exception(messageResponse.text));
+        } else {
+          request?.complete(messageResponse);
         }
         break;
     }
@@ -125,15 +123,14 @@ class FilePersistor extends Persistor {
       initDirectory(),
     ]);
 
-    // Create a receive port on the main isolatex to receive messages from the worker.
+    // Create a receive port on the main isolate to receive messages from the worker.
     receivePort = ReceivePort();
     receivePort.listen(_onMessage);
 
     // The initial message request to the worker contains three necessary values:
     // 1. The persistor's send port that will allow for message passing from the worker.
-    // 2. The persistor settings that the worker uses to manage file data stores.
-    // 3. The directory in which to store files. This is created on the main isolate since it uses
-    //    APIs like `getApplicationDocumentsDirectory` that are not easily available on an isolate.
+    // 2. The directory that the worker uses to persist file data stores.
+    // 3. The encrypter used by file data stores that have encryption enabled.
     final initMessage = InitMessageRequest(
       sendPort: receivePort.sendPort,
       directory: directory as Directory,

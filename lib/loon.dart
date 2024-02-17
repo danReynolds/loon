@@ -128,12 +128,9 @@ class Loon {
       }
     }
 
-    _documentDependencyStore.clear(collection);
     _documentStore.remove(collection);
-
-    if (persist) {
-      persistor!._clear(collection);
-    }
+    _documentDependencyStore.clear(collection);
+    persistor?._clear(collection);
 
     // Delete all subcollections of this collection.
     for (final otherCollection in _documentStore.keys.toList()) {
@@ -177,15 +174,16 @@ class Loon {
     }
 
     _documentStore.clear();
-
-    if (persistor != null) {
-      return persistor!._clearAll();
-    }
+    return persistor?._clearAll();
   }
 
   /// Returns whether a document exists in the collection data store.
   bool _hasDocument(Document doc) {
     return _documentStore[doc.collection]?.containsKey(doc.id) ?? false;
+  }
+
+  bool _hasCollection(String collection) {
+    return _documentStore.containsKey(collection);
   }
 
   void _replaceCollection<T>(
@@ -194,6 +192,7 @@ class Loon {
     FromJson<T>? fromJson,
     ToJson<T>? toJson,
     PersistorSettings? persistorSettings,
+    bool broadcast = true,
   }) {
     final snapsById =
         snaps.fold<Map<String, DocumentSnapshot<T>>>({}, (acc, snap) {
@@ -213,15 +212,15 @@ class Loon {
       final updatedSnap = snapsById[docId];
 
       if (updatedSnap != null) {
-        existingSnap.doc.update(updatedSnap.data);
+        existingSnap.doc.update(updatedSnap.data, broadcast: broadcast);
       } else {
-        existingSnap.doc.delete();
+        existingSnap.doc.delete(broadcast: broadcast);
       }
     }
 
     for (final newSnap in snapsById.values) {
       if (!newSnap.doc.exists()) {
-        newSnap.doc.create(newSnap.data);
+        newSnap.doc.create(newSnap.data, broadcast: broadcast);
       }
     }
   }
@@ -233,7 +232,7 @@ class Loon {
     ToJson<T>? toJson,
     PersistorSettings? persistorSettings,
   }) {
-    if (!_documentStore.containsKey(collection)) {
+    if (!_hasCollection(collection)) {
       return [];
     }
 
@@ -298,10 +297,7 @@ class Loon {
     for (final observer in _broadcastObservers) {
       observer._onBroadcast();
     }
-
-    for (final broadcastCollection in _documentBroadcastStore.values) {
-      broadcastCollection.clear();
-    }
+    _documentBroadcastStore.clear();
   }
 
   DocumentSnapshot<T> _writeSnapshot<T>(
@@ -424,10 +420,7 @@ class Loon {
       return;
     }
 
-    if (!_documentBroadcastStore.containsKey(doc.collection)) {
-      _documentBroadcastStore[doc.collection] = {};
-    }
-
+    _documentBroadcastStore[doc.collection] ??= {};
     _documentBroadcastStore[doc.collection]![doc.id] = broadcastType;
 
     _rebroadcastDependents(doc);

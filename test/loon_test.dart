@@ -1038,13 +1038,17 @@ void main() {
         Loon.extract()['dependencyStore'],
         {
           "dependencies": {
-            postDoc: {
-              userDoc,
-            }
+            "posts": {
+              "1": {
+                userDoc,
+              },
+            },
           },
           "dependents": {
-            userDoc: {
-              postDoc,
+            "users": {
+              "1": {
+                postDoc,
+              }
             }
           },
         },
@@ -1072,14 +1076,18 @@ void main() {
         Loon.extract()['dependencyStore'],
         {
           "dependencies": {
-            postDoc: {
-              userDoc,
-            }
+            "posts": {
+              "1": {
+                userDoc,
+              },
+            },
           },
           "dependents": {
-            userDoc: {
-              postDoc,
-            }
+            "users": {
+              "1": {
+                postDoc,
+              },
+            },
           },
         },
       );
@@ -1100,10 +1108,14 @@ void main() {
         Loon.extract()['dependencyStore'],
         {
           "dependencies": {
-            postDoc: <dynamic>{},
+            "posts": {
+              "1": <dynamic>{},
+            },
           },
           "dependents": {
-            userDoc: <dynamic>{},
+            "users": {
+              "1": <dynamic>{},
+            }
           },
         },
       );

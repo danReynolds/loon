@@ -9,10 +9,10 @@ import 'package:path/path.dart' as path;
 typedef DocumentDataStore = Map<String, Map<String, FileDataStore>>;
 
 class FilePersistorWorker {
-  /// The persistor's send port
+  /// The persistor's send port.
   final SendPort sendPort;
 
-  /// This worker's receive port
+  /// This worker's receive port.
   final receivePort = ReceivePort();
 
   /// An index of file data stores by name.
@@ -42,7 +42,7 @@ class FilePersistorWorker {
     sendPort.send(response);
   }
 
-  _sendDebugMessage(String text) {
+  _sendDebugResponse(String text) {
     _sendMessageResponse(DebugMessageResponse(text: text));
   }
 
@@ -50,7 +50,7 @@ class FilePersistorWorker {
     return measureDuration(
       label,
       operation,
-      output: _sendDebugMessage,
+      output: _sendDebugResponse,
     );
   }
 
@@ -120,7 +120,7 @@ class FilePersistorWorker {
               await dataStore.hydrate();
               return dataStore;
             } catch (e) {
-              _sendDebugMessage(
+              _sendDebugResponse(
                 'Error hydrating collection: ${dataStore.name}',
               );
               return null;
@@ -129,10 +129,9 @@ class FilePersistorWorker {
         );
         final fileDataStores = hydratedDataStores.whereType<FileDataStore>();
 
-        // On hydration, the following Messages must be performed for each file data store:
+        // On hydration, the following actions must be performed for each file data store:
         // 1. The data store should be added to the data store index.
-        // 2. Each of the data store's documents should be indexed into the document data store index by its document
-        //    index ID.
+        // 2. Each of the data store's documents should be indexed into the document data store index by its collection and ID.
         // 3. Each of the data store's documents should be grouped into the collection data store by collection.
         for (final fileDataStore in fileDataStores) {
           _fileDataStoreIndex[fileDataStore.name] = fileDataStore;
