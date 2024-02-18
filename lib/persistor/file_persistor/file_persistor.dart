@@ -28,7 +28,7 @@ class EncryptedFilePersistorSettings extends FilePersistorSettings {
   /// then custom persistor settings can be provided to those specific collections.
   final bool encryptionEnabled;
 
-  EncryptedFilePersistorSettings({
+  const EncryptedFilePersistorSettings({
     super.getPersistenceKey,
     super.persistenceEnabled = true,
     this.encryptionEnabled = true,
@@ -50,7 +50,7 @@ class FilePersistor extends Persistor {
 
   FilePersistor({
     super.persistenceThrottle = const Duration(milliseconds: 100),
-    super.persistorSettings = const FilePersistorSettings(),
+    super.settings = const FilePersistorSettings(),
     super.onPersist,
     super.onClear,
     super.onClearAll,
@@ -89,7 +89,7 @@ class FilePersistor extends Persistor {
   /// isolate context.
   Future<Encrypter?> initEncrypter() async {
     // The encrypter is only initialized if the global settings are encrypted file persistor settings.
-    if (persistorSettings is! EncryptedFilePersistorSettings) {
+    if (settings is! EncryptedFilePersistorSettings) {
       return null;
     }
 

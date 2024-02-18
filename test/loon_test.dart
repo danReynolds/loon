@@ -273,15 +273,21 @@ void main() {
       );
     });
 
-    test('Modifinyg a non-existent document throws an error', () {
-      final updatedUser = TestUserModel('User 1');
-      final userDoc = TestUserModel.store.doc('1');
+    test(
+      'Modifying a new document creates the document',
+      () {
+        final newUser = TestUserModel('User 1');
+        final userDoc = TestUserModel.store.doc('1');
 
-      expect(
-        () => userDoc.modify((_) => updatedUser),
-        throwsException,
-      );
-    });
+        expect(
+          userDoc.modify((_) => newUser),
+          DocumentSnapshotMatcher(DocumentSnapshot(
+            doc: userDoc,
+            data: newUser,
+          )),
+        );
+      },
+    );
 
     test('JSON document modified successfully', () {
       final userCollection = Loon.collection('users');

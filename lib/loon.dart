@@ -7,6 +7,7 @@ import 'package:loon/utils.dart';
 export 'widgets/query_stream_builder.dart';
 export 'widgets/document_stream_builder.dart';
 export 'persistor/file_persistor/file_persistor.dart';
+export 'persistor/file_persistor/encrypted_file_persistor.dart';
 
 part 'broadcast_observer.dart';
 part 'query.dart';
@@ -42,6 +43,8 @@ class Loon {
   final _documentDependencyStore = _DocumentDependencyStore();
 
   bool _hasPendingBroadcast = false;
+
+  bool enableLogging = false;
 
   /// Validates that data is either already in a serializable format or comes with a serializer.
   static void _validateDataSerialization<T>({
@@ -104,7 +107,7 @@ class Loon {
   }
 
   bool get _isGlobalPersistenceEnabled {
-    return _instance.persistor?.persistorSettings.persistenceEnabled ?? false;
+    return _instance.persistor?.settings.persistenceEnabled ?? false;
   }
 
   void _deleteCollection(
@@ -347,7 +350,7 @@ class Loon {
     return snap;
   }
 
-  DocumentSnapshot<T> _addDocument<T>(
+  DocumentSnapshot<T> _createDocument<T>(
     Document<T> doc,
     T data, {
     bool broadcast = true,
@@ -377,12 +380,27 @@ class Loon {
     );
   }
 
+  DocumentSnapshot<T> _createOrUpdateDocument<T>(
+    Document<T> doc,
+    T data, {
+    bool broadcast = true,
+  }) {
+    if (doc.exists()) {
+      return _updateDocument(doc, data, broadcast: broadcast);
+    }
+    return _createDocument(doc, data, broadcast: broadcast);
+  }
+
   DocumentSnapshot<T> _modifyDocument<T>(
     Document<T> doc,
     ModifyFn<T> modifyFn, {
     bool broadcast = true,
   }) {
-    return _updateDocument<T>(doc, modifyFn(doc.get()), broadcast: broadcast);
+    return _createOrUpdateDocument<T>(
+      doc,
+      modifyFn(doc.get()),
+      broadcast: broadcast,
+    );
   }
 
   void _deleteDocument<T>(
@@ -441,7 +459,9 @@ class Loon {
 
   static void configure({
     Persistor? persistor,
+    bool enableLogging = false,
   }) {
+    _instance.enableLogging = enableLogging;
     _instance.persistor = persistor;
   }
 
@@ -527,5 +547,9 @@ class Loon {
         "dependents": _instance._documentDependencyStore._dependentsStore,
       },
     };
+  }
+
+  static bool get isLoggingEnabled {
+    return _instance.enableLogging;
   }
 }

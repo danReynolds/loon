@@ -15,7 +15,7 @@ class PersistorSettings<T> {
 /// See [FilePersistor] as an example implementation.
 abstract class Persistor {
   final Duration persistenceThrottle;
-  final PersistorSettings persistorSettings;
+  final PersistorSettings settings;
   final void Function(List<Document> batch)? onPersist;
   final void Function(String collection)? onClear;
   final void Function()? onClearAll;
@@ -33,7 +33,7 @@ abstract class Persistor {
   bool _isBusy = false;
 
   Persistor({
-    this.persistorSettings = const PersistorSettings(),
+    this.settings = const PersistorSettings(),
     this.persistenceThrottle = const Duration(milliseconds: 100),
     this.onPersist,
     this.onClear,

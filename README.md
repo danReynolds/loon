@@ -4,13 +4,13 @@
 <br />
 <br />
 
-Loon is a reactive, key/value data store for Dart & Flutter.
+Loon is a reactive collection data store for Dart & Flutter.
 
 ## Features
 
 * Synchronous reading, writing and querying of documents.
 * Streaming of changes to documents and queries.
-* Built-in file persistence with options for per-collection encryption and sharding.
+* Out of the box persistence and encryption.
 
 ## ➕ Creating documents
 

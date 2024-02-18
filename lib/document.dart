@@ -79,17 +79,18 @@ class Document<T> {
     T data, {
     bool broadcast = true,
   }) {
-    return Loon._instance._addDocument<T>(this, data, broadcast: broadcast);
+    return Loon._instance._createDocument<T>(this, data, broadcast: broadcast);
   }
 
   DocumentSnapshot<T> createOrUpdate(
     T data, {
     bool broadcast = true,
   }) {
-    if (exists()) {
-      return update(data, broadcast: broadcast);
-    }
-    return create(data, broadcast: broadcast);
+    return Loon._instance._createOrUpdateDocument<T>(
+      this,
+      data,
+      broadcast: broadcast,
+    );
   }
 
   DocumentSnapshot<T>? get() {
@@ -147,7 +148,7 @@ class Document<T> {
   }
 
   PersistorSettings? get persistorSettings {
-    return _persistorSettings ?? Loon._instance.persistor?.persistorSettings;
+    return _persistorSettings ?? Loon._instance.persistor?.settings;
   }
 }
 

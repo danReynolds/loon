@@ -1,12 +1,11 @@
-import 'dart:async';
-
 import 'package:flutter/foundation.dart';
+import 'package:loon/loon.dart';
 
 void printDebug(
   String message, {
   String? label = 'Loon',
 }) {
-  if (const bool.fromEnvironment('ENABLE_LOGGING', defaultValue: false)) {
+  if (Loon.isLoggingEnabled) {
     // ignore: avoid_print
     print('$label: $message');
   }
