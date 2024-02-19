@@ -17,21 +17,13 @@ class FilePersistorSettings extends PersistorSettings {
   /// the persistenc key can be used to group arbitrary documents together into the same persistence file.
   final String? Function(Document doc)? getPersistenceKey;
 
-  const FilePersistorSettings({
-    this.getPersistenceKey,
-    super.persistenceEnabled = true,
-  });
-}
-
-class EncryptedFilePersistorSettings extends FilePersistorSettings {
-  /// Whether collections should be encrypted as part of persistence. If encryption is only required for certain collections,
-  /// then custom persistor settings can be provided to those specific collections.
+  /// Whether encryption is enabled globally for all collections in the store.
   final bool encryptionEnabled;
 
-  const EncryptedFilePersistorSettings({
-    super.getPersistenceKey,
+  const FilePersistorSettings({
     super.persistenceEnabled = true,
-    this.encryptionEnabled = true,
+    this.getPersistenceKey,
+    this.encryptionEnabled = false,
   });
 }
 
@@ -88,8 +80,11 @@ class FilePersistor extends Persistor {
   /// as opposed to the worker since it requires access to plugins that are not easily available in the worker
   /// isolate context.
   Future<Encrypter?> initEncrypter() async {
+    final persistorSettings = settings;
+
     // The encrypter is only initialized if the global settings are encrypted file persistor settings.
-    if (settings is! EncryptedFilePersistorSettings) {
+    if (persistorSettings is! FilePersistorSettings ||
+        !persistorSettings.encryptionEnabled) {
       return null;
     }
 

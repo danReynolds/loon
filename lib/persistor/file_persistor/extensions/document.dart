@@ -25,8 +25,8 @@ extension DocumentExtensions<T> on Document<T> {
 
   /// Returns whether encryption is enabled for this document.
   bool isEncryptionEnabled() {
-    return persistorSettings is EncryptedFilePersistorSettings &&
-        (persistorSettings as EncryptedFilePersistorSettings).encryptionEnabled;
+    return persistorSettings is FilePersistorSettings &&
+        (persistorSettings as FilePersistorSettings).encryptionEnabled;
   }
 
   FilePersistDocument toPersistenceDoc() {

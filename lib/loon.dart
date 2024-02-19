@@ -7,7 +7,6 @@ import 'package:loon/utils.dart';
 export 'widgets/query_stream_builder.dart';
 export 'widgets/document_stream_builder.dart';
 export 'persistor/file_persistor/file_persistor.dart';
-export 'persistor/file_persistor/encrypted_file_persistor.dart';
 
 part 'broadcast_observer.dart';
 part 'query.dart';

@@ -63,7 +63,7 @@ void main() {
       Loon.configure(
         persistor: TestEncryptionFilePersistor(
           persistenceThrottle: const Duration(milliseconds: 1),
-          settings: const EncryptedFilePersistorSettings(),
+          settings: const FilePersistorSettings(encryptionEnabled: true),
           onPersist: (_) {
             persistCompleter.complete();
           },
@@ -168,7 +168,7 @@ void main() {
       Loon.configure(
         persistor: TestEncryptionFilePersistor(
           persistenceThrottle: const Duration(milliseconds: 1),
-          settings: const EncryptedFilePersistorSettings(),
+          settings: const FilePersistorSettings(encryptionEnabled: true),
           onPersist: (_) {
             persistCompleter.complete();
           },
@@ -207,8 +207,7 @@ void main() {
       Loon.configure(
         persistor: TestEncryptionFilePersistor(
           persistenceThrottle: const Duration(milliseconds: 1),
-          settings:
-              const EncryptedFilePersistorSettings(encryptionEnabled: false),
+          settings: const FilePersistorSettings(encryptionEnabled: false),
           onPersist: (_) {
             persistCompleter.complete();
           },
@@ -219,9 +218,7 @@ void main() {
         'users',
         fromJson: TestUserModel.fromJson,
         toJson: (user) => user.toJson(),
-        persistorSettings: const EncryptedFilePersistorSettings(
-          encryptionEnabled: true,
-        ),
+        persistorSettings: const FilePersistorSettings(encryptionEnabled: true),
       );
 
       final user1 = TestUserModel('User 1');
@@ -252,7 +249,7 @@ void main() {
     Loon.configure(
       persistor: TestEncryptionFilePersistor(
         persistenceThrottle: const Duration(milliseconds: 1),
-        settings: const EncryptedFilePersistorSettings(),
+        settings: const FilePersistorSettings(encryptionEnabled: true),
         onPersist: (_) {
           persistCompleter.complete();
         },
@@ -263,9 +260,7 @@ void main() {
       'users',
       fromJson: TestUserModel.fromJson,
       toJson: (user) => user.toJson(),
-      persistorSettings: const EncryptedFilePersistorSettings(
-        encryptionEnabled: false,
-      ),
+      persistorSettings: const FilePersistorSettings(encryptionEnabled: false),
     );
 
     final user1 = TestUserModel('User 1');
@@ -298,7 +293,7 @@ void main() {
     Loon.configure(
       persistor: TestEncryptionFilePersistor(
         persistenceThrottle: const Duration(milliseconds: 1),
-        settings: const EncryptedFilePersistorSettings(),
+        settings: const FilePersistorSettings(encryptionEnabled: true),
         onPersist: (_) {
           persistCompleter.complete();
         },
