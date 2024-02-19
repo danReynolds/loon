@@ -1,3 +1,9 @@
+## 1.0.0
+
+* Use of isolates for background persistence processing.
+* Data dependency support with the `dependenciesBuilder` API.
+* More architecture and performance improvements.
+
 ## 0.0.5
 
 * More performance optimizations.

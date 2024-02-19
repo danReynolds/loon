@@ -49,8 +49,6 @@ Loon.collection<BirdModel>(
 If persistence is enabled, then a typed data model will need a `fromJson/toJson` serialization pair. In order to avoid having to specify types or serializers whenever a collection is accessed, it can be helpful to store the collection in a variable or as an index on a data model:
 
 ```dart
-import 'package:loon/loon.dart';
-
 class BirdModel {
   final String name;
   final String description;
@@ -75,8 +73,6 @@ class BirdModel {
 Documents can then be read/written using the index:
 
 ```dart
-import './models/reviews.dart';
-
 BirdModel.store.doc('cormorant').create(
   BirdModel(
     name: 'Cormorant',
@@ -89,8 +85,6 @@ BirdModel.store.doc('cormorant').create(
 ## 📚 Reading documents
 
 ```dart
-import './models/birds.dart';
-
 final snap = BirdModel.store.doc('loon').get();
 
 if (snap != null && snap.id == 'loon') {
@@ -108,17 +102,12 @@ print(snap.data) // BirdModel(...)
 To watch for changes to a document, you can read it as a stream:
 
 ```dart
-import './models/birds.dart';
-
 BirdModel.store.doc('loon').stream().listen((snap) {});
 ```
 
 You can then use Flutter's built-in `StreamBuilder` or the library's `DocumentStreamBuilder` widget to access data from widgets:
 
 ```dart
-import './models/birds.dart';
-import 'package:loon/loon.dart';
-
 class MyWidget extends StatelessWidget {
   @override
   build(context) {
@@ -163,8 +152,6 @@ for (final snap in snaps) {
 Documents can be read and filtered using queries:
 
 ```dart
-import './models/birds.dart';
-
 final snapshots = BirdModel.store.where((snap) => snap.data.family == 'Gaviidae').get();
 for (final snap in snapshots) {
   print(snap.data.name);
@@ -177,9 +164,6 @@ for (final snap in snapshots) {
 Queries can also be streamed, optionally using the `QueryStreamBuilder`:
 
 ```dart
-import 'package:loon/loon.dart';
-import './models/birds.dart';
-
 class MyWidget extends StatelessWidget {
   @override
   build(context) {
@@ -231,8 +215,6 @@ BirdModel.doc('loon').modify((snap) {
 Deleting a document removes it and all of its subcollections from the store.
 
 ```dart
-import './models/birds.dart';
-
 BirdModel.doc('cormorant').delete();
 ```
 
@@ -412,10 +394,3 @@ class MyPersistor extends Persistor {
 
 The base `Persistor` class implements batching and throttling, so you can just choose your storage mechanism and format.
 
-## Loon time coming
-
-I've been wanting to play around with building a data store library for a while, incorporating some reflections from working with web libraries like `Redux`, `ApolloClient` and Flutter libraries like `cloud_firestore` (the collection/document pattern most notably).
-
-The library is really new and I'm still thinking about the streaming and persistence models so feel free to give feedback.
-
-Happy coding!
