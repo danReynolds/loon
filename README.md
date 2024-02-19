@@ -4,13 +4,15 @@
 <br />
 <br />
 
-Loon is a reactive, key/value data store for Dart & Flutter.
+Loon is a reactive collection data store for Flutter.
 
 ## Features
 
 * Synchronous reading, writing and querying of documents.
 * Streaming of changes to documents and queries.
-* Built-in file persistence with options for per-collection encryption and sharding.
+* Out of the box persistence and encryption.
+
+You can get started by looking at the [example](./example/lib/main.dart).
 
 ## ➕ Creating documents
 
@@ -19,141 +21,159 @@ Loon is based around collections of documents.
 ```dart
 import 'package:loon/loon.dart';
 
-Loon.collection('reviews').doc('The Book of Boba Fett').create({
-  'rating': 3/10,
-  'review': "A largely disappointing series that played it too safe and didn't live up to fan expectations for the character.",
+Loon.collection('birds').doc('loon').create({
+  'name': 'Loon',
+  'description': 'The loon is an aquatic bird native to North America and parts of Northern Eurasia.',
 });
 ```
 
-Documents are stored under collections in a map structure that allows for synchronous reading/writing. To get type safety, you can define your own classes to represent collections and implement a serializer:
+Documents are stored under collections in a map structure. They can contain any type of data, like a `Map` or a typed data model:
 
 ```dart
 import 'package:loon/loon.dart';
 import './models/reviews.dart';
 
-Loon.collection<ReviewModel>(
-  'reviews',
-  fromJson: (Json json) => ReviewModel.fromJson(json),
-  toJson: (review) => review.toJson(),
-).doc('Obi-Wan Kenobi').create(
-  ReviewModel(
-    rating: 6/10,
-    review: "The show had its moments, but they really should have de-aged Anakin.",
+Loon.collection<BirdModel>(
+  'birds',
+  fromJson: BirdModel.fromJson,
+  toJson: (user) => user.toJson(),
+).doc('loon').create(
+  BirdModel(
+    name: 'Loon',
+    description: 'The loon is known for its distinctive black-and-white plumage, haunting calls, and remarkable diving ability.',
+    family: 'Gaviidae',
   )
 );
 ```
 
-To get reusable type safety and serialization, it can be helpful to define a collection index on your model:
+If persistence is enabled, then a typed data model will need a `fromJson/toJson` serialization pair. In order to avoid having to specify types or serializers whenever a collection is accessed, it can be helpful to store the collection in a variable or as an index on a data model:
 
 ```dart
-import 'package:loon/loon.dart';
+class BirdModel {
+  final String name;
+  final String description;
+  final String species;
 
-class ReviewModel {
-  final double rating;
-  final String review;
+  BirdModel({
+    required this.name,
+    required this.description,
+    required this.species,
+  });
 
-  ReviewModel({required this.rating, required this.review});
-
-  static Collection<ReviewModel> get store {
-    return Loon.collection<ReviewModel>(
-      'reviews',
-      fromJson: (Json json) => ReviewModel.fromJson(json),
-      toJson: (review) => review.toJson(),
+  static Collection<BirdModel> get store {
+    return Loon.collection<BirdModel>(
+      'birds',
+      fromJson: BirdModel.fromJson,
+      toJson: (bird) => bird.toJson(),
     )
   }
 }
 ```
 
-You can then read and write documents in your collection using the index:
+Documents can then be read/written using the index:
 
 ```dart
-import './models/reviews.dart';
-
-ReviewModel.store.doc('Andor').create(
-  ReviewModel(
-    rating: 8/10,
-    review: "Definitely a quality jump from Boba and Obi-Wan. Great writing, expect less action and more intrigue.",
-  )
+BirdModel.store.doc('cormorant').create(
+  BirdModel(
+    name: 'Cormorant',
+    description: 'Cormorants are generally darker than loons, with an almost black plumage, and have a more hook-tipped beak',
+    family: 'Phalacrocoracidae',
+  ),
 );
 ```
 
 ## 📚 Reading documents
 
 ```dart
-import './models/reviews.dart';
+final snap = BirdModel.store.doc('loon').get();
 
-final snap = ReviewModel.store.doc('The Book of Boba Fett').get();
-
-if (snap != null && snap.data.rating > 8/10) {
-  print('Great show') // Unreachable
+if (snap != null && snap.id == 'loon') {
+  print('Loons are excellent swimmers, using their feet to propel themselves above and under water.');
 }
 ```
 
-Reading documents returns a `DocumentSnapshot?` which exposes your document's data and ID:
+Reading a document returns a `DocumentSnapshot?` which exposes your document's data and ID:
 
 ```dart
-print(snap.id) // Book of Boba Fett
-print(snap.data) // ReviewModel(...)
+print(snap.id) // loon
+print(snap.data) // BirdModel(...)
 ```
 
 To watch for changes to a document, you can read it as a stream:
 
 ```dart
-import './models/reviews.dart';
-
-ReviewModel.store.doc('Obi-Wan').stream().listen((snap) {});
+BirdModel.store.doc('loon').stream().listen((snap) {});
 ```
 
-You can then use Flutter's built-in `StreamBuilder` or the provided `DocumentStreamBuilder` widget to then stream updates to documents data in your UI:
+You can then use Flutter's built-in `StreamBuilder` or the library's `DocumentStreamBuilder` widget to access data from widgets:
 
 ```dart
-import './models/reviews.dart';
-import 'package:loon/loon.dart';
-
 class MyWidget extends StatelessWidget {
   @override
   build(context) {
-    return DocumentStreamBuilder<ReviewModel>(
-      doc: ReviewModel.store.doc('Andor'),
+    return DocumentStreamBuilder(
+      doc: BirdModel.store.doc('loon'),
       builder: (context, snap) {
-        final rating = snap.data.rating;
+        final bird = snap?.data;
 
-        return Text('A pretty good show, just look at the rating: ${rating}');
+        if (bird == null) {
+          return Text('Missing bird');
+        }
+        return Text(
+          '''
+          The common loon is the provincial bird of Ontario and is depicted on the Canadian one-dollar coin,
+          which has come to be known affectionately as the "loonie".
+          '''
+        );
       }
     )
   }
 }
 ```
 
-You can read multiple documents using queries:
+## Subcollections
+
+Documents support nested subcollections. Documents in subcollections are grouped under the parent document and are uniquely identified by their collection and
+document ID.
 
 ```dart
-import './models/reviews.dart';
+final snaps = BirdModel.store.doc('loon').subcollection('prey').get();
 
-final snapshots = ReviewModel.store.where((snap) => snap.data.rating >= 5/10).get();
-for (final snap in snapshots) {
-  print(snap.id);
-  // Obi-Wan
-  // Andor
+for (final snap in snaps) {
+  print("${snap.id}: ${snap.collection}");
+  // crayfish: birds_loon_crayfish
+  // frogs: birds_loon_frogs
+  // snails: birds_loon_snails
 }
 ```
 
-You can stream queries just like documents, with an option to use the `QueryStreamBuilder`:
+## Queries
+
+Documents can be read and filtered using queries:
 
 ```dart
-import 'package:loon/loon.dart';
-import './models/reviews.dart';
+final snapshots = BirdModel.store.where((snap) => snap.data.family == 'Gaviidae').get();
+for (final snap in snapshots) {
+  print(snap.data.name);
+  // Red-throated Loon
+  // Pacific Loon
+  // Common Loon
+}
+```
 
+Queries can also be streamed, optionally using the `QueryStreamBuilder`:
+
+```dart
 class MyWidget extends StatelessWidget {
   @override
   build(context) {
-    return QueryStreamBuilder<ReviewModel>(
-      query: ReviewModel.store.where((snap) => snap.data.rating >= 5/10),
-      builder: (context, snapshots) {
+    return QueryStreamBuilder(
+      query: BirdModel.store.where((snap) => snap.data.family == 'Phalacrocoracidae'),
+      builder: (context, snaps) {
         return ListView.builder(
-          itemCount: snapshots.length,
+          itemCount: snaps.length,
           builder: (context, snap) {
-            return Text('I gave ${snap.id} a ${snap.data.rating}.');
+            return Text('Phalacrocoracidae is a family of approximately 40 species of aquatic birds including the ${snap.data.name}');
           }
         )
       }
@@ -164,183 +184,213 @@ class MyWidget extends StatelessWidget {
 
 ## ✏️ Updating documents
 
-Assuming our model has a `copyWith` function, we can then perform updates to documents like this:
+Assuming a model has a `copyWith` function, documents can be updated as shown below:
 
 ```dart
-import './models/reviews.dart';
-
-final doc = ReviewModel.doc('The Book of Boba Fett');
-final review = doc.get();
+final doc = BirdModel.doc('loon');
+final snap = doc.get();
 
 doc.update(
-  review.copyWith(
-    rating: 4/10,
-    review: "If I take the Mando episodes out it actually feels even lower.",
+  snap.data.copyWith(
+    description: 'Loons are monogamous, a single female and male often together defend a territory and may breed together for a decade or more',
   ),
 );
 ```
 
-If we don't want to read the document first, we can use the `modify` API:
+The reading and writing of a document can be combined using the `modify` API. If the document does not yet exist, then its snapshot is null.
 
 ```dart
-import './models/reviews.dart';
-
-ReviewModel.doc('The Book of Boba Fett').modify((review) {
-  return review.copyWith(
-    rating: 3/10,
-    review: "They really did my boy dirty",
+BirdModel.doc('loon').modify((snap) {
+  if (snap == null) {
+    return null;
+  }
+  return snap.data.copyWith(
+    description: 'Loons nest during the summer on freshwater lakes and/or large ponds.',
   );
-})
+});
 ```
 
 ## ❌ Deleting documents
 
-Short and sweet, just call delete:
+Deleting a document removes it and all of its subcollections from the store.
 
 ```dart
-import './models/reviews.dart';
-
-ReviewModel.doc('The Book of Boba Fett').delete(); // Good riddance.
+BirdModel.doc('cormorant').delete();
 ```
 
-## Persisting Data
+## Streaming changes
 
-The library comes with two persistence options out of the box:
-
-`FilePersistor` and `EncryptedFilePersistor`.
-
-You can specify which one you want to use by default for all collections like this:
+Documents and queries can be streamed for changes which provides the reason for their rebroadcast:
 
 ```dart
-import 'package:loon/loon.dart';
+BirdModel.store.streamChanges().listen((changes) {
+  for (final changeSnap in changes) {
+     switch(changeSnap.type) {
+      case BroadcastEventTypes.added:
+        print('New document ${changeSnap.id} was added to the collection.');
+        break;
+      case BraodcastEventTypes.modified:
+        print('The document ${changeSnap.id} was modified from ${changeSnap.prevData} to ${changeSnap.data}');
+        break;
+      case BraodcastEventTypes.removed:
+        print('${changeSnap.id} was removed from the collection.');
+        break;
+      case BraodcastEventTypes.hydrated:
+        print('${changeSnap.id} was hydrated from the persisted data');
+        break;
+    }
+  }
+});
+```
 
+## Data Dependencies
+
+Data relationships in the store can be established using the data dependencies builder.
+
+```dart
+final families = Loon.collection('families');
+
+final birds = Loon.collection<BirdModel>(
+  'birds',
+  dependenciesBuilder: (snap) {
+    return {
+      famililes.doc(snap.data.family),
+    };
+  },
+);
+```
+
+In this example, whenever a bird's given family is updated, the bird will be rebroadcast as well to any of its listeners.
+
+## Data Persistence
+
+A default file-based persistence option is available out of the box and can be configured on app start.
+
+```dart
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
 
   Loon.configure(persistor: FilePersistor());
 
-  Loon.hydrate(); // Hydrate data from persistence.
+  Loon.hydrate().then(() {
+    print('Hydration complete');
+  });
 
   runApp(const MyApp());
 }
 ```
 
-When changes occur to documents in the app, they are batched and written to a file per collection. In the case of the `reviews` collection, it would be: `loon_reviews.json`.
+The call to `hydrate` returns a `Future` that resolves when the data has been hydrated from the persistence layer. It can be awaited to ensure that
+data is available before proceeding, otherwise hydrated data will be merged on top of any data already in the store.
 
-You can specify the frequency that batch updates should be written:
+## Persistence options
 
-```dart
-import 'package:loon/loon.dart';
-
-PersistorSettings(
-  persistenceThrottle: Duration(milliseconds: 200),
-);
-```
-
-as well as specify custom options per collection, like sharding documents:
+Persistence options can be specified globally or on a per-collection basis.
 
 ```dart
-import 'package:loon/loon.dart';
-
-class ReviewModel {
-  final double rating;
-  final String review;
-
-  ReviewModel({required this.rating, required this.review});
-
-  static Collection<ReviewModel> get store {
-    return Loon.collection<ReviewModel>(
-      'reviews',
-      persistorSettings: FilePersistorSettings(
-        shardFn: (doc) {
-          final snap = doc.get();
-          final rating = snap.data.rating ?? 0;
-
-          return rating >= 6/10 ? 'good' : 'bad';
-        },
-      ),
-      fromJson: (Json json) => ReviewModel.fromJson(json),
-      toJson: (review) => review.toJson(),
-    )
-  }
-}
-```
-
-In this example, the documents in our reviews collection would be spread across multiple files:
-
-* `reviews_good.json`:
-  * Obi-Wan
-  * Andor
-* `reviews_bad.json`:
-  * The Book of Boba Fett
-
-If some of your collections contain sensitive data, you can choose to encrypt them by using the `EncryptedFilePersistor` instead (no web support yet), either globally:
-
-```dart
-import 'package:loon/loon.dart';
-
-import 'package:loon/loon.dart';
-
+// main.dart
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
 
-  Loon.configure(persistor: EncryptedFilePersistor());
+  Loon.configure(persistor: FilePersistor(encryptionEnabled: true));
 
-  runApp(const MyApp());
+  Loon.hydrate().then(() {
+    print('Hydration complete');
+  });
 }
-```
 
-or on a per-collection basis:
+// models/birds.dart
+class BirdModel {
+  final String name;
+  final String description;
+  final String species;
 
-```dart
-import 'package:loon/loon.dart';
+  BirdModel({
+    required this.name,
+    required this.description,
+    required this.species,
+  });
 
-class ReviewModel {
-  final double rating;
-  final String review;
-
-  ReviewModel({required this.rating, required this.review});
-
-  static Collection<ReviewModel> get store {
-    return Loon.collection<ReviewModel>(
-      'reviews',
-      persistorSettings: EncryptedFilePersistorSettings(
-        isEncrypted: true,
+  static Collection<BirdModel> get store {
+    return Loon.collection<BirdModel>(
+      'birds',
+      fromJson: BirdModel.fromJson,
+      toJson: (bird) => bird.toJson(),
+      settings: FilePersistorSettings(
+        encryptionEnabled: false,
       ),
-      fromJson: (Json json) => ReviewModel.fromJson(json),
-      toJson: (review) => review.toJson(),
     )
   }
 }
 ```
 
-Encrypted files are stored similarly to default file persistence, in this case it would be: `loon_reviews.encrypted.json`.
+In this example, file encryption is enabled globally for all collections, but disabled
+specifically for the bird collection.
+
+By default, file persistence stores data in files on a per collection basis. The above `birds` collection is stored as:
+
+```
+loon >
+  birds.json
+```
+
+If data needs to be persisted differently, either by merging data across collections into a single file or by breaking down a collection
+into multiple files, then a custom persistence key can be specified on the collection.
+
+```dart
+class BirdModel {
+  final String name;
+  final String description;
+  final String species;
+
+  BirdModel({
+    required this.name,
+    required this.description,
+    required this.species,
+  });
+
+  static Collection<BirdModel> get store {
+    return Loon.collection<BirdModel>(
+      'birds',
+      fromJson: BirdModel.fromJson,
+      toJson: (bird) => bird.toJson(),
+      settings: FilePersistorSettings(
+        getPersistenceKey: (snap) {
+          return 'birds_${snap.data.family};
+        }
+      ),
+    )
+  }
+}
+```
+
+In the updated example, data from the collection is now broken down into multiple files based on the document data:
+
+```dart
+loon >
+  birds_phalacrocoracidae.json
+  birds_gaviidae.json
+```
 
 ## Custom persistence
 
-If you don't want to use the provided persistence options, it's pretty straightforward to use your own, just implement the persistence interface:
+If you would prefer to persist data using an alternative implementation than the default `FilePersistor`, you just need to implement the persistence interface:
 
 ```dart
 import 'package:loon/loon.dart';
 
-typedef DocumentDataStore = Map<String, Json>;
-typedef CollectionDataStore = Map<String, DocumentDataStore>;
-
 class MyPersistor extends Persistor {
-  Future<void> persist(List<BroadcastDocument> docs);
+  Future<void> init();
 
-  Future<CollectionDataStore> hydrate();
+  Future<void> persist(List<Document> docs);
+
+  Future<SerializedCollectionStore> hydrate();
 
   Future<void> clear(String collection);
+
+  Future<void> clearAll();
 }
 ```
 
 The base `Persistor` class implements batching and throttling, so you can just choose your storage mechanism and format.
 
-## Loon time coming
-
-I've been wanting to play around with building a data store library for a while, incorporating some reflections from working with web libraries like `Redux`, `ApolloClient` and Flutter libraries like `cloud_firestore` (the collection/document pattern most notably).
-
-The library is really new and I'm still thinking about the streaming and persistence models so feel free to give feedback.
-
-Happy coding!

@@ -12,3 +12,9 @@ typedef FromJson<T> = T Function(Json json);
 typedef ToJson<T> = Json Function(T model);
 
 typedef Optional<T> = T?;
+
+/// Returns a set of documents that the document associated with the given [DocumentSnapshot]
+/// is dependent on.
+typedef DependenciesBuilder<T> = Set<Document>? Function(
+  DocumentSnapshot<T> snap,
+);

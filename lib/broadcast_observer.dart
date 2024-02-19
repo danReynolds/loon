@@ -44,7 +44,7 @@ mixin BroadcastObserver<T, S> {
     return _value;
   }
 
-  /// [get] is left unimplemented since it has variable logic based on the type of [Observable] like an [ObservableDocument]
+  /// [get] is left unimplemented since it has variable logic based on the type of observer like an [ObservableDocument]
   /// and [ObservableQuery].
   T get();
 

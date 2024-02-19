@@ -5,27 +5,49 @@ class Document<T> {
   final String id;
   final FromJson<T>? fromJson;
   final ToJson<T>? toJson;
-  final PersistorSettings? persistorSettings;
+  final PersistorSettings? _persistorSettings;
+  final DependenciesBuilder<T>? dependenciesBuilder;
 
   Document({
     required this.collection,
     required this.id,
     this.fromJson,
     this.toJson,
-    this.persistorSettings,
-  });
+    PersistorSettings? persistorSettings,
+    this.dependenciesBuilder,
+  }) : _persistorSettings = persistorSettings;
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) {
+      return true;
+    }
+    if (other is Document) {
+      return id == other.id && collection == other.collection;
+    }
+    return false;
+  }
+
+  @override
+  int get hashCode => Object.hashAll([id, collection]);
+
+  String get key {
+    return "$collection:$id";
+  }
 
   Collection<S> subcollection<S>(
     String subcollection, {
     FromJson<S>? fromJson,
     ToJson<S>? toJson,
-    PersistorSettings<S>? persistorSettings,
+    PersistorSettings? persistorSettings,
+    DependenciesBuilder<S>? dependenciesBuilder,
   }) {
     return Collection<S>(
-      "${collection}_${id}_$subcollection",
+      "${collection}__${id}__$subcollection",
       fromJson: fromJson,
       toJson: toJson,
       persistorSettings: persistorSettings,
+      dependenciesBuilder: dependenciesBuilder,
     );
   }
 
@@ -57,21 +79,28 @@ class Document<T> {
     T data, {
     bool broadcast = true,
   }) {
-    return Loon._instance._addDocument<T>(this, data, broadcast: broadcast);
+    return Loon._instance._createDocument<T>(this, data, broadcast: broadcast);
   }
 
   DocumentSnapshot<T> createOrUpdate(
     T data, {
     bool broadcast = true,
   }) {
-    if (exists()) {
-      return update(data, broadcast: broadcast);
-    }
-    return create(data, broadcast: broadcast);
+    return Loon._instance._createOrUpdateDocument<T>(
+      this,
+      data,
+      broadcast: broadcast,
+    );
   }
 
   DocumentSnapshot<T>? get() {
-    return Loon._instance._getSnapshot<T>(this);
+    return Loon._instance._getSnapshot<T>(
+      id: id,
+      collection: collection,
+      fromJson: fromJson,
+      toJson: toJson,
+      persistorSettings: persistorSettings,
+    );
   }
 
   ObservableDocument<T> observe({
@@ -84,6 +113,7 @@ class Document<T> {
       toJson: toJson,
       persistorSettings: persistorSettings,
       multicast: multicast,
+      dependenciesBuilder: dependenciesBuilder,
     );
   }
 
@@ -96,7 +126,7 @@ class Document<T> {
   }
 
   Json? getJson() {
-    final data = Loon._instance._getSnapshot<T>(this)?.data;
+    final data = get()?.data;
 
     if (data is Json?) {
       return data;
@@ -109,8 +139,16 @@ class Document<T> {
     return Loon._instance._hasDocument(this);
   }
 
+  bool isPersistenceEnabled() {
+    return persistorSettings?.persistenceEnabled ?? false;
+  }
+
   bool isPendingBroadcast() {
     return Loon._instance._isDocumentPendingBroadcast(this);
+  }
+
+  PersistorSettings? get persistorSettings {
+    return _persistorSettings ?? Loon._instance.persistor?.settings;
   }
 }
 
@@ -129,19 +167,4 @@ enum BroadcastEventTypes {
 
   /// The document has been hydrated from persisted storage.
   hydrated,
-}
-
-class BroadcastDocument<T> extends Document<T> {
-  final BroadcastEventTypes type;
-
-  BroadcastDocument(
-    Document<T> doc,
-    this.type,
-  ) : super(
-          id: doc.id,
-          collection: doc.collection,
-          fromJson: doc.fromJson,
-          toJson: doc.toJson,
-          persistorSettings: doc.persistorSettings,
-        );
 }

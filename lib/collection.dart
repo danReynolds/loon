@@ -2,33 +2,54 @@ part of loon;
 
 class Collection<T> extends Query<T> {
   Collection(
-    super.collection, {
+    super.name, {
     required super.fromJson,
     required super.toJson,
     required super.persistorSettings,
+    required super.dependenciesBuilder,
   }) : super(filters: [], sort: null);
 
   Document<T> doc(String id) {
     return Document<T>(
-      collection: collection,
+      collection: name,
       id: id,
       fromJson: fromJson,
       toJson: toJson,
       persistorSettings: persistorSettings,
+      dependenciesBuilder: dependenciesBuilder,
     );
   }
 
-  void clear() {
-    Loon._instance._clearCollection(collection);
+  bool isPersistenceEnabled() {
+    return persistorSettings?.persistenceEnabled ??
+        Loon._instance._isGlobalPersistenceEnabled;
   }
 
-  void replace(List<DocumentSnapshot<T>> snaps) {
+  bool exists() {
+    return Loon._instance._hasCollection(name);
+  }
+
+  void delete({
+    bool broadcast = true,
+  }) {
+    Loon._instance._deleteCollection(
+      name,
+      broadcast: broadcast,
+      persist: isPersistenceEnabled(),
+    );
+  }
+
+  void replace(
+    List<DocumentSnapshot<T>> snaps, {
+    bool broadcast = true,
+  }) {
     Loon._instance._replaceCollection<T>(
-      collection,
+      name,
       snaps: snaps,
       fromJson: fromJson,
       toJson: toJson,
       persistorSettings: persistorSettings,
+      broadcast: broadcast,
     );
   }
 }

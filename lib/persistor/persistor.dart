@@ -10,89 +10,138 @@ class PersistorSettings<T> {
   });
 }
 
+/// Abstract persistor that implements the base persistence batching, de-duping and locking of
+/// persistence operations and exposes the public persistence APIs for persistence implementations to implement.
+/// See [FilePersistor] as an example implementation.
 abstract class Persistor {
-  final BroadcastCollectionStore _broadcastCollectionDataStore = {};
-  Timer? _persistTimer;
-  bool _isPersisting = false;
   final Duration persistenceThrottle;
+  final PersistorSettings settings;
+  final void Function(List<Document> batch)? onPersist;
+  final void Function(String collection)? onClear;
+  final void Function()? onClearAll;
+  final void Function(SerializedCollectionStore data)? onHydrate;
 
-  final PersistorSettings persistorSettings;
+  final Set<Document> _batch = {};
+
+  /// The operation queue ensures that operations (init, hydrate, persist, clear) are blocking and
+  /// that only one is ever running at a time, not concurrently.
+  final List<Completer> _operationQueue = [];
+
+  Timer? _persistTimer;
+
+  /// Whether the persistor is busy running an operation.
+  bool _isBusy = false;
 
   Persistor({
-    this.persistorSettings = const PersistorSettings(),
+    this.settings = const PersistorSettings(),
     this.persistenceThrottle = const Duration(milliseconds: 100),
-  });
-
-  List<BroadcastDocument> _getBroadcastDocuments() {
-    List<BroadcastDocument> documents = [];
-
-    for (final broadcastCollection in _broadcastCollectionDataStore.values) {
-      for (final broadcastDocument in broadcastCollection.values) {
-        if (broadcastDocument.type != BroadcastEventTypes.touched) {
-          documents.add(broadcastDocument);
-        }
-      }
-    }
-
-    return documents;
+    this.onPersist,
+    this.onClear,
+    this.onClearAll,
+    this.onHydrate,
+  }) {
+    _runOperation(() {
+      return init();
+    });
   }
 
-  Future<void> _persist() async {
-    // A guard to prevent multiple persistence calls from stacking up in the scenario where
-    // persistence takes longer than the throttle.
-    if (_isPersisting) {
-      return;
-    }
-    _isPersisting = true;
-
-    final docs = _getBroadcastDocuments();
-    if (docs.isEmpty) {
-      return;
-    }
-
-    // The collection data stores are eagerly cleared after their documents are sent to be persisted.
-    for (final collectionDataStore in _broadcastCollectionDataStore.values) {
-      collectionDataStore.clear();
+  Future<T> _runOperation<T>(Future<T> Function() operation) async {
+    if (_isBusy) {
+      final completer = Completer();
+      _operationQueue.add(completer);
+      await completer.future;
+    } else {
+      _isBusy = true;
     }
 
     try {
-      await persist(docs);
+      // If the operation fails, then we still move on to the next operation. If it was a persist(),
+      // then it can still be recovered, as the file data store will remain marked as dirty and will attempt
+      // to be persisted again with the next persistence operation.
+      final result = await operation();
+      return result;
     } finally {
-      _isPersisting = false;
-
-      // On persist completing, if there are more docs that have since been added to be persisted,
-      // then persist again.
-      if (_getBroadcastDocuments().isNotEmpty) {
-        _persist();
+      // Start the next operation after the previous one completes.
+      if (_operationQueue.isNotEmpty) {
+        final completer = _operationQueue.removeAt(0);
+        completer.complete();
+      } else {
+        _isBusy = false;
       }
     }
   }
 
-  void onBroadcast(List<BroadcastDocument> docs) {
-    if (docs.isEmpty) {
+  Future<void> _clear(String collection) {
+    return _runOperation(() async {
+      await clear(collection);
+      onClear?.call(collection);
+    });
+  }
+
+  Future<void> _clearAll() {
+    return _runOperation(() async {
+      await clearAll();
+      onClearAll?.call();
+    });
+  }
+
+  Future<SerializedCollectionStore> _hydrate() {
+    return _runOperation(() async {
+      final result = await hydrate();
+      onHydrate?.call(result);
+      return result;
+    });
+  }
+
+  Future<void> _persist() async {
+    try {
+      await _runOperation(() async {
+        final batchDocs = _batch.toList();
+
+        // The current batch is eagerly cleared so that after persistence completes, it can be re-checked to see if there
+        // are more documents to persist and schedule another run.
+        _batch.clear();
+
+        await persist(batchDocs);
+
+        onPersist?.call(batchDocs);
+      });
+    } finally {
+      _persistTimer = null;
+
+      // If there are more documents that came in while the previous batch was being persisted, then schedule another persist.
+      if (_batch.isNotEmpty) {
+        _schedulePersist();
+      }
+    }
+  }
+
+  /// Schedules the current batch of documents to be persisted using a timer set to the persistence throttle.
+  void _schedulePersist() {
+    _persistTimer ??= Timer(persistenceThrottle, () {
+      _persist();
+    });
+  }
+
+  void _persistDoc(Document doc) {
+    if (!doc.isPersistenceEnabled()) {
+      printDebug('Persistence not enabled for document: ${doc.id}');
       return;
     }
 
-    if (_persistTimer == null && !_isPersisting) {
-      _persistTimer = Timer(persistenceThrottle, () {
-        _persistTimer = null;
-        _persist();
-      });
+    if (_batch.contains(doc)) {
+      return;
     }
 
-    for (final doc in docs) {
-      final docId = doc.id;
-      final collection = doc.collection;
-
-      if (!_broadcastCollectionDataStore.containsKey(collection)) {
-        _broadcastCollectionDataStore[collection] = {};
-      }
-
-      _broadcastCollectionDataStore[collection]![docId] = doc;
-    }
+    _batch.add(doc);
+    _schedulePersist();
   }
 
-  Future<void> persist(List<BroadcastDocument> docs);
+  /// Public APIs to be implemented by any [Persistor] extension like [FilePersistor].
+
+  Future<void> init();
+
+  Future<void> persist(List<Document> docs);
 
   Future<SerializedCollectionStore> hydrate();
 
