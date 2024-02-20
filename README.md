@@ -31,7 +31,7 @@ Documents are stored under collections in a map structure. They can contain any 
 
 ```dart
 import 'package:loon/loon.dart';
-import './models/reviews.dart';
+import './models/bird.dart';
 
 Loon.collection<BirdModel>(
   'birds',
@@ -46,7 +46,7 @@ Loon.collection<BirdModel>(
 );
 ```
 
-If persistence is enabled, then a typed data model will need a `fromJson/toJson` serialization pair. In order to avoid having to specify types or serializers whenever a collection is accessed, it can be helpful to store the collection in a variable or as an index on a data model:
+If persistence is enabled, then a typed data model will need a `fromJson/toJson` serialization pair. In order to avoid having to specify types or serializers whenever a collection is accessed, it can be helpful to store the collection in a variable or as an index on the data model:
 
 ```dart
 class BirdModel {
@@ -119,6 +119,7 @@ class MyWidget extends StatelessWidget {
         if (bird == null) {
           return Text('Missing bird');
         }
+
         return Text(
           '''
           The common loon is the provincial bird of Ontario and is depicted on the Canadian one-dollar coin,
@@ -131,9 +132,9 @@ class MyWidget extends StatelessWidget {
 }
 ```
 
-## Subcollections
+## 𖢞 Subcollections
 
-Documents support nested subcollections. Documents in subcollections are grouped under the parent document and are uniquely identified by their collection and
+Documents can be nested under subcollections. Documents in subcollections are uniquely identified by their collection and
 document ID.
 
 ```dart
@@ -147,12 +148,13 @@ for (final snap in snaps) {
 }
 ```
 
-## Queries
+## 🔎 Queries
 
-Documents can be read and filtered using queries:
+Documents can be read and filtered with queries:
 
 ```dart
 final snapshots = BirdModel.store.where((snap) => snap.data.family == 'Gaviidae').get();
+
 for (final snap in snapshots) {
   print(snap.data.name);
   // Red-throated Loon
@@ -197,7 +199,7 @@ doc.update(
 );
 ```
 
-The reading and writing of a document can be combined using the `modify` API. If the document does not yet exist, then its snapshot is null.
+The reading and writing of a document can be combined using the `modify` API. If the document does not yet exist, then its snapshot is `null`.
 
 ```dart
 BirdModel.doc('loon').modify((snap) {
@@ -218,9 +220,9 @@ Deleting a document removes it and all of its subcollections from the store.
 BirdModel.doc('cormorant').delete();
 ```
 
-## Streaming changes
+## 🌊 Streaming changes
 
-Documents and queries can be streamed for changes which provides the reason for their rebroadcast:
+Documents and queries can be streamed for changes which provides the previous and current document data as well as the event type of the change:
 
 ```dart
 BirdModel.store.streamChanges().listen((changes) {
@@ -229,13 +231,13 @@ BirdModel.store.streamChanges().listen((changes) {
       case BroadcastEventTypes.added:
         print('New document ${changeSnap.id} was added to the collection.');
         break;
-      case BraodcastEventTypes.modified:
+      case BroadcastEventTypes.modified:
         print('The document ${changeSnap.id} was modified from ${changeSnap.prevData} to ${changeSnap.data}');
         break;
-      case BraodcastEventTypes.removed:
+      case BroadcastEventTypes.removed:
         print('${changeSnap.id} was removed from the collection.');
         break;
-      case BraodcastEventTypes.hydrated:
+      case BroadcastEventTypes.hydrated:
         print('${changeSnap.id} was hydrated from the persisted data');
         break;
     }
@@ -243,7 +245,7 @@ BirdModel.store.streamChanges().listen((changes) {
 });
 ```
 
-## Data Dependencies
+## 🔁 Data Dependencies
 
 Data relationships in the store can be established using the data dependencies builder.
 
@@ -260,9 +262,21 @@ final birds = Loon.collection<BirdModel>(
 );
 ```
 
-In this example, whenever a bird's given family is updated, the bird will be rebroadcast as well to any of its listeners.
+In this example, whenever a bird's given family is updated, the bird will also be rebroadcast to any of its listeners.
 
-## Data Persistence
+Additionally, whenever a document is updated, it will rebuild its set of dependencies, allowing documents to support dynamic dependencies
+that can change in response to updated document data.
+
+## 🪴 Root collection
+
+Not all documents necessarily make sense to be grouped together under any particular collection. In this scenario, any one-off documents can be stored
+on the root collection:
+
+```dart
+Loon.doc('selected_bird_id').create('loon');
+```
+
+## 🗄️ Data Persistence
 
 A default file-based persistence option is available out of the box and can be configured on app start.
 
@@ -283,7 +297,7 @@ void main() {
 The call to `hydrate` returns a `Future` that resolves when the data has been hydrated from the persistence layer. It can be awaited to ensure that
 data is available before proceeding, otherwise hydrated data will be merged on top of any data already in the store.
 
-## Persistence options
+## ⚙️ Persistence options
 
 Persistence options can be specified globally or on a per-collection basis.
 
@@ -372,7 +386,7 @@ loon >
   birds_gaviidae.json
 ```
 
-## Custom persistence
+## 🎨 Custom persistence
 
 If you would prefer to persist data using an alternative implementation than the default `FilePersistor`, you just need to implement the persistence interface:
 
