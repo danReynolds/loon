@@ -51,6 +51,7 @@ class Query<T> {
           fromJson: fromJson,
           toJson: toJson,
           persistorSettings: persistorSettings,
+          dependenciesBuilder: dependenciesBuilder,
         ),
       ),
     );

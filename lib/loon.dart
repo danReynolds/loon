@@ -70,9 +70,10 @@ class Loon {
   DocumentSnapshot<T>? _getSnapshot<T>({
     required String id,
     required String collection,
-    FromJson<T>? fromJson,
-    ToJson<T>? toJson,
-    PersistorSettings? persistorSettings,
+    required FromJson<T>? fromJson,
+    required ToJson<T>? toJson,
+    required PersistorSettings? persistorSettings,
+    required DependenciesBuilder<T>? dependenciesBuilder,
   }) {
     final snap = _documentStore[collection]?[id];
 
@@ -95,6 +96,7 @@ class Loon {
           fromJson: fromJson,
           toJson: toJson,
           persistorSettings: persistorSettings,
+          dependenciesBuilder: dependenciesBuilder,
         ),
         fromJson!(snap.data),
         broadcast: false,
@@ -193,6 +195,7 @@ class Loon {
     FromJson<T>? fromJson,
     ToJson<T>? toJson,
     PersistorSettings? persistorSettings,
+    DependenciesBuilder<T>? dependenciesBuilder,
     bool broadcast = true,
   }) {
     final snapsById =
@@ -206,6 +209,7 @@ class Loon {
       fromJson: fromJson,
       toJson: toJson,
       persistorSettings: persistorSettings,
+      dependenciesBuilder: dependenciesBuilder,
     );
 
     for (final existingSnap in existingSnaps) {
@@ -229,9 +233,10 @@ class Loon {
   /// Returns a list of data snapshots for the given collection.
   List<DocumentSnapshot<T>> _getSnapshots<T>(
     String collection, {
-    FromJson<T>? fromJson,
-    ToJson<T>? toJson,
-    PersistorSettings? persistorSettings,
+    required FromJson<T>? fromJson,
+    required ToJson<T>? toJson,
+    required PersistorSettings? persistorSettings,
+    required DependenciesBuilder<T>? dependenciesBuilder,
   }) {
     if (!_hasCollection(collection)) {
       return [];
@@ -253,6 +258,7 @@ class Loon {
             fromJson: fromJson,
             toJson: toJson,
             persistorSettings: persistorSettings,
+            dependenciesBuilder: dependenciesBuilder,
           ),
           fromJson!(snap.data),
           broadcast: false,

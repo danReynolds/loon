@@ -63,6 +63,7 @@ class ObservableQuery<T> extends Query<T>
         fromJson: fromJson,
         toJson: toJson,
         persistorSettings: persistorSettings,
+        dependenciesBuilder: dependenciesBuilder,
       );
 
       switch (broadcastType) {

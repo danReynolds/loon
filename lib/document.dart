@@ -100,6 +100,7 @@ class Document<T> {
       fromJson: fromJson,
       toJson: toJson,
       persistorSettings: persistorSettings,
+      dependenciesBuilder: dependenciesBuilder,
     );
   }
 

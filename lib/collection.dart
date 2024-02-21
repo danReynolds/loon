@@ -49,6 +49,7 @@ class Collection<T> extends Query<T> {
       fromJson: fromJson,
       toJson: toJson,
       persistorSettings: persistorSettings,
+      dependenciesBuilder: dependenciesBuilder,
       broadcast: broadcast,
     );
   }

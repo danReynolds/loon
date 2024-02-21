@@ -1,3 +1,7 @@
+## 1.0.1
+
+* Fixes propagation of the dependenciesBuilder field.
+
 ## 1.0.0
 
 * Use of isolates for background persistence processing.
