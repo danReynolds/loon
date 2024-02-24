@@ -273,7 +273,7 @@ Not all documents necessarily make sense to be grouped together under any partic
 on the root collection:
 
 ```dart
-Loon.doc('selected_bird_id').create('loon');
+Loon.doc('selected_bird_id').create('hawk');
 ```
 
 ## 🗄️ Data Persistence
