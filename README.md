@@ -138,13 +138,13 @@ Documents can be nested under subcollections. Documents in subcollections are un
 document ID.
 
 ```dart
-final snaps = BirdModel.store.doc('loon').subcollection('prey').get();
+final snaps = BirdModel.store.doc('hawk').subcollection('prey').get();
 
 for (final snap in snaps) {
   print("${snap.id}: ${snap.collection}");
-  // crayfish: birds_loon_crayfish
-  // frogs: birds_loon_frogs
-  // snails: birds_loon_snails
+  // crayfish: birds__hawk__prey__mice
+  // frogs: birds__hawk__prey__rabbits
+  // snails: birds__hawk__prey__squirrels
 }
 ```
 
