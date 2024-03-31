@@ -1,3 +1,7 @@
+## 1.1.0
+
+* More fixes and improvements.
+
 ## 1.0.1
 
 * Fixes propagation of the dependenciesBuilder field.
