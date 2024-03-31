@@ -22,7 +22,9 @@ class Document<T> {
     if (identical(this, other)) {
       return true;
     }
-    if (other is Document) {
+    // Documents are equivalent based on their ID and collection, however, observable documents
+    // are not, since they have additional properties unique to their instance.
+    if (other is Document && this is! ObservableDocument) {
       return id == other.id && collection == other.collection;
     }
     return false;

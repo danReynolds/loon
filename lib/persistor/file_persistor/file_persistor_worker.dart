@@ -121,7 +121,7 @@ class FilePersistorWorker {
               return dataStore;
             } catch (e) {
               _sendDebugResponse(
-                'Error hydrating collection: ${dataStore.name}',
+                'Error hydrating collection: ${dataStore.name} $e',
               );
               return null;
             }

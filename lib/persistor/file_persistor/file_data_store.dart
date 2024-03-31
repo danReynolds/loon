@@ -153,7 +153,7 @@ class FileDataStoreFactory {
       }
 
       return EncryptedFileDataStore(
-        name: name,
+        name: '$name.encrypted',
         file: file,
         encrypter: encrypter!,
       );

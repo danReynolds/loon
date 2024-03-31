@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:loon/loon.dart';
-import 'package:loon/widgets/observable_stream_builder.dart';
 
-class DocumentStreamBuilder<T> extends StatelessWidget {
+class DocumentStreamBuilder<T> extends StatefulWidget {
   final Document<T> doc;
   final Widget Function(BuildContext, DocumentSnapshot<T>?) builder;
 
@@ -13,10 +12,35 @@ class DocumentStreamBuilder<T> extends StatelessWidget {
   });
 
   @override
+  DocumentStreamBuilderState<T> createState() =>
+      DocumentStreamBuilderState<T>();
+}
+
+class DocumentStreamBuilderState<T> extends State<DocumentStreamBuilder<T>> {
+  late ObservableDocument<T> _observable;
+
+  @override
+  initState() {
+    super.initState();
+    _observable = widget.doc.observe();
+  }
+
+  @override
+  void didUpdateWidget(covariant DocumentStreamBuilder<T> oldWidget) {
+    super.didUpdateWidget(oldWidget);
+
+    if (oldWidget.doc != widget.doc) {
+      _observable.dispose();
+      _observable = widget.doc.observe();
+    }
+  }
+
+  @override
   build(context) {
-    return ObservableStreamBuilder(
-      observable: doc.observe(),
-      builder: builder,
+    return StreamBuilder<DocumentSnapshot<T>?>(
+      initialData: _observable.get(),
+      stream: _observable.stream(),
+      builder: (context, snap) => widget.builder(context, snap.data),
     );
   }
 }
