@@ -116,67 +116,41 @@ class Loon {
     bool broadcast = true,
     bool persist = true,
   }) {
-    final collectionStore = _documentStore[collection];
-    if (collectionStore == null) {
-      return;
-    }
-
-    // Immediately clear any documents in the collection scheduled for broadcast, as all broadcasts that had previously
-    // been scheduled for documents in the collection are now invalidated.
-    _documentBroadcastStore[collection]?.clear();
-
-    if (broadcast) {
-      for (final snap in collectionStore.values) {
-        _writeDocumentBroadcast(snap.doc, BroadcastEventTypes.removed);
+    // Clear the collection and all of its subcollections.
+    for (final key in _documentStore.keys.toList()) {
+      if (key.startsWith(collection)) {
+        _documentStore.remove(key);
+        _documentBroadcastStore[key]?.clear();
+        _documentDependencyStore.clear(key);
+        persistor?._clear(key);
       }
     }
 
-    _documentStore.remove(collection);
-    _documentDependencyStore.clear(collection);
-    persistor?._clear(collection);
-
-    // Delete all subcollections of this collection.
-    for (final otherCollection in _documentStore.keys.toList()) {
-      if (collection != otherCollection &&
-          otherCollection.startsWith('${collection}__')) {
-        _deleteCollection(
-          otherCollection,
-          broadcast: broadcast,
-          // Subcollections of the deleted collection do not need to be persisted
-          // as the default behavior of clearing a collection at the persistence layer
-          // is to clear all subcollections as well.
-          persist: false,
-        );
+    // Clear all observers watching documents of the collection ands its subcollections.
+    for (final observer in _broadcastObservers) {
+      if (observer.key.startsWith(collection)) {
+        observer._onClear();
       }
     }
   }
 
   /// Clears all data from the store.
   Future<void> _clearAll({
-    bool broadcast = false,
+    bool broadcast = true,
   }) async {
-    // Immediately clear any documents scheduled for broadcast, as whatever events happened prior to the clear are now irrelevant.
+    // Clear all documents from the store.
+    _documentStore.clear();
+    // Clear any documents scheduled for broadcast, as whatever events happened prior to the clear are now irrelevant.
     _documentBroadcastStore.clear();
-    // Immediately clear all dependencies of documents, since all documents are being removed and will be broadcast if indicated.
+    // Clear all dependencies of documents.
     _documentDependencyStore.clearAll();
 
-    // If it should broadcast, then we need to go through every document that is being
-    // cleared and schedule it for broadcast.
     if (broadcast) {
-      for (final collectionName in _documentStore.keys) {
-        final collectionStore = _documentStore[collectionName];
-
-        if (collectionStore == null) {
-          continue;
-        }
-
-        for (final snap in collectionStore.values) {
-          _writeDocumentBroadcast(snap.doc, BroadcastEventTypes.removed);
-        }
+      for (final observer in _broadcastObservers) {
+        observer._onClear();
       }
     }
 
-    _documentStore.clear();
     return persistor?._clearAll();
   }
 
@@ -291,7 +265,7 @@ class Loon {
   }
 
   bool _isQueryPendingBroadcast<T>(Query<T> query) {
-    return _instance._documentBroadcastStore.containsKey(query.name);
+    return _instance._documentBroadcastStore.containsKey(query.key);
   }
 
   bool _isDocumentPendingBroadcast<T>(Document<T> doc) {
@@ -529,7 +503,7 @@ class Loon {
   }
 
   static Future<void> clearAll({
-    bool broadcast = false,
+    bool broadcast = true,
   }) {
     return Loon._instance._clearAll(broadcast: broadcast);
   }

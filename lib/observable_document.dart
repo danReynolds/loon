@@ -42,6 +42,22 @@ class ObservableDocument<T> extends Document<T>
   }
 
   @override
+  _onClear() {
+    if (_changeController.hasListener) {
+      _changeController.add(
+        DocumentChangeSnapshot(
+          doc: this,
+          type: BroadcastEventTypes.removed,
+          data: null,
+          prevData: _value?.data,
+        ),
+      );
+    }
+
+    add(null);
+  }
+
+  @override
   ObservableDocument<T> observe({bool multicast = false}) {
     return this;
   }

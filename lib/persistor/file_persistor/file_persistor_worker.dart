@@ -235,11 +235,14 @@ class FilePersistorWorker {
   void _clearAll(ClearAllMessageRequest request) {
     _measureOperation('ClearAll operation', () async {
       try {
-        _fileDataStoreIndex.clear();
-        _documentDataStoreIndex.clear();
-        await Future.wait(
+        final future = Future.wait(
           _fileDataStoreIndex.values.map((dataStore) => dataStore.delete()),
         );
+
+        _fileDataStoreIndex.clear();
+        _documentDataStoreIndex.clear();
+
+        await future;
 
         _sendMessageResponse(request.success());
       } catch (e) {

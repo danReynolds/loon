@@ -554,4 +554,33 @@ void main() {
       );
     },
   );
+
+  group(
+    'clearAll',
+    () {
+      test(
+        "Deletes all file data stores",
+        () async {
+          final userCollection = Loon.collection(
+            'users',
+            fromJson: TestUserModel.fromJson,
+            toJson: (user) => user.toJson(),
+          );
+
+          userCollection.doc('1').create(TestUserModel('User 1'));
+          userCollection.doc('2').create(TestUserModel('User 2'));
+
+          final file = File('${testDirectory.path}/loon/users.json');
+
+          await completer.onPersistComplete;
+
+          expect(file.existsSync(), true);
+
+          await Loon.clearAll();
+
+          expect(file.existsSync(), false);
+        },
+      );
+    },
+  );
 }

@@ -30,7 +30,7 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  uuid: ^3.0.7
+  uuid: ^4.3.3
   loon:
     path: ../
 

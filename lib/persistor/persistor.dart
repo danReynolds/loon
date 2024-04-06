@@ -71,10 +71,10 @@ abstract class Persistor {
     }
   }
 
-  Future<void> _clear(String collection) {
+  Future<void> _clear(String key) {
     return _runOperation(() async {
-      await clear(collection);
-      onClear?.call(collection);
+      await clear(key);
+      onClear?.call(key);
     });
   }
 
