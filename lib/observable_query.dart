@@ -8,7 +8,7 @@ class ObservableQuery<T> extends Query<T>
   final Map<String, DocumentSnapshot<T>> _index = {};
 
   ObservableQuery(
-    super.collection, {
+    super.key, {
     required super.filters,
     required super.sort,
     required super.fromJson,
@@ -37,7 +37,7 @@ class ObservableQuery<T> extends Query<T>
   /// 4. A document that has been manually touched to be rebroadcasted.
   @override
   void _onBroadcast() {
-    final docBroadcasts = Loon._instance._documentBroadcastStore[name];
+    final docBroadcasts = Loon._instance._documentBroadcastStore[key];
 
     if (docBroadcasts == null) {
       return;
@@ -59,7 +59,7 @@ class ObservableQuery<T> extends Query<T>
       final prevSnap = _index[docId];
       final snap = Loon._instance._getSnapshot<T>(
         id: docId,
-        collection: name,
+        collection: key,
         fromJson: fromJson,
         toJson: toJson,
         persistorSettings: persistorSettings,
@@ -189,6 +189,23 @@ class ObservableQuery<T> extends Query<T>
         _changeController.add(changeSnaps);
       }
     }
+  }
+
+  @override
+  _onClear() {
+    if (_changeController.hasListener) {
+      _changeController.add(_index.values.map((prevSnap) {
+        return DocumentChangeSnapshot<T>(
+          doc: prevSnap.doc,
+          type: BroadcastEventTypes.removed,
+          prevData: prevSnap.data,
+          data: null,
+        );
+      }).toList());
+    }
+
+    _index.clear();
+    add([]);
   }
 
   @override

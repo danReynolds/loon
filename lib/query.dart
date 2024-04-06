@@ -1,7 +1,7 @@
 part of loon;
 
 class Query<T> {
-  final String name;
+  final String key;
   final List<FilterFn<T>> filters;
   final SortFn<T>? sort;
   final FromJson<T>? fromJson;
@@ -13,7 +13,7 @@ class Query<T> {
   final DependenciesBuilder<T>? dependenciesBuilder;
 
   Query(
-    this.name, {
+    this.key, {
     required this.filters,
     required this.sort,
     required this.fromJson,
@@ -47,7 +47,7 @@ class Query<T> {
     return _sortQuery(
       _filterQuery(
         Loon._instance._getSnapshots(
-          name,
+          key,
           fromJson: fromJson,
           toJson: toJson,
           persistorSettings: persistorSettings,
@@ -61,7 +61,7 @@ class Query<T> {
     bool multicast = false,
   }) {
     return ObservableQuery<T>(
-      name,
+      key,
       filters: filters,
       sort: sort,
       fromJson: fromJson,
@@ -82,7 +82,7 @@ class Query<T> {
 
   Query<T> sortBy(SortFn<T> sort) {
     return Query<T>(
-      name,
+      key,
       filters: filters,
       sort: sort,
       fromJson: fromJson,
@@ -94,7 +94,7 @@ class Query<T> {
 
   Query<T> where(FilterFn<T> filter) {
     return Query<T>(
-      name,
+      key,
       filters: [...filters, filter],
       sort: sort,
       fromJson: fromJson,

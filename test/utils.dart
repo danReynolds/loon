@@ -16,7 +16,9 @@ class ResetCompleter<T> {
   Completer<T> _completer = Completer();
 
   void complete([T? value]) {
-    _completer.complete(value);
+    if (!_completer.isCompleted) {
+      _completer.complete(value);
+    }
   }
 
   Future<void> get future async {

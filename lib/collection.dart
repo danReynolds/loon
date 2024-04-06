@@ -11,7 +11,7 @@ class Collection<T> extends Query<T> {
 
   Document<T> doc(String id) {
     return Document<T>(
-      collection: name,
+      collection: key,
       id: id,
       fromJson: fromJson,
       toJson: toJson,
@@ -26,14 +26,14 @@ class Collection<T> extends Query<T> {
   }
 
   bool exists() {
-    return Loon._instance._hasCollection(name);
+    return Loon._instance._hasCollection(key);
   }
 
   void delete({
     bool broadcast = true,
   }) {
     Loon._instance._deleteCollection(
-      name,
+      key,
       broadcast: broadcast,
       persist: isPersistenceEnabled(),
     );
@@ -44,7 +44,7 @@ class Collection<T> extends Query<T> {
     bool broadcast = true,
   }) {
     Loon._instance._replaceCollection<T>(
-      name,
+      key,
       snaps: snaps,
       fromJson: fromJson,
       toJson: toJson,

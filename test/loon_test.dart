@@ -650,99 +650,218 @@ void main() {
     });
   });
 
-  group('Delete collection', () {
-    tearDown(() {
-      Loon.clearAll();
-    });
+  group(
+    'Delete collection',
+    () {
+      tearDown(() {
+        Loon.clearAll();
+      });
 
-    test('Deletes the collection', () {
-      final userDoc = TestUserModel.store.doc('1');
-      final userDoc2 = TestUserModel.store.doc('2');
+      test('Deletes the collection', () {
+        final userDoc = TestUserModel.store.doc('1');
+        final userDoc2 = TestUserModel.store.doc('2');
 
-      final userData = TestUserModel('User 1');
-      final userData2 = TestUserModel('User 2');
+        final userData = TestUserModel('User 1');
+        final userData2 = TestUserModel('User 2');
 
-      userDoc.create(userData);
-      userDoc2.create(userData2);
+        userDoc.create(userData);
+        userDoc2.create(userData2);
 
-      expect(
-        Loon.extract()['collectionStore'],
-        {
-          "users": {
-            "1": DocumentSnapshotMatcher(
-              DocumentSnapshot(
-                doc: userDoc,
-                data: userData,
+        expect(
+          Loon.extract()['collectionStore'],
+          {
+            "users": {
+              "1": DocumentSnapshotMatcher(
+                DocumentSnapshot(
+                  doc: userDoc,
+                  data: userData,
+                ),
               ),
-            ),
-            "2": DocumentSnapshotMatcher(
-              DocumentSnapshot(
-                doc: userDoc2,
-                data: userData2,
+              "2": DocumentSnapshotMatcher(
+                DocumentSnapshot(
+                  doc: userDoc2,
+                  data: userData2,
+                ),
               ),
-            ),
-          }
-        },
-      );
-
-      TestUserModel.store.delete();
-
-      expect(
-        Loon.extract()['collectionStore'],
-        {},
-      );
-    });
-
-    test('Deletes subcollections of the collection', () {
-      final userDoc = TestUserModel.store.doc('1');
-      final userDoc2 = TestUserModel.store.doc('2');
-
-      final userData = TestUserModel('User 1');
-      final userData2 = TestUserModel('User 2');
-
-      final friendDoc =
-          userDoc.subcollection<TestUserModel>('friends').doc('2');
-
-      userDoc.create(userData);
-      friendDoc.create(userData2);
-      userDoc2.create(userData2);
-
-      expect(
-        Loon.extract()['collectionStore'],
-        {
-          "users": {
-            "1": DocumentSnapshotMatcher(
-              DocumentSnapshot(
-                doc: userDoc,
-                data: userData,
-              ),
-            ),
-            "2": DocumentSnapshotMatcher(
-              DocumentSnapshot(
-                doc: userDoc2,
-                data: userData2,
-              ),
-            ),
+            }
           },
-          "users__1__friends": {
-            "2": DocumentSnapshotMatcher(
-              DocumentSnapshot(
-                doc: friendDoc,
-                data: userData2,
+        );
+
+        TestUserModel.store.delete();
+
+        expect(
+          Loon.extract()['collectionStore'],
+          {},
+        );
+      });
+
+      test('Deletes subcollections of the collection', () {
+        final userDoc = TestUserModel.store.doc('1');
+        final userDoc2 = TestUserModel.store.doc('2');
+
+        final userData = TestUserModel('User 1');
+        final userData2 = TestUserModel('User 2');
+
+        final friendDoc =
+            userDoc.subcollection<TestUserModel>('friends').doc('2');
+
+        userDoc.create(userData);
+        friendDoc.create(userData2);
+        userDoc2.create(userData2);
+
+        expect(
+          Loon.extract()['collectionStore'],
+          {
+            "users": {
+              "1": DocumentSnapshotMatcher(
+                DocumentSnapshot(
+                  doc: userDoc,
+                  data: userData,
+                ),
               ),
-            ),
-          }
+              "2": DocumentSnapshotMatcher(
+                DocumentSnapshot(
+                  doc: userDoc2,
+                  data: userData2,
+                ),
+              ),
+            },
+            "users__1__friends": {
+              "2": DocumentSnapshotMatcher(
+                DocumentSnapshot(
+                  doc: friendDoc,
+                  data: userData2,
+                ),
+              ),
+            }
+          },
+        );
+
+        TestUserModel.store.delete();
+
+        expect(
+          Loon.extract()['collectionStore'],
+          {},
+        );
+      });
+
+      test(
+        'Broadcasts the delete to observers of the collection and subcollections',
+        () async {
+          final userDoc = TestUserModel.store.doc('1');
+          final userDoc2 = TestUserModel.store.doc('2');
+
+          final userData = TestUserModel('User 1');
+          final userData2 = TestUserModel('User 2');
+
+          final friendDoc =
+              userDoc.subcollection<TestUserModel>('friends').doc('2');
+
+          userDoc.create(userData);
+          friendDoc.create(userData2);
+          userDoc2.create(userData2);
+
+          final userDocStream = userDoc.stream();
+          final userCollectionStream = TestUserModel.store.stream();
+          final friendDocStream = friendDoc.stream();
+          final friendCollectionStream =
+              userDoc.subcollection<TestUserModel>('friends').stream();
+
+          TestUserModel.store.delete();
+
+          final userDocData = await userDocStream.take(2).toList();
+          final userCollectionData =
+              await userCollectionStream.take(2).toList();
+          final friendDocData = await friendDocStream.take(2).toList();
+          final friendCollectionData =
+              await friendCollectionStream.take(2).toList();
+
+          expect(
+            userDocData,
+            [
+              DocumentSnapshotMatcher(
+                DocumentSnapshot(
+                  doc: userDoc,
+                  data: userData,
+                ),
+              ),
+              null,
+            ],
+          );
+
+          expect(
+            userCollectionData,
+            [
+              [
+                DocumentSnapshotMatcher(
+                  DocumentSnapshot(
+                    doc: userDoc,
+                    data: userData,
+                  ),
+                ),
+                DocumentSnapshotMatcher(
+                  DocumentSnapshot(
+                    doc: userDoc2,
+                    data: userData2,
+                  ),
+                )
+              ],
+              [],
+            ],
+          );
+
+          expect(
+            friendDocData,
+            [
+              DocumentSnapshotMatcher(
+                DocumentSnapshot(
+                  doc: friendDoc,
+                  data: userData2,
+                ),
+              ),
+              null,
+            ],
+          );
+
+          expect(
+            userCollectionData,
+            [
+              [
+                DocumentSnapshotMatcher(
+                  DocumentSnapshot(
+                    doc: userDoc,
+                    data: userData,
+                  ),
+                ),
+                DocumentSnapshotMatcher(
+                  DocumentSnapshot(
+                    doc: userDoc2,
+                    data: userData2,
+                  ),
+                )
+              ],
+              [],
+            ],
+          );
+
+          expect(
+            friendCollectionData,
+            [
+              [
+                DocumentSnapshotMatcher(
+                  DocumentSnapshot(
+                    doc: friendDoc,
+                    data: userData2,
+                  ),
+                ),
+              ],
+              [],
+            ],
+          );
         },
       );
-
-      TestUserModel.store.delete();
-
-      expect(
-        Loon.extract()['collectionStore'],
-        {},
-      );
-    });
-  });
+    },
+  );
 
   group('Replace collection', () {
     tearDown(() {
@@ -816,56 +935,109 @@ void main() {
     });
   });
 
-  group('clearAll', () {
-    tearDown(() {
-      Loon.clearAll();
-    });
+  group(
+    'clearAll',
+    () {
+      tearDown(() {
+        Loon.clearAll();
+      });
 
-    test('Clears all documents across all collections', () {
-      final userDoc = TestUserModel.store.doc('1');
-      final userDoc2 = TestUserModel.store.doc('2');
+      test('Clears all documents across all collections', () {
+        final userDoc = TestUserModel.store.doc('1');
+        final userDoc2 = TestUserModel.store.doc('2');
 
-      final userData = TestUserModel('User 1');
-      final userData2 = TestUserModel('User 2');
+        final userData = TestUserModel('User 1');
+        final userData2 = TestUserModel('User 2');
 
-      userDoc.create(userData);
-      userDoc2.create(userData2);
+        userDoc.create(userData);
+        userDoc2.create(userData2);
 
-      expect(
-        Loon.extract()['collectionStore'],
-        {
-          "users": {
-            "1": DocumentSnapshotMatcher(
-              DocumentSnapshot(
-                doc: userDoc,
-                data: userData,
+        expect(
+          Loon.extract()['collectionStore'],
+          {
+            "users": {
+              "1": DocumentSnapshotMatcher(
+                DocumentSnapshot(
+                  doc: userDoc,
+                  data: userData,
+                ),
               ),
-            ),
-            "2": DocumentSnapshotMatcher(
-              DocumentSnapshot(
-                doc: userDoc2,
-                data: userData2,
+              "2": DocumentSnapshotMatcher(
+                DocumentSnapshot(
+                  doc: userDoc2,
+                  data: userData2,
+                ),
               ),
-            ),
-          }
+            }
+          },
+        );
+
+        Loon.clearAll();
+
+        expect(
+          Loon.extract()['collectionStore'],
+          {},
+        );
+        expect(
+          Loon.extract()['dependencyStore'],
+          {
+            'dependencies': {},
+            'dependents': {},
+          },
+        );
+      });
+
+      test(
+        'Broadcasts the clear to observers',
+        () async {
+          final userDoc = TestUserModel.store.doc('1');
+          final userData = TestUserModel('User 1');
+          final userDocStream = userDoc.stream();
+          final userCollectionStream = TestUserModel.store.stream();
+
+          userDoc.create(userData);
+
+          await asyncEvent();
+
+          Loon.clearAll();
+
+          final userDocStreamData = await userDocStream.take(3).toList();
+          final userCollectionStreamData =
+              await userCollectionStream.take(3).toList();
+
+          expect(
+            userDocStreamData,
+            [
+              null,
+              DocumentSnapshotMatcher(
+                DocumentSnapshot(
+                  doc: userDoc,
+                  data: userData,
+                ),
+              ),
+              null,
+            ],
+          );
+
+          expect(
+            userCollectionStreamData,
+            [
+              [],
+              [
+                DocumentSnapshotMatcher(
+                  DocumentSnapshot(
+                    doc: userDoc,
+                    data: userData,
+                  ),
+                ),
+              ],
+              [],
+            ],
+          );
         },
       );
-
-      Loon.clearAll();
-
-      expect(
-        Loon.extract()['collectionStore'],
-        {},
-      );
-      expect(
-        Loon.extract()['dependencyStore'],
-        {
-          'dependencies': {},
-          'dependents': {},
-        },
-      );
-    });
-  });
+    },
+  );
 
   group('Root collection', () {
     tearDown(() {
