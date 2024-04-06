@@ -1,3 +1,8 @@
+## 1.2.0
+
+* Fixed a bug where `clearAll` wasn't broadcasting to observers.
+* Simplified logic of deleting collections recursively and broadcasting to observers.
+
 ## 1.1.0
 
 * More fixes and improvements.
