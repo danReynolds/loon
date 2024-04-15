@@ -118,7 +118,7 @@ class Loon {
   }) {
     // Clear the collection and all of its subcollections.
     for (final key in _documentStore.keys.toList()) {
-      if (key.startsWith(collection)) {
+      if (key == collection || key.startsWith('${collection}__')) {
         _documentStore.remove(key);
         _documentBroadcastStore[key]?.clear();
         _documentDependencyStore.clear(key);
