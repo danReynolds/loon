@@ -2,12 +2,13 @@ library loon;
 
 import 'dart:async';
 
-import 'package:loon/utils.dart';
+import 'package:flutter/foundation.dart';
 
 export 'widgets/query_stream_builder.dart';
 export 'widgets/document_stream_builder.dart';
 export 'persistor/file_persistor/file_persistor.dart';
 
+part 'store_node.dart';
 part 'broadcast_observer.dart';
 part 'query.dart';
 part 'observable_query.dart';
@@ -19,9 +20,29 @@ part 'document_snapshot.dart';
 part 'persistor/persistor.dart';
 part 'document_change_snapshot.dart';
 part 'document_dependency_store.dart';
+part 'utils.dart';
 
-typedef DocumentStore = Map<String, Map<String, DocumentSnapshot>>;
-typedef DocumentBroadcastStore = Map<String, Map<String, BroadcastEventTypes>>;
+enum EventTypes {
+  /// The document has been modified.
+  modified,
+
+  /// The document has been added.
+  added,
+
+  /// The document has been removed.
+  removed,
+
+  /// The document has been manually touched for rebroadcast.
+  touched,
+
+  /// The document has been hydrated from persisted storage.
+  hydrated,
+}
+
+typedef BroadcastStore = Map<String, Map<String, EventTypes>>;
+
+/// Set of broadcast observers by collection.
+typedef BroadcastObserverStore = Set<BroadcastObserver>;
 
 class Loon {
   Persistor? persistor;
@@ -31,81 +52,19 @@ class Loon {
   Loon._();
 
   /// The store of document snapshots indexed by their collections.
-  final DocumentStore _documentStore = {};
+  var _store = Document('ROOT');
 
   /// The store of broadcast types for documents scheduled to be broadcast, indexed by their collection.
-  final DocumentBroadcastStore _documentBroadcastStore = {};
+  final BroadcastStore _broadcastStore = {};
 
-  /// The list of observers, either document or query observables, that should be notified on broadcast.
-  final Set<BroadcastObserver> _broadcastObservers = {};
+  /// The store of broadcast observers that should be notified on broadcast.
+  final BroadcastObserverStore _broadcastObservers = {};
 
   final _documentDependencyStore = _DocumentDependencyStore();
 
   bool _hasPendingBroadcast = false;
 
   bool enableLogging = false;
-
-  /// Validates that data is either already in a serializable format or comes with a serializer.
-  static void _validateDataSerialization<T>({
-    required FromJson<T>? fromJson,
-    required ToJson<T>? toJson,
-    required T? data,
-  }) {
-    if (data is! Json? && (fromJson == null || toJson == null)) {
-      throw Exception('Missing fromJson/toJson serializer');
-    }
-  }
-
-  /// Validates that a type is either already serialized or comes with a serializer.
-  static void _validateTypeSerialization<T>({
-    required FromJson<T>? fromJson,
-    required ToJson<T>? toJson,
-  }) {
-    if (T != Json && T != dynamic && (fromJson == null && toJson == null)) {
-      throw Exception('Missing fromJson/toJson serializer');
-    }
-  }
-
-  /// Returns a data snapshot for the given document.
-  DocumentSnapshot<T>? _getSnapshot<T>({
-    required String id,
-    required String collection,
-    required FromJson<T>? fromJson,
-    required ToJson<T>? toJson,
-    required PersistorSettings? persistorSettings,
-    required DependenciesBuilder<T>? dependenciesBuilder,
-  }) {
-    final snap = _documentStore[collection]?[id];
-
-    if (snap == null) {
-      return null;
-    }
-
-    if (snap is DocumentSnapshot<Json> && T != Json && T != dynamic) {
-      _validateTypeSerialization<T>(
-        fromJson: fromJson,
-        toJson: toJson,
-      );
-
-      // When a document is read, if it is still in JSON format from hydration and is now being accessed
-      // with a serializer, then it is de-serialized at time of access.
-      return _writeSnapshot<T>(
-        Document<T>(
-          id: id,
-          collection: collection,
-          fromJson: fromJson,
-          toJson: toJson,
-          persistorSettings: persistorSettings,
-          dependenciesBuilder: dependenciesBuilder,
-        ),
-        fromJson!(snap.data),
-        broadcast: false,
-        persist: false,
-      );
-    }
-
-    return snap as DocumentSnapshot<T>;
-  }
 
   bool get _isGlobalPersistenceEnabled {
     return _instance.persistor?.settings.persistenceEnabled ?? false;
@@ -116,32 +75,32 @@ class Loon {
     bool broadcast = true,
     bool persist = true,
   }) {
-    // Clear the collection and all of its subcollections.
-    for (final key in _documentStore.keys.toList()) {
-      if (key == collection || key.startsWith('${collection}__')) {
-        _documentStore.remove(key);
-        _documentBroadcastStore[key]?.clear();
-        _documentDependencyStore.clear(key);
-        persistor?._clear(key);
-      }
-    }
+    // // Clear the collection and all of its subcollections.
+    // for (final key in _documentStore.keys.toList()) {
+    //   if (key == collection || key.startsWith('${collection}__')) {
+    //     _documentStore.remove(key);
+    //     _broadcastStore[key]?.clear();
+    //     _documentDependencyStore.clear(key);
+    //     persistor?._clear(key);
+    //   }
+    // }
 
-    // Clear all observers watching documents of the collection ands its subcollections.
-    for (final observer in _broadcastObservers) {
-      if (observer.key.startsWith(collection)) {
-        observer._onClear();
-      }
-    }
+    // // Clear all observers watching documents of the collection ands its subcollections.
+    // for (final observer in _broadcastObservers) {
+    //   if (observer.key.startsWith(collection)) {
+    //     observer._onClear();
+    //   }
+    // }
   }
 
   /// Clears all data from the store.
   Future<void> _clearAll({
     bool broadcast = true,
   }) async {
-    // Clear all documents from the store.
-    _documentStore.clear();
+    // Reset the store.
+    _store = Document('ROOT');
     // Clear any documents scheduled for broadcast, as whatever events happened prior to the clear are now irrelevant.
-    _documentBroadcastStore.clear();
+    _broadcastStore.clear();
     // Clear all dependencies of documents.
     _documentDependencyStore.clearAll();
 
@@ -154,96 +113,6 @@ class Loon {
     return persistor?._clearAll();
   }
 
-  /// Returns whether a document exists in the collection data store.
-  bool _hasDocument(Document doc) {
-    return _documentStore[doc.collection]?.containsKey(doc.id) ?? false;
-  }
-
-  bool _hasCollection(String collection) {
-    return _documentStore.containsKey(collection);
-  }
-
-  void _replaceCollection<T>(
-    String collection, {
-    required List<DocumentSnapshot<T>> snaps,
-    FromJson<T>? fromJson,
-    ToJson<T>? toJson,
-    PersistorSettings? persistorSettings,
-    DependenciesBuilder<T>? dependenciesBuilder,
-    bool broadcast = true,
-  }) {
-    final snapsById =
-        snaps.fold<Map<String, DocumentSnapshot<T>>>({}, (acc, snap) {
-      acc[snap.id] = snap;
-      return acc;
-    });
-
-    final existingSnaps = _getSnapshots<T>(
-      collection,
-      fromJson: fromJson,
-      toJson: toJson,
-      persistorSettings: persistorSettings,
-      dependenciesBuilder: dependenciesBuilder,
-    );
-
-    for (final existingSnap in existingSnaps) {
-      final docId = existingSnap.id;
-      final updatedSnap = snapsById[docId];
-
-      if (updatedSnap != null) {
-        existingSnap.doc.update(updatedSnap.data, broadcast: broadcast);
-      } else {
-        existingSnap.doc.delete(broadcast: broadcast);
-      }
-    }
-
-    for (final newSnap in snapsById.values) {
-      if (!newSnap.doc.exists()) {
-        newSnap.doc.create(newSnap.data, broadcast: broadcast);
-      }
-    }
-  }
-
-  /// Returns a list of data snapshots for the given collection.
-  List<DocumentSnapshot<T>> _getSnapshots<T>(
-    String collection, {
-    required FromJson<T>? fromJson,
-    required ToJson<T>? toJson,
-    required PersistorSettings? persistorSettings,
-    required DependenciesBuilder<T>? dependenciesBuilder,
-  }) {
-    if (!_hasCollection(collection)) {
-      return [];
-    }
-
-    return _documentStore[collection]!.values.map((snap) {
-      if (snap is DocumentSnapshot<Json> && T != Json && T != dynamic) {
-        _validateTypeSerialization<T>(
-          fromJson: fromJson,
-          toJson: toJson,
-        );
-
-        // When a document is read, if it is still in JSON format from hydration and is now being accessed
-        // with a serializer, then it is de-serialized at time of access.
-        return _writeSnapshot<T>(
-          Document<T>(
-            id: snap.doc.id,
-            collection: collection,
-            fromJson: fromJson,
-            toJson: toJson,
-            persistorSettings: persistorSettings,
-            dependenciesBuilder: dependenciesBuilder,
-          ),
-          fromJson!(snap.data),
-          broadcast: false,
-          persist: false,
-        );
-      }
-
-      return snap as DocumentSnapshot<T>;
-    }).toList();
-  }
-
   void _addBroadcastObserver(BroadcastObserver observer) {
     _broadcastObservers.add(observer);
   }
@@ -252,25 +121,12 @@ class Loon {
     _broadcastObservers.remove(observer);
   }
 
-  void _scheduleBroadcast() {
-    if (!_hasPendingBroadcast) {
-      _hasPendingBroadcast = true;
-
-      // Schedule a broadcast event to be run on the microtask queue.
-      scheduleMicrotask(() {
-        _broadcast();
-        _hasPendingBroadcast = false;
-      });
-    }
-  }
-
   bool _isQueryPendingBroadcast<T>(Query<T> query) {
-    return _instance._documentBroadcastStore.containsKey(query.key);
+    return _instance._broadcastStore.containsKey(query.collection.name);
   }
 
   bool _isDocumentPendingBroadcast<T>(Document<T> doc) {
-    return _instance._documentBroadcastStore[doc.collection]
-            ?.containsKey(doc.id) ??
+    return _instance._broadcastStore[doc.parent!.name]?.containsKey(doc.id) ??
         false;
   }
 
@@ -278,123 +134,34 @@ class Loon {
     for (final observer in _broadcastObservers) {
       observer._onBroadcast();
     }
-    _documentBroadcastStore.clear();
+    _broadcastStore.clear();
   }
 
-  DocumentSnapshot<T> _writeSnapshot<T>(
-    Document<T> doc,
-    T data, {
+  void _onWrite<T>(
+    Document<T> doc, {
+    required EventTypes event,
     bool broadcast = true,
     bool persist = true,
-    bool hydrating = false,
   }) {
-    if (data is! Json && doc.isPersistenceEnabled()) {
-      _validateDataSerialization<T>(
-        fromJson: doc.fromJson,
-        toJson: doc.toJson,
-        data: data,
-      );
-    }
-
-    final collection = doc.collection;
-
-    if (!_documentStore.containsKey(collection)) {
-      _documentStore[collection] = {};
-    }
-
-    final BroadcastEventTypes broadcastType;
-    if (hydrating) {
-      broadcastType = BroadcastEventTypes.hydrated;
-    } else if (doc.exists()) {
-      broadcastType = BroadcastEventTypes.modified;
-    } else {
-      broadcastType = BroadcastEventTypes.added;
-    }
-
-    final snap = _documentStore[doc.collection]![doc.id] = DocumentSnapshot<T>(
-      doc: doc,
-      data: data,
-    );
-
-    _documentDependencyStore.rebuildDependencies(snap);
-
     if (broadcast) {
-      _writeDocumentBroadcast(doc, broadcastType);
+      _rebroadcastDoc(doc, event);
     }
+
+    _documentDependencyStore.rebuildDependencies(doc.get()!);
 
     if (persist && doc.isPersistenceEnabled()) {
       persistor!._persistDoc(doc);
     }
-
-    return snap;
   }
 
-  DocumentSnapshot<T> _createDocument<T>(
-    Document<T> doc,
-    T data, {
-    bool broadcast = true,
-  }) {
-    if (doc.exists()) {
-      throw Exception('Cannot add duplicate document');
-    }
-
-    return _writeSnapshot<T>(doc, data, broadcast: broadcast);
-  }
-
-  DocumentSnapshot<T> _updateDocument<T>(
-    Document<T> doc,
-    T data, {
-    bool broadcast = true,
-  }) {
-    if (!doc.exists()) {
-      throw Exception('Missing document ${doc.key}');
-    }
-
-    return _writeSnapshot<T>(
-      doc,
-      data,
-      // As an optimization, broadcasting is skipped when updating a document if the document
-      // data is unchanged.
-      broadcast: broadcast && doc.get()?.data != data,
-    );
-  }
-
-  DocumentSnapshot<T> _createOrUpdateDocument<T>(
-    Document<T> doc,
-    T data, {
-    bool broadcast = true,
-  }) {
-    if (doc.exists()) {
-      return _updateDocument(doc, data, broadcast: broadcast);
-    }
-    return _createDocument(doc, data, broadcast: broadcast);
-  }
-
-  DocumentSnapshot<T> _modifyDocument<T>(
-    Document<T> doc,
-    ModifyFn<T> modifyFn, {
-    bool broadcast = true,
-  }) {
-    return _createOrUpdateDocument<T>(
-      doc,
-      modifyFn(doc.get()),
-      broadcast: broadcast,
-    );
-  }
-
-  void _deleteDocument<T>(
+  void _onDelete<T>(
     Document<T> doc, {
     bool broadcast = true,
   }) {
-    if (!doc.exists()) {
-      return;
-    }
-
-    _documentStore[doc.collection]!.remove(doc.id);
     _documentDependencyStore.clearDependencies(doc);
 
     if (broadcast) {
-      _writeDocumentBroadcast<T>(doc, BroadcastEventTypes.removed);
+      _rebroadcastDoc(doc, EventTypes.removed);
     }
 
     if (doc.isPersistenceEnabled()) {
@@ -402,23 +169,20 @@ class Loon {
     }
   }
 
-  void _writeDocumentBroadcast<T>(
+  void _rebroadcastDoc<T>(
     Document<T> doc,
-    BroadcastEventTypes broadcastType,
+    EventTypes event,
   ) {
-    final pendingBroadcastType =
-        _documentBroadcastStore[doc.collection]?[doc.id];
+    final collection = doc.parent!;
+    final pendingEvent = _broadcastStore[collection]?[doc];
 
-    // Ignore writing a duplicate broadcast event type or overwriting a pending mutative event type with a touched event.
-    if (pendingBroadcastType != null &&
-        (pendingBroadcastType == broadcastType ||
-            broadcastType == BroadcastEventTypes.touched)) {
+    // Ignore writing a duplicate event type or overwriting a pending mutative event type with a touched event.
+    if (pendingEvent != null &&
+        (pendingEvent == event || pendingEvent == EventTypes.touched)) {
       return;
     }
 
-    _documentBroadcastStore[doc.collection] ??= {};
-    _documentBroadcastStore[doc.collection]![doc.id] = broadcastType;
-
+    (_broadcastStore[collection.name] ??= {})[doc.id] = event;
     _rebroadcastDependents(doc);
 
     _scheduleBroadcast();
@@ -433,6 +197,18 @@ class Loon {
       for (final dependent in dependents) {
         rebroadcast(dependent);
       }
+    }
+  }
+
+  _scheduleBroadcast() {
+    if (!_hasPendingBroadcast) {
+      _hasPendingBroadcast = true;
+
+      // Schedule a broadcast event to be run on the microtask queue.
+      scheduleMicrotask(() {
+        _broadcast();
+        _hasPendingBroadcast = false;
+      });
     }
   }
 
@@ -453,16 +229,15 @@ class Loon {
       final data = await _instance.persistor!._hydrate();
 
       for (final collectionDataStore in data.entries) {
-        final collection = collectionDataStore.key;
+        final collectionName = collectionDataStore.key;
         final documentDataStore = collectionDataStore.value;
 
         for (final documentDataEntry in documentDataStore.entries) {
-          _instance._writeSnapshot<Json>(
-            Document<Json>(id: documentDataEntry.key, collection: collection),
-            documentDataEntry.value,
-            persist: false,
-            hydrating: true,
-          );
+          final collection = Loon.collection<Json>(collectionName);
+          final doc = collection.doc(documentDataEntry.key);
+
+          doc.createOrUpdate(documentDataEntry.value, broadcast: false);
+          _instance._onWrite(doc, event: EventTypes.hydrated, persist: false);
         }
       }
     } catch (e) {
@@ -473,33 +248,19 @@ class Loon {
   }
 
   static Collection<T> collection<T>(
-    String collection, {
+    String name, {
     FromJson<T>? fromJson,
     ToJson<T>? toJson,
     PersistorSettings? persistorSettings,
     DependenciesBuilder<T>? dependenciesBuilder,
   }) {
-    return Collection<T>(
-      collection,
+    return _instance._store.subcollection<T>(
+      name,
       fromJson: fromJson,
       toJson: toJson,
       persistorSettings: persistorSettings,
       dependenciesBuilder: dependenciesBuilder,
     );
-  }
-
-  static Document<T> doc<T>(
-    String id, {
-    FromJson<T>? fromJson,
-    ToJson<T>? toJson,
-    PersistorSettings? persistorSettings,
-  }) {
-    return collection<T>(
-      '__ROOT__',
-      fromJson: fromJson,
-      toJson: toJson,
-      persistorSettings: persistorSettings,
-    ).doc(id);
   }
 
   static Future<void> clearAll({
@@ -508,19 +269,16 @@ class Loon {
     return Loon._instance._clearAll(broadcast: broadcast);
   }
 
-  /// Enqueues a document to be rebroadcasted, updating all listeners that are subscribed to that document.
+  /// Schedules a document to be rebroadcasted, updating all listeners that are subscribed to that document.
   static void rebroadcast(Document doc) {
-    _instance._writeDocumentBroadcast(
-      doc,
-      BroadcastEventTypes.touched,
-    );
+    _instance._rebroadcastDoc(doc, EventTypes.touched);
   }
 
   /// Returns a Map of all of the data and metadata of the store for debugging and inspection purposes.
-  static Json extract() {
+  static Json inspect() {
     return {
-      "collectionStore": _instance._documentStore,
-      "documentBroadcastStore": _instance._documentBroadcastStore,
+      "store": inspectNode(_instance._store),
+      "broadcastStore": _instance._broadcastStore,
       "dependencyStore": {
         "dependencies": _instance._documentDependencyStore._dependenciesStore,
         "dependents": _instance._documentDependencyStore._dependentsStore,

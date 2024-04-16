@@ -9,11 +9,25 @@ class DocumentSnapshot<T> {
     required this.data,
   });
 
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) {
+      return true;
+    }
+    if (other is DocumentSnapshot<T>) {
+      return other.data == data && other.doc == doc;
+    }
+    return false;
+  }
+
+  @override
+  int get hashCode => Object.hashAll([doc, data]);
+
   String get id {
     return doc.id;
   }
 
-  String get collection {
-    return doc.collection;
+  String get path {
+    return doc.path;
   }
 }

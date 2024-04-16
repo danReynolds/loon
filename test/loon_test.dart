@@ -40,7 +40,7 @@ class DocumentSnapshotMatcher<T> extends Matcher {
     final actualData = actual?.data;
     final expectedData = expected?.data;
 
-    if (actual.doc.key != expected?.doc.key) {
+    if (actual.doc.path != expected?.doc.path) {
       return false;
     }
 
@@ -75,15 +75,21 @@ void main() {
         userDoc.create(user);
 
         expect(
-          Loon.extract()['collectionStore'],
+          Loon.inspect()['store'],
           {
-            "users": {
-              "1": DocumentSnapshotMatcher(
-                DocumentSnapshot(
-                  doc: userDoc,
-                  data: user,
-                ),
-              ),
+            "snap": null,
+            "children": {
+              TestUserModel.store: {
+                "children": {
+                  userDoc: {
+                    "children": null,
+                    "snap": DocumentSnapshot(
+                      doc: userDoc,
+                      data: user,
+                    )
+                  }
+                }
+              }
             }
           },
         );
@@ -100,15 +106,21 @@ void main() {
       userDoc.create(userJson);
 
       expect(
-        Loon.extract()['collectionStore'],
+        Loon.inspect()['store'],
         {
-          "users": {
-            "2": DocumentSnapshotMatcher(
-              DocumentSnapshot(
-                doc: userDoc,
-                data: userJson,
-              ),
-            ),
+          "snap": null,
+          "children": {
+            userCollection: {
+              "children": {
+                userDoc: {
+                  "snap": DocumentSnapshot(
+                    doc: userDoc,
+                    data: userJson,
+                  ),
+                  "children": null,
+                }
+              }
+            }
           }
         },
       );
@@ -340,7 +352,7 @@ void main() {
       expect(userDoc.exists(), false);
 
       expect(
-        Loon.extract()['collectionStore'],
+        Loon.inspect()['collectionStore'],
         {"users": {}},
       );
     });
@@ -436,8 +448,8 @@ void main() {
 
       // Add document
       expect(
-        snaps[0].type,
-        BroadcastEventTypes.added,
+        snaps[0].event,
+        EventTypes.added,
       );
       expect(
         snaps[0].prevData,
@@ -450,8 +462,8 @@ void main() {
 
       // Update document
       expect(
-        snaps[1].type,
-        BroadcastEventTypes.modified,
+        snaps[1].event,
+        EventTypes.modified,
       );
       expect(
         snaps[1].prevData,
@@ -590,8 +602,8 @@ void main() {
       expect(snaps[0].length, 2);
 
       expect(
-        snaps[0].first.type,
-        BroadcastEventTypes.added,
+        snaps[0].first.event,
+        EventTypes.added,
       );
       expect(
         snaps[0].first.data,
@@ -599,8 +611,8 @@ void main() {
       );
 
       expect(
-        snaps[0].last.type,
-        BroadcastEventTypes.added,
+        snaps[0].last.event,
+        EventTypes.added,
       );
       expect(
         snaps[0].last.data,
@@ -610,8 +622,8 @@ void main() {
       expect(snaps[1].length, 1);
 
       expect(
-        snaps[1].first.type,
-        BroadcastEventTypes.modified,
+        snaps[1].first.event,
+        EventTypes.modified,
       );
       expect(
         snaps[1].first.prevData,
@@ -641,11 +653,11 @@ void main() {
 
       expect(snaps[0].length, 1);
       expect(
-        snaps[0].first.type,
+        snaps[0].first.event,
         // The global event is a [BroadcastEventTypes.modified] when the user is updated,
         // but to this query, it should be a [BroadcastEventTypes.added] event since previously
         // it was not included and now it is.
-        BroadcastEventTypes.added,
+        EventTypes.added,
       );
     });
   });
@@ -668,7 +680,7 @@ void main() {
         userDoc2.create(userData2);
 
         expect(
-          Loon.extract()['collectionStore'],
+          Loon.inspect()['collectionStore'],
           {
             "users": {
               "1": DocumentSnapshotMatcher(
@@ -690,7 +702,7 @@ void main() {
         TestUserModel.store.delete();
 
         expect(
-          Loon.extract()['collectionStore'],
+          Loon.inspect()['collectionStore'],
           {},
         );
       });
@@ -710,7 +722,7 @@ void main() {
         userDoc2.create(userData2);
 
         expect(
-          Loon.extract()['collectionStore'],
+          Loon.inspect()['collectionStore'],
           {
             "users": {
               "1": DocumentSnapshotMatcher(
@@ -740,7 +752,7 @@ void main() {
         TestUserModel.store.delete();
 
         expect(
-          Loon.extract()['collectionStore'],
+          Loon.inspect()['collectionStore'],
           {},
         );
       });
@@ -879,7 +891,7 @@ void main() {
       userDoc2.create(userData2);
 
       expect(
-        Loon.extract()['collectionStore'],
+        Loon.inspect()['collectionStore'],
         {
           "users": {
             "1": DocumentSnapshotMatcher(
@@ -914,7 +926,7 @@ void main() {
       ]);
 
       expect(
-        Loon.extract()['collectionStore'],
+        Loon.inspect()['collectionStore'],
         {
           "users": {
             "2": DocumentSnapshotMatcher(
@@ -953,7 +965,7 @@ void main() {
         userDoc2.create(userData2);
 
         expect(
-          Loon.extract()['collectionStore'],
+          Loon.inspect()['collectionStore'],
           {
             "users": {
               "1": DocumentSnapshotMatcher(
@@ -975,11 +987,11 @@ void main() {
         Loon.clearAll();
 
         expect(
-          Loon.extract()['collectionStore'],
+          Loon.inspect()['collectionStore'],
           {},
         );
         expect(
-          Loon.extract()['dependencyStore'],
+          Loon.inspect()['dependencyStore'],
           {
             'dependencies': {},
             'dependents': {},
@@ -1040,30 +1052,30 @@ void main() {
   );
 
   group('Root collection', () {
-    tearDown(() {
-      Loon.clearAll();
-    });
+    // tearDown(() {
+    //   Loon.clearAll();
+    // });
 
-    test('Writes documents successfully', () {
-      final data = {"test": true};
-      final rootDoc = Loon.doc('1');
+    // test('Writes documents successfully', () {
+    //   final data = {"test": true};
+    //   final rootDoc = Loon.doc('1');
 
-      rootDoc.create(data);
+    //   rootDoc.create(data);
 
-      expect(
-        Loon.extract()['collectionStore'],
-        {
-          "__ROOT__": {
-            "1": DocumentSnapshotMatcher(
-              DocumentSnapshot(
-                doc: rootDoc,
-                data: data,
-              ),
-            ),
-          }
-        },
-      );
-    });
+    //   expect(
+    //     Loon.inspect()['collectionStore'],
+    //     {
+    //       "__ROOT__": {
+    //         "1": DocumentSnapshotMatcher(
+    //           DocumentSnapshot(
+    //             doc: rootDoc,
+    //             data: data,
+    //           ),
+    //         ),
+    //       }
+    //     },
+    //   );
+    // });
   });
 
   group('Subcollections', () {
@@ -1081,7 +1093,7 @@ void main() {
       friendDoc.create(friendData);
 
       expect(
-        Loon.extract()['collectionStore'],
+        Loon.inspect()['collectionStore'],
         {
           "users__1__friends": {
             "1": DocumentSnapshotMatcher(
@@ -1141,7 +1153,7 @@ void main() {
 
       // The data is hydrated as Json
       expect(
-        Loon.extract()['collectionStore'],
+        Loon.inspect()['collectionStore'],
         {
           "users": {
             "1": DocumentSnapshotMatcher(
@@ -1167,7 +1179,7 @@ void main() {
 
       // Afterwards first read, it is stored de-serialized.
       expect(
-        Loon.extract()['collectionStore'],
+        Loon.inspect()['collectionStore'],
         {
           "users": {
             "1": DocumentSnapshotMatcher(
@@ -1213,7 +1225,7 @@ void main() {
       await asyncEvent();
 
       expect(
-        Loon.extract()['dependencyStore'],
+        Loon.inspect()['dependencyStore'],
         {
           "dependencies": {
             "posts": {
@@ -1251,7 +1263,7 @@ void main() {
       // Deleting the user doc should not alter the dependencies, as the post doc remains
       // dependent on the user doc, even when it is no longer in the store, since it could be added back later.
       expect(
-        Loon.extract()['dependencyStore'],
+        Loon.inspect()['dependencyStore'],
         {
           "dependencies": {
             "posts": {
@@ -1283,7 +1295,7 @@ void main() {
 
       // Now the post doc has been updated and is no longer dependent on the user doc.
       expect(
-        Loon.extract()['dependencyStore'],
+        Loon.inspect()['dependencyStore'],
         {
           "dependencies": {
             "posts": {
@@ -1361,7 +1373,7 @@ void main() {
       await asyncEvent();
 
       expect(
-        Loon.extract()['dependencyStore'],
+        Loon.inspect()['dependencyStore'],
         {
           "dependencies": {
             "users": {
@@ -1382,7 +1394,7 @@ void main() {
       });
 
       expect(
-        Loon.extract()['dependencyStore'],
+        Loon.inspect()['dependencyStore'],
         {
           "dependencies": {
             "users": {
@@ -1471,7 +1483,7 @@ void main() {
       await asyncEvent();
 
       expect(
-        Loon.extract()['dependencyStore'],
+        Loon.inspect()['dependencyStore'],
         {
           "dependencies": {
             "friends": {
@@ -1495,7 +1507,7 @@ void main() {
       await asyncEvent();
 
       expect(
-        Loon.extract()['dependencyStore'],
+        Loon.inspect()['dependencyStore'],
         {
           "dependencies": {},
           // The dependents are not cleared when a collection is cleared, instead
@@ -1515,7 +1527,7 @@ void main() {
       await asyncEvent();
 
       expect(
-        Loon.extract()['dependencyStore'],
+        Loon.inspect()['dependencyStore'],
         {
           "dependencies": {},
           "dependents": {

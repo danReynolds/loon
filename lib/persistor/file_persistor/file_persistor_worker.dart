@@ -3,7 +3,6 @@ import 'dart:isolate';
 import 'package:loon/loon.dart';
 import 'package:loon/persistor/file_persistor/file_data_store.dart';
 import 'package:loon/persistor/file_persistor/messages.dart';
-import 'package:loon/utils.dart';
 import 'package:path/path.dart' as path;
 
 typedef DocumentDataStore = Map<String, Map<String, FileDataStore>>;

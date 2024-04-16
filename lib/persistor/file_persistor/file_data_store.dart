@@ -3,7 +3,6 @@ import 'dart:io';
 import 'package:encrypt/encrypt.dart';
 import 'package:loon/loon.dart';
 import 'package:loon/persistor/file_persistor/file_persist_document.dart';
-import 'package:loon/utils.dart';
 import 'package:path/path.dart' as path;
 
 class FileDataStore {

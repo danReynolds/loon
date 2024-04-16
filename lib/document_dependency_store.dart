@@ -16,7 +16,7 @@ class _DocumentDependencyStore {
 
   /// Returns the set of dependencies (if any) that the given document is dependent on.
   Set<Document>? getDependencies(Document doc) {
-    return _dependenciesStore[doc.collection]?[doc.id];
+    return _dependenciesStore[doc.parent?.path]?[doc.id];
   }
 
   /// Returns the set of documents (if any) that are dependent on the given document.
@@ -24,7 +24,7 @@ class _DocumentDependencyStore {
   /// If there are stale dependents for documents that have been removed since last update,
   /// then they are lazily removed when accessed.
   Set<Document>? getDependents(Document doc) {
-    final dependents = _dependentsStore[doc.collection]?[doc.id];
+    final dependents = _dependentsStore[doc.parent?.path]?[doc.id];
 
     if (dependents == null) {
       return null;
@@ -45,13 +45,13 @@ class _DocumentDependencyStore {
   /// 1. The dependency should be added to the dependencies store for the given document.
   /// 2. The document should be added to the dependents store for the given dependency.
   void addDependency(Document doc, Document dependency) {
-    _dependentsStore[dependency.collection] ??= {};
+    _dependentsStore[dependency.parent!.path] ??= {};
     final dependents =
-        _dependentsStore[dependency.collection]![dependency.id] ??= {};
+        _dependentsStore[dependency.parent!.path]![dependency.id] ??= {};
     dependents.add(doc);
 
-    _dependenciesStore[doc.collection] ??= {};
-    final dependencies = _dependenciesStore[doc.collection]![doc.id] ??= {};
+    _dependenciesStore[doc.parent!.path] ??= {};
+    final dependencies = _dependenciesStore[doc.parent!.path]![doc.id] ??= {};
     dependencies.add(dependency);
   }
 
@@ -61,8 +61,8 @@ class _DocumentDependencyStore {
   /// 1. The dependency should be removed from the dependencies store for the given document.
   /// 2. The document should be removed from the dependents store for the given dependency.
   void removeDependency(Document doc, Document dependency) {
-    _dependenciesStore[doc.collection]?[doc.id]?.remove(dependency);
-    _dependentsStore[dependency.collection]?[dependency.id]?.remove(doc);
+    _dependenciesStore[doc.parent!.path]?[doc.id]?.remove(dependency);
+    _dependentsStore[dependency.parent!.path]?[dependency.id]?.remove(doc);
   }
 
   /// Clears all dependencies of the given document.
@@ -70,7 +70,7 @@ class _DocumentDependencyStore {
   /// The document is *not* removed from the dependents set of each of its dependencies at this time, that is instead lazily
   /// done when the dependent is updated and attempts to rebroadcast its dependencies.
   void clearDependencies(Document doc) {
-    _dependenciesStore[doc.collection]?.remove(doc.id);
+    _dependenciesStore[doc.parent!.path]?.remove(doc.id);
   }
 
   /// Clears dependency entries for the given collection. The documents are *not* removed from the dependents set of each of

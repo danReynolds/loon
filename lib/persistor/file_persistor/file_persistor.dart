@@ -7,7 +7,6 @@ import 'package:loon/loon.dart';
 import 'package:loon/persistor/file_persistor/extensions/document.dart';
 import 'package:loon/persistor/file_persistor/file_persistor_worker.dart';
 import 'package:loon/persistor/file_persistor/messages.dart';
-import 'package:loon/utils.dart';
 import 'package:path_provider/path_provider.dart';
 
 class FilePersistorSettings extends PersistorSettings {

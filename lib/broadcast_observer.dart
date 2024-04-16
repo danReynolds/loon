@@ -56,8 +56,6 @@ mixin BroadcastObserver<T, S> {
     return _changeController.stream;
   }
 
-  String get key;
-
   void _onBroadcast();
   void _onClear();
 }

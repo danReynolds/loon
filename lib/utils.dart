@@ -1,5 +1,4 @@
-import 'package:flutter/foundation.dart';
-import 'package:loon/loon.dart';
+part of loon;
 
 void printDebug(
   String message, {
@@ -36,4 +35,20 @@ Future<T> measureDuration<T>(
 
     rethrow;
   }
+}
+
+Map inspectNode(StoreNode node) {
+  final Map<dynamic, dynamic> index = {
+    "children":
+        node.children?.values.fold<Map<StoreNode, dynamic>>({}, (acc, child) {
+      acc[child] = inspectNode(child);
+      return acc;
+    }),
+  };
+
+  if (node is Document) {
+    index['snap'] = node._snap;
+  }
+
+  return index;
 }

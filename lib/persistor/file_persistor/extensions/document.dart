@@ -11,13 +11,13 @@ extension DocumentExtensions<T> on Document<T> {
 
     if (documentSettings is FilePersistorSettings) {
       dataStoreName =
-          documentSettings.getPersistenceKey?.call(this) ?? collection;
+          documentSettings.getPersistenceKey?.call(this) ?? parent!.path;
 
       if (isEncryptionEnabled()) {
         dataStoreName += '.encrypted';
       }
     } else {
-      dataStoreName = collection;
+      dataStoreName = parent!.path;
     }
 
     return dataStoreName;
@@ -31,7 +31,7 @@ extension DocumentExtensions<T> on Document<T> {
 
   FilePersistDocument toPersistenceDoc() {
     return FilePersistDocument(
-      key: key,
+      key: path,
       encryptionEnabled: isEncryptionEnabled(),
       dataStoreName: getDatastoreName(),
       data: getJson(),

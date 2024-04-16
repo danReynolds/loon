@@ -2,24 +2,26 @@ part of loon;
 
 class ObservableDocument<T> extends Document<T>
     with BroadcastObserver<DocumentSnapshot<T>?, DocumentChangeSnapshot<T>> {
-  ObservableDocument({
-    required super.collection,
-    required super.id,
+  ObservableDocument(
+    String id, {
+    required super.parent,
     super.fromJson,
     super.toJson,
     super.persistorSettings,
     super.dependenciesBuilder,
     required bool multicast,
-  }) {
-    init(super.get(), multicast: multicast);
+  }) : super(id) {
+    init(
+      super.get(),
+      multicast: multicast,
+    );
   }
 
   /// Observing a document involves checking if it is included in the latest broadcast
   /// and if so, emitting an update to observers.
   @override
   void _onBroadcast() {
-    final broadcastType =
-        Loon._instance._documentBroadcastStore[collection]?[id];
+    final broadcastType = Loon._instance._broadcastStore[parent]?[id];
 
     if (broadcastType == null) {
       return;
@@ -31,7 +33,7 @@ class ObservableDocument<T> extends Document<T>
       _changeController.add(
         DocumentChangeSnapshot(
           doc: this,
-          type: broadcastType,
+          event: broadcastType,
           data: snap?.data,
           prevData: _value?.data,
         ),
@@ -47,7 +49,7 @@ class ObservableDocument<T> extends Document<T>
       _changeController.add(
         DocumentChangeSnapshot(
           doc: this,
-          type: BroadcastEventTypes.removed,
+          event: EventTypes.removed,
           data: null,
           prevData: _value?.data,
         ),
