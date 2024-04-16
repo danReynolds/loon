@@ -1,6 +1,8 @@
 part of loon;
 
-class Collection<T> extends StoreNode {
+class Collection<T> {
+  final String parent;
+  final String name;
   final FromJson<T>? fromJson;
   final ToJson<T>? toJson;
   final PersistorSettings? persistorSettings;
@@ -10,14 +12,20 @@ class Collection<T> extends StoreNode {
   final DependenciesBuilder<T>? dependenciesBuilder;
 
   Collection(
-    super.name, {
-    super.parent,
-    super.children,
+    this.parent,
+    this.name, {
     this.fromJson,
     this.toJson,
     this.persistorSettings,
     this.dependenciesBuilder,
   });
+
+  String get path {
+    if (parent == 'ROOT') {
+      return name;
+    }
+    return "${parent}__$name";
+  }
 
   @override
   bool operator ==(Object other) {
@@ -31,27 +39,17 @@ class Collection<T> extends StoreNode {
   }
 
   @override
-  int get hashCode => Object.hashAll([parent?.path, name]);
+  int get hashCode => Object.hashAll([parent, name]);
 
   bool isPersistenceEnabled() {
     return persistorSettings?.persistenceEnabled ??
         Loon._instance._isGlobalPersistenceEnabled;
   }
 
-  bool exists() {
-    return children?.isNotEmpty ?? false;
-  }
-
   Document<T> doc(String id) {
-    final childNode = children?[id];
-    if (childNode is Document<T>) {
-      return childNode;
-    }
-
     return Document<T>(
+      path,
       id,
-      parent: this,
-      children: childNode?.children,
       fromJson: fromJson,
       toJson: toJson,
       persistorSettings: persistorSettings,
@@ -85,10 +83,7 @@ class Collection<T> extends StoreNode {
   }
 
   List<DocumentSnapshot<T>> get() {
-    return children?.values
-            .map((child) => this.doc(child.name).get()!)
-            .toList() ??
-        [];
+    return Loon._instance.getCollection(this);
   }
 
   Stream<List<DocumentSnapshot<T>>> stream() {

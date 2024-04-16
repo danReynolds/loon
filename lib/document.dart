@@ -1,23 +1,21 @@
 part of loon;
 
-class Document<T> extends StoreNode {
+class Document<T> {
+  final String id;
+  final String parent;
   final FromJson<T>? fromJson;
   final ToJson<T>? toJson;
   final PersistorSettings? _persistorSettings;
   final DependenciesBuilder<T>? dependenciesBuilder;
 
-  DocumentSnapshot<T>? _snap;
-
   Document(
-    String id, {
-    super.children,
-    super.parent,
+    this.parent,
+    this.id, {
     this.fromJson,
     this.toJson,
     PersistorSettings? persistorSettings,
     this.dependenciesBuilder,
-  })  : _persistorSettings = persistorSettings,
-        super(id);
+  }) : _persistorSettings = persistorSettings;
 
   @override
   bool operator ==(Object other) {
@@ -33,11 +31,17 @@ class Document<T> extends StoreNode {
   }
 
   @override
-  int get hashCode => Object.hashAll([parent?.path, id]);
+  int get hashCode => Object.hashAll([parent, id]);
 
-  String get id {
-    return name;
+  String get path {
+    if (parent == 'ROOT') {
+      return id;
+    }
+
+    return "${parent}__$id";
   }
+
+  static final root = Document('ROOT', 'ROOT');
 
   Collection<S> subcollection<S>(
     String name, {
@@ -46,15 +50,9 @@ class Document<T> extends StoreNode {
     PersistorSettings? persistorSettings,
     DependenciesBuilder<S>? dependenciesBuilder,
   }) {
-    final node = children?[name];
-    if (node is Collection<S>) {
-      return node;
-    }
-
     return Collection<S>(
+      path,
       name,
-      parent: this,
-      children: node?.children,
       fromJson: fromJson,
       toJson: toJson,
       persistorSettings: persistorSettings,
@@ -70,20 +68,12 @@ class Document<T> extends StoreNode {
       throw Exception('Cannot create duplicate document');
     }
 
-    final snap = _snap = DocumentSnapshot<T>(
-      doc: this,
-      data: data,
-    );
-
-    parent?._addChild(this);
-
-    Loon._instance._onWrite<T>(
+    return Loon._instance._writeDoc<T>(
       this,
+      data,
       broadcast: broadcast,
       event: EventTypes.added,
     );
-
-    return snap;
   }
 
   DocumentSnapshot<T> update(
@@ -94,21 +84,14 @@ class Document<T> extends StoreNode {
       throw Exception('Missing document $path');
     }
 
-    final prevSnap = _snap;
-    final snap = _snap = DocumentSnapshot<T>(
-      doc: this,
-      data: data,
-    );
-
-    Loon._instance._onWrite<T>(
+    return Loon._instance._writeDoc<T>(
       this,
+      data,
       // As an optimization, broadcasting is skipped when updating a document if the document
       // data is unchanged.
-      broadcast: snap.data != prevSnap!.data,
+      broadcast: data != get()!.data,
       event: EventTypes.modified,
     );
-
-    return snap;
   }
 
   DocumentSnapshot<T> createOrUpdate(
@@ -131,25 +114,19 @@ class Document<T> extends StoreNode {
   void delete({
     bool broadcast = true,
   }) {
-    if (!exists()) {
-      return;
-    }
-
-    parent?._removeChild(this);
-
-    Loon._instance._onDelete<T>(this, broadcast: broadcast);
+    Loon._instance._deleteDoc<T>(this, broadcast: broadcast);
   }
 
   DocumentSnapshot<T>? get() {
-    return _snap;
+    return Loon._instance._getDoc(this);
   }
 
   ObservableDocument<T> observe({
     bool multicast = false,
   }) {
     return ObservableDocument<T>(
+      parent,
       id,
-      parent: parent,
       fromJson: fromJson,
       toJson: toJson,
       persistorSettings: persistorSettings,

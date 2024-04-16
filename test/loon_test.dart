@@ -77,18 +77,16 @@ void main() {
         expect(
           Loon.inspect()['store'],
           {
-            "snap": null,
+            "values": null,
             "children": {
-              TestUserModel.store: {
-                "children": {
-                  userDoc: {
-                    "children": null,
-                    "snap": DocumentSnapshot(
-                      doc: userDoc,
-                      data: user,
-                    )
-                  }
-                }
+              "users": {
+                "children": null,
+                "values": {
+                  "1": DocumentSnapshot(
+                    doc: userDoc,
+                    data: user,
+                  )
+                },
               }
             }
           },
@@ -108,18 +106,16 @@ void main() {
       expect(
         Loon.inspect()['store'],
         {
-          "snap": null,
+          "values": null,
           "children": {
-            userCollection: {
-              "children": {
-                userDoc: {
-                  "snap": DocumentSnapshot(
-                    doc: userDoc,
-                    data: userJson,
-                  ),
-                  "children": null,
-                }
-              }
+            "users": {
+              "children": null,
+              "values": {
+                "2": DocumentSnapshot(
+                  doc: userDoc,
+                  data: userJson,
+                ),
+              },
             }
           }
         },

@@ -39,8 +39,6 @@ enum EventTypes {
   hydrated,
 }
 
-typedef BroadcastStore = Map<String, Map<String, EventTypes>>;
-
 /// Set of broadcast observers by collection.
 typedef BroadcastObserverStore = Set<BroadcastObserver>;
 
@@ -51,11 +49,11 @@ class Loon {
 
   Loon._();
 
-  /// The store of document snapshots indexed by their collections.
-  var _store = Document('ROOT');
+  /// The store of document snapshots indexed by their document path.
+  StoreNode<DocumentSnapshot> _store = StoreNode();
 
   /// The store of broadcast types for documents scheduled to be broadcast, indexed by their collection.
-  final BroadcastStore _broadcastStore = {};
+  StoreNode<EventTypes> _broadcastStore = StoreNode();
 
   /// The store of broadcast observers that should be notified on broadcast.
   final BroadcastObserverStore _broadcastObservers = {};
@@ -98,9 +96,9 @@ class Loon {
     bool broadcast = true,
   }) async {
     // Reset the store.
-    _store = Document('ROOT');
+    _store = StoreNode();
     // Clear any documents scheduled for broadcast, as whatever events happened prior to the clear are now irrelevant.
-    _broadcastStore.clear();
+    _broadcastStore = StoreNode();
     // Clear all dependencies of documents.
     _documentDependencyStore.clearAll();
 
@@ -122,29 +120,36 @@ class Loon {
   }
 
   bool _isQueryPendingBroadcast<T>(Query<T> query) {
-    return _instance._broadcastStore.containsKey(query.collection.name);
+    return _instance._broadcastStore.contains(query.collection.path);
   }
 
   bool _isDocumentPendingBroadcast<T>(Document<T> doc) {
-    return _instance._broadcastStore[doc.parent!.name]?.containsKey(doc.id) ??
-        false;
+    return _instance._broadcastStore.contains(doc.path);
   }
 
   void _broadcast() {
     for (final observer in _broadcastObservers) {
       observer._onBroadcast();
     }
-    _broadcastStore.clear();
+    _broadcastStore = StoreNode();
   }
 
-  void _onWrite<T>(
-    Document<T> doc, {
+  DocumentSnapshot<T>? _getDoc<T>(Document<T> doc) {
+    return _store.get(doc.path) as DocumentSnapshot<T>?;
+  }
+
+  DocumentSnapshot<T> _writeDoc<T>(
+    Document<T> doc,
+    T data, {
     required EventTypes event,
     bool broadcast = true,
     bool persist = true,
   }) {
+    final snap = DocumentSnapshot(doc: doc, data: data);
+    _store.write(doc.path, snap);
+
     if (broadcast) {
-      _rebroadcastDoc(doc, event);
+      _broadcastDoc(doc, event);
     }
 
     _documentDependencyStore.rebuildDependencies(doc.get()!);
@@ -152,16 +157,24 @@ class Loon {
     if (persist && doc.isPersistenceEnabled()) {
       persistor!._persistDoc(doc);
     }
+
+    return snap;
   }
 
-  void _onDelete<T>(
+  void _deleteDoc<T>(
     Document<T> doc, {
     bool broadcast = true,
   }) {
+    if (!doc.exists()) {
+      return;
+    }
+
+    _store.delete(doc.path);
+
     _documentDependencyStore.clearDependencies(doc);
 
     if (broadcast) {
-      _rebroadcastDoc(doc, EventTypes.removed);
+      _broadcastDoc(doc, EventTypes.removed);
     }
 
     if (doc.isPersistenceEnabled()) {
@@ -169,12 +182,19 @@ class Loon {
     }
   }
 
-  void _rebroadcastDoc<T>(
+  EventTypes? _getBroadcastDoc<T>(Document<T> doc) {
+    return _broadcastStore.get(doc.path);
+  }
+
+  Map<String, EventTypes>? _getBroadcastCollection<T>(Collection collection) {
+    return _broadcastStore.getAll(collection.path);
+  }
+
+  void _broadcastDoc<T>(
     Document<T> doc,
     EventTypes event,
   ) {
-    final collection = doc.parent!;
-    final pendingEvent = _broadcastStore[collection]?[doc];
+    final pendingEvent = _broadcastStore.get(doc.path);
 
     // Ignore writing a duplicate event type or overwriting a pending mutative event type with a touched event.
     if (pendingEvent != null &&
@@ -182,9 +202,9 @@ class Loon {
       return;
     }
 
-    (_broadcastStore[collection.name] ??= {})[doc.id] = event;
-    _rebroadcastDependents(doc);
+    _broadcastStore.write(doc.path, event);
 
+    _rebroadcastDependents(doc);
     _scheduleBroadcast();
   }
 
@@ -212,6 +232,11 @@ class Loon {
     }
   }
 
+  List<DocumentSnapshot<T>> getCollection<T>(Collection<T> collection) {
+    return (_store.getAll(collection.path)?.values.toList() ?? [])
+        as List<DocumentSnapshot<T>>;
+  }
+
   static void configure({
     Persistor? persistor,
     bool enableLogging = false,
@@ -233,11 +258,12 @@ class Loon {
         final documentDataStore = collectionDataStore.value;
 
         for (final documentDataEntry in documentDataStore.entries) {
-          final collection = Loon.collection<Json>(collectionName);
-          final doc = collection.doc(documentDataEntry.key);
-
-          doc.createOrUpdate(documentDataEntry.value, broadcast: false);
-          _instance._onWrite(doc, event: EventTypes.hydrated, persist: false);
+          _instance._writeDoc(
+            Loon.collection<Json>(collectionName).doc(documentDataEntry.key),
+            documentDataEntry.value,
+            event: EventTypes.hydrated,
+            persist: false,
+          );
         }
       }
     } catch (e) {
@@ -254,7 +280,7 @@ class Loon {
     PersistorSettings? persistorSettings,
     DependenciesBuilder<T>? dependenciesBuilder,
   }) {
-    return _instance._store.subcollection<T>(
+    return Document.root.subcollection<T>(
       name,
       fromJson: fromJson,
       toJson: toJson,
@@ -271,14 +297,14 @@ class Loon {
 
   /// Schedules a document to be rebroadcasted, updating all listeners that are subscribed to that document.
   static void rebroadcast(Document doc) {
-    _instance._rebroadcastDoc(doc, EventTypes.touched);
+    _instance._broadcastDoc(doc, EventTypes.touched);
   }
 
   /// Returns a Map of all of the data and metadata of the store for debugging and inspection purposes.
   static Json inspect() {
     return {
-      "store": inspectNode(_instance._store),
-      "broadcastStore": _instance._broadcastStore,
+      "store": _instance._store.inspect(),
+      "broadcastStore": _instance._broadcastStore.inspect(),
       "dependencyStore": {
         "dependencies": _instance._documentDependencyStore._dependenciesStore,
         "dependents": _instance._documentDependencyStore._dependentsStore,

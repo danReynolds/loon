@@ -33,7 +33,7 @@ class ObservableQuery<T> extends Query<T>
   /// 4. A document that has been manually touched to be rebroadcasted.
   @override
   void _onBroadcast() {
-    final docBroadcasts = Loon._instance._broadcastStore[collection.name];
+    final docBroadcasts = Loon._instance._getBroadcastCollection(collection);
 
     if (docBroadcasts == null) {
       return;

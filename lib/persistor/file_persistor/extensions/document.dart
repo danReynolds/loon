@@ -10,14 +10,13 @@ extension DocumentExtensions<T> on Document<T> {
     final documentSettings = persistorSettings;
 
     if (documentSettings is FilePersistorSettings) {
-      dataStoreName =
-          documentSettings.getPersistenceKey?.call(this) ?? parent!.path;
+      dataStoreName = documentSettings.getPersistenceKey?.call(this) ?? parent;
 
       if (isEncryptionEnabled()) {
         dataStoreName += '.encrypted';
       }
     } else {
-      dataStoreName = parent!.path;
+      dataStoreName = parent;
     }
 
     return dataStoreName;
