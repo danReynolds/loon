@@ -83,7 +83,7 @@ class Collection<T> {
   }
 
   List<DocumentSnapshot<T>> get() {
-    return Loon._instance.getCollection(this);
+    return Loon._instance._getCollection(this);
   }
 
   Stream<List<DocumentSnapshot<T>>> stream() {

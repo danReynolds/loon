@@ -21,7 +21,7 @@ class ObservableDocument<T> extends Document<T>
   /// and if so, emitting an update to observers.
   @override
   void _onBroadcast() {
-    final event = Loon._instance._getBroadcastDoc(this);
+    final event = Loon._instance._broadcastStore.get(path);
 
     if (event == null) {
       return;
