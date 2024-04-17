@@ -42,16 +42,16 @@ class Loon {
     return persistor?.settings.persistenceEnabled ?? false;
   }
 
-  DocumentSnapshot<T>? _getSnapshot<T>(Document<T> doc) {
+  DocumentSnapshot<T>? getSnapshot<T>(Document<T> doc) {
     return _documentStore.get(doc.path) as DocumentSnapshot<T>?;
   }
 
-  List<DocumentSnapshot<T>> _getSnapshots<T>(Collection<T> collection) {
+  List<DocumentSnapshot<T>> getSnapshots<T>(Collection<T> collection) {
     return (_documentStore.getAll(collection.path)?.values.toList() ?? [])
         as List<DocumentSnapshot<T>>;
   }
 
-  DocumentSnapshot<T> _writeDocument<T>(
+  DocumentSnapshot<T> writeDocument<T>(
     Document<T> doc,
     T data, {
     required EventTypes event,
@@ -71,7 +71,7 @@ class Loon {
       _broadcastManager.write(doc.path, event);
     }
 
-    _rebuildDependencies(doc);
+    rebuildDependencies(doc);
 
     if (persist && doc.isPersistenceEnabled()) {
       persistor!._persistDoc(doc);
@@ -80,10 +80,7 @@ class Loon {
     return snap;
   }
 
-  void _deleteDocument<T>(
-    Document<T> doc, {
-    bool broadcast = true,
-  }) {
+  void deleteDocument<T>(Document<T> doc) {
     if (!doc.exists()) {
       return;
     }
@@ -91,25 +88,19 @@ class Loon {
     _documentStore.delete(doc.path);
     _dependencyStore.delete(doc.path);
 
-    if (broadcast) {
-      // On deleting a document, first delete all broadcasts events for the document and *under* it,
-      // which importantly also notify observers of all paths under the document.
-      _broadcastManager.delete(doc.path);
-      // Then write an event for the removal of the document, which will schedule a broadcast to any observers
-      // of the document itself as well as the collection containing the document.
-      _broadcastManager.write(doc.path, EventTypes.removed);
-    }
+    // On deleting a document, first delete any existing broadcast events for the document and documents *under* it,
+    // as they are all invalidated.
+    _broadcastManager.delete(doc.path);
+    // Then write an event for the removal of the document, which will schedule a broadcast to any observers
+    // of the document and its collection.
+    _broadcastManager.write(doc.path, EventTypes.removed);
 
     if (doc.isPersistenceEnabled()) {
       persistor!._persistDoc(doc);
     }
   }
 
-  void _deleteCollection(
-    Collection collection, {
-    bool broadcast = true,
-    bool persist = true,
-  }) {
+  void deleteCollection(Collection collection) {
     final path = collection.path;
     _documentStore.delete(path);
     _broadcastManager.delete(path);
@@ -131,9 +122,8 @@ class Loon {
     return persistor?._clearAll();
   }
 
-  /// Rebuilds the set of dependencies of the given document based on its updated
-  /// snapshot.
-  void _rebuildDependencies(Document doc) {
+  /// Rebuilds the set of dependencies of the given document based on its updated snapshot.
+  void rebuildDependencies(Document doc) {
     final dependenciesBuilder = doc.dependenciesBuilder;
 
     if (dependenciesBuilder != null) {
@@ -169,7 +159,7 @@ class Loon {
         final documentDataStore = collectionDataStore.value;
 
         for (final documentDataEntry in documentDataStore.entries) {
-          _instance._writeDocument(
+          _instance.writeDocument(
             Loon.collection<Json>(collectionName).doc(documentDataEntry.key),
             documentDataEntry.value,
             event: EventTypes.hydrated,

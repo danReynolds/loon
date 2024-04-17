@@ -68,7 +68,7 @@ class Document<T> {
       throw Exception('Cannot create duplicate document');
     }
 
-    return Loon._instance._writeDocument<T>(
+    return Loon._instance.writeDocument<T>(
       this,
       data,
       broadcast: broadcast,
@@ -84,7 +84,7 @@ class Document<T> {
       throw Exception('Missing document $path');
     }
 
-    return Loon._instance._writeDocument<T>(
+    return Loon._instance.writeDocument<T>(
       this,
       data,
       // As an optimization, broadcasting is skipped when updating a document if the document
@@ -111,14 +111,12 @@ class Document<T> {
     return createOrUpdate(modifyFn(get()), broadcast: broadcast);
   }
 
-  void delete({
-    bool broadcast = true,
-  }) {
-    Loon._instance._deleteDocument<T>(this, broadcast: broadcast);
+  void delete() {
+    Loon._instance.deleteDocument<T>(this);
   }
 
   DocumentSnapshot<T>? get() {
-    return Loon._instance._getSnapshot(this);
+    return Loon._instance.getSnapshot(this);
   }
 
   ObservableDocument<T> observe({

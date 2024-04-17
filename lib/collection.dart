@@ -57,14 +57,8 @@ class Collection<T> {
     );
   }
 
-  void delete({
-    bool broadcast = true,
-  }) {
-    Loon._instance._deleteCollection(
-      this,
-      broadcast: broadcast,
-      persist: isPersistenceEnabled(),
-    );
+  void delete() {
+    Loon._instance.deleteCollection(this);
   }
 
   void replace(
@@ -83,7 +77,7 @@ class Collection<T> {
   }
 
   List<DocumentSnapshot<T>> get() {
-    return Loon._instance._getSnapshots(this);
+    return Loon._instance.getSnapshots(this);
   }
 
   bool exists() {
