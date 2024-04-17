@@ -86,6 +86,10 @@ class Collection<T> {
     return Loon._instance._getSnapshots(this);
   }
 
+  bool exists() {
+    return Loon._instance._documentStore.contains(path);
+  }
+
   Stream<List<DocumentSnapshot<T>>> stream() {
     return Query<T>(this).observe().stream();
   }

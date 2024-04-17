@@ -92,6 +92,11 @@ class Loon {
     _dependencyStore.delete(doc.path);
 
     if (broadcast) {
+      // On deleting a document, first delete all broadcasts events for the document and *under* it,
+      // which importantly also notify observers of all paths under the document.
+      _broadcastManager.delete(doc.path);
+      // Then write an event for the removal of the document, which will schedule a broadcast to any observers
+      // of the document itself as well as the collection containing the document.
       _broadcastManager.write(doc.path, EventTypes.removed);
     }
 

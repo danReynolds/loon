@@ -84,8 +84,21 @@ class StoreNode<T> {
     _delete(path.split(pathDelimiter), 0);
   }
 
+  bool _contains(List<String> fragments, int index) {
+    if (fragments.isEmpty) {
+      return true;
+    }
+
+    if (index < fragments.length - 1) {
+      return children?[fragments[index]]?._contains(fragments, index + 1) ??
+          false;
+    }
+
+    return children?.containsKey(fragments.last) ?? false;
+  }
+
   bool contains(String path) {
-    return get(path) != null;
+    return _contains(path.split(pathDelimiter), 0);
   }
 
   void clear() {
