@@ -17,7 +17,7 @@ enum EventTypes {
   hydrated,
 }
 
-class BroadcastStore {
+class BroadcastManager {
   /// The store of broadcast documents/collections scheduled for broadcast.
   final StoreNode<EventTypes> _store = StoreNode();
 
@@ -27,12 +27,12 @@ class BroadcastStore {
   /// Whether the broadcast store is dirty and has a pending broadcast scheduled.
   bool _pendingBroadcast = false;
 
-  EventTypes? get(String path) {
-    return _store.get(path);
+  EventTypes? getBroadcast(Document doc) {
+    return _store.get(doc.path);
   }
 
-  Map<String, EventTypes>? getAll<T>(String path) {
-    return _store.getAll(path);
+  Map<String, EventTypes>? getBroadcasts<T>(Collection collection) {
+    return _store.getAll(collection.path);
   }
 
   bool contains(String path) {

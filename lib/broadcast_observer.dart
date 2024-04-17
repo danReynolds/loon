@@ -31,13 +31,13 @@ mixin BroadcastObserver<T, S> {
     _value = initialValue;
     _controller.add(_value);
 
-    Loon._instance._broadcastStore.addObserver(this);
+    Loon._instance._broadcastManager.addObserver(this);
   }
 
   void dispose() {
     _controller.close();
     _changeController.close();
-    Loon._instance._broadcastStore.removeObserver(this);
+    Loon._instance._broadcastManager.removeObserver(this);
   }
 
   T add(T updatedValue) {

@@ -33,7 +33,8 @@ class ObservableQuery<T> extends Query<T>
   /// 4. A document that has been manually touched to be rebroadcasted.
   @override
   void _onBroadcast() {
-    final broadcasts = Loon._instance._broadcastStore.getAll(path);
+    final broadcasts =
+        Loon._instance._broadcastManager.getBroadcasts(collection);
 
     if (broadcasts == null) {
       return;
@@ -206,7 +207,7 @@ class ObservableQuery<T> extends Query<T>
   get() {
     // If the query is pending a broadcast when its data is accessed, we must immediately
     // run the broadcast instead of waiting until the next micro-task in order to return the latest value.
-    if (Loon._instance._broadcastStore.contains(path)) {
+    if (Loon._instance._broadcastManager.contains(path)) {
       _onBroadcast();
     }
     return _value;

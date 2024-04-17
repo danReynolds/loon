@@ -118,7 +118,7 @@ class Document<T> {
   }
 
   DocumentSnapshot<T>? get() {
-    return Loon._instance._getDocument(this);
+    return Loon._instance._getSnapshot(this);
   }
 
   ObservableDocument<T> observe({
@@ -162,7 +162,7 @@ class Document<T> {
   }
 
   bool isPendingBroadcast() {
-    return Loon._instance._broadcastStore.contains(path);
+    return Loon._instance._broadcastManager.contains(path);
   }
 
   PersistorSettings? get persistorSettings {

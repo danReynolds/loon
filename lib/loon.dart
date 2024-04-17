@@ -19,8 +19,7 @@ part 'types.dart';
 part 'document_snapshot.dart';
 part 'persistor/persistor.dart';
 part 'document_change_snapshot.dart';
-part 'broadcast_store.dart';
-part 'dependency_store.dart';
+part 'broadcast_manager.dart';
 part 'utils.dart';
 
 class Loon {
@@ -31,19 +30,25 @@ class Loon {
   Loon._();
 
   /// The store of document snapshots indexed by their document path.
-  final StoreNode<DocumentSnapshot> _documentStore = StoreNode();
+  final _documentStore = StoreNode<DocumentSnapshot>();
+  // The store of document dependencies indexed by their path.
+  final _dependencyStore = StoreNode<Set<Document>>();
 
-  final _broadcastStore = BroadcastStore();
-  final _dependencyStore = DependencyStore();
+  final _broadcastManager = BroadcastManager();
 
   bool enableLogging = false;
 
   bool get _isGlobalPersistenceEnabled {
-    return _instance.persistor?.settings.persistenceEnabled ?? false;
+    return persistor?.settings.persistenceEnabled ?? false;
   }
 
-  DocumentSnapshot<T>? _getDocument<T>(Document<T> doc) {
+  DocumentSnapshot<T>? _getSnapshot<T>(Document<T> doc) {
     return _documentStore.get(doc.path) as DocumentSnapshot<T>?;
+  }
+
+  List<DocumentSnapshot<T>> _getSnapshots<T>(Collection<T> collection) {
+    return (_documentStore.getAll(collection.path)?.values.toList() ?? [])
+        as List<DocumentSnapshot<T>>;
   }
 
   DocumentSnapshot<T> _writeDocument<T>(
@@ -63,10 +68,10 @@ class Loon {
     _documentStore.write(doc.path, snap);
 
     if (broadcast) {
-      _broadcastStore.write(doc.path, event);
+      _broadcastManager.write(doc.path, event);
     }
 
-    _dependencyStore.rebuild(doc);
+    _rebuildDependencies(doc);
 
     if (persist && doc.isPersistenceEnabled()) {
       persistor!._persistDoc(doc);
@@ -87,17 +92,12 @@ class Loon {
     _dependencyStore.delete(doc.path);
 
     if (broadcast) {
-      _broadcastStore.write(doc.path, EventTypes.removed);
+      _broadcastManager.write(doc.path, EventTypes.removed);
     }
 
     if (doc.isPersistenceEnabled()) {
       persistor!._persistDoc(doc);
     }
-  }
-
-  List<DocumentSnapshot<T>> _getCollection<T>(Collection<T> collection) {
-    return (_documentStore.getAll(collection.path)?.values.toList() ?? [])
-        as List<DocumentSnapshot<T>>;
   }
 
   void _deleteCollection(
@@ -107,7 +107,7 @@ class Loon {
   }) {
     final path = collection.path;
     _documentStore.delete(path);
-    _broadcastStore.delete(path);
+    _broadcastManager.delete(path);
     _dependencyStore.delete(path);
     // persistor?.delete(path);
   }
@@ -119,11 +119,28 @@ class Loon {
     // Clear the store.
     _documentStore.clear();
     // Clear any documents scheduled for broadcast, as whatever events happened prior to the clear are now irrelevant.
-    _broadcastStore.clear();
+    _broadcastManager.clear();
     // Clear all dependencies of documents.
     _dependencyStore.clear();
 
     return persistor?._clearAll();
+  }
+
+  /// Rebuilds the set of dependencies of the given document based on its updated
+  /// snapshot.
+  void _rebuildDependencies(Document doc) {
+    final dependenciesBuilder = doc.dependenciesBuilder;
+
+    if (dependenciesBuilder != null) {
+      final path = doc.path;
+      final deps = doc.dependenciesBuilder?.call(doc.get()!);
+
+      if (deps != null) {
+        _dependencyStore.write(path, deps);
+      } else if (_dependencyStore.contains(path)) {
+        _dependencyStore.delete(path);
+      }
+    }
   }
 
   static void configure({
@@ -186,14 +203,14 @@ class Loon {
 
   /// Schedules a document to be rebroadcasted, updating all listeners that are subscribed to that document.
   static void rebroadcast(Document doc) {
-    _instance._broadcastStore.write(doc.path, EventTypes.touched);
+    _instance._broadcastManager.write(doc.path, EventTypes.touched);
   }
 
   /// Returns a Map of all of the data and metadata of the store for debugging and inspection purposes.
   static Json inspect() {
     return {
       "store": _instance._documentStore.inspect(),
-      "broadcastStore": _instance._broadcastStore.inspect(),
+      "broadcastStore": _instance._broadcastManager.inspect(),
       "dependencyStore": _instance._dependencyStore.inspect(),
     };
   }
