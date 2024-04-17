@@ -11,6 +11,10 @@ class Query<T> {
     this.sort,
   });
 
+  String get path {
+    return collection.path;
+  }
+
   bool _filter(DocumentSnapshot<T> snap) {
     for (final filter in filters) {
       if (!filter(snap)) {

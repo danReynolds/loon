@@ -60,11 +60,11 @@ class Collection<T> {
   void delete({
     bool broadcast = true,
   }) {
-    // Loon._instance._deleteCollection(
-    //   key,
-    //   broadcast: broadcast,
-    //   persist: isPersistenceEnabled(),
-    // );
+    Loon._instance._deleteCollection(
+      this,
+      broadcast: broadcast,
+      persist: isPersistenceEnabled(),
+    );
   }
 
   void replace(

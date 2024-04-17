@@ -50,10 +50,10 @@ class Loon {
   Loon._();
 
   /// The store of document snapshots indexed by their document path.
-  StoreNode<DocumentSnapshot> _store = StoreNode();
+  final StoreNode<DocumentSnapshot> _store = StoreNode();
 
   /// The store of broadcast types for documents scheduled to be broadcast, indexed by their collection.
-  StoreNode<EventTypes> _broadcastStore = StoreNode();
+  final StoreNode<EventTypes> _broadcastStore = StoreNode();
 
   /// The store of broadcast observers that should be notified on broadcast.
   final BroadcastObserverStore _broadcastObservers = {};
@@ -69,36 +69,35 @@ class Loon {
   }
 
   void _deleteCollection(
-    String collection, {
+    Collection collection, {
     bool broadcast = true,
     bool persist = true,
   }) {
-    // // Clear the collection and all of its subcollections.
-    // for (final key in _documentStore.keys.toList()) {
-    //   if (key == collection || key.startsWith('${collection}__')) {
-    //     _documentStore.remove(key);
-    //     _broadcastStore[key]?.clear();
-    //     _documentDependencyStore.clear(key);
-    //     persistor?._clear(key);
-    //   }
-    // }
+    final path = collection.path;
+    _store.delete(path);
+    _broadcastStore.delete(path);
 
-    // // Clear all observers watching documents of the collection ands its subcollections.
-    // for (final observer in _broadcastObservers) {
-    //   if (observer.key.startsWith(collection)) {
-    //     observer._onClear();
-    //   }
-    // }
+    _documentDependencyStore.clear(path);
+    persistor?._clear(path);
+
+    // Clear all observers watching documents of the collection ands its subcollections.
+    // Given the sparse number of active observers relative to documents, this should be
+    // relatively performant.
+    for (final observer in _broadcastObservers) {
+      if (observer.path.startsWith(path)) {
+        observer._onClear();
+      }
+    }
   }
 
   /// Clears all data from the store.
   Future<void> _clearAll({
     bool broadcast = true,
   }) async {
-    // Reset the store.
-    _store = StoreNode();
+    // Clear the store.
+    _store.clear();
     // Clear any documents scheduled for broadcast, as whatever events happened prior to the clear are now irrelevant.
-    _broadcastStore = StoreNode();
+    _broadcastStore.clear();
     // Clear all dependencies of documents.
     _documentDependencyStore.clearAll();
 
@@ -131,7 +130,7 @@ class Loon {
     for (final observer in _broadcastObservers) {
       observer._onBroadcast();
     }
-    _broadcastStore = StoreNode();
+    _broadcastStore.clear();
   }
 
   DocumentSnapshot<T>? _getDoc<T>(Document<T> doc) {
@@ -145,6 +144,12 @@ class Loon {
     bool broadcast = true,
     bool persist = true,
   }) {
+    _validateDataSerialization(
+      data: data,
+      fromJson: doc.fromJson,
+      toJson: doc.toJson,
+    );
+
     final snap = DocumentSnapshot(doc: doc, data: data);
     _store.write(doc.path, snap);
 
@@ -170,7 +175,6 @@ class Loon {
     }
 
     _store.delete(doc.path);
-
     _documentDependencyStore.clearDependencies(doc);
 
     if (broadcast) {

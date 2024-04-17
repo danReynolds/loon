@@ -7,6 +7,8 @@ mixin BroadcastObserver<T, S> {
   late T _value;
   late final bool multicast;
 
+  String get path;
+
   void init(
     T initialValue, {
     /// Whether the [Observable] can have more than one observable subscription. A single-subscription

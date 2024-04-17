@@ -88,6 +88,11 @@ class StoreNode<T> {
     return get(path) != null;
   }
 
+  void clear() {
+    values?.clear();
+    children?.clear();
+  }
+
   Map inspect() {
     final Map<dynamic, dynamic> index = {
       "values": values,

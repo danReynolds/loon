@@ -36,3 +36,13 @@ Future<T> measureDuration<T>(
     rethrow;
   }
 }
+
+void _validateDataSerialization<T>({
+  required FromJson<T>? fromJson,
+  required ToJson<T>? toJson,
+  required T? data,
+}) {
+  if (data is! Json? && (fromJson == null || toJson == null)) {
+    throw Exception('Missing fromJson/toJson serializer');
+  }
+}
