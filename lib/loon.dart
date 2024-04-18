@@ -19,6 +19,7 @@ part 'types.dart';
 part 'document_snapshot.dart';
 part 'persistor/persistor.dart';
 part 'document_change_snapshot.dart';
+part 'dependency_manager.dart';
 part 'broadcast_manager.dart';
 part 'utils.dart';
 
@@ -31,11 +32,8 @@ class Loon {
 
   /// The store of document snapshots indexed by their document path.
   final documentStore = StoreNode<DocumentSnapshot>();
-  // The store of documents to the documents that they depend on.
-  final dependencyStore = StoreNode<StoreNode<void>>();
-  // The store of documents to the documents that are dependent on them.
-  final dependentsStore = StoreNode<Set<Document>>();
 
+  final dependencyManager = DependencyManager();
   final broadcastManager = BroadcastManager();
 
   bool enableLogging = false;
@@ -73,7 +71,7 @@ class Loon {
       broadcastManager.writeDocument(doc, event);
     }
 
-    rebuildDependencies(doc);
+    dependencyManager.updateDependencies(doc);
 
     if (persist && doc.isPersistenceEnabled()) {
       persistor!._persistDoc(doc);
@@ -122,34 +120,6 @@ class Loon {
     dependentsStore.clear();
 
     return persistor?._clearAll();
-  }
-
-  /// Rebuilds the set of dependencies of the given document based on its updated snapshot.
-  void rebuildDependencies(Document doc) {
-    final dependenciesBuilder = doc.dependenciesBuilder;
-
-    if (dependenciesBuilder != null) {
-      final path = doc.path;
-      final deps = doc.dependenciesBuilder?.call(doc.get()!);
-
-      if (deps != null) {
-        final node = StoreNode();
-
-        for (final dep in deps) {
-          node.write(dep.path, null);
-        }
-
-        dependencyStore.write(path, node);
-        dependencyStore.write(doc.parent, deps);
-
-        // The document's collection also now depends on the dependency's collection path
-        // and above. Then when any of those collections are removed, send out an event for that
-        // and have the observer check if any of its collection's dependencies are included in the broadcast
-        // events.
-      } else if (dependencyStore.contains(path)) {
-        dependencyStore.delete(path);
-      }
-    }
   }
 
   static void configure({

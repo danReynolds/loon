@@ -55,16 +55,16 @@ class StoreNode<T> {
     if (index < fragments.length - 1) {
       final children = this.children ??= {};
       final child = children[fragments[index]] ??= StoreNode();
-      child._write(fragments, index + 1, value);
-      return;
+      return child._write(fragments, index + 1, value);
     }
 
     final values = this.values ??= {};
     values[fragments.last] = value;
   }
 
-  void write(String path, T value) {
+  T write(String path, T value) {
     _write(path.split(pathDelimiter), 0, value);
+    return value;
   }
 
   void _delete(List<String> fragments, int index) {
