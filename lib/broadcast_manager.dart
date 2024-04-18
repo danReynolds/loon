@@ -27,7 +27,7 @@ class BroadcastManager {
   /// Whether the broadcast store is dirty and has a pending broadcast scheduled.
   bool _pendingBroadcast = false;
 
-  void _scheduleBroadcast() {
+  void scheduleBroadcast() {
     if (!_pendingBroadcast) {
       _pendingBroadcast = true;
 
@@ -55,8 +55,8 @@ class BroadcastManager {
     return _store.contains(path);
   }
 
-  void write(String path, EventTypes event) {
-    final pendingEvent = _store.get(path);
+  void writeDocument(Document doc, EventTypes event) {
+    final pendingEvent = _store.get(doc.path);
 
     // Ignore writing a duplicate event type or overwriting a pending mutative event type with a touched event.
     if (pendingEvent != null &&
@@ -64,19 +64,43 @@ class BroadcastManager {
       return;
     }
 
-    _store.write(path, event);
+    _store.write(doc.path, event);
 
-    _scheduleBroadcast();
+    broadcastDependents(doc);
+
+    scheduleBroadcast();
   }
 
-  void delete(String path) {
-    _store.delete(path);
-    _scheduleBroadcast();
+  /// Schedules all dependents of the given document for broadcast.
+  void broadcastDependents(Document doc) {
+    final dependents = Loon._instance.dependentsStore.get(doc.path);
+
+    if (dependents != null) {
+      for (final dependent in dependents) {
+        writeDocument(dependent, EventTypes.touched);
+      }
+    }
+  }
+
+  void deleteCollection(Collection collection) {
+    _store.delete(collection.path);
+    _store.write(collection.path, EventTypes.removed);
+    scheduleBroadcast();
+  }
+
+  // On deleting a document, first delete any existing broadcast events for the document and documents *under* it,
+  // as they are now invalid. Then write an event for the removal of the document to notify observers.
+  void deleteDocument(Document doc) {
+    _store.delete(doc.path);
+
+    broadcastDependents(doc);
+
+    scheduleBroadcast();
   }
 
   void clear() {
     _store.clear();
-    _scheduleBroadcast();
+    scheduleBroadcast();
   }
 
   void addObserver(BroadcastObserver observer) {

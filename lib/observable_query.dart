@@ -37,6 +37,7 @@ class ObservableQuery<T> extends Query<T>
   ///    b) Previously satisfied the query filter and now does not.
   ///    c) Previously did not satisfy the query filter and now does.
   /// 5. A document that has been manually touched to be rebroadcasted.
+  /// 6. Any of the query's dependencies have changed.
   @override
   void _onBroadcast() {
     // 1. If the query's index is non empty and the query's collection no longer exists,
@@ -59,7 +60,7 @@ class ObservableQuery<T> extends Query<T>
     }
 
     final broadcasts =
-        Loon._instance._broadcastManager.getBroadcasts(collection);
+        Loon._instance.broadcastManager.getBroadcasts(collection);
 
     if (broadcasts == null) {
       return;
@@ -215,7 +216,7 @@ class ObservableQuery<T> extends Query<T>
   get() {
     // If the query is pending a broadcast when its data is accessed, we must immediately
     // run the broadcast instead of waiting until the next micro-task in order to return the latest value.
-    if (Loon._instance._broadcastManager.contains(path)) {
+    if (Loon._instance.broadcastManager.contains(path)) {
       _onBroadcast();
     }
     return _value;

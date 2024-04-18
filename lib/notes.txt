@@ -1,0 +1,29 @@
+
+The observable query builds up a dependency tree.
+
+Say it is watching collection users_1_transactions which currently has users_1_transactions_1, users_1_transactions_2.
+
+Let's the say that each of those transactions depends on an account, so users_1_transactions_1 depends on users_1_account_1,
+and users_1_transactions_2 depends on users_1_account_1.
+
+Then the query has a dependency graph of:
+
+{
+  users: {
+    1: {
+        account: {
+            1
+        }
+        account: {
+            2
+        }
+    }
+  }
+}
+
+Have a dependents store for each document. When a document is updated, it goes through each of its dependents and marks them as in need of a broadcast as well.
+
+On broadcast, the observer re-emits to its listeners if:
+
+1. Any of its dependents are scheduled for broadcast
+2. Any of its dependents no longer exist in the cache and previously did

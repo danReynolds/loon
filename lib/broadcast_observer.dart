@@ -9,6 +9,9 @@ mixin BroadcastObserver<T, S> {
 
   String get path;
 
+  /// A cache of the observer's dependencies.
+  Map<Document, DocumentSnapshot?>? _dependencies;
+
   void init(
     T initialValue, {
     /// Whether the [Observable] can have more than one observable subscription. A single-subscription
@@ -31,13 +34,13 @@ mixin BroadcastObserver<T, S> {
     _value = initialValue;
     _controller.add(_value);
 
-    Loon._instance._broadcastManager.addObserver(this);
+    Loon._instance.broadcastManager.addObserver(this);
   }
 
   void dispose() {
     _controller.close();
     _changeController.close();
-    Loon._instance._broadcastManager.removeObserver(this);
+    Loon._instance.broadcastManager.removeObserver(this);
   }
 
   T add(T updatedValue) {

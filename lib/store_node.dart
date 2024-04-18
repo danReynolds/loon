@@ -20,7 +20,7 @@ class StoreNode<T> {
     return values?[fragments.last];
   }
 
-  /// Returns the value for the given document path.
+  /// Returns the value for the given path.
   T? get(String path) {
     final children = this.children;
     if (children == null || children.isEmpty) {
@@ -42,7 +42,7 @@ class StoreNode<T> {
     return values;
   }
 
-  /// Returns all values for the given collection path.
+  /// Returns a map of all values under the given path.
   Map<String, T>? getAll(String path) {
     return _getAll(path.split(pathDelimiter), 0);
   }
@@ -72,8 +72,12 @@ class StoreNode<T> {
       return children?[fragments[index]]?._delete(fragments, index + 1);
     }
 
-    children?.remove(fragments.last);
-    values?.remove(fragments.last);
+    // If the path is to a terminal value, then it would exist on its parent's
+    // value index, otherwise if the path is to an intermediary node, it would exist
+    // on its parent's children index. Attempt to delete the path from both.
+    final fragment = fragments.last;
+    children?.remove(fragment);
+    values?.remove(fragment);
   }
 
   void delete(String path) {
@@ -94,9 +98,17 @@ class StoreNode<T> {
           false;
     }
 
-    return children?.containsKey(fragments.last) ?? false;
+    final fragment = fragments.last;
+
+    // If the path is to a terminal value, then it would exist on its parent's
+    // value index, otherwise if the path is to an intermediary node, it would exist
+    // on its parent's children index. Attempt to find the path on both.
+    return children?.containsKey(fragment) ??
+        values?.containsKey(fragment) ??
+        false;
   }
 
+  /// Returns whether the store contains the given path.
   bool contains(String path) {
     return _contains(path.split(pathDelimiter), 0);
   }

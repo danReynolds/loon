@@ -30,11 +30,13 @@ class Loon {
   Loon._();
 
   /// The store of document snapshots indexed by their document path.
-  final _documentStore = StoreNode<DocumentSnapshot>();
-  // The store of document dependencies indexed by their path.
-  final _dependencyStore = StoreNode<Set<Document>>();
+  final documentStore = StoreNode<DocumentSnapshot>();
+  // The store of documents to the documents that they depend on.
+  final dependencyStore = StoreNode<StoreNode<void>>();
+  // The store of documents to the documents that are dependent on them.
+  final dependentsStore = StoreNode<Set<Document>>();
 
-  final _broadcastManager = BroadcastManager();
+  final broadcastManager = BroadcastManager();
 
   bool enableLogging = false;
 
@@ -43,11 +45,11 @@ class Loon {
   }
 
   DocumentSnapshot<T>? getSnapshot<T>(Document<T> doc) {
-    return _documentStore.get(doc.path) as DocumentSnapshot<T>?;
+    return documentStore.get(doc.path) as DocumentSnapshot<T>?;
   }
 
   List<DocumentSnapshot<T>> getSnapshots<T>(Collection<T> collection) {
-    return (_documentStore.getAll(collection.path)?.values.toList() ?? [])
+    return (documentStore.getAll(collection.path)?.values.toList() ?? [])
         as List<DocumentSnapshot<T>>;
   }
 
@@ -65,10 +67,10 @@ class Loon {
     );
 
     final snap = DocumentSnapshot(doc: doc, data: data);
-    _documentStore.write(doc.path, snap);
+    documentStore.write(doc.path, snap);
 
     if (broadcast) {
-      _broadcastManager.write(doc.path, event);
+      broadcastManager.writeDocument(doc, event);
     }
 
     rebuildDependencies(doc);
@@ -85,15 +87,13 @@ class Loon {
       return;
     }
 
-    _documentStore.delete(doc.path);
-    _dependencyStore.delete(doc.path);
+    // Delete the document and all data under it from the document store.
+    documentStore.delete(doc.path);
 
-    // On deleting a document, first delete any existing broadcast events for the document and documents *under* it,
-    // as they are all invalidated.
-    _broadcastManager.delete(doc.path);
-    // Then write an event for the removal of the document, which will schedule a broadcast to any observers
-    // of the document and its collection.
-    _broadcastManager.write(doc.path, EventTypes.removed);
+    // Delete the dependencies of the document from the dependency store.
+    dependencyStore.delete(doc.path);
+
+    broadcastManager.deleteDocument(doc);
 
     if (doc.isPersistenceEnabled()) {
       persistor!._persistDoc(doc);
@@ -102,9 +102,9 @@ class Loon {
 
   void deleteCollection(Collection collection) {
     final path = collection.path;
-    _documentStore.delete(path);
-    _broadcastManager.delete(path);
-    _dependencyStore.delete(path);
+    documentStore.delete(path);
+    dependencyStore.delete(path);
+    broadcastManager.deleteCollection(collection);
     // persistor?.delete(path);
   }
 
@@ -113,11 +113,13 @@ class Loon {
     bool broadcast = true,
   }) async {
     // Clear the store.
-    _documentStore.clear();
+    documentStore.clear();
     // Clear any documents scheduled for broadcast, as whatever events happened prior to the clear are now irrelevant.
-    _broadcastManager.clear();
+    broadcastManager.clear();
     // Clear all dependencies of documents.
-    _dependencyStore.clear();
+    dependencyStore.clear();
+    // Clear all dependents of documents.
+    dependentsStore.clear();
 
     return persistor?._clearAll();
   }
@@ -131,9 +133,21 @@ class Loon {
       final deps = doc.dependenciesBuilder?.call(doc.get()!);
 
       if (deps != null) {
-        _dependencyStore.write(path, deps);
-      } else if (_dependencyStore.contains(path)) {
-        _dependencyStore.delete(path);
+        final node = StoreNode();
+
+        for (final dep in deps) {
+          node.write(dep.path, null);
+        }
+
+        dependencyStore.write(path, node);
+        dependencyStore.write(doc.parent, deps);
+
+        // The document's collection also now depends on the dependency's collection path
+        // and above. Then when any of those collections are removed, send out an event for that
+        // and have the observer check if any of its collection's dependencies are included in the broadcast
+        // events.
+      } else if (dependencyStore.contains(path)) {
+        dependencyStore.delete(path);
       }
     }
   }
@@ -198,15 +212,16 @@ class Loon {
 
   /// Schedules a document to be rebroadcasted, updating all listeners that are subscribed to that document.
   static void rebroadcast(Document doc) {
-    _instance._broadcastManager.write(doc.path, EventTypes.touched);
+    _instance.broadcastManager.writeDocument(doc, EventTypes.touched);
   }
 
   /// Returns a Map of all of the data and metadata of the store for debugging and inspection purposes.
   static Json inspect() {
     return {
-      "store": _instance._documentStore.inspect(),
-      "broadcastStore": _instance._broadcastManager.inspect(),
-      "dependencyStore": _instance._dependencyStore.inspect(),
+      "store": _instance.documentStore.inspect(),
+      "broadcastStore": _instance.broadcastManager.inspect(),
+      "dependencyStore": _instance.dependencyStore.inspect(),
+      "dependentsStore": _instance.dependentsStore.inspect(),
     };
   }
 

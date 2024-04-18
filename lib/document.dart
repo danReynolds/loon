@@ -160,7 +160,7 @@ class Document<T> {
   }
 
   bool isPendingBroadcast() {
-    return Loon._instance._broadcastManager.contains(path);
+    return Loon._instance.broadcastManager.contains(path);
   }
 
   PersistorSettings? get persistorSettings {
