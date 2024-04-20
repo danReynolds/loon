@@ -1,9 +1,10 @@
 part of loon;
 
-const pathDelimiter = '__';
-
-class DepTree {
+class DepStore {
   final _store = {};
+
+  static const _delimiter = '__';
+  static const _depKey = '__deps';
 
   Map? _get(Map? node, List<String> segments, int index) {
     if (node == null) {
@@ -18,7 +19,7 @@ class DepTree {
   }
 
   Map? get(String path) {
-    return _get(_store, path.split(pathDelimiter), 0);
+    return _get(_store, path.split(_delimiter), 0);
   }
 
   /// Increments the dep count at the given path from the node.
@@ -40,19 +41,17 @@ class DepTree {
   /// the node can be deleted after the decrement.
   bool _dec(Map node, List<String> segments, [int index = 0]) {
     if (index < segments.length - 1) {
-      final child = node[segments[index]];
+      final Map? child = node[segments[index]];
 
       if (child == null) {
         return node.isEmpty;
       }
 
-      if (_dec(child, segments, index + 1)) {
-        if (child.length == 1) {
-          return true;
-        }
-        child.remove(segments[index + 1]);
+      if (_dec(child, segments, index + 1) && child.length == 1) {
+        return true;
       }
 
+      child.remove(segments[index + 1]);
       return false;
     }
 
@@ -79,16 +78,16 @@ class DepTree {
 
     final collection = node[segments[index]] ??= {};
     final doc = collection[segments[index + 1]] ??= {};
-    final collectionDeps = collection['deps'] ??= {};
-    final docDeps = doc['deps'] ??= {};
+    final collectionDeps = collection[_depKey] ??= {};
+    final docDeps = doc[_depKey] ??= {};
 
     _inc(collectionDeps, depSegments);
     _inc(docDeps, depSegments);
   }
 
   void addDep(String path, String depPath) {
-    final pathSegments = path.split(pathDelimiter);
-    final depSegments = depPath.split(pathDelimiter);
+    final pathSegments = path.split(_delimiter);
+    final depSegments = depPath.split(_delimiter);
     _addDep(_store, pathSegments, depSegments);
   }
 
@@ -125,7 +124,7 @@ class DepTree {
       return true;
     }
 
-    final Map? deps = child['deps'];
+    final Map? deps = child[_depKey];
     if (deps == null) {
       // If the child node exists but it has no dependencies, then it must just be a transient
       // node to another path with dependencies so it should not be deleted.
@@ -139,7 +138,7 @@ class DepTree {
         return true;
       } else {
         // Otherwise, just clear the child node's deps.
-        child.remove('deps');
+        child.remove(_depKey);
       }
     }
 
@@ -156,8 +155,8 @@ class DepTree {
   }
 
   void removeDep(String path, String depPath) {
-    final pathSegments = path.split(pathDelimiter);
-    final depSegments = depPath.split(pathDelimiter);
+    final pathSegments = path.split(_delimiter);
+    final depSegments = depPath.split(_delimiter);
 
     if (_removeDep(_store, pathSegments, depSegments)) {
       _store.remove(pathSegments.first);

@@ -4,7 +4,7 @@ import 'package:loon/loon.dart';
 void main() {
   group('Add dep', () {
     test('Correctly adds dependencies', () {
-      final deps = DepTree();
+      final deps = DepStore();
 
       // Add a user as a dependency to a post.
       deps.addDep('posts__1', 'users__1');
@@ -12,7 +12,7 @@ void main() {
       expect(deps.inspect(), {
         "posts": {
           // The user is stored as a dependency of both the posts document and its collection.
-          "deps": {
+          "__deps": {
             "users": {
               // The collection's dependency includes a ref count to the number of docs in the
               // collection that reference this dependency, so that it can know when it can be removed
@@ -21,7 +21,7 @@ void main() {
             },
           },
           "1": {
-            "deps": {
+            "__deps": {
               "users": {
                 "1": 1,
               },
@@ -36,7 +36,7 @@ void main() {
 
       expect(deps.inspect(), {
         "posts": {
-          "deps": {
+          "__deps": {
             "users": {
               // The posts collection should correctly increment the number of
               // references to the users__1 path.
@@ -45,19 +45,19 @@ void main() {
             },
           },
           "1": {
-            "deps": {
+            "__deps": {
               "users": {
                 "1": 1,
               },
             },
             "comments": {
-              "deps": {
+              "__deps": {
                 "users": {
                   "2": 1,
                 },
               },
               "2": {
-                "deps": {
+                "__deps": {
                   "users": {
                     "2": 1,
                   },
@@ -66,14 +66,14 @@ void main() {
             },
           },
           "2": {
-            "deps": {
+            "__deps": {
               "users": {
                 "1": 1,
               },
             }
           },
           "3": {
-            "deps": {
+            "__deps": {
               "users": {
                 "2": 1,
               },
@@ -84,7 +84,7 @@ void main() {
     });
 
     test('Correctly removes dependencies', () {
-      final deps = DepTree();
+      final deps = DepStore();
 
       deps.addDep('posts__1', 'users__1');
       deps.addDep('posts__2', 'users__1');
@@ -92,28 +92,28 @@ void main() {
 
       expect(deps.inspect(), {
         "posts": {
-          "deps": {
+          "__deps": {
             "users": {
               "1": 2,
               "2": 1,
             },
           },
           "1": {
-            "deps": {
+            "__deps": {
               "users": {
                 "1": 1,
               },
             }
           },
           "2": {
-            "deps": {
+            "__deps": {
               "users": {
                 "1": 1,
               },
             }
           },
           "3": {
-            "deps": {
+            "__deps": {
               "users": {
                 "2": 1,
               },
@@ -126,7 +126,7 @@ void main() {
 
       expect(deps.inspect(), {
         "posts": {
-          "deps": {
+          "__deps": {
             "users": {
               // The posts collection's ref count for the users__1 dependency
               // has been decremented.
@@ -136,14 +136,14 @@ void main() {
           },
           // The posts__1 dependency has been removed.
           "2": {
-            "deps": {
+            "__deps": {
               "users": {
                 "1": 1,
               },
             }
           },
           "3": {
-            "deps": {
+            "__deps": {
               "users": {
                 "2": 1,
               },
@@ -156,7 +156,7 @@ void main() {
 
       expect(deps.inspect(), {
         "posts": {
-          "deps": {
+          "__deps": {
             "users": {
               // Now that the users__1 dependency has been decremented to 0,
               // it is removed from the posts collection's dependencies altogether.
@@ -164,7 +164,7 @@ void main() {
             },
           },
           "3": {
-            "deps": {
+            "__deps": {
               "users": {
                 "2": 1,
               },
@@ -181,7 +181,7 @@ void main() {
     });
 
     test("Keeps paths with transient dependencies", () {
-      final deps = DepTree();
+      final deps = DepStore();
 
       deps.addDep('posts__1', 'users__1');
       deps.addDep('posts__2', 'users__1');
@@ -189,20 +189,20 @@ void main() {
 
       expect(deps.inspect(), {
         "posts": {
-          "deps": {
+          "__deps": {
             "users": {
               "1": 2,
             },
           },
           "1": {
-            "deps": {
+            "__deps": {
               "users": {
                 "1": 1,
               },
             }
           },
           "2": {
-            "deps": {
+            "__deps": {
               "users": {
                 "1": 1,
               },
@@ -210,13 +210,13 @@ void main() {
           },
           "4": {
             "comments": {
-              "deps": {
+              "__deps": {
                 "users": {
                   "2": 1,
                 }
               },
               "2": {
-                "deps": {
+                "__deps": {
                   "users": {
                     "2": 1,
                   }
@@ -236,13 +236,13 @@ void main() {
         "posts": {
           "4": {
             "comments": {
-              "deps": {
+              "__deps": {
                 "users": {
                   "2": 1,
                 }
               },
               "2": {
-                "deps": {
+                "__deps": {
                   "users": {
                     "2": 1,
                   }

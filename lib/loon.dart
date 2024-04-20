@@ -1,6 +1,7 @@
 library loon;
 
 import 'dart:async';
+import 'dart:ffi';
 
 import 'package:flutter/foundation.dart';
 
@@ -8,8 +9,8 @@ export 'widgets/query_stream_builder.dart';
 export 'widgets/document_stream_builder.dart';
 export 'persistor/file_persistor/file_persistor.dart';
 
-part 'dep_tree.dart';
-part 'store_node.dart';
+part 'dep_store.dart';
+part 'value_store.dart';
 part 'broadcast_observer.dart';
 part 'query.dart';
 part 'observable_query.dart';
@@ -32,7 +33,7 @@ class Loon {
   Loon._();
 
   /// The store of document snapshots indexed by their document path.
-  final documentStore = StoreNode<DocumentSnapshot>();
+  final documentStore = ValueStore<DocumentSnapshot>();
 
   final dependencyManager = DependencyManager();
   final broadcastManager = BroadcastManager();
