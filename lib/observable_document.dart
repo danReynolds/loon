@@ -42,23 +42,23 @@ class ObservableDocument<T> extends Document<T>
     }
 
     // 3. Check if any of the document's dependencies have changed.
-    final dependencies = Loon._instance.dependencyStore.get(path);
-    if (dependencies != null) {
-      bool shouldUpdate = false;
+    // final dependencies = Loon._instance.dependencyStore.get(path);
+    // if (dependencies != null) {
+    //   bool shouldUpdate = false;
 
-      for (final doc in dependencies) {
-        if (doc.isPendingBroadcast()) {}
-        final nextSnap = doc.get();
-        if (nextSnap != _dependencies?[doc]) {
-          shouldUpdate = true;
-          break;
-        }
-      }
+    //   for (final doc in dependencies) {
+    //     if (doc.isPendingBroadcast()) {}
+    //     final nextSnap = doc.get();
+    //     if (nextSnap != _dependencies?[doc]) {
+    //       shouldUpdate = true;
+    //       break;
+    //     }
+    //   }
 
-      if (shouldUpdate) {
-        _addEvent(EventTypes.touched, get());
-      }
-    }
+    //   if (shouldUpdate) {
+    //     _addEvent(EventTypes.touched, get());
+    //   }
+    // }
   }
 
   _addEvent(EventTypes event, DocumentSnapshot<T>? snap) {

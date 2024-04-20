@@ -1,23 +1,25 @@
 part of loon;
 
-const pathDelimiter = '__';
-
 class StoreNode<T> {
   Map<String, T>? values;
   Map<String, StoreNode<T>>? children;
 
   StoreNode();
 
-  T? _get(List<String> fragments, int index) {
-    if (fragments.isEmpty) {
+  List<String> _segments(String path) {
+    return path.split(pathDelimiter);
+  }
+
+  T? _get(List<String> segments, int index) {
+    if (segments.isEmpty) {
       return null;
     }
 
-    if (index < fragments.length - 1) {
-      return children?[fragments[index]]?._get(fragments, index + 1);
+    if (index < segments.length - 1) {
+      return children?[segments[index]]?._get(segments, index + 1);
     }
 
-    return values?[fragments.last];
+    return values?[segments.last];
   }
 
   /// Returns the value for the given path.
@@ -30,13 +32,13 @@ class StoreNode<T> {
     return _get(path.split(pathDelimiter), 0);
   }
 
-  Map<String, T>? _getAll(List<String> fragments, int index) {
-    if (fragments.isEmpty) {
+  Map<String, T>? _getAll(List<String> segments, int index) {
+    if (segments.isEmpty) {
       return null;
     }
 
-    if (index < fragments.length) {
-      return children?[fragments[index]]?._getAll(fragments, index + 1);
+    if (index < segments.length) {
+      return children?[segments[index]]?._getAll(segments, index + 1);
     }
 
     return values;
@@ -47,19 +49,19 @@ class StoreNode<T> {
     return _getAll(path.split(pathDelimiter), 0);
   }
 
-  void _write(List<String> fragments, int index, T value) {
-    if (fragments.length < 2) {
+  void _write(List<String> segments, int index, T value) {
+    if (segments.length < 2) {
       return;
     }
 
-    if (index < fragments.length - 1) {
+    if (index < segments.length - 1) {
       final children = this.children ??= {};
-      final child = children[fragments[index]] ??= StoreNode();
-      return child._write(fragments, index + 1, value);
+      final child = children[segments[index]] ??= StoreNode();
+      return child._write(segments, index + 1, value);
     }
 
     final values = this.values ??= {};
-    values[fragments.last] = value;
+    values[segments.last] = value;
   }
 
   T write(String path, T value) {
@@ -67,15 +69,44 @@ class StoreNode<T> {
     return value;
   }
 
-  void _delete(List<String> fragments, int index) {
-    if (index < fragments.length - 2) {
-      return children?[fragments[index]]?._delete(fragments, index + 1);
+  void _replace(List<String> segments, int index, Map<String, T> values) {
+    if (segments.length < 2) {
+      return;
+    }
+
+    if (index < segments.length - 1) {
+      final children = this.children ??= {};
+      final child = children[segments[index]] ??= StoreNode();
+      return child._replace(segments, index + 1, values);
+    }
+
+    this.values = values;
+  }
+
+  Map<String, T> replace(String path, Map<String, T> values) {
+    _replace(_segments(path), 0, values);
+    return values;
+  }
+
+  void _delete(List<String> segments, int index) {
+    if (index < segments.length - 2) {
+      final children = this.children;
+
+      if (children == null) {
+        return;
+      }
+
+      children[segments[index]]?._delete(segments, index + 1);
+
+      if (children.isEmpty) {
+        this.children = null;
+      }
     }
 
     // If the path is to a terminal value, then it would exist on its parent's
     // value index, otherwise if the path is to an intermediary node, it would exist
     // on its parent's children index. Attempt to delete the path from both.
-    final fragment = fragments.last;
+    final fragment = segments.last;
     children?.remove(fragment);
     values?.remove(fragment);
   }
@@ -88,17 +119,17 @@ class StoreNode<T> {
     _delete(path.split(pathDelimiter), 0);
   }
 
-  bool _contains(List<String> fragments, int index) {
-    if (fragments.isEmpty) {
+  bool _contains(List<String> segments, int index) {
+    if (segments.isEmpty) {
       return true;
     }
 
-    if (index < fragments.length - 1) {
-      return children?[fragments[index]]?._contains(fragments, index + 1) ??
+    if (index < segments.length - 1) {
+      return children?[segments[index]]?._contains(segments, index + 1) ??
           false;
     }
 
-    final fragment = fragments.last;
+    final fragment = segments.last;
 
     // If the path is to a terminal value, then it would exist on its parent's
     // value index, otherwise if the path is to an intermediary node, it would exist

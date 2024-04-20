@@ -24,14 +24,29 @@ class DependencyManager {
   ///   posts: {
   ///     dependencies: {
   ///       users: {
-  ///         1
+  ///         A: 2 -> ref count
+  ///         B: 1
   ///       }
   ///     },
   ///     children: {
   ///       1: {
   ///         dependencies: {
   ///           users: {
-  ///             1
+  ///             A: 1
+  ///           }
+  ///         }
+  ///       },
+  ///       2: {
+  ///         dependencies: {
+  ///           users: {
+  ///             A: 1
+  ///           }
+  ///         }
+  ///       },
+  ///       3: {
+  ///         dependencies: {
+  ///           users: {
+  ///             B: 1
   ///           }
   ///         }
   ///       }
@@ -39,11 +54,14 @@ class DependencyManager {
   ///   }
   /// }
   ///
+  /// Suppose that there are three posts, two of which depend on user A and one dependent on user B.
+  ///
   /// Broadcast events are stored by the [BroadcastManager] in a path tree structure as well, with each leaf node containing
   /// its associated broadcast [EventTypes].
   ///
   /// On broadcast, each broadcast observer is iterated over to process the tree of broadcast events. The observer of posts__1 traverses
-  /// its dependency tree, checking to see if any of its dependencies have an event in the broadcast tree.
+  /// its dependency tree, checking to see if any of its dependencies have an event in the broadcast tree. It discovers users__A in the dependency
+  /// tree and notifies its listeners.
   ///
   /// # Complexity
   ///
@@ -56,47 +74,62 @@ class DependencyManager {
   /// # Deleting a path
   ///
   /// Let's take a more complicated example where a deep-path doc is dependent on another deep-path doc.
-  /// In this example, say that post comments need to depend on a user's profile. So posts__1__comments__1 is
-  /// dependent on users__1__profile__1. Now let's say that we delete the users collection. Since a parent path
+  /// In this example, say that post comments need to depend on a user's profile. So posts__A__comments__B is
+  /// dependent on users__C__profile__D. Now let's say that we delete the users collection. Since a parent path
   /// of users__1__profile__1 has been deleted then users__1__profile__1 has been deleted too and posts__1__comments__1
   /// needs to be rebroadcast.
   ///
+  /// The dependency graph looks like this:
+  ///
+  /// {
+  ///   posts: {
+  ///     A: {
+  ///       comments: {
+  ///         deps: {
+  ///           users: {
+  ///             C: {
+  ///               profile: {
+  ///                 D: 2 -> ref count
+  ///               }
+  ///             }
+  ///           }
+  ///         }
+  ///         B: {
+  ///           deps: {
+  ///             users: {
+  ///               C: {
+  ///                 profile: {
+  ///                   D: 1
+  ///                 }
+  ///               }
+  ///             }
+  ///           }
+  ///         }
+  ///       }
+  ///     }
+  ///   }
+  /// }
+  ///
   /// The post comment isn't just dependent on the one document path, it is dependent on every parent path of it as well.
   ///
-  /// So posts__1__comments__1 adds users__1__profile__1 to its path dependency tree, as well as the dependency tree of its parent collection.
+  /// So posts__A__comments__B adds users__C__profile__D to its path dependency tree, as well as the dependency tree of its parent collection.
   ///
   /// Now when the users collection is deleted, its path is broadcast with a [EventTypes.removed] event and each broadcast observer is iterated over to process
   /// the broadcast events. A broadcast observer then iterates over its set of dependencies and checks if a partial path of any of its dependencies is present
   /// in the broadcast tree with a [EventTypes.removed] event.
   ///
-  /// posts__1__comments__1 discovers the users path immediately in the broadcast tree and rebroadcasts.
+  /// posts__A__comments__B discovers the users path immediately in the broadcast tree and rebroadcasts.
   ///
   /// The complexity of this operation is again O(n * m * p).
 
-  final _store = StoreNode<StoreNode<bool>>();
+  final _dependenciesStore = StoreNode();
+  final Map<Document, Set<Document>> _dependentsStore = {};
 
   /// Recalculates the set of dependencies of the updated document and updates them
   /// in the dependency store.
   void updateDependencies(Document doc) {
-    final dependenciesBuilder = doc.dependenciesBuilder;
+    final deps = doc.dependenciesBuilder?.call(doc.get()!);
 
-    if (dependenciesBuilder != null) {
-      final path = doc.path;
-      final deps = doc.dependenciesBuilder?.call(doc.get()!);
-
-      if (deps != null) {
-        final node = _store.write(path, StoreNode());
-        final parentNode = _store.get(doc.parent) ?? StoreNode();
-
-        for (final dep in deps) {
-          final depPath = dep.path;
-
-          node.write(depPath, true);
-          parentNode.write(depPath, true);
-        }
-      } else if (_store.contains(path)) {
-        _store.delete(path);
-      }
-    }
+    _dependenciesStore.write(doc.path, deps);
   }
 }

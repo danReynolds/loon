@@ -8,6 +8,7 @@ export 'widgets/query_stream_builder.dart';
 export 'widgets/document_stream_builder.dart';
 export 'persistor/file_persistor/file_persistor.dart';
 
+part 'dep_tree.dart';
 part 'store_node.dart';
 part 'broadcast_observer.dart';
 part 'query.dart';
@@ -71,7 +72,7 @@ class Loon {
       broadcastManager.writeDocument(doc, event);
     }
 
-    dependencyManager.updateDependencies(doc);
+    // dependencyManager.updateDependencies(snap);
 
     if (persist && doc.isPersistenceEnabled()) {
       persistor!._persistDoc(doc);
@@ -89,7 +90,7 @@ class Loon {
     documentStore.delete(doc.path);
 
     // Delete the dependencies of the document from the dependency store.
-    dependencyStore.delete(doc.path);
+    // dependencyStore.delete(doc.path);
 
     broadcastManager.deleteDocument(doc);
 
@@ -101,7 +102,7 @@ class Loon {
   void deleteCollection(Collection collection) {
     final path = collection.path;
     documentStore.delete(path);
-    dependencyStore.delete(path);
+    // dependencyStore.delete(path);
     broadcastManager.deleteCollection(collection);
     // persistor?.delete(path);
   }
@@ -115,9 +116,9 @@ class Loon {
     // Clear any documents scheduled for broadcast, as whatever events happened prior to the clear are now irrelevant.
     broadcastManager.clear();
     // Clear all dependencies of documents.
-    dependencyStore.clear();
+    // dependencyStore.clear();
     // Clear all dependents of documents.
-    dependentsStore.clear();
+    // dependentsStore.clear();
 
     return persistor?._clearAll();
   }
@@ -190,8 +191,8 @@ class Loon {
     return {
       "store": _instance.documentStore.inspect(),
       "broadcastStore": _instance.broadcastManager.inspect(),
-      "dependencyStore": _instance.dependencyStore.inspect(),
-      "dependentsStore": _instance.dependentsStore.inspect(),
+      // "dependencyStore": _instance.dependencyStore.inspect(),
+      // "dependentsStore": _instance.dependentsStore.inspect(),
     };
   }
 

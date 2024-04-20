@@ -73,13 +73,13 @@ class BroadcastManager {
 
   /// Schedules all dependents of the given document for broadcast.
   void broadcastDependents(Document doc) {
-    final dependents = Loon._instance.dependentsStore.get(doc.path);
+    // final dependents = Loon._instance.dependentsStore.get(doc.path);
 
-    if (dependents != null) {
-      for (final dependent in dependents) {
-        writeDocument(dependent, EventTypes.touched);
-      }
-    }
+    // if (dependents != null) {
+    //   for (final dependent in dependents) {
+    //     writeDocument(dependent, EventTypes.touched);
+    //   }
+    // }
   }
 
   void deleteCollection(Collection collection) {
