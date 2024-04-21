@@ -4,9 +4,6 @@ class ObservableQuery<T> extends Query<T>
     with
         BroadcastObserver<List<DocumentSnapshot<T>>,
             List<DocumentChangeSnapshot<T>>> {
-  /// A cache of the snapshots broadcasted by the query indexed by their [Document] ID.
-  final Map<String, DocumentSnapshot<T>> _index = {};
-
   ObservableQuery(
     super.collection, {
     required super.filters,
@@ -14,8 +11,14 @@ class ObservableQuery<T> extends Query<T>
     required bool multicast,
   }) {
     final snaps = super.get();
-    for (final snap in snaps) {
-      _index[snap.id] = snap;
+
+    if (snaps.isNotEmpty) {
+      final deps = _deps = DepStore();
+
+      // Initialize the query's dependency graph to all of its filtered documents.
+      for (final snap in snaps) {
+        deps.addDep(collection.path, snap.doc.id);
+      }
     }
 
     init(snaps, multicast: multicast);

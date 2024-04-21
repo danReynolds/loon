@@ -1,6 +1,7 @@
 part of loon;
 
 class DependencyManager {
+  /// Global store of document dependencies.
   final _dependenciesStore = DepStore();
   final Map<Document, Set<Document>> _dependentsStore = {};
 
@@ -12,7 +13,6 @@ class DependencyManager {
 
     if (deps != null) {
       for (final dep in deps) {
-        _dependenciesStore.addDep(doc.parent, dep.path);
         _dependenciesStore.addDep(doc.path, dep.path);
       }
     }

@@ -163,6 +163,28 @@ class DepStore {
     }
   }
 
+  bool _clear(
+    Map node,
+    List<String> segments, [
+    int index = 0,
+  ]) {
+    if (index < segments.length - 1) {
+      final child = node[segments[index]];
+
+      if (child == null) {
+        return true;
+      }
+
+      if (_clear(child, segments, index + 1)) {}
+    }
+  }
+
+  void clear(String path) {
+    final pathSegments = path.split(_delimiter);
+
+    _clear(_store, pathSegments);
+  }
+
   Map inspect() {
     return _store;
   }

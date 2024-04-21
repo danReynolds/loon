@@ -9,8 +9,7 @@ mixin BroadcastObserver<T, S> {
 
   String get path;
 
-  /// A cache of the observer's dependencies.
-  Map<Document, DocumentSnapshot?>? _dependencies;
+  DepStore? _deps;
 
   void init(
     T initialValue, {
