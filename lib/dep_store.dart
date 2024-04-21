@@ -31,17 +31,17 @@ class DepStore {
       return _inc(node[segment], segments, index + 1);
     }
 
-    // If the node already has a ref count, then just increment it.
+    // If the child node already has a ref count, then just increment it.
     if (node[segment] is int) {
       node[segment]++;
-      // If the node is a map with deeper dependencies, then increment its ref count key.
+      // If the child node is a map with deeper dependencies, then increment its ref count key.
     } else if (node[segment] is Map) {
       if (node[segment].containsKey(_refKey)) {
         node[segment][_refKey]++;
       } else {
         node[segment][_refKey] = 1;
       }
-      // Otherwise, the node does not exist yet and its ref count is initialized.
+      // Otherwise, the child node does not exist yet and its ref count is initialized.
     } else {
       node[segment] = 1;
     }
@@ -69,8 +69,8 @@ class DepStore {
         // is not a dependency itself (as denoted by not having a ref count) and it has no
         // other deeper dependencies, mark it for removal as well.
         if (!node.containsKey(_refKey) && node.length == 1) {
-          // If the first child of the path is marked for removal, then the root node removes the entire
-          // path subtree.
+          // If this is the root node of the path and its child is marked for removal,
+          // then remove the entire child subtree.
           if (index == 0) {
             node.remove(segment);
           }
@@ -84,13 +84,15 @@ class DepStore {
 
     // If the child node is an int ref count, then decrement it.
     if (node[segment] is int) {
-      // If this is the last reference to the child node, then mark it for removal
-      // and mark the current node for removal as well if this was its only child
-      // and it is not a ref itself (as denoted by the node having no other keys).
+      // If this is the last reference to the child node, then mark it for removal.
       if (node[segment] == 1) {
+        // If this was the current node's only child and it is not a ref itself,
+        // as denoted by the node having no other child keys and no ref key, then
+        // mark the current node for removal as well.
         if (node.length == 1) {
           return true;
         }
+        // Otherwise just remove the child key from
         node.remove(segment);
         return false;
       }
@@ -134,7 +136,7 @@ class DepStore {
       return node[segment].containsKey(_refKey);
     }
 
-    return true;
+    return node.containsKey(segment);
   }
 
   /// Returns whether the path has been added as a dependency in the store.

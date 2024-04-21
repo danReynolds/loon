@@ -99,4 +99,36 @@ void main() {
       });
     });
   });
+
+  group('has', () {
+    test('Correctly determines whether the given path is a dependency', () {
+      final store = DepStore();
+
+      store.inc('users__1');
+
+      expect(store.has('users__1'), true);
+      expect(store.has('users__2'), false);
+    });
+
+    test('Returns false for transient paths', () {
+      final store = DepStore();
+
+      store.inc('users__1__posts__1');
+
+      expect(store.has('users__1'), false);
+      expect(store.has('users__1__posts__1'), true);
+    });
+  });
+
+  group('hasPath', () {
+    test('Returns true for both dependency paths and transient paths', () {
+      final store = DepStore();
+
+      store.inc('users__1__posts__1');
+
+      expect(store.hasPath('users__1'), true);
+      expect(store.hasPath('users__1__posts__1'), true);
+      expect(store.hasPath('users__2'), false);
+    });
+  });
 }
