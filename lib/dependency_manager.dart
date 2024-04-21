@@ -2,7 +2,7 @@ part of loon;
 
 class DependencyManager {
   /// Global store of document dependencies.
-  final _dependenciesStore = DepStore();
+  final Map<Document, Set<Document>> _dependenciesStore = {};
   final Map<Document, Set<Document>> _dependentsStore = {};
 
   /// On write of a snapshot, the dependencies manager updates the dependencies
@@ -12,9 +12,9 @@ class DependencyManager {
     final deps = snap.doc.dependenciesBuilder?.call(snap);
 
     if (deps != null) {
-      for (final dep in deps) {
-        _dependenciesStore.addDep(doc.path, dep.path);
-      }
+      _dependenciesStore[doc] = deps;
+    } else if (_dependenciesStore.containsKey(doc)) {
+      _dependenciesStore.remove(doc);
     }
   }
 }
