@@ -39,6 +39,7 @@ class BroadcastManager {
           observer._onBroadcast();
         }
         store.clear();
+        _pendingBroadcast = false;
       });
     }
   }

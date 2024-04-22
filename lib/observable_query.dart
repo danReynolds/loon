@@ -105,7 +105,8 @@ class ObservableQuery<T> extends Query<T>
       return;
     }
 
-    final events = Loon._instance.broadcastManager.store.getAll(path);
+    final events =
+        Loon._instance.broadcastManager.store.getAll(collection.path);
     if (events != null) {
       // The list of changes to the query. Note that the [EventTypes] of the document
       // local to the query are different from the global broadcast events. For example, if a document

@@ -52,8 +52,9 @@ class Loon {
   }
 
   List<DocumentSnapshot<T>> getSnapshots<T>(Collection<T> collection) {
-    return (documentStore.getAll(collection.path)?.values.toList() ?? [])
-        as List<DocumentSnapshot<T>>;
+    return List<DocumentSnapshot<T>>.from(
+      documentStore.getAll(collection.path)?.values.toList() ?? [],
+    );
   }
 
   DocumentSnapshot<T> writeDocument<T>(

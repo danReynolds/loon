@@ -340,8 +340,8 @@ void main() {
       expect(userDoc.exists(), false);
 
       expect(
-        Loon.inspect()['collectionStore'],
-        {"users": {}},
+        Loon.inspect()["store"],
+        {},
       );
     });
   });
