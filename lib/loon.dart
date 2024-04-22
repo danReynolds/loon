@@ -1,9 +1,8 @@
 library loon;
 
 import 'dart:async';
-import 'dart:ffi';
-
 import 'package:flutter/foundation.dart';
+import 'package:uuid/uuid.dart';
 
 export 'widgets/query_stream_builder.dart';
 export 'widgets/document_stream_builder.dart';
@@ -21,7 +20,6 @@ part 'types.dart';
 part 'document_snapshot.dart';
 part 'persistor/persistor.dart';
 part 'document_change_snapshot.dart';
-part 'dependency_manager.dart';
 part 'broadcast_manager.dart';
 part 'utils.dart';
 
@@ -35,7 +33,12 @@ class Loon {
   /// The store of document snapshots indexed by their document path.
   final documentStore = ValueStore<DocumentSnapshot>();
 
-  final dependencyManager = DependencyManager();
+  /// The store of dependencies of documents.
+  final Map<Document, Set<Document>> dependenciesStore = {};
+
+  /// The store of dependents of documents.
+  final Map<Document, Set<Document>> dependentsStore = {};
+
   final broadcastManager = BroadcastManager();
 
   bool enableLogging = false;
@@ -66,14 +69,17 @@ class Loon {
       toJson: doc.toJson,
     );
 
-    final snap = DocumentSnapshot(doc: doc, data: data);
-    documentStore.write(doc.path, snap);
-
     if (broadcast) {
       broadcastManager.writeDocument(doc, event);
     }
 
-    // dependencyManager.updateDependencies(snap);
+    final snap = DocumentSnapshot(
+      doc: doc,
+      data: data,
+    );
+    documentStore.write(doc.path, snap);
+
+    updateDependencies(snap);
 
     if (persist && doc.isPersistenceEnabled()) {
       persistor!._persistDoc(doc);
@@ -89,10 +95,6 @@ class Loon {
 
     // Delete the document and all data under it from the document store.
     documentStore.delete(doc.path);
-
-    // Delete the dependencies of the document from the dependency store.
-    // dependencyStore.delete(doc.path);
-
     broadcastManager.deleteDocument(doc);
 
     if (doc.isPersistenceEnabled()) {
@@ -103,9 +105,25 @@ class Loon {
   void deleteCollection(Collection collection) {
     final path = collection.path;
     documentStore.delete(path);
-    // dependencyStore.delete(path);
     broadcastManager.deleteCollection(collection);
     // persistor?.delete(path);
+  }
+
+  /// On write of a snapshot, the dependencies manager updates the dependencies
+  /// store with the updated document dependencies and
+  void updateDependencies(DocumentSnapshot snap) {
+    final doc = snap.doc;
+    final deps = doc.dependenciesBuilder?.call(snap);
+
+    if (deps != null) {
+      dependenciesStore[doc] = deps;
+
+      for (final dep in deps) {
+        (dependentsStore[dep] ??= {}).add(doc);
+      }
+    } else if (dependenciesStore.containsKey(doc)) {
+      dependenciesStore.remove(doc);
+    }
   }
 
   /// Clears all data from the store.
@@ -116,10 +134,10 @@ class Loon {
     documentStore.clear();
     // Clear any documents scheduled for broadcast, as whatever events happened prior to the clear are now irrelevant.
     broadcastManager.clear();
-    // Clear all dependencies of documents.
-    // dependencyStore.clear();
-    // Clear all dependents of documents.
-    // dependentsStore.clear();
+
+    // Clear all dependencies and dependents of documents.
+    dependenciesStore.clear();
+    dependentsStore.clear();
 
     return persistor?._clearAll();
   }
@@ -192,8 +210,8 @@ class Loon {
     return {
       "store": _instance.documentStore.inspect(),
       "broadcastStore": _instance.broadcastManager.inspect(),
-      // "dependencyStore": _instance.dependencyStore.inspect(),
-      // "dependentsStore": _instance.dependentsStore.inspect(),
+      "dependencyStore": _instance.dependenciesStore,
+      "dependentsStore": _instance.dependentsStore,
     };
   }
 

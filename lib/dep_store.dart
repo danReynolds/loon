@@ -92,7 +92,7 @@ class DepStore {
         if (node.length == 1) {
           return true;
         }
-        // Otherwise just remove the child key from
+        // Otherwise just remove the child key from node.
         node.remove(segment);
         return false;
       }
@@ -172,6 +172,10 @@ class DepStore {
   /// ```
   bool hasPath(String path) {
     return _hasPath(_store, path.split(delimiter));
+  }
+
+  void clear() {
+    _store.clear();
   }
 
   Map inspect() {

@@ -1,9 +1,12 @@
 part of loon;
 
+const uuid = Uuid();
+
 class Query<T> {
   final Collection<T> collection;
   final List<FilterFn<T>> filters;
   final SortFn<T>? sort;
+  final _queryId = uuid.v4();
 
   Query(
     this.collection, {
@@ -12,7 +15,7 @@ class Query<T> {
   });
 
   String get path {
-    return collection.path;
+    return "${collection.path}__$_queryId";
   }
 
   bool _filter(DocumentSnapshot<T> snap) {
@@ -52,7 +55,11 @@ class Query<T> {
   }
 
   bool exists() {
-    return Loon._instance.documentStore.contains(path);
+    return Loon._instance.documentStore.hasAny(path);
+  }
+
+  bool isScheduledForBroadcast() {
+    return collection.isPendingBroadcast();
   }
 
   Stream<List<DocumentSnapshot<T>>> stream() {

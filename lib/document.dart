@@ -155,12 +155,20 @@ class Document<T> {
     return get() != null;
   }
 
+  Set<Document>? dependencies() {
+    return Loon._instance.dependenciesStore[this];
+  }
+
+  Set<Document>? dependents() {
+    return Loon._instance.dependentsStore[this];
+  }
+
   bool isPersistenceEnabled() {
     return persistorSettings?.persistenceEnabled ?? false;
   }
 
   bool isPendingBroadcast() {
-    return Loon._instance.broadcastManager.contains(path);
+    return Loon._instance.broadcastManager.store.has(path);
   }
 
   PersistorSettings? get persistorSettings {

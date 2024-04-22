@@ -1,5 +1,6 @@
 part of loon;
 
+/// A snapshot of a document's data and dependencies at any given moment.
 class DocumentSnapshot<T> {
   final Document<T> doc;
   final T data;
@@ -15,7 +16,7 @@ class DocumentSnapshot<T> {
       return true;
     }
     if (other is DocumentSnapshot<T>) {
-      return other.data == data && other.doc == doc;
+      return other.doc == doc && other.data == data;
     }
     return false;
   }

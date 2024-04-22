@@ -19,15 +19,15 @@ enum EventTypes {
 
 class BroadcastManager {
   /// The store of broadcast documents/collections scheduled for broadcast.
-  final _store = ValueStore<EventTypes>();
+  final store = ValueStore<EventTypes>();
 
-  /// The store of broadcast observers that should be notified on broadcast.
+  /// The store of broadcast observers that should be notified on broadcast
   final Set<BroadcastObserver> _observers = {};
 
   /// Whether the broadcast store is dirty and has a pending broadcast scheduled.
   bool _pendingBroadcast = false;
 
-  void scheduleBroadcast() {
+  void _scheduleBroadcast() {
     if (!_pendingBroadcast) {
       _pendingBroadcast = true;
 
@@ -38,25 +38,13 @@ class BroadcastManager {
         for (final observer in _observers) {
           observer._onBroadcast();
         }
-        _store.clear();
+        store.clear();
       });
     }
   }
 
-  EventTypes? getBroadcast(Document doc) {
-    return _store.get(doc.path);
-  }
-
-  Map<String, EventTypes>? getBroadcasts<T>(Collection collection) {
-    return _store.getAll(collection.path);
-  }
-
-  bool contains(String path) {
-    return _store.contains(path);
-  }
-
-  void writeDocument(Document doc, EventTypes event) {
-    final pendingEvent = _store.get(doc.path);
+  void _writePath(String path, EventTypes event) {
+    final pendingEvent = store.get(path);
 
     // Ignore writing a duplicate event type or overwriting a pending mutative event type with a touched event.
     if (pendingEvent != null &&
@@ -64,43 +52,70 @@ class BroadcastManager {
       return;
     }
 
-    _store.write(doc.path, event);
+    store.write(path, event);
+  }
+
+  void writeDocument(Document doc, EventTypes event) {
+    _writePath(doc.path, event);
+
+    // If this is the first document written to the collection, then add a [EventTypes.added]
+    // event for the collection path.
+    if (!Loon._instance.documentStore.hasAny(doc.parent)) {
+      _writePath(doc.parent, EventTypes.added);
+    }
 
     broadcastDependents(doc);
 
-    scheduleBroadcast();
+    _scheduleBroadcast();
   }
 
   /// Schedules all dependents of the given document for broadcast.
   void broadcastDependents(Document doc) {
-    // final dependents = Loon._instance.dependentsStore.get(doc.path);
+    final dependents = Loon._instance.dependentsStore[doc];
 
-    // if (dependents != null) {
-    //   for (final dependent in dependents) {
-    //     writeDocument(dependent, EventTypes.touched);
-    //   }
-    // }
+    if (dependents != null) {
+      for (final doc in dependents.toList()) {
+        // If a dependent does not exist in the store, then it is lazily removed.
+        if (!doc.exists()) {
+          dependents.remove(doc);
+        } else {
+          writeDocument(doc, EventTypes.touched);
+        }
+      }
+    }
+  }
+
+  /// When a path is deleted from the document store, the broadcast store is updated
+  /// to remove all broadcasts scheduled for that path and paths under it, since that subtree
+  /// is now invalid, and replace the root of the subtree with a single [EventTypes.removed] event for that path.
+  ///
+  /// If any observer's dependencies contain the deleted path, then the observer must
+  /// be scheduled for rebroadcast, since its dependencies are dirty.
+  void _deletePath(String path) {
+    store.delete(path);
+    store.write(path, EventTypes.removed);
+
+    for (final observer in _observers) {
+      if (observer._deps.hasPath(path)) {
+        store.write(observer.path, EventTypes.touched);
+      }
+    }
+
+    _scheduleBroadcast();
   }
 
   void deleteCollection(Collection collection) {
-    _store.delete(collection.path);
-    _store.write(collection.path, EventTypes.removed);
-    scheduleBroadcast();
+    _deletePath(collection.path);
   }
 
-  // On deleting a document, first delete any existing broadcast events for the document and documents *under* it,
-  // as they are now invalid. Then write an event for the removal of the document to notify observers.
   void deleteDocument(Document doc) {
-    _store.delete(doc.path);
-
+    _deletePath(doc.path);
     broadcastDependents(doc);
-
-    scheduleBroadcast();
   }
 
   void clear() {
-    _store.clear();
-    scheduleBroadcast();
+    store.clear();
+    _scheduleBroadcast();
   }
 
   void addObserver(BroadcastObserver observer) {
@@ -112,6 +127,6 @@ class BroadcastManager {
   }
 
   Map inspect() {
-    return _store.inspect();
+    return store.inspect();
   }
 }

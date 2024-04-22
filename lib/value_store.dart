@@ -45,7 +45,7 @@ class ValueStore<T> {
     return node[_values];
   }
 
-  /// Returns a map of all values under the given path.
+  /// Returns a map of all values that are immediate children of the given path.
   Map<String, T>? getAll(String path) {
     return _getAll(_store, path.split(_delimiter), 0);
   }
@@ -69,7 +69,6 @@ class ValueStore<T> {
     return value;
   }
 
-  // users__1__messages__2
   // Deletes the path from the store. Returns whether the node is empty after the removal.
   bool _delete(Map node, List<String> segments, int index) {
     if (index < segments.length - 1) {
@@ -81,72 +80,38 @@ class ValueStore<T> {
       }
 
       if (_delete(child, segments, index + 1) && node.length == 1) {
+        if (index == 0) {
+          node.remove(segment);
+        }
+
         return true;
       }
-
-      node.remove(segment);
       return false;
     }
 
     final segment = segments.last;
-    if (node.length == 1) {
-      if (node.containsKey(segment)) {
-        return true;
-      }
+    final Map? values = node[_values];
 
-      final Map values = node[_values];
-      if (values.length == 1) {
-        return true;
-      }
+    node.remove(segment);
+    values?.remove(segment);
 
-      values.remove(segment);
-      return false;
-    }
-
-    if (node.containsKey(segment)) {
-      node.remove(segment);
-      return false;
-    }
-
-    node[_values].remove(segment);
-    return false;
+    // The final segment of the path is removed from the child value tree as well as
+    // from the values of the parent node.
+    return node.isEmpty || node.length == 1 && (values?.isEmpty ?? false);
   }
 
   void delete(String path) {
-    if (path.isEmpty) {
-      return;
-    }
     _delete(_store, path.split(_delimiter), 0);
   }
 
-  bool _contains(Map node, List<String> segments, int index) {
-    if (segments.isEmpty) {
-      return true;
-    }
-
-    if (index < segments.length - 1) {
-      final child = node[segments[index]];
-
-      if (child == null) {
-        return false;
-      }
-
-      return _contains(child, segments, index + 1);
-    }
-
-    final segment = segments.last;
-
-    // If the path is to a terminal value, then it would exist on its parent's
-    // value index, otherwise if the path is to an intermediary node, it would exist
-    // on its parent's children index. Attempt to find the path on both.
-
-    return node.containsKey(segment) ||
-        (node[_values]?.containsKey(segment) ?? false);
+  /// Returns whether the store has a value for the given path.
+  bool has(String path) {
+    return get(path) != null;
   }
 
-  /// Returns whether the store contains the given path.
-  bool contains(String path) {
-    return _contains(_store, path.split(_delimiter), 0);
+  /// Returns whether the store has any values for the given path.
+  bool hasAny(String path) {
+    return getAll(path)?.isNotEmpty ?? false;
   }
 
   void clear() {

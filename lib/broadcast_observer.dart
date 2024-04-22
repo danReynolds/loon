@@ -9,7 +9,7 @@ mixin BroadcastObserver<T, S> {
 
   String get path;
 
-  DepStore? _deps;
+  final _deps = DepStore();
 
   void init(
     T initialValue, {
@@ -47,6 +47,8 @@ mixin BroadcastObserver<T, S> {
     _controller.add(_value);
     return _value;
   }
+
+  bool exists();
 
   /// [get] is left unimplemented since it has variable logic based on the type of observer like an [ObservableDocument]
   /// and [ObservableQuery].
