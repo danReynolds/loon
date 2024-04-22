@@ -668,21 +668,23 @@ void main() {
         userDoc2.create(userData2);
 
         expect(
-          Loon.inspect()['collectionStore'],
+          Loon.inspect()['store'],
           {
             "users": {
-              "1": DocumentSnapshotMatcher(
-                DocumentSnapshot(
-                  doc: userDoc,
-                  data: userData,
+              "__values": {
+                "1": DocumentSnapshotMatcher(
+                  DocumentSnapshot(
+                    doc: userDoc,
+                    data: userData,
+                  ),
                 ),
-              ),
-              "2": DocumentSnapshotMatcher(
-                DocumentSnapshot(
-                  doc: userDoc2,
-                  data: userData2,
+                "2": DocumentSnapshotMatcher(
+                  DocumentSnapshot(
+                    doc: userDoc2,
+                    data: userData2,
+                  ),
                 ),
-              ),
+              }
             }
           },
         );
@@ -690,7 +692,7 @@ void main() {
         TestUserModel.store.delete();
 
         expect(
-          Loon.inspect()['collectionStore'],
+          Loon.inspect()['store'],
           {},
         );
       });
@@ -702,45 +704,56 @@ void main() {
         final userData = TestUserModel('User 1');
         final userData2 = TestUserModel('User 2');
 
-        final friendDoc =
-            userDoc.subcollection<TestUserModel>('friends').doc('2');
+        final friendDoc = userDoc
+            .subcollection<TestUserModel>(
+              'friends',
+              fromJson: TestUserModel.fromJson,
+              toJson: (snap) => snap.toJson(),
+            )
+            .doc('2');
 
         userDoc.create(userData);
         friendDoc.create(userData2);
         userDoc2.create(userData2);
 
         expect(
-          Loon.inspect()['collectionStore'],
+          Loon.inspect()['store'],
           {
             "users": {
-              "1": DocumentSnapshotMatcher(
-                DocumentSnapshot(
-                  doc: userDoc,
-                  data: userData,
+              "__values": {
+                "1": DocumentSnapshotMatcher(
+                  DocumentSnapshot(
+                    doc: userDoc,
+                    data: userData,
+                  ),
                 ),
-              ),
-              "2": DocumentSnapshotMatcher(
-                DocumentSnapshot(
-                  doc: userDoc2,
-                  data: userData2,
+                "2": DocumentSnapshotMatcher(
+                  DocumentSnapshot(
+                    doc: userDoc2,
+                    data: userData2,
+                  ),
                 ),
-              ),
+              },
+              "1": {
+                "friends": {
+                  "__values": {
+                    "2": DocumentSnapshotMatcher(
+                      DocumentSnapshot(
+                        doc: friendDoc,
+                        data: userData2,
+                      ),
+                    ),
+                  }
+                }
+              }
             },
-            "users__1__friends": {
-              "2": DocumentSnapshotMatcher(
-                DocumentSnapshot(
-                  doc: friendDoc,
-                  data: userData2,
-                ),
-              ),
-            }
           },
         );
 
         TestUserModel.store.delete();
 
         expect(
-          Loon.inspect()['collectionStore'],
+          Loon.inspect()['store'],
           {},
         );
       });
