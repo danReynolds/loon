@@ -3,7 +3,7 @@ import 'dart:io';
 import 'package:encrypt/encrypt.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:loon/loon.dart';
-import 'loon_test.dart';
+import 'matchers/document_snapshot.dart';
 import 'models/test_user_model.dart';
 import 'utils.dart';
 

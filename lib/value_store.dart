@@ -51,10 +51,6 @@ class ValueStore<T> {
   }
 
   void _write(Map node, List<String> segments, int index, T value) {
-    if (segments.length < 2) {
-      return;
-    }
-
     if (index < segments.length - 1) {
       final child = node[segments[index]] ??= {};
       return _write(child, segments, index + 1, value);

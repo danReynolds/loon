@@ -44,6 +44,22 @@ class BroadcastManager {
     }
   }
 
+  /// Schedules all dependents of the given document for broadcast.
+  void _broadcastDependents(Document doc) {
+    final dependents = Loon._instance.dependentsStore[doc];
+
+    if (dependents != null) {
+      for (final doc in dependents.toList()) {
+        // If a dependent document does not exist in the store, then it is lazily removed.
+        if (!doc.exists()) {
+          dependents.remove(doc);
+        } else {
+          writeDocument(doc, EventTypes.touched);
+        }
+      }
+    }
+  }
+
   void _writePath(String path, EventTypes event) {
     final pendingEvent = store.get(path);
 
@@ -54,55 +70,39 @@ class BroadcastManager {
     }
 
     store.write(path, event);
-  }
-
-  void writeDocument(Document doc, EventTypes event) {
-    _writePath(doc.path, event);
-
-    // If this is the first document written to the collection, then add a [EventTypes.added]
-    // event for the collection path.
-    if (!Loon._instance.documentStore.hasAny(doc.parent)) {
-      _writePath(doc.parent, EventTypes.added);
-    }
-
-    broadcastDependents(doc);
 
     _scheduleBroadcast();
   }
 
-  /// Schedules all dependents of the given document for broadcast.
-  void broadcastDependents(Document doc) {
-    final dependents = Loon._instance.dependentsStore[doc];
-
-    if (dependents != null) {
-      for (final doc in dependents.toList()) {
-        // If a dependent does not exist in the store, then it is lazily removed.
-        if (!doc.exists()) {
-          dependents.remove(doc);
-        } else {
-          writeDocument(doc, EventTypes.touched);
-        }
-      }
-    }
-  }
-
-  /// When a path is deleted from the document store, the broadcast store is updated
-  /// to remove all broadcasts scheduled for that path and paths under it, since that subtree
-  /// is now invalid, and replace the root of the subtree with a single [EventTypes.removed] event for that path.
-  ///
-  /// If any observer's dependencies contain the deleted path, then the observer must
-  /// be scheduled for rebroadcast, since its dependencies are dirty.
+  /// Deletes the given path from the broadcast store.
   void _deletePath(String path) {
+    /// When a path is deleted, the broadcast store is updated to remove all broadcasts
+    /// scheduled for that path and paths under it, since that subtree is now invalid,
+    /// and replace the root of the subtree with a single [EventTypes.removed] event for that path.
     store.delete(path);
     store.write(path, EventTypes.removed);
 
+    /// Deleting paths should be infrequent, so iterating over every active observer for each delete
+    /// is presumed to be reasonable for performance, given the small number of deletes and observers.
     for (final observer in _observers) {
-      if (observer._deps.hasPath(path)) {
+      // If the observer's path is a child of the deleted path, then the observer is rebroadcast
+      // as having been removed.
+      if (observer.exists() && observer.path.startsWith(path)) {
+        store.write(observer.path, EventTypes.removed);
+
+        /// If any observer's dependencies contain the deleted path, then the observer must
+        /// be scheduled for rebroadcast, since its dependencies are dirty.
+      } else if (observer._deps.hasPath(path)) {
         store.write(observer.path, EventTypes.touched);
       }
     }
 
     _scheduleBroadcast();
+  }
+
+  void writeDocument(Document doc, EventTypes event) {
+    _writePath(doc.path, event);
+    _broadcastDependents(doc);
   }
 
   void deleteCollection(Collection collection) {
@@ -111,7 +111,8 @@ class BroadcastManager {
 
   void deleteDocument(Document doc) {
     _deletePath(doc.path);
-    broadcastDependents(doc);
+
+    _broadcastDependents(doc);
   }
 
   void clear() {

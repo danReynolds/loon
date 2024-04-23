@@ -6,11 +6,15 @@ void main() {
     test('Writes the value to the given path', () {
       final store = ValueStore<String>();
 
+      store.write('users', 'Collection value');
       store.write('users__1', 'Dan');
       store.write('users__2', 'Sonja');
       store.write('users__1__messages__2', 'Hey there!');
 
       expect(store.inspect(), {
+        "__values": {
+          "users": "Collection value",
+        },
         "users": {
           "__values": {
             "1": "Dan",

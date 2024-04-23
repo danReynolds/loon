@@ -2,7 +2,6 @@ library loon;
 
 import 'dart:async';
 import 'package:flutter/foundation.dart';
-import 'package:uuid/uuid.dart';
 
 export 'widgets/query_stream_builder.dart';
 export 'widgets/document_stream_builder.dart';
@@ -78,9 +77,9 @@ class Loon {
       doc: doc,
       data: data,
     );
-    documentStore.write(doc.path, snap);
-
     updateDependencies(snap);
+
+    documentStore.write(doc.path, snap);
 
     if (persist && doc.isPersistenceEnabled()) {
       persistor!._persistDoc(doc);
@@ -89,14 +88,19 @@ class Loon {
     return snap;
   }
 
+  // List<DocumentSnapshot<T>> replaceCollection<T>() {
+  //   Collection<T> collection,
+  // } {
+  //   // final
+  // }
+
   void deleteDocument<T>(Document<T> doc) {
     if (!doc.exists()) {
       return;
     }
 
-    // Delete the document and all data under it from the document store.
-    documentStore.delete(doc.path);
     broadcastManager.deleteDocument(doc);
+    documentStore.delete(doc.path);
 
     if (doc.isPersistenceEnabled()) {
       persistor!._persistDoc(doc);
@@ -105,8 +109,8 @@ class Loon {
 
   void deleteCollection(Collection collection) {
     final path = collection.path;
-    documentStore.delete(path);
     broadcastManager.deleteCollection(collection);
+    documentStore.delete(path);
     // persistor?.delete(path);
   }
 
@@ -114,16 +118,35 @@ class Loon {
   /// store with the updated document dependencies and
   void updateDependencies(DocumentSnapshot snap) {
     final doc = snap.doc;
+    final prevDeps = dependenciesStore[doc];
     final deps = doc.dependenciesBuilder?.call(snap);
 
-    if (deps != null) {
+    if (setEquals(deps, prevDeps)) {
+      return;
+    }
+
+    if (deps != null && prevDeps != null) {
       dependenciesStore[doc] = deps;
 
+      final addedDeps = deps.difference(prevDeps);
+      final removedDeps = prevDeps.difference(deps);
+
+      for (final dep in addedDeps) {
+        (dependentsStore[dep] ??= {}).add(doc);
+      }
+      for (final dep in removedDeps) {
+        dependentsStore[dep]!.remove(doc);
+      }
+    } else if (deps != null) {
+      dependenciesStore[doc] = deps;
       for (final dep in deps) {
         (dependentsStore[dep] ??= {}).add(doc);
       }
-    } else if (dependenciesStore.containsKey(doc)) {
+    } else if (prevDeps != null) {
       dependenciesStore.remove(doc);
+      for (final dep in prevDeps) {
+        dependentsStore[dep]!.remove(doc);
+      }
     }
   }
 

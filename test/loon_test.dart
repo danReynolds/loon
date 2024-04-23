@@ -1,63 +1,12 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:loon/loon.dart';
 
+import 'matchers/document_snapshot.dart';
 import 'models/test_persistor.dart';
 import 'models/test_user_model.dart';
 
 Future<void> asyncEvent() {
   return Future.delayed(const Duration(milliseconds: 1), () => null);
-}
-
-class DocumentSnapshotMatcher<T> extends Matcher {
-  DocumentSnapshot<T?>? expected;
-  late DocumentSnapshot<T?>? actual;
-  DocumentSnapshotMatcher(this.expected);
-
-  @override
-  Description describe(Description description) {
-    return description.add(
-      "has expected document ID: ${expected?.id}, data: ${expected?.data}",
-    );
-  }
-
-  @override
-  Description describeMismatch(
-    dynamic item,
-    Description mismatchDescription,
-    Map<dynamic, dynamic> matchState,
-    bool verbose,
-  ) {
-    return mismatchDescription.add(
-      "Expected: $item, Actual: ${matchState['actual']}",
-    );
-  }
-
-  @override
-  bool matches(actual, Map matchState) {
-    this.actual = actual;
-
-    final actualData = actual?.data;
-    final expectedData = expected?.data;
-
-    if (actual.doc.path != expected?.doc.path) {
-      return false;
-    }
-
-    if (expectedData == null) {
-      return actualData == null;
-    }
-
-    if (expectedData is Json) {
-      return actualData is Json && mapEquals(actualData, expectedData);
-    }
-
-    if (expectedData is TestUserModel) {
-      return actualData is TestUserModel && expectedData == actualData;
-    }
-
-    return false;
-  }
 }
 
 void main() {
@@ -494,36 +443,42 @@ void main() {
     });
   });
 
-  group('Stream documents', () {
+  group('Stream queries', () {
     tearDown(() {
       Loon.clearAll();
     });
 
-    test('Returns a stream of documents that satisfy the query', () async {
-      final user = TestUserModel('User 1');
-      final user2 = TestUserModel('User 2');
-      final userDoc = TestUserModel.store.doc('1');
-      final userDoc2 = TestUserModel.store.doc('2');
+    test(
+      'Returns a stream of documents that satisfy the query',
+      () async {
+        final user = TestUserModel('User 1');
+        final user2 = TestUserModel('User 2');
+        final userDoc = TestUserModel.store.doc('1');
+        final userDoc2 = TestUserModel.store.doc('2');
 
-      userDoc.create(user);
-      userDoc2.create(user2);
+        userDoc.create(user);
+        userDoc2.create(user2);
 
-      final queryStream =
-          TestUserModel.store.where((snap) => snap.id == '1').stream();
+        final queryStream =
+            TestUserModel.store.where((snap) => snap.id == '1').stream();
 
-      final querySnap = await queryStream.first;
+        final querySnaps = await queryStream.take(1).toList();
 
-      expect(querySnap.length, 1);
-      expect(
-        querySnap.first,
-        DocumentSnapshotMatcher(
-          DocumentSnapshot(
-            doc: userDoc,
-            data: user,
-          ),
-        ),
-      );
-    });
+        expect(
+          querySnaps,
+          [
+            [
+              DocumentSnapshotMatcher(
+                DocumentSnapshot(
+                  doc: userDoc,
+                  data: user,
+                ),
+              )
+            ]
+          ],
+        );
+      },
+    );
 
     test('Updates the stream of documents when they change', () async {
       final user = TestUserModel('User 1');
@@ -546,21 +501,71 @@ void main() {
       userDoc.update(user2);
 
       final querySnaps = await queryStream.toList();
-      final firstSnap = querySnaps.first;
-      final lastSnap = querySnaps.last;
-
-      expect(firstSnap.length, 1);
       expect(
-        firstSnap[0],
-        DocumentSnapshotMatcher(
-          DocumentSnapshot(
-            doc: userDoc,
-            data: user,
-          ),
-        ),
+        querySnaps,
+        [
+          [
+            DocumentSnapshotMatcher(
+              DocumentSnapshot(
+                doc: userDoc,
+                data: user,
+              ),
+            ),
+          ],
+          [],
+        ],
       );
+    });
 
-      expect(lastSnap.isEmpty, true);
+    test(
+        'Correctly handles the scenario where a collection is removed and written to in the same task',
+        () async {
+      final user = TestUserModel('User 1');
+      final user2 = TestUserModel('User 2');
+      final userDoc = TestUserModel.store.doc('1');
+      final userDoc2 = TestUserModel.store.doc('2');
+
+      userDoc.create(user);
+      userDoc2.create(user2);
+
+      await asyncEvent();
+
+      final queryStream = TestUserModel.store.stream().take(2);
+
+      await asyncEvent();
+
+      TestUserModel.store.delete();
+      userDoc.create(user);
+
+      final querySnaps = await queryStream.toList();
+
+      expect(
+        querySnaps,
+        [
+          [
+            DocumentSnapshotMatcher(
+              DocumentSnapshot(
+                doc: userDoc,
+                data: user,
+              ),
+            ),
+            DocumentSnapshotMatcher(
+              DocumentSnapshot(
+                doc: userDoc2,
+                data: user2,
+              ),
+            )
+          ],
+          [
+            DocumentSnapshotMatcher(
+              DocumentSnapshot(
+                doc: userDoc,
+                data: user,
+              ),
+            ),
+          ],
+        ],
+      );
     });
   });
 
@@ -576,7 +581,7 @@ void main() {
       final userDoc2 = TestUserModel.store.doc('2');
       final updatedUser = TestUserModel('User 1 updated');
 
-      final queryFuture = TestUserModel.store.streamChanges().take(2).toList();
+      final changeSnaps = TestUserModel.store.streamChanges().take(2).toList();
 
       userDoc.create(user);
       userDoc2.create(user2);
@@ -585,41 +590,32 @@ void main() {
 
       userDoc.update(updatedUser);
 
-      final snaps = await queryFuture;
-
-      expect(snaps[0].length, 2);
-
       expect(
-        snaps[0].first.event,
-        EventTypes.added,
-      );
-      expect(
-        snaps[0].first.data,
-        user,
-      );
-
-      expect(
-        snaps[0].last.event,
-        EventTypes.added,
-      );
-      expect(
-        snaps[0].last.data,
-        user2,
-      );
-
-      expect(snaps[1].length, 1);
-
-      expect(
-        snaps[1].first.event,
-        EventTypes.modified,
-      );
-      expect(
-        snaps[1].first.prevData,
-        user,
-      );
-      expect(
-        snaps[1].first.data,
-        updatedUser,
+        await changeSnaps,
+        [
+          [
+            DocumentChangeSnapshot(
+              doc: userDoc,
+              data: user,
+              event: EventTypes.added,
+              prevData: null,
+            ),
+            DocumentChangeSnapshot(
+              doc: userDoc2,
+              data: user2,
+              event: EventTypes.added,
+              prevData: null,
+            ),
+          ],
+          [
+            DocumentChangeSnapshot(
+              doc: userDoc,
+              data: updatedUser,
+              event: EventTypes.modified,
+              prevData: user,
+            ),
+          ]
+        ],
       );
     });
 
@@ -627,7 +623,7 @@ void main() {
       final user = TestUserModel('User 1');
       final userDoc = TestUserModel.store.doc('1');
 
-      final queryFuture = TestUserModel.store
+      final changeSnaps = TestUserModel.store
           .where((snap) => snap.data.name == 'User 1 updated')
           .streamChanges()
           .take(1)
@@ -635,17 +631,83 @@ void main() {
 
       userDoc.create(user);
       await asyncEvent();
-      userDoc.update(TestUserModel('User 1 updated'));
+      final updatedUser = TestUserModel('User 1 updated');
+      userDoc.update(updatedUser);
 
-      final snaps = await queryFuture;
-
-      expect(snaps[0].length, 1);
       expect(
-        snaps[0].first.event,
-        // The global event is a [BroadcastEventTypes.modified] when the user is updated,
-        // but to this query, it should be a [BroadcastEventTypes.added] event since previously
-        // it was not included and now it is.
-        EventTypes.added,
+        await changeSnaps,
+        [
+          [
+            DocumentChangeSnapshot(
+              doc: userDoc,
+              data: updatedUser,
+              // The global event is a [BroadcastEventTypes.modified] when the user is updated,
+              // but to this query, it should be a [BroadcastEventTypes.added] event since previously
+              // it was not included and now it is.
+              event: EventTypes.modified,
+              prevData: null,
+            ),
+          ],
+        ],
+      );
+    });
+
+    test(
+        'Correctly handles the scenario where a collection is removed and written to in the same task',
+        () async {
+      final user = TestUserModel('User 1');
+      final user2 = TestUserModel('User 2');
+      final userDoc = TestUserModel.store.doc('1');
+      final userDoc2 = TestUserModel.store.doc('2');
+
+      final changeSnaps = TestUserModel.store.streamChanges().take(2).toList();
+
+      userDoc.create(user);
+      userDoc2.create(user2);
+
+      await asyncEvent();
+
+      TestUserModel.store.delete();
+      userDoc.create(user);
+
+      expect(
+        await changeSnaps,
+        [
+          [
+            DocumentChangeSnapshot(
+              doc: userDoc,
+              data: user,
+              prevData: null,
+              event: EventTypes.added,
+            ),
+            DocumentChangeSnapshot(
+              doc: userDoc2,
+              data: user2,
+              prevData: null,
+              event: EventTypes.added,
+            )
+          ],
+          [
+            DocumentChangeSnapshot(
+              doc: userDoc,
+              data: null,
+              prevData: user,
+              event: EventTypes.removed,
+            ),
+            DocumentChangeSnapshot(
+              doc: userDoc2,
+              data: null,
+              prevData: user2,
+              event: EventTypes.removed,
+            ),
+            DocumentChangeSnapshot(
+              doc: userDoc,
+              data: user,
+              prevData: null,
+              event: EventTypes.added,
+            ),
+          ],
+        ],
       );
     });
   });
@@ -767,8 +829,13 @@ void main() {
           final userData = TestUserModel('User 1');
           final userData2 = TestUserModel('User 2');
 
-          final friendDoc =
-              userDoc.subcollection<TestUserModel>('friends').doc('2');
+          final friendDoc = userDoc
+              .subcollection<TestUserModel>(
+                'friends',
+                fromJson: TestUserModel.fromJson,
+                toJson: (snap) => snap.toJson(),
+              )
+              .doc('2');
 
           userDoc.create(userData);
           friendDoc.create(userData2);
