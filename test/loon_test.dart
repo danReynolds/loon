@@ -1,9 +1,9 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:loon/loon.dart';
 
+import 'matchers/document_snapshot.dart';
 import 'models/test_persistor.dart';
 import 'models/test_user_model.dart';
-import 'utils.dart';
 
 Future<void> asyncEvent() {
   return Future.delayed(const Duration(milliseconds: 1), () => null);
@@ -1258,9 +1258,11 @@ void main() {
         {
           "users": {
             "__values": {
-              "1": DocumentSnapshot(
-                doc: userDoc,
-                data: userData.toJson(),
+              "1": DocumentSnapshotMatcher(
+                DocumentSnapshot(
+                  doc: userDoc,
+                  data: userData.toJson(),
+                ),
               ),
             }
           }
