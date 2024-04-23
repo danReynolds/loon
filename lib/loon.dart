@@ -46,14 +46,73 @@ class Loon {
     return persistor?.settings.persistenceEnabled ?? false;
   }
 
+  // When a document is read, if it is still in JSON format from hydration and is now being accessed
+  // with a serializer, then it is de-serialized at time of access.
+  DocumentSnapshot<T> deserializeSnap<T>(
+    DocumentSnapshot snap, {
+    required FromJson<T>? fromJson,
+    required ToJson<T>? toJson,
+    required PersistorSettings? persistorSettings,
+    required DependenciesBuilder<T>? dependenciesBuilder,
+  }) {
+    if (snap is DocumentSnapshot<Json> && T != Json && T != dynamic) {
+      _validateTypeSerialization<T>(
+        fromJson: fromJson,
+        toJson: toJson,
+      );
+      final doc = snap.doc;
+
+      return writeDocument<T>(
+        Document<T>(
+          doc.parent,
+          doc.id,
+          fromJson: fromJson,
+          toJson: toJson,
+          persistorSettings: persistorSettings,
+          dependenciesBuilder: dependenciesBuilder,
+        ),
+        fromJson!(snap.data),
+        event: EventTypes.modified,
+        broadcast: false,
+        persist: false,
+      );
+    }
+
+    return snap as DocumentSnapshot<T>;
+  }
+
   DocumentSnapshot<T>? getSnapshot<T>(Document<T> doc) {
-    return documentStore.get(doc.path) as DocumentSnapshot<T>?;
+    final snap = documentStore.get(doc.path);
+
+    if (snap == null) {
+      return null;
+    }
+
+    return deserializeSnap(
+      snap,
+      fromJson: doc.fromJson,
+      toJson: doc.toJson,
+      persistorSettings: doc.persistorSettings,
+      dependenciesBuilder: doc.dependenciesBuilder,
+    );
   }
 
   List<DocumentSnapshot<T>> getSnapshots<T>(Collection<T> collection) {
-    return List<DocumentSnapshot<T>>.from(
-      documentStore.getAll(collection.path)?.values.toList() ?? [],
-    );
+    final snaps = documentStore
+        .getAll(collection.path)
+        ?.values
+        .map(
+          (snap) => deserializeSnap(
+            snap,
+            fromJson: collection.fromJson,
+            toJson: collection.toJson,
+            persistorSettings: collection.persistorSettings,
+            dependenciesBuilder: collection.dependenciesBuilder,
+          ),
+        )
+        .toList();
+
+    return List<DocumentSnapshot<T>>.from(snaps ?? []);
   }
 
   DocumentSnapshot<T> writeDocument<T>(
@@ -211,6 +270,20 @@ class Loon {
       printDebug('Error hydrating');
       rethrow;
     }
+  }
+
+  static Document<T> doc<T>(
+    String id, {
+    FromJson<T>? fromJson,
+    ToJson<T>? toJson,
+    PersistorSettings? persistorSettings,
+  }) {
+    return collection<T>(
+      _rootKey,
+      fromJson: fromJson,
+      toJson: toJson,
+      persistorSettings: persistorSettings,
+    ).doc(id);
   }
 
   static Collection<T> collection<T>(

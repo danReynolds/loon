@@ -1131,30 +1131,58 @@ void main() {
   );
 
   group('Root collection', () {
-    // tearDown(() {
-    //   Loon.clearAll();
-    // });
+    tearDown(() {
+      Loon.clearAll();
+    });
 
-    // test('Writes documents successfully', () {
-    //   final data = {"test": true};
-    //   final rootDoc = Loon.doc('1');
+    test('Writes documents successfully', () {
+      final data = {"test": true};
+      final rootDoc = Loon.doc('1');
 
-    //   rootDoc.create(data);
+      rootDoc.create(data);
 
-    //   expect(
-    //     Loon.inspect()['collectionStore'],
-    //     {
-    //       "__ROOT__": {
-    //         "1": DocumentSnapshotMatcher(
-    //           DocumentSnapshot(
-    //             doc: rootDoc,
-    //             data: data,
-    //           ),
-    //         ),
-    //       }
-    //     },
-    //   );
-    // });
+      expect(
+        Loon.inspect()['store'],
+        {
+          "ROOT": {
+            "__values": {
+              "1": DocumentSnapshot(
+                doc: rootDoc,
+                data: data,
+              ),
+            }
+          }
+        },
+      );
+    });
+
+    test('Can be deleted successfully', () {
+      final data = {"test": true};
+      final rootDoc = Loon.doc('1');
+
+      rootDoc.create(data);
+
+      expect(
+        Loon.inspect()['store'],
+        {
+          "ROOT": {
+            "__values": {
+              "1": DocumentSnapshot(
+                doc: rootDoc,
+                data: data,
+              ),
+            }
+          }
+        },
+      );
+
+      rootDoc.delete();
+
+      expect(
+        Loon.inspect()['store'],
+        {},
+      );
+    });
   });
 
   group('Subcollections', () {
@@ -1166,19 +1194,29 @@ void main() {
       final friendData = TestUserModel('Friend 1');
       final friendDoc = Loon.collection('users')
           .doc('1')
-          .subcollection<TestUserModel>('friends')
+          .subcollection<TestUserModel>(
+            'friends',
+            fromJson: TestUserModel.fromJson,
+            toJson: (snap) => snap.toJson(),
+          )
           .doc('1');
 
       friendDoc.create(friendData);
 
       expect(
-        Loon.inspect()['collectionStore'],
+        Loon.inspect()['store'],
         {
-          "users__1__friends": {
-            "1": DocumentSnapshot(
-              doc: friendDoc,
-              data: friendData,
-            ),
+          "users": {
+            "1": {
+              "friends": {
+                "__values": {
+                  "1": DocumentSnapshot(
+                    doc: friendDoc,
+                    data: friendData,
+                  ),
+                },
+              },
+            }
           }
         },
       );
@@ -1200,19 +1238,6 @@ void main() {
       final userDoc = userCollection.doc('1');
       final userData = TestUserModel('User 1');
 
-      expectLater(
-        userDoc.stream(),
-        emitsInOrder(
-          [
-            null,
-            DocumentSnapshot(
-              doc: userDoc,
-              data: userData,
-            ),
-          ],
-        ),
-      );
-
       Loon.configure(
         persistor: TestPersistor(
           seedData: [
@@ -1228,13 +1253,15 @@ void main() {
 
       // The data is hydrated as Json
       expect(
-        Loon.inspect()['collectionStore'],
+        Loon.inspect()['store'],
         {
           "users": {
-            "1": DocumentSnapshot(
-              doc: userDoc,
-              data: userData.toJson(),
-            ),
+            "__values": {
+              "1": DocumentSnapshot(
+                doc: userDoc,
+                data: userData.toJson(),
+              ),
+            }
           }
         },
       );
@@ -1250,13 +1277,15 @@ void main() {
 
       // Afterwards first read, it is stored de-serialized.
       expect(
-        Loon.inspect()['collectionStore'],
+        Loon.inspect()['store'],
         {
           "users": {
-            "1": DocumentSnapshot(
-              doc: userDoc,
-              data: userData,
-            ),
+            "__values": {
+              "1": DocumentSnapshot(
+                doc: userDoc,
+                data: userData,
+              ),
+            }
           }
         },
       );

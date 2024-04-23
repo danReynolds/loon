@@ -21,7 +21,7 @@ class Collection<T> {
   });
 
   String get path {
-    if (parent == 'ROOT') {
+    if (parent == _rootKey) {
       return name;
     }
     return "${parent}__$name";

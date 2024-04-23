@@ -1,5 +1,7 @@
 part of loon;
 
+const _rootKey = 'ROOT';
+
 class Document<T> {
   final String id;
   final String parent;
@@ -34,14 +36,14 @@ class Document<T> {
   int get hashCode => Object.hashAll([parent, id]);
 
   String get path {
-    if (parent == 'ROOT') {
+    if (parent.isEmpty) {
       return id;
     }
 
     return "${parent}__$id";
   }
 
-  static final root = Document('ROOT', 'ROOT');
+  static final root = Document('', _rootKey);
 
   Collection<S> subcollection<S>(
     String name, {
