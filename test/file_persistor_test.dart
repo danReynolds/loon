@@ -8,7 +8,6 @@ import 'package:path_provider_platform_interface/path_provider_platform_interfac
 // ignore: depend_on_referenced_packages
 import 'package:plugin_platform_interface/plugin_platform_interface.dart';
 
-import 'matchers/document_snapshot.dart';
 import 'models/test_large_model.dart';
 import 'models/test_user_model.dart';
 import 'utils.dart';
@@ -299,17 +298,13 @@ void main() {
       expect(
         userCollection.get(),
         [
-          DocumentSnapshotMatcher(
-            DocumentSnapshot(
-              doc: userCollection.doc('1'),
-              data: TestUserModel('User 1'),
-            ),
+          DocumentSnapshot(
+            doc: userCollection.doc('1'),
+            data: TestUserModel('User 1'),
           ),
-          DocumentSnapshotMatcher(
-            DocumentSnapshot(
-              doc: userCollection.doc('2'),
-              data: TestUserModel('User 2'),
-            ),
+          DocumentSnapshot(
+            doc: userCollection.doc('2'),
+            data: TestUserModel('User 2'),
           ),
         ],
       );
@@ -340,17 +335,13 @@ void main() {
       expect(
         userCollection.get(),
         [
-          DocumentSnapshotMatcher(
-            DocumentSnapshot(
-              doc: userCollection.doc('1'),
-              data: TestUserModel('User 1'),
-            ),
+          DocumentSnapshot(
+            doc: userCollection.doc('1'),
+            data: TestUserModel('User 1'),
           ),
-          DocumentSnapshotMatcher(
-            DocumentSnapshot(
-              doc: userCollection.doc('2'),
-              data: TestUserModel('User 2'),
-            ),
+          DocumentSnapshot(
+            doc: userCollection.doc('2'),
+            data: TestUserModel('User 2'),
           ),
         ],
       );

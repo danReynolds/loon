@@ -61,19 +61,11 @@ class Collection<T> {
     Loon._instance.deleteCollection(this);
   }
 
-  void replace(
-    List<DocumentSnapshot<T>> snaps, {
-    bool broadcast = true,
-  }) {
-    // Loon._instance._replaceCollection<T>(
-    //   key,
-    //   snaps: snaps,
-    //   fromJson: fromJson,
-    //   toJson: toJson,
-    //   persistorSettings: persistorSettings,
-    //   dependenciesBuilder: dependenciesBuilder,
-    //   broadcast: broadcast,
-    // );
+  void replace(List<DocumentSnapshot<T>> snaps) {
+    Loon._instance.replaceCollection<T>(
+      this,
+      snaps,
+    );
   }
 
   List<DocumentSnapshot<T>> get() {

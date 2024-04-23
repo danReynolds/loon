@@ -117,7 +117,10 @@ class BroadcastManager {
 
   void clear() {
     store.clear();
-    _scheduleBroadcast();
+
+    for (final observer in _observers) {
+      _writePath(observer.path, EventTypes.removed);
+    }
   }
 
   void addObserver(BroadcastObserver observer) {

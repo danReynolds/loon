@@ -3,7 +3,6 @@ import 'dart:io';
 import 'package:encrypt/encrypt.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:loon/loon.dart';
-import 'matchers/document_snapshot.dart';
 import 'models/test_user_model.dart';
 import 'utils.dart';
 
@@ -93,17 +92,13 @@ void main() {
       expect(
         userCollection.get(),
         [
-          DocumentSnapshotMatcher(
-            DocumentSnapshot(
-              doc: userCollection.doc('1'),
-              data: TestUserModel('User 1'),
-            ),
+          DocumentSnapshot(
+            doc: userCollection.doc('1'),
+            data: TestUserModel('User 1'),
           ),
-          DocumentSnapshotMatcher(
-            DocumentSnapshot(
-              doc: userCollection.doc('2'),
-              data: TestUserModel('User 2'),
-            ),
+          DocumentSnapshot(
+            doc: userCollection.doc('2'),
+            data: TestUserModel('User 2'),
           ),
         ],
       );
@@ -140,23 +135,17 @@ void main() {
       expect(
         userCollection.get(),
         unorderedEquals([
-          DocumentSnapshotMatcher(
-            DocumentSnapshot(
-              doc: userCollection.doc('1'),
-              data: TestUserModel('User 1'),
-            ),
+          DocumentSnapshot(
+            doc: userCollection.doc('1'),
+            data: TestUserModel('User 1'),
           ),
-          DocumentSnapshotMatcher(
-            DocumentSnapshot(
-              doc: userCollection.doc('3'),
-              data: TestUserModel('User 3'),
-            ),
+          DocumentSnapshot(
+            doc: userCollection.doc('3'),
+            data: TestUserModel('User 3'),
           ),
-          DocumentSnapshotMatcher(
-            DocumentSnapshot(
-              doc: userCollection.doc('2'),
-              data: TestUserModel('User 2'),
-            ),
+          DocumentSnapshot(
+            doc: userCollection.doc('2'),
+            data: TestUserModel('User 2'),
           ),
         ]),
       );

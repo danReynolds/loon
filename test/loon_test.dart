@@ -1,7 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:loon/loon.dart';
 
-import 'matchers/document_snapshot.dart';
 import 'models/test_persistor.dart';
 import 'models/test_user_model.dart';
 
@@ -100,11 +99,9 @@ void main() {
 
       expect(
         userDoc.get(),
-        DocumentSnapshotMatcher(
-          DocumentSnapshot(
-            doc: userDoc,
-            data: user,
-          ),
+        DocumentSnapshot(
+          doc: userDoc,
+          data: user,
         ),
       );
     });
@@ -120,11 +117,9 @@ void main() {
 
       expect(
         userDoc.get(),
-        DocumentSnapshotMatcher(
-          DocumentSnapshot(
-            doc: userDoc,
-            data: userJson,
-          ),
+        DocumentSnapshot(
+          doc: userDoc,
+          data: userJson,
         ),
       );
     });
@@ -144,11 +139,9 @@ void main() {
 
       expect(
         userDoc.get(),
-        DocumentSnapshotMatcher(
-          DocumentSnapshot(
-            doc: userDoc,
-            data: updatedUser,
-          ),
+        DocumentSnapshot(
+          doc: userDoc,
+          data: updatedUser,
         ),
       );
     });
@@ -168,11 +161,9 @@ void main() {
 
       expect(
         userDoc.get(),
-        DocumentSnapshotMatcher(
-          DocumentSnapshot(
-            doc: userDoc,
-            data: updatedUserJson,
-          ),
+        DocumentSnapshot(
+          doc: userDoc,
+          data: updatedUserJson,
         ),
       );
     });
@@ -213,11 +204,9 @@ void main() {
 
       expect(
         userDoc.get(),
-        DocumentSnapshotMatcher(
-          DocumentSnapshot(
-            doc: userDoc,
-            data: updatedUser,
-          ),
+        DocumentSnapshot(
+          doc: userDoc,
+          data: updatedUser,
         ),
       );
     });
@@ -230,10 +219,10 @@ void main() {
 
         expect(
           userDoc.modify((_) => newUser),
-          DocumentSnapshotMatcher(DocumentSnapshot(
+          DocumentSnapshot(
             doc: userDoc,
             data: newUser,
-          )),
+          ),
         );
       },
     );
@@ -253,11 +242,9 @@ void main() {
 
       expect(
         userDoc.get(),
-        DocumentSnapshotMatcher(
-          DocumentSnapshot(
-            doc: userDoc,
-            data: updatedUserJson,
-          ),
+        DocumentSnapshot(
+          doc: userDoc,
+          data: updatedUserJson,
         ),
       );
     });
@@ -311,11 +298,9 @@ void main() {
       expectLater(
         userStream,
         emits(
-          DocumentSnapshotMatcher(
-            DocumentSnapshot(
-              doc: userDoc,
-              data: user,
-            ),
+          DocumentSnapshot(
+            doc: userDoc,
+            data: user,
           ),
         ),
       );
@@ -344,17 +329,13 @@ void main() {
         userObs.stream(),
         emitsInOrder([
           null,
-          DocumentSnapshotMatcher(
-            DocumentSnapshot(
-              doc: userDoc,
-              data: user,
-            ),
+          DocumentSnapshot(
+            doc: userDoc,
+            data: user,
           ),
-          DocumentSnapshotMatcher(
-            DocumentSnapshot(
-              doc: userDoc,
-              data: updatedUser,
-            ),
+          DocumentSnapshot(
+            doc: userDoc,
+            data: updatedUser,
           ),
           null,
           emitsDone,
@@ -433,11 +414,9 @@ void main() {
       expect(querySnap.length, 1);
       expect(
         querySnap.first,
-        DocumentSnapshotMatcher(
-          DocumentSnapshot(
-            doc: userDoc,
-            data: user,
-          ),
+        DocumentSnapshot(
+          doc: userDoc,
+          data: user,
         ),
       );
     });
@@ -468,12 +447,10 @@ void main() {
           querySnaps,
           [
             [
-              DocumentSnapshotMatcher(
-                DocumentSnapshot(
-                  doc: userDoc,
-                  data: user,
-                ),
-              )
+              DocumentSnapshot(
+                doc: userDoc,
+                data: user,
+              ),
             ]
           ],
         );
@@ -505,11 +482,9 @@ void main() {
         querySnaps,
         [
           [
-            DocumentSnapshotMatcher(
-              DocumentSnapshot(
-                doc: userDoc,
-                data: user,
-              ),
+            DocumentSnapshot(
+              doc: userDoc,
+              data: user,
             ),
           ],
           [],
@@ -543,25 +518,19 @@ void main() {
         querySnaps,
         [
           [
-            DocumentSnapshotMatcher(
-              DocumentSnapshot(
-                doc: userDoc,
-                data: user,
-              ),
+            DocumentSnapshot(
+              doc: userDoc,
+              data: user,
             ),
-            DocumentSnapshotMatcher(
-              DocumentSnapshot(
-                doc: userDoc2,
-                data: user2,
-              ),
-            )
+            DocumentSnapshot(
+              doc: userDoc2,
+              data: user2,
+            ),
           ],
           [
-            DocumentSnapshotMatcher(
-              DocumentSnapshot(
-                doc: userDoc,
-                data: user,
-              ),
+            DocumentSnapshot(
+              doc: userDoc,
+              data: user,
             ),
           ],
         ],
@@ -644,7 +613,7 @@ void main() {
               // The global event is a [BroadcastEventTypes.modified] when the user is updated,
               // but to this query, it should be a [BroadcastEventTypes.added] event since previously
               // it was not included and now it is.
-              event: EventTypes.modified,
+              event: EventTypes.added,
               prevData: null,
             ),
           ],
@@ -734,17 +703,13 @@ void main() {
           {
             "users": {
               "__values": {
-                "1": DocumentSnapshotMatcher(
-                  DocumentSnapshot(
-                    doc: userDoc,
-                    data: userData,
-                  ),
+                "1": DocumentSnapshot(
+                  doc: userDoc,
+                  data: userData,
                 ),
-                "2": DocumentSnapshotMatcher(
-                  DocumentSnapshot(
-                    doc: userDoc2,
-                    data: userData2,
-                  ),
+                "2": DocumentSnapshot(
+                  doc: userDoc2,
+                  data: userData2,
                 ),
               }
             }
@@ -783,27 +748,21 @@ void main() {
           {
             "users": {
               "__values": {
-                "1": DocumentSnapshotMatcher(
-                  DocumentSnapshot(
-                    doc: userDoc,
-                    data: userData,
-                  ),
+                "1": DocumentSnapshot(
+                  doc: userDoc,
+                  data: userData,
                 ),
-                "2": DocumentSnapshotMatcher(
-                  DocumentSnapshot(
-                    doc: userDoc2,
-                    data: userData2,
-                  ),
+                "2": DocumentSnapshot(
+                  doc: userDoc2,
+                  data: userData2,
                 ),
               },
               "1": {
                 "friends": {
                   "__values": {
-                    "2": DocumentSnapshotMatcher(
-                      DocumentSnapshot(
-                        doc: friendDoc,
-                        data: userData2,
-                      ),
+                    "2": DocumentSnapshot(
+                      doc: friendDoc,
+                      data: userData2,
                     ),
                   }
                 }
@@ -859,11 +818,9 @@ void main() {
           expect(
             userDocData,
             [
-              DocumentSnapshotMatcher(
-                DocumentSnapshot(
-                  doc: userDoc,
-                  data: userData,
-                ),
+              DocumentSnapshot(
+                doc: userDoc,
+                data: userData,
               ),
               null,
             ],
@@ -873,18 +830,14 @@ void main() {
             userCollectionData,
             [
               [
-                DocumentSnapshotMatcher(
-                  DocumentSnapshot(
-                    doc: userDoc,
-                    data: userData,
-                  ),
+                DocumentSnapshot(
+                  doc: userDoc,
+                  data: userData,
                 ),
-                DocumentSnapshotMatcher(
-                  DocumentSnapshot(
-                    doc: userDoc2,
-                    data: userData2,
-                  ),
-                )
+                DocumentSnapshot(
+                  doc: userDoc2,
+                  data: userData2,
+                ),
               ],
               [],
             ],
@@ -893,11 +846,9 @@ void main() {
           expect(
             friendDocData,
             [
-              DocumentSnapshotMatcher(
-                DocumentSnapshot(
-                  doc: friendDoc,
-                  data: userData2,
-                ),
+              DocumentSnapshot(
+                doc: friendDoc,
+                data: userData2,
               ),
               null,
             ],
@@ -907,18 +858,14 @@ void main() {
             userCollectionData,
             [
               [
-                DocumentSnapshotMatcher(
-                  DocumentSnapshot(
-                    doc: userDoc,
-                    data: userData,
-                  ),
+                DocumentSnapshot(
+                  doc: userDoc,
+                  data: userData,
                 ),
-                DocumentSnapshotMatcher(
-                  DocumentSnapshot(
-                    doc: userDoc2,
-                    data: userData2,
-                  ),
-                )
+                DocumentSnapshot(
+                  doc: userDoc2,
+                  data: userData2,
+                ),
               ],
               [],
             ],
@@ -928,11 +875,9 @@ void main() {
             friendCollectionData,
             [
               [
-                DocumentSnapshotMatcher(
-                  DocumentSnapshot(
-                    doc: friendDoc,
-                    data: userData2,
-                  ),
+                DocumentSnapshot(
+                  doc: friendDoc,
+                  data: userData2,
                 ),
               ],
               [],
@@ -943,77 +888,156 @@ void main() {
     },
   );
 
-  group('Replace collection', () {
-    tearDown(() {
-      Loon.clearAll();
-    });
+  group(
+    'Replace collection',
+    () {
+      tearDown(() {
+        Loon.clearAll();
+      });
 
-    test('Replaces all documents in the collection', () {
-      final userDoc = TestUserModel.store.doc('1');
-      final userDoc2 = TestUserModel.store.doc('2');
+      test('Replaces all documents in the collection', () {
+        final userDoc = TestUserModel.store.doc('1');
+        final userDoc2 = TestUserModel.store.doc('2');
 
-      final userData = TestUserModel('User 1');
-      final userData2 = TestUserModel('User 2');
+        final userData = TestUserModel('User 1');
+        final userData2 = TestUserModel('User 2');
 
-      userDoc.create(userData);
-      userDoc2.create(userData2);
+        userDoc.create(userData);
+        userDoc2.create(userData2);
 
-      expect(
-        Loon.inspect()['collectionStore'],
-        {
-          "users": {
-            "1": DocumentSnapshotMatcher(
-              DocumentSnapshot(
-                doc: userDoc,
-                data: userData,
-              ),
+        expect(
+          Loon.inspect()['store'],
+          {
+            "users": {
+              "__values": {
+                "1": DocumentSnapshot(
+                  doc: userDoc,
+                  data: userData,
+                ),
+                "2": DocumentSnapshot(
+                  doc: userDoc2,
+                  data: userData2,
+                ),
+              }
+            }
+          },
+        );
+
+        final updatedUser2 = TestUserModel('User 2 updated');
+        final userDoc3 = TestUserModel.store.doc('3');
+        final userData3 = TestUserModel('User 3');
+
+        TestUserModel.store.replace([
+          DocumentSnapshot(
+            doc: userDoc2,
+            data: updatedUser2,
+          ),
+          DocumentSnapshot(
+            doc: userDoc3,
+            data: userData3,
+          ),
+        ]);
+
+        expect(
+          Loon.inspect()['store'],
+          {
+            "users": {
+              "__values": {
+                "2": DocumentSnapshot(
+                  doc: userDoc2,
+                  data: updatedUser2,
+                ),
+                "3": DocumentSnapshot(
+                  doc: userDoc3,
+                  data: userData3,
+                ),
+              },
+            }
+          },
+        );
+      });
+
+      test(
+        "Broadcasts the expected change events",
+        () async {
+          final userDoc = TestUserModel.store.doc('1');
+          final userDoc2 = TestUserModel.store.doc('2');
+
+          final userData = TestUserModel('User 1');
+          final userData2 = TestUserModel('User 2');
+
+          final querySnaps =
+              TestUserModel.store.streamChanges().take(2).toList();
+
+          userDoc.create(userData);
+          userDoc2.create(userData2);
+
+          await asyncEvent();
+
+          final updatedUser2 = TestUserModel('User 2 updated');
+          final userDoc3 = TestUserModel.store.doc('3');
+          final userData3 = TestUserModel('User 3');
+
+          TestUserModel.store.replace([
+            DocumentSnapshot(
+              doc: userDoc2,
+              data: updatedUser2,
             ),
-            "2": DocumentSnapshotMatcher(
-              DocumentSnapshot(
-                doc: userDoc2,
-                data: userData2,
-              ),
+            DocumentSnapshot(
+              doc: userDoc3,
+              data: userData3,
             ),
-          }
+          ]);
+
+          expect(
+            await querySnaps,
+            [
+              [
+                DocumentChangeSnapshot(
+                  doc: userDoc,
+                  data: userData,
+                  event: EventTypes.added,
+                  prevData: null,
+                ),
+                DocumentChangeSnapshot(
+                  doc: userDoc2,
+                  data: userData2,
+                  event: EventTypes.added,
+                  prevData: null,
+                ),
+              ],
+              [
+                DocumentChangeSnapshot(
+                  doc: userDoc,
+                  data: null,
+                  event: EventTypes.removed,
+                  prevData: userData,
+                ),
+                DocumentChangeSnapshot(
+                  doc: userDoc2,
+                  data: null,
+                  event: EventTypes.removed,
+                  prevData: userData2,
+                ),
+                DocumentChangeSnapshot(
+                  doc: userDoc2,
+                  data: updatedUser2,
+                  event: EventTypes.added,
+                  prevData: null,
+                ),
+                DocumentChangeSnapshot(
+                  doc: userDoc3,
+                  data: userData3,
+                  event: EventTypes.added,
+                  prevData: null,
+                ),
+              ]
+            ],
+          );
         },
       );
-
-      final updatedUser2 = TestUserModel('User 2 updated');
-      final userDoc3 = TestUserModel.store.doc('3');
-      final userData3 = TestUserModel('User 3');
-
-      TestUserModel.store.replace([
-        DocumentSnapshot(
-          doc: userDoc2,
-          data: updatedUser2,
-        ),
-        DocumentSnapshot(
-          doc: userDoc3,
-          data: userData3,
-        ),
-      ]);
-
-      expect(
-        Loon.inspect()['collectionStore'],
-        {
-          "users": {
-            "2": DocumentSnapshotMatcher(
-              DocumentSnapshot(
-                doc: userDoc2,
-                data: updatedUser2,
-              ),
-            ),
-            "3": DocumentSnapshotMatcher(
-              DocumentSnapshot(
-                doc: userDoc3,
-                data: userData3,
-              ),
-            ),
-          }
-        },
-      );
-    });
-  });
+    },
+  );
 
   group(
     'clearAll',
@@ -1033,21 +1057,19 @@ void main() {
         userDoc2.create(userData2);
 
         expect(
-          Loon.inspect()['collectionStore'],
+          Loon.inspect()['store'],
           {
             "users": {
-              "1": DocumentSnapshotMatcher(
-                DocumentSnapshot(
+              "__values": {
+                "1": DocumentSnapshot(
                   doc: userDoc,
                   data: userData,
                 ),
-              ),
-              "2": DocumentSnapshotMatcher(
-                DocumentSnapshot(
+                "2": DocumentSnapshot(
                   doc: userDoc2,
                   data: userData2,
                 ),
-              ),
+              }
             }
           },
         );
@@ -1055,15 +1077,8 @@ void main() {
         Loon.clearAll();
 
         expect(
-          Loon.inspect()['collectionStore'],
+          Loon.inspect()['store'],
           {},
-        );
-        expect(
-          Loon.inspect()['dependencyStore'],
-          {
-            'dependencies': {},
-            'dependents': {},
-          },
         );
       });
 
@@ -1089,11 +1104,9 @@ void main() {
             userDocStreamData,
             [
               null,
-              DocumentSnapshotMatcher(
-                DocumentSnapshot(
-                  doc: userDoc,
-                  data: userData,
-                ),
+              DocumentSnapshot(
+                doc: userDoc,
+                data: userData,
               ),
               null,
             ],
@@ -1104,11 +1117,9 @@ void main() {
             [
               [],
               [
-                DocumentSnapshotMatcher(
-                  DocumentSnapshot(
-                    doc: userDoc,
-                    data: userData,
-                  ),
+                DocumentSnapshot(
+                  doc: userDoc,
+                  data: userData,
                 ),
               ],
               [],
@@ -1164,11 +1175,9 @@ void main() {
         Loon.inspect()['collectionStore'],
         {
           "users__1__friends": {
-            "1": DocumentSnapshotMatcher(
-              DocumentSnapshot(
-                doc: friendDoc,
-                data: friendData,
-              ),
+            "1": DocumentSnapshot(
+              doc: friendDoc,
+              data: friendData,
             ),
           }
         },
@@ -1196,11 +1205,9 @@ void main() {
         emitsInOrder(
           [
             null,
-            DocumentSnapshotMatcher(
-              DocumentSnapshot(
-                doc: userDoc,
-                data: userData,
-              ),
+            DocumentSnapshot(
+              doc: userDoc,
+              data: userData,
             ),
           ],
         ),
@@ -1224,11 +1231,9 @@ void main() {
         Loon.inspect()['collectionStore'],
         {
           "users": {
-            "1": DocumentSnapshotMatcher(
-              DocumentSnapshot(
-                doc: userDoc,
-                data: userData.toJson(),
-              ),
+            "1": DocumentSnapshot(
+              doc: userDoc,
+              data: userData.toJson(),
             ),
           }
         },
@@ -1237,11 +1242,9 @@ void main() {
       // It is then de-serialized when it is first accessed.
       expect(
         userDoc.get(),
-        DocumentSnapshotMatcher(
-          DocumentSnapshot(
-            doc: userDoc,
-            data: userData,
-          ),
+        DocumentSnapshot(
+          doc: userDoc,
+          data: userData,
         ),
       );
 
@@ -1250,11 +1253,9 @@ void main() {
         Loon.inspect()['collectionStore'],
         {
           "users": {
-            "1": DocumentSnapshotMatcher(
-              DocumentSnapshot(
-                doc: userDoc,
-                data: userData,
-              ),
+            "1": DocumentSnapshot(
+              doc: userDoc,
+              data: userData,
             ),
           }
         },
@@ -1505,27 +1506,21 @@ void main() {
           // First emits null when no user has been written.
           null,
           // Emits the initially created user.
-          DocumentSnapshotMatcher(
-            DocumentSnapshot(
-              doc: userDoc,
-              data: userData,
-            ),
+          DocumentSnapshot(
+            doc: userDoc,
+            data: userData,
           ),
           // Emits the same user again when the post is updated. Infinite rebroadcasting
           // does not occur despite a cyclical dependency between the user and the post since
           // attempts to rebroadcast documents that are already pending broadcast are ignored.
-          DocumentSnapshotMatcher(
-            DocumentSnapshot(
-              doc: userDoc,
-              data: userData,
-            ),
+          DocumentSnapshot(
+            doc: userDoc,
+            data: userData,
           ),
           // Emits the updated user.
-          DocumentSnapshotMatcher(
-            DocumentSnapshot(
-              doc: userDoc,
-              data: updatedUserData,
-            ),
+          DocumentSnapshot(
+            doc: userDoc,
+            data: updatedUserData,
           ),
           emitsDone,
         ]),

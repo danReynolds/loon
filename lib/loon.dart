@@ -88,11 +88,22 @@ class Loon {
     return snap;
   }
 
-  // List<DocumentSnapshot<T>> replaceCollection<T>() {
-  //   Collection<T> collection,
-  // } {
-  //   // final
-  // }
+  List<DocumentSnapshot<T>> replaceCollection<T>(
+    Collection<T> collection,
+    List<DocumentSnapshot<T>> snaps,
+  ) {
+    deleteCollection(collection);
+
+    for (final snap in snaps) {
+      writeDocument(
+        snap.doc,
+        snap.data,
+        event: EventTypes.added,
+      );
+    }
+
+    return snaps;
+  }
 
   void deleteDocument<T>(Document<T> doc) {
     if (!doc.exists()) {
