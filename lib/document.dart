@@ -158,7 +158,7 @@ class Document<T> {
   }
 
   Set<Document>? dependencies() {
-    return Loon._instance.dependenciesStore[this];
+    return Loon._instance.dependenciesStore.get(path);
   }
 
   Set<Document>? dependents() {

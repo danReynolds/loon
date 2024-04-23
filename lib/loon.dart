@@ -33,7 +33,7 @@ class Loon {
   final documentStore = ValueStore<DocumentSnapshot>();
 
   /// The store of dependencies of documents.
-  final Map<Document, Set<Document>> dependenciesStore = {};
+  final dependenciesStore = ValueStore<Set<Document>>();
 
   /// The store of dependents of documents.
   final Map<Document, Set<Document>> dependentsStore = {};
@@ -181,14 +181,15 @@ class Loon {
     final path = collection.path;
     broadcastManager.deleteCollection(collection);
     documentStore.delete(path);
+    dependenciesStore.delete(path);
     // persistor?.delete(path);
   }
 
   /// On write of a snapshot, the dependencies manager updates the dependencies
   /// store with the updated document dependencies and
-  void updateDependencies(DocumentSnapshot snap) {
+  void updateDependencies<T>(DocumentSnapshot<T> snap) {
     final doc = snap.doc;
-    final prevDeps = dependenciesStore[doc];
+    final prevDeps = dependenciesStore.get(doc.path);
     final deps = doc.dependenciesBuilder?.call(snap);
 
     if (setEquals(deps, prevDeps)) {
@@ -196,8 +197,6 @@ class Loon {
     }
 
     if (deps != null && prevDeps != null) {
-      dependenciesStore[doc] = deps;
-
       final addedDeps = deps.difference(prevDeps);
       final removedDeps = prevDeps.difference(deps);
 
@@ -205,17 +204,31 @@ class Loon {
         (dependentsStore[dep] ??= {}).add(doc);
       }
       for (final dep in removedDeps) {
-        dependentsStore[dep]!.remove(doc);
+        if (dependentsStore[dep]!.length == 1) {
+          dependentsStore.remove(dep);
+        } else {
+          dependentsStore[dep]!.remove(doc);
+        }
+      }
+
+      if (deps.isEmpty) {
+        dependenciesStore.delete(doc.path);
+      } else {
+        dependenciesStore.write(doc.path, deps);
       }
     } else if (deps != null) {
-      dependenciesStore[doc] = deps;
+      dependenciesStore.write(doc.path, deps);
       for (final dep in deps) {
         (dependentsStore[dep] ??= {}).add(doc);
       }
     } else if (prevDeps != null) {
-      dependenciesStore.remove(doc);
+      dependenciesStore.delete(doc.path);
       for (final dep in prevDeps) {
-        dependentsStore[dep]!.remove(doc);
+        if (dependentsStore[dep]!.length == 1) {
+          dependentsStore.remove(dep);
+        } else {
+          dependentsStore[dep]!.remove(doc);
+        }
       }
     }
   }
@@ -318,7 +331,7 @@ class Loon {
     return {
       "store": _instance.documentStore.inspect(),
       "broadcastStore": _instance.broadcastManager.inspect(),
-      "dependencyStore": _instance.dependenciesStore,
+      "dependencyStore": _instance.dependenciesStore.inspect(),
       "dependentsStore": _instance.dependentsStore,
     };
   }

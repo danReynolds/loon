@@ -53,9 +53,13 @@ class BroadcastManager {
         // If a dependent document does not exist in the store, then it is lazily removed.
         if (!doc.exists()) {
           dependents.remove(doc);
-        } else {
+        } else if (!store.has(doc.path)) {
           writeDocument(doc, EventTypes.touched);
         }
+      }
+
+      if (dependents.isEmpty) {
+        Loon._instance.dependentsStore.remove(doc);
       }
     }
   }

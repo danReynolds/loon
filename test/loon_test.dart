@@ -1328,19 +1328,20 @@ void main() {
       expect(
         Loon.inspect()['dependencyStore'],
         {
-          "dependencies": {
-            "posts": {
+          "posts": {
+            "__values": {
               "1": {
                 userDoc,
-              },
-            },
-          },
-          "dependents": {
-            "users": {
-              "1": {
-                postDoc,
               }
             }
+          }
+        },
+      );
+      expect(
+        Loon.inspect()['dependentsStore'],
+        {
+          userDoc: {
+            postDoc,
           },
         },
       );
@@ -1366,19 +1367,20 @@ void main() {
       expect(
         Loon.inspect()['dependencyStore'],
         {
-          "dependencies": {
-            "posts": {
+          "posts": {
+            "__values": {
               "1": {
                 userDoc,
-              },
-            },
+              }
+            }
           },
-          "dependents": {
-            "users": {
-              "1": {
-                postDoc,
-              },
-            },
+        },
+      );
+      expect(
+        Loon.inspect()['dependentsStore'],
+        {
+          userDoc: {
+            postDoc,
           },
         },
       );
@@ -1397,22 +1399,16 @@ void main() {
       // Now the post doc has been updated and is no longer dependent on the user doc.
       expect(
         Loon.inspect()['dependencyStore'],
-        {
-          "dependencies": {
-            "posts": {
-              "1": <dynamic>{},
-            },
-          },
-          "dependents": {
-            "users": {
-              "1": <dynamic>{},
-            }
-          },
-        },
+        {},
+      );
+      expect(
+        Loon.inspect()['dependentsStore'],
+        {},
       );
 
       await asyncEvent();
 
+      // Skips this update to user doc, since the last update caused the user doc to be removed as a dependency.
       userDoc.update({
         "id": 1,
         "name": "User 1 updated",
@@ -1424,22 +1420,24 @@ void main() {
 
       final snaps = await postsStream.take(8).toList();
 
-      // No post yet
-      expect(snaps[0], null);
-      // Post created
-      expect(snaps[1]!.data, postData);
-      // Rebroadcast post when user created
-      expect(snaps[2]!.data, postData);
-      // Rebroadcast post when user updated
-      expect(snaps[3]!.data, postData);
-      // Rebroadcast post when user deleted
-      expect(snaps[4]!.data, postData);
-      // Rebroadcast post when user re-added (ensures dependencies remain across deletion/re-creation)
-      expect(snaps[5]!.data, postData);
-      // Rebroadcast when post data is updated
-      expect(snaps[6]!.data, updatedPostData1);
-      // Skips the update to user doc, since the last update caused the user doc to be removed as a dependency.
-      expect(snaps[7]!.data, updatedPostData2);
+      expect(snaps, [
+        // No post yet
+        null,
+        // Post created
+        DocumentSnapshot(doc: postDoc, data: postData),
+        // Rebroadcast post when user created
+        DocumentSnapshot(doc: postDoc, data: postData),
+        // Rebroadcast post when user updated
+        DocumentSnapshot(doc: postDoc, data: postData),
+        // Rebroadcast post when user deleted
+        DocumentSnapshot(doc: postDoc, data: postData),
+        // Rebroadcast post when user re-added (ensures dependencies remain across deletion/re-creation)
+        DocumentSnapshot(doc: postDoc, data: postData),
+        // Rebroadcast when post data is updated
+        DocumentSnapshot(doc: postDoc, data: updatedPostData1),
+        // Rebroadcast when post data is updated again
+        DocumentSnapshot(doc: postDoc, data: updatedPostData2),
+      ]);
     });
 
     test("Cyclical dependencies do not cause infinite rebroadcasts", () async {
@@ -1476,16 +1474,21 @@ void main() {
       expect(
         Loon.inspect()['dependencyStore'],
         {
-          "dependencies": {
-            "users": {
-              "1": {postDoc},
-            },
-          },
-          "dependents": {
-            "posts": {
-              "1": {userDoc},
+          "users": {
+            "__values": {
+              "1": {
+                postDoc,
+              },
             }
           },
+        },
+      );
+      expect(
+        Loon.inspect()['dependentsStore'],
+        {
+          postDoc: {
+            userDoc,
+          }
         },
       );
 
@@ -1497,30 +1500,31 @@ void main() {
       expect(
         Loon.inspect()['dependencyStore'],
         {
-          "dependencies": {
-            "users": {
+          "users": {
+            "__values": {
               "1": {
                 postDoc,
-              }
+              },
             },
-            "posts": {
+          },
+          "posts": {
+            "__values": {
               "1": {
                 userDoc,
-              }
-            }
-          },
-          "dependents": {
-            "posts": {
-              "1": {
-                userDoc,
-              }
+              },
             },
-            "users": {
-              "1": {
-                postDoc,
-              }
-            }
           },
+        },
+      );
+      expect(
+        Loon.inspect()['dependentsStore'],
+        {
+          postDoc: {
+            userDoc,
+          },
+          userDoc: {
+            postDoc,
+          }
         },
       );
 
@@ -1538,31 +1542,28 @@ void main() {
           // First emits null when no user has been written.
           null,
           // Emits the initially created user.
-          DocumentSnapshot(
-            doc: userDoc,
-            data: userData,
-          ),
+          DocumentSnapshot(doc: userDoc, data: userData),
           // Emits the same user again when the post is updated. Infinite rebroadcasting
           // does not occur despite a cyclical dependency between the user and the post since
           // attempts to rebroadcast documents that are already pending broadcast are ignored.
-          DocumentSnapshot(
-            doc: userDoc,
-            data: userData,
-          ),
+          DocumentSnapshot(doc: userDoc, data: userData),
           // Emits the updated user.
-          DocumentSnapshot(
-            doc: userDoc,
-            data: updatedUserData,
-          ),
+          DocumentSnapshot(doc: userDoc, data: updatedUserData),
           emitsDone,
         ]),
       );
     });
 
     test("Deleting a collection clears its dependencies", () async {
-      final usersCollection = Loon.collection('users');
-      final friendsCollection = Loon.collection<TestUserModel>(
+      final usersCollection = Loon.collection(
+        'users',
+        fromJson: TestUserModel.fromJson,
+        toJson: (snap) => snap.toJson(),
+      );
+      final friendsCollection = Loon.collection(
         'friends',
+        fromJson: TestUserModel.fromJson,
+        toJson: (snap) => snap.toJson(),
         dependenciesBuilder: (snap) {
           return {
             usersCollection.doc(snap.doc.id),
@@ -1580,20 +1581,21 @@ void main() {
       expect(
         Loon.inspect()['dependencyStore'],
         {
-          "dependencies": {
-            "friends": {
+          "friends": {
+            "__values": {
               "1": {
                 userDoc,
               }
             }
-          },
-          "dependents": {
-            "users": {
-              "1": {
-                friendDoc,
-              }
-            }
-          },
+          }
+        },
+      );
+      expect(
+        Loon.inspect()['dependentsStore'],
+        {
+          userDoc: {
+            friendDoc,
+          }
         },
       );
 
@@ -1603,33 +1605,26 @@ void main() {
 
       expect(
         Loon.inspect()['dependencyStore'],
+        {},
+      );
+      expect(
+        Loon.inspect()['dependentsStore'],
         {
-          "dependencies": {},
           // The dependents are not cleared when a collection is cleared, instead
           // the dependents are lazily cleared when the dependent is updated.
-          "dependents": {
-            "users": {
-              "1": {
-                friendDoc,
-              }
-            }
+          userDoc: {
+            friendDoc,
           },
         },
       );
 
+      // Now that the user has been updated, it has cleared its friend dependent.
       userDoc.update(TestUserModel('User 1 updated'));
 
       await asyncEvent();
 
-      expect(
-        Loon.inspect()['dependencyStore'],
-        {
-          "dependencies": {},
-          "dependents": {
-            "users": {"1": <dynamic>{}}
-          },
-        },
-      );
+      expect(Loon.inspect()['dependencyStore'], {});
+      expect(Loon.inspect()['dependentsStore'], {});
     });
   });
 }
