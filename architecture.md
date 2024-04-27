@@ -26,12 +26,12 @@ Each type of observable ([ObservableDocument], [ObservableQuery]) implements the
 on the [BroadcastManager].
 
 When changes occur to documents in the store, the change event, such as an [EventTypes.added], [EventTypes.modified] or [EventTypes.removed]
-event, is recorded in a custom broadcast tree structure called a [ValueStore], which is maintained by the [BroadcastManager] and maps document paths to changes.
+event, is recorded in a custom broadcast tree structure called a [CollectionStore], which is maintained by the [BroadcastManager] and maps document paths to changes.
 
-A [ValueStore] is a variant of a trie data structure that groups values by collection, a helpful optimization for quick access to all values of a particular collection. An example is shown below:
+A [CollectionStore] is a variant of a trie data structure that groups values by collection, a helpful optimization for quick access to all values of a particular collection. An example is shown below:
 
 ```dart
-final store = ValueStore<String>();
+final store = CollectionStore<String>();
 
 store.write('users__1', 'User 1');
 store.write('users__2', 'User 2');

@@ -9,7 +9,7 @@ mixin BroadcastObserver<T, S> {
 
   String get path;
 
-  final _deps = DepStore();
+  final _deps = PathRefStore();
 
   void init(
     T initialValue, {

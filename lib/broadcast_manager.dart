@@ -19,7 +19,7 @@ enum EventTypes {
 
 class BroadcastManager {
   /// The store of broadcast documents/collections scheduled for broadcast.
-  final store = ValueStore<EventTypes>();
+  final store = IndexStore<EventTypes>();
 
   /// The store of broadcast observers that should be notified on broadcast
   final Set<BroadcastObserver> _observers = {};
@@ -96,7 +96,7 @@ class BroadcastManager {
 
         /// If any observer's dependencies contain the deleted path, then the observer must
         /// be scheduled for rebroadcast, since its dependencies are dirty.
-      } else if (observer._deps.hasPath(path)) {
+      } else if (observer._deps.has(path)) {
         store.write(observer.path, EventTypes.touched);
       }
     }

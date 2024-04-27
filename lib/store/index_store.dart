@@ -1,6 +1,41 @@
 part of loon;
 
-class ValueStore<T> {
+/// An index store is a tree structure that takes a path and indexes its value into the tree as a
+/// key of its parent path, enabling efficient access to all values of the parent path.
+///
+/// Ex. In this example, the parent path `users__2__messages` indexes the value 'Test' by its key `1`.
+///
+/// ```dart
+/// final store = IndexStore<String>();
+/// store.write('users__2__messages__1', 'Test');
+/// store.write('users__2__messages__2', 'Test again');
+/// {
+///   users: {
+///     2: {
+///       messages: {
+///         __values: {
+///           1: 'Test',
+///           2: 'Test again',
+///         }
+///       }
+///     }
+///   }
+/// }
+/// ```
+///
+/// All values of the given path can then be retrieved as shown below:
+///
+/// ```dart
+/// final values = store.getAll('users__2__messages');
+/// {
+///   1: 'Test',
+///   2: 'Test again',
+/// }
+/// ```
+///
+/// This is used in modeling collections, which index their documents by key and require
+/// efficient access to all of their values.
+class IndexStore<T> {
   final Map _store = {};
 
   static const _delimiter = '__';

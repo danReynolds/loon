@@ -7,8 +7,8 @@ export 'widgets/query_stream_builder.dart';
 export 'widgets/document_stream_builder.dart';
 export 'persistor/file_persistor/file_persistor.dart';
 
-part 'dep_store.dart';
-part 'value_store.dart';
+part 'store/path_ref_store.dart';
+part 'store/index_store.dart';
 part 'broadcast_observer.dart';
 part 'query.dart';
 part 'observable_query.dart';
@@ -30,10 +30,10 @@ class Loon {
   Loon._();
 
   /// The store of document snapshots indexed by their document path.
-  final documentStore = ValueStore<DocumentSnapshot>();
+  final documentStore = IndexStore<DocumentSnapshot>();
 
   /// The store of dependencies of documents.
-  final dependenciesStore = ValueStore<Set<Document>>();
+  final dependenciesStore = IndexStore<Set<Document>>();
 
   /// The store of dependents of documents.
   final Map<Document, Set<Document>> dependentsStore = {};
@@ -48,7 +48,7 @@ class Loon {
 
   // When a document is read, if it is still in JSON format from hydration and is now being accessed
   // with a serializer, then it is de-serialized at time of access.
-  DocumentSnapshot<T> deserializeSnap<T>(
+  DocumentSnapshot<T> parseSnap<T>(
     DocumentSnapshot snap, {
     required FromJson<T>? fromJson,
     required ToJson<T>? toJson,
@@ -88,7 +88,7 @@ class Loon {
       return null;
     }
 
-    return deserializeSnap(
+    return parseSnap(
       snap,
       fromJson: doc.fromJson,
       toJson: doc.toJson,
@@ -102,7 +102,7 @@ class Loon {
         .getAll(collection.path)
         ?.values
         .map(
-          (snap) => deserializeSnap(
+          (snap) => parseSnap(
             snap,
             fromJson: collection.fromJson,
             toJson: collection.toJson,
@@ -239,6 +239,7 @@ class Loon {
   }) async {
     // Clear the store.
     documentStore.clear();
+
     // Clear any documents scheduled for broadcast, as whatever events happened prior to the clear are now irrelevant.
     broadcastManager.clear();
 

@@ -4,26 +4,38 @@ import 'package:loon/loon.dart';
 void main() {
   group('inc', () {
     test('Correctly increments the ref count', () {
-      final store = DepStore();
+      final store = PathRefStore();
 
       store.inc('posts__1');
 
       expect(store.inspect(), {
+        "__ref": 1,
         "posts": {
+          "__ref": 1,
           "1": 1,
         }
       });
 
       store.inc('posts__1');
       store.inc('posts__1__comments__2');
+      store.inc('posts__1__comments__2__reactions__1');
       store.inc('posts__2');
 
       expect(store.inspect(), {
+        "__ref": 5,
         "posts": {
+          "__ref": 5,
           "1": {
-            "__ref": 2,
+            "__ref": 4,
             "comments": {
-              "2": 1,
+              "__ref": 2,
+              "2": {
+                "__ref": 2,
+                "reactions": {
+                  "__ref": 1,
+                  "1": 1,
+                }
+              }
             },
           },
           "2": 1,
@@ -34,7 +46,7 @@ void main() {
 
   group("dec", () {
     test('Correctly decrements the ref count', () {
-      final store = DepStore();
+      final store = PathRefStore();
 
       store.inc('posts__1');
       store.inc('posts__1');
@@ -42,7 +54,9 @@ void main() {
       store.inc('posts__3');
 
       expect(store.inspect(), {
+        "__ref": 4,
         "posts": {
+          "__ref": 4,
           "1": 2,
           "2": 1,
           "3": 1,
@@ -52,7 +66,9 @@ void main() {
       store.dec('posts__1');
 
       expect(store.inspect(), {
+        "__ref": 3,
         "posts": {
+          "__ref": 3,
           "1": 1,
           "2": 1,
           "3": 1,
@@ -66,18 +82,21 @@ void main() {
       expect(store.inspect(), {});
     });
 
-    test("Retains transient paths to deeper nodes", () {
-      final store = DepStore();
+    test("Does not decrement deeper nodes", () {
+      final store = PathRefStore();
 
       store.inc('posts__1');
       store.inc('posts__2');
       store.inc('posts__1__comments__2');
 
       expect(store.inspect(), {
+        "__ref": 3,
         "posts": {
+          "__ref": 3,
           "1": {
-            "__ref": 1,
+            "__ref": 2,
             "comments": {
+              "__ref": 1,
               "2": 1,
             },
           },
@@ -88,9 +107,13 @@ void main() {
       store.dec('posts__1');
 
       expect(store.inspect(), {
+        "__ref": 2,
         "posts": {
+          "__ref": 2,
           "1": {
+            "__ref": 1,
             "comments": {
+              "__ref": 1,
               "2": 1,
             },
           },
@@ -101,34 +124,14 @@ void main() {
   });
 
   group('has', () {
-    test('Correctly determines whether the given path is a dependency', () {
-      final store = DepStore();
+    test('Returns true for paths that exists in the store', () {
+      final store = PathRefStore();
 
-      store.inc('users__1');
+      store.inc('users__1__posts__1');
 
       expect(store.has('users__1'), true);
-      expect(store.has('users__2'), false);
-    });
-
-    test('Returns false for transient paths', () {
-      final store = DepStore();
-
-      store.inc('users__1__posts__1');
-
-      expect(store.has('users__1'), false);
       expect(store.has('users__1__posts__1'), true);
-    });
-  });
-
-  group('hasPath', () {
-    test('Returns true for both dependency paths and transient paths', () {
-      final store = DepStore();
-
-      store.inc('users__1__posts__1');
-
-      expect(store.hasPath('users__1'), true);
-      expect(store.hasPath('users__1__posts__1'), true);
-      expect(store.hasPath('users__2'), false);
+      expect(store.has('users__2'), false);
     });
   });
 }

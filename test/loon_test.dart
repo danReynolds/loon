@@ -1300,7 +1300,7 @@ void main() {
       Loon.clearAll();
     });
 
-    test("Dependent changes should broadcast dependencies", () async {
+    test("Changes to dependents should broadcast dependencies", () async {
       final usersCollection = Loon.collection('users');
       final postsCollection = Loon.collection<Json>(
         'posts',
