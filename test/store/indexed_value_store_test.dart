@@ -4,7 +4,7 @@ import 'package:loon/loon.dart';
 void main() {
   group('write', () {
     test('Writes the value to the given path', () {
-      final store = IndexStore<String>();
+      final store = IndexedValueStore<String>();
 
       store.write('users', 'Collection value');
       store.write('users__1', 'Dan');
@@ -34,7 +34,7 @@ void main() {
 
   group('get', () {
     test('Retrieves the value at the given path', () {
-      final store = IndexStore<String>();
+      final store = IndexedValueStore<String>();
 
       store.write('users__1', 'Dan');
       store.write('users__2', 'Sonja');
@@ -48,7 +48,7 @@ void main() {
 
   group('getAll', () {
     test('Retrieves all of the values of the children of the given path', () {
-      final store = IndexStore<String>();
+      final store = IndexedValueStore<String>();
 
       store.write('users__1', 'Dan');
       store.write('users__2', 'Sonja');
@@ -67,8 +67,8 @@ void main() {
   });
 
   group('delete', () {
-    test('Removes the path from the store.', () {
-      final store = IndexStore<String>();
+    test('Removes the value at the given path from the store.', () {
+      final store = IndexedValueStore<String>();
 
       store.write('users__1', 'Dan');
       store.write('users__2', 'Sonja');

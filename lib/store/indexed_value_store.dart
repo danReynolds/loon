@@ -1,12 +1,12 @@
 part of loon;
 
-/// An index store is a tree structure that takes a path and indexes its value into the tree as a
+/// An indexed value store is a tree structure that takes a path and indexes its value into the tree as a
 /// key of its parent path, enabling efficient access to all values of the parent path.
 ///
 /// Ex. In this example, the parent path `users__2__messages` indexes the value 'Test' by its key `1`.
 ///
 /// ```dart
-/// final store = IndexStore<String>();
+/// final store = IndexedValueStore<String>();
 /// store.write('users__2__messages__1', 'Test');
 /// store.write('users__2__messages__2', 'Test again');
 /// {
@@ -35,7 +35,7 @@ part of loon;
 ///
 /// This is used in modeling collections, which index their documents by key and require
 /// efficient access to all of their values.
-class IndexStore<T> {
+class IndexedValueStore<T> {
   final Map _store = {};
 
   static const _delimiter = '__';
@@ -121,14 +121,18 @@ class IndexStore<T> {
     }
 
     final segment = segments.last;
-    final Map? values = node[_values];
-
     node.remove(segment);
-    values?.remove(segment);
 
-    // The final segment of the path is removed from the child value tree as well as
-    // from the values of the parent node.
-    return node.isEmpty || node.length == 1 && (values?.isEmpty ?? false);
+    if (node.containsKey(_values)) {
+      final Map values = node[_values];
+      values.remove(segment);
+
+      if (values.isEmpty) {
+        node.remove(_values);
+      }
+    }
+
+    return node.isEmpty;
   }
 
   void delete(String path) {

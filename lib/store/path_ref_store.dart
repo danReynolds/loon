@@ -2,8 +2,7 @@ part of loon;
 
 /// The path ref store is a tree structure that maintains a ref count of the number of times a path has been added to the tree.
 ///
-/// Ex. The posts__1 path has a ref count of 2, since it has had two paths added to the tree that contain its path:
-/// posts__1 and posts__1__comments__2.
+/// Ex.
 ///
 /// ```dart
 /// final store = PathRefStore();
@@ -12,9 +11,11 @@ part of loon;
 /// store.inc('posts__2');
 /// {
 ///   "posts": {
+///     "__ref": 3,
 ///     "1": {
 ///       "__ref": 2,
 ///       "comments": {
+///         "__ref": 1,
 ///         "2": 1,
 ///       },
 ///     },
