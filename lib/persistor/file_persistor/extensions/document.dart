@@ -30,7 +30,7 @@ extension DocumentExtensions<T> on Document<T> {
 
   FilePersistDocument toPersistenceDoc() {
     return FilePersistDocument(
-      key: path,
+      path: path,
       encryptionEnabled: isEncryptionEnabled(),
       dataStoreName: getDatastoreName(),
       data: getJson(),

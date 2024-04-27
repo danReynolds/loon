@@ -5,7 +5,7 @@ import 'package:loon/persistor/file_persistor/file_data_store.dart';
 import 'package:loon/persistor/file_persistor/messages.dart';
 import 'package:path/path.dart' as path;
 
-typedef DocumentDataStore = Map<String, Map<String, FileDataStore>>;
+const _indexKey = 'index';
 
 class FilePersistorWorker {
   /// The persistor's send port.
@@ -14,11 +14,10 @@ class FilePersistorWorker {
   /// This worker's receive port.
   final receivePort = ReceivePort();
 
-  /// An index of file data stores by name.
-  final Map<String, FileDataStore> _fileDataStoreIndex = {};
+  /// A map of file data stores by name.
+  final Map<String, FileDataStore> _fileDataStores = {};
 
-  /// An index of a documents by collection to the file data store that the document is persisted in.
-  final DocumentDataStore _documentDataStoreIndex = {};
+  final _documentDataStoreIndex = IndexedRefValueStore<FileDataStore>();
 
   final FileDataStoreFactory factory;
 
@@ -73,13 +72,13 @@ class FilePersistorWorker {
   /// Syncs all dirty file data stores, updating and deleting them as necessary.
   Future<void> _sync() {
     return Future.wait(
-      _fileDataStoreIndex.values.toList().map((dataStore) async {
+      _fileDataStores.values.toList().map((dataStore) async {
         if (!dataStore.isDirty) {
           return;
         }
 
         if (dataStore.data.isEmpty) {
-          _fileDataStoreIndex.remove(dataStore.name);
+          _fileDataStores.remove(dataStore.name);
           return dataStore.delete();
         }
 
@@ -133,7 +132,7 @@ class FilePersistorWorker {
         // 2. Each of the data store's documents should be indexed into the document data store index by its collection and ID.
         // 3. Each of the data store's documents should be grouped into the collection data store by collection.
         for (final fileDataStore in fileDataStores) {
-          _fileDataStoreIndex[fileDataStore.name] = fileDataStore;
+          _fileDataStores[fileDataStore.name] = fileDataStore;
 
           for (final documentDataEntry in fileDataStore.data.entries) {
             final documentKey = documentDataEntry.key;
@@ -159,31 +158,25 @@ class FilePersistorWorker {
     try {
       _measureOperation('Persist operation', () async {
         for (final doc in request.data) {
-          final documentKey = doc.key;
-          final [collection, documentId] = documentKey.split(':');
+          final docPath = doc.path;
           final docJson = doc.data;
-          final documentDataStoreName = doc.dataStoreName;
-          final documentDataStore =
-              _fileDataStoreIndex[documentDataStoreName] ??=
-                  factory.fromDoc(doc);
+          final documentDataStore = _fileDataStores[doc.dataStoreName] ??=
+              _documentDataStoreIndex.write(docPath, factory.fromDoc(doc));
 
           // If the document has changed the file data store it should be stored in, then it should
           // be removed from its previous file data store (if one exists) and placed in the new one.
-          final prevDocumentDataStore =
-              _documentDataStoreIndex[collection]?[documentId];
-          if (prevDocumentDataStore != null &&
-              documentDataStore != prevDocumentDataStore) {
-            prevDocumentDataStore.removeDocument(documentKey);
+          final prevDocumentDataStore = _documentDataStoreIndex.get(docPath);
+          if (documentDataStore != prevDocumentDataStore &&
+              prevDocumentDataStore != null) {
+            prevDocumentDataStore.removeDocument(doc);
           }
 
           if (docJson != null) {
-            documentDataStore.updateDocument(documentKey, docJson);
-            _documentDataStoreIndex[collection] ??= {};
-            _documentDataStoreIndex[collection]![documentId] =
-                documentDataStore;
+            documentDataStore.updateDocument(doc, docJson);
+            _documentDataStoreIndex.write(docPath, documentDataStore);
           } else {
-            documentDataStore.removeDocument(documentKey);
-            _documentDataStoreIndex[collection]?.remove(documentKey);
+            documentDataStore.removeDocument(doc);
+            _documentDataStoreIndex.delete(docPath);
           }
         }
 
@@ -235,10 +228,10 @@ class FilePersistorWorker {
     _measureOperation('ClearAll operation', () async {
       try {
         final future = Future.wait(
-          _fileDataStoreIndex.values.map((dataStore) => dataStore.delete()),
+          _fileDataStores.values.map((dataStore) => dataStore.delete()),
         );
 
-        _fileDataStoreIndex.clear();
+        _fileDataStores.clear();
         _documentDataStoreIndex.clear();
 
         await future;

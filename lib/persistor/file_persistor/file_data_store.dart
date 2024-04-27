@@ -9,8 +9,7 @@ class FileDataStore {
   final File file;
   final String name;
 
-  /// A map of documents by key (collection:id) to the document's JSON data.
-  final Map<String, Json> data = {};
+  var store = IndexedValueStore();
 
   /// Whether the file data store has pending changes that should be persisted.
   bool isDirty = false;
@@ -20,14 +19,28 @@ class FileDataStore {
     required this.name,
   });
 
-  void updateDocument(String documentKey, Json docData) {
-    data[documentKey] = docData;
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) {
+      return true;
+    }
+    if (other is FileDataStore) {
+      return other.name == name;
+    }
+    return false;
+  }
+
+  @override
+  int get hashCode => Object.hashAll([name]);
+
+  void updateDocument(FilePersistDocument doc, Json data) {
+    store.write(doc.path, data);
     isDirty = true;
   }
 
-  void removeDocument(String documentKey) {
-    if (data.containsKey(documentKey)) {
-      data.remove(documentKey);
+  void removeDocument(FilePersistDocument doc) {
+    if (store.has(doc.path)) {
+      store.delete(doc.path);
       isDirty = true;
     }
   }
@@ -59,15 +72,12 @@ class FileDataStore {
       await measureDuration(
         'Parse data store $name',
         () async {
-          final hydrationData = jsonDecode(fileStr).map(
+          store = jsonDecode(fileStr).map(
             (key, dynamic value) => MapEntry(
               key,
               Map<String, dynamic>.from(value),
             ),
           );
-          for (final entry in hydrationData.entries) {
-            data[entry.key] = entry.value;
-          }
         },
       );
     } catch (e) {
@@ -78,14 +88,14 @@ class FileDataStore {
   }
 
   Future<void> persist() async {
-    if (data.isEmpty) {
+    if (store.isEmpty) {
       printDebug('Attempted to write empty data store');
       return;
     }
 
     final encodedStore = await measureDuration(
       'Serialize data store $name',
-      () async => jsonEncode(data),
+      () async => jsonEncode(store.inspect()),
     );
 
     await writeFile(encodedStore);

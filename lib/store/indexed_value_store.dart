@@ -153,6 +153,10 @@ class IndexedValueStore<T> {
     _store.clear();
   }
 
+  bool get isEmpty {
+    return _store.isEmpty;
+  }
+
   Map inspect() {
     return _store;
   }

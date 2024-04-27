@@ -7,8 +7,8 @@ import 'package:loon/loon.dart';
 /// fields and references that would be unnecessarily copied into the isolate. It also has back references to
 /// the [Loon] instance which shouldn't be accessed in the isolate.
 class FilePersistDocument {
-  /// The document key of format collection:id.
-  final String key;
+  /// The document path.
+  final String path;
 
   /// The name of the file data store that the document should be persisted in.
   final String dataStoreName;
@@ -20,7 +20,7 @@ class FilePersistDocument {
   final bool encryptionEnabled;
 
   FilePersistDocument({
-    required this.key,
+    required this.path,
     required this.dataStoreName,
     required this.data,
     required this.encryptionEnabled,
