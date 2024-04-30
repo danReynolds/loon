@@ -1,18 +1,23 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:encrypt/encrypt.dart';
+import 'package:loon/logger.dart';
 import 'package:loon/loon.dart';
 import 'package:loon/persistor/file_persistor/file_persist_document.dart';
 import 'package:path/path.dart' as path;
 
-class FileDataStore {
+final logger = Logger('FileDataStore');
+
+class FileDataStore<T> {
   final File file;
   final String name;
 
-  var store = IndexedValueStore();
+  var _store = IndexedValueStore<T>();
 
   /// Whether the file data store has pending changes that should be persisted.
   bool isDirty = false;
+
+  bool isHydrated = false;
 
   FileDataStore({
     required this.file,
@@ -33,14 +38,18 @@ class FileDataStore {
   @override
   int get hashCode => Object.hashAll([name]);
 
-  void updateDocument(FilePersistDocument doc, Json data) {
-    store.write(doc.path, data);
+  T? getEntry(String path) {
+    return _store.get(path);
+  }
+
+  void writeEntry(String path, T data) {
+    _store.write(path, data);
     isDirty = true;
   }
 
-  void removeDocument(FilePersistDocument doc) {
-    if (store.has(doc.path)) {
-      store.delete(doc.path);
+  void removeEntry(String path) {
+    if (_store.has(path)) {
+      _store.delete(path);
       isDirty = true;
     }
   }
@@ -50,7 +59,7 @@ class FileDataStore {
   }
 
   Future<void> writeFile(String value) {
-    return measureDuration(
+    return logger.measure(
       'Write data store $name',
       () => file.writeAsString(value),
     );
@@ -58,7 +67,7 @@ class FileDataStore {
 
   Future<void> delete() async {
     if (!file.existsSync()) {
-      printDebug('Attempted to delete non-existent file');
+      logger.log('Attempted to delete non-existent file');
       return;
     }
 
@@ -67,40 +76,52 @@ class FileDataStore {
   }
 
   Future<void> hydrate() async {
+    if (isHydrated) {
+      return;
+    }
+
     try {
       final fileStr = await readFile();
-      await measureDuration(
+      await logger.measure(
         'Parse data store $name',
         () async {
-          store = jsonDecode(fileStr).map(
-            (key, dynamic value) => MapEntry(
-              key,
-              Map<String, dynamic>.from(value),
-            ),
-          );
+          _store = jsonDecode(fileStr);
         },
       );
+      isHydrated = true;
     } catch (e) {
       // If hydration fails, then this file data store is corrupt and should be removed from the file data store index.
-      printDebug('Corrupt file data store');
+      logger.log('Corrupt file data store');
       rethrow;
     }
   }
 
   Future<void> persist() async {
-    if (store.isEmpty) {
-      printDebug('Attempted to write empty data store');
+    if (_store.isEmpty) {
+      logger.log('Attempted to write empty data store');
       return;
     }
 
-    final encodedStore = await measureDuration(
+    final encodedStore = await logger.measure(
       'Serialize data store $name',
-      () async => jsonEncode(store.inspect()),
+      () async => jsonEncode(_store.inspect()),
     );
 
     await writeFile(encodedStore);
 
     isDirty = false;
+  }
+
+  bool get isEmpty {
+    return _store.isEmpty;
+  }
+
+  Map<String, T> extract() {
+    return _store.extract();
+  }
+
+  Map<String, T> extractPath(String path) {
+    return _store.extractPath(path);
   }
 }
 

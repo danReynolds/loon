@@ -41,7 +41,8 @@ class IndexedValueStore<T> {
   static const _delimiter = '__';
   static const _values = '__values';
 
-  T? _get(Map node, List<String> segments, int index) {
+  /// Returns the node at the given path.
+  Map? _getNode(Map node, List<String> segments, int index) {
     if (segments.isEmpty) {
       return null;
     }
@@ -52,37 +53,47 @@ class IndexedValueStore<T> {
         return null;
       }
 
-      return _get(child, segments, index + 1);
+      return _getNode(child, segments, index + 1);
     }
 
-    return node[_values]?[segments.last];
+    return node;
   }
 
   /// Returns the value for the given path.
   T? get(String path) {
-    return _get(_store, path.split(_delimiter), 0);
+    final segments = path.split(_delimiter);
+    return _getNode(_store, segments, 0)?[_values]?[segments.last];
   }
 
-  Map<String, T>? _getAll(Map node, List<String> segments, int index) {
-    if (segments.isEmpty) {
-      return null;
-    }
-
-    if (index < segments.length) {
-      final child = node[segments[index]];
+  T? _getNearest(Map node, List<String> segments, int index) {
+    if (index < segments.length - 1) {
+      final segment = segments[index];
+      final Map? child = node[segment];
       if (child == null) {
         return null;
       }
 
-      return _getAll(child, segments, index + 1);
+      final value = _getNearest(child, segments, index + 1);
+
+      if (value != null) {
+        return value;
+      }
+
+      return node[_values][segment];
     }
 
-    return node[_values];
+    return node[_values][segments[index]];
+  }
+
+  /// Returns the nearest value along the given path, beginning at the full path
+  /// and then attempting to find a non-null value for any parent node moving up the tree.
+  T? getNearest(String path) {
+    return _getNearest(_store, path.split(_delimiter), 0);
   }
 
   /// Returns a map of all values that are immediate children of the given path.
   Map<String, T>? getAll(String path) {
-    return _getAll(_store, path.split(_delimiter), 0);
+    return _getNode(_store, path.split(_delimiter), 0)?[_values];
   }
 
   void _write(Map node, List<String> segments, int index, T value) {
@@ -95,6 +106,7 @@ class IndexedValueStore<T> {
     values[segments.last] = value;
   }
 
+  /// Writes the value at the given path.
   T write(String path, T value) {
     _write(_store, path.split(_delimiter), 0, value);
     return value;
@@ -159,5 +171,42 @@ class IndexedValueStore<T> {
 
   Map inspect() {
     return _store;
+  }
+
+  Map<String, T> _extract(
+    Map node, [
+    String path = '',
+    Map<String, T> index = const {},
+  ]) {
+    if (node.containsKey(_values)) {
+      for (final entry in node[_values].entries) {
+        index["${path}__${entry.key}"] = entry.value;
+      }
+    }
+
+    for (final key in node.keys) {
+      if (key != _values) {
+        _extract(node, "${path}__$key", index);
+      }
+    }
+
+    return index;
+  }
+
+  /// Extracts all values from the store into a set of flat key-value pairs of paths to values.
+  Map<String, T> extract() {
+    return _extract(_store);
+  }
+
+  /// Similar to [extract], extracts all values from the store into a flat key-value pairs beginning
+  /// at the given path.
+  Map<String, T> extractPath(String path) {
+    final node = _getNode(_store, path.split(_delimiter), 0);
+
+    if (node == null) {
+      return {};
+    }
+
+    return _extract(node, path);
   }
 }

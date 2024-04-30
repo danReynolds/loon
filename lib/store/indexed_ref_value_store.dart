@@ -19,9 +19,11 @@ part of loon;
 ///           'Test': 2,
 ///           'Test 2': 1,
 ///         }
-///         1: 'Test',
-///         2: 'Test',
-///         3: 'Test 2',
+///         __values: {
+///           1: 'Test',
+///           2: 'Test',
+///           3: 'Test 2',
+///         }
 ///       }
 ///     }
 ///   }
@@ -35,21 +37,21 @@ class IndexedRefValueStore<T> {
   static const _values = '__values';
   static const _refs = '__refs';
 
-  int _getRef(Map? node, List<String> segments, int index, T value) {
+  int _getRefCount(Map? node, List<String> segments, int index, T value) {
     if (node == null || segments.isEmpty) {
       return 0;
     }
 
     if (index < segments.length) {
-      return _getRef(node[segments[index]], segments, index + 1, value);
+      return _getRefCount(node[segments[index]], segments, index + 1, value);
     }
 
     return node[_refs]?[value] ?? 0;
   }
 
   /// Returns the ref count for the value at the given path.
-  int getRef(String path, T value) {
-    return _getRef(_store, path.split(_delimiter), 0, value);
+  int getRefCount(String path, T value) {
+    return _getRefCount(_store, path.split(_delimiter), 0, value);
   }
 
   T? _get(Map? node, List<String> segments, int index) {
@@ -97,12 +99,25 @@ class IndexedRefValueStore<T> {
       return _write(child, segments, index + 1, value);
     }
 
+    final segment = segments.last;
     final values = node[_values] ??= <String, T>{};
     final refs = node[_refs] ??= <T, int>{};
 
     refs[value] ??= 0;
     refs[value]++;
-    values[segments.last] = value;
+
+    if (values.containsKey(segment)) {
+      final prevValue = values[segment];
+      if (prevValue != value) {
+        if (refs[prevValue] == 1) {
+          refs.remove(prevValue);
+        } else {
+          refs[prevValue]--;
+        }
+      }
+    }
+
+    values[segment] = value;
   }
 
   T write(String path, T value) {

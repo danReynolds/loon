@@ -40,6 +40,54 @@ void main() {
         }
       });
     });
+
+    test('Decrements the old value when a path is updated', () {
+      final store = IndexedRefValueStore<String>();
+
+      store.write('users__1', 'Test');
+      store.write('users__2', 'Test');
+
+      expect(store.inspect(), {
+        "users": {
+          "__refs": {
+            'Test': 2,
+          },
+          "__values": {
+            "1": 'Test',
+            "2": 'Test',
+          },
+        },
+      });
+
+      store.write('users__2', 'Test 2');
+
+      expect(store.inspect(), {
+        "users": {
+          "__refs": {
+            'Test': 1,
+            'Test 2': 1,
+          },
+          "__values": {
+            "1": 'Test',
+            "2": 'Test 2',
+          },
+        },
+      });
+
+      store.write('users__1', 'Test 2');
+
+      expect(store.inspect(), {
+        "users": {
+          "__refs": {
+            'Test 2': 2,
+          },
+          "__values": {
+            "1": 'Test 2',
+            "2": 'Test 2',
+          },
+        },
+      });
+    });
   });
 
   group('getRef', () {
@@ -50,13 +98,13 @@ void main() {
       store.write('users__2', 'Sonja');
       store.write('users__1__friends__1', 'Nik');
 
-      expect(store.getRef('users', 'Dan'), 1);
-      expect(store.getRef('users', 'Sonja'), 1);
-      expect(store.getRef('users__1__friends', 'Nik'), 1);
+      expect(store.getRefCount('users', 'Dan'), 1);
+      expect(store.getRefCount('users', 'Sonja'), 1);
+      expect(store.getRefCount('users__1__friends', 'Nik'), 1);
 
       store.write('users__3', 'Dan');
 
-      expect(store.getRef('users', 'Dan'), 2);
+      expect(store.getRefCount('users', 'Dan'), 2);
     });
   });
 

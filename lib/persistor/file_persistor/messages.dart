@@ -51,7 +51,11 @@ class InitMessageResponse extends MessageResponse {
 }
 
 class HydrateMessageRequest extends MessageRequest<HydrateMessageResponse> {
-  HydrateMessageResponse success(SerializedCollectionStore data) {
+  final List<Collection>? collections;
+
+  HydrateMessageRequest([this.collections]);
+
+  HydrateMessageResponse success(Map<String, Json> data) {
     return HydrateMessageResponse(
       id: id,
       data: data,
@@ -60,7 +64,8 @@ class HydrateMessageRequest extends MessageRequest<HydrateMessageResponse> {
 }
 
 class HydrateMessageResponse extends MessageResponse {
-  final SerializedCollectionStore data;
+  /// A map of document paths to the document's hydrated data.
+  final Map<String, Json> data;
 
   HydrateMessageResponse({
     required super.id,

@@ -1,11 +1,13 @@
 import 'dart:io';
 import 'dart:isolate';
+import 'package:loon/logger.dart';
 import 'package:loon/loon.dart';
 import 'package:loon/persistor/file_persistor/file_data_store.dart';
 import 'package:loon/persistor/file_persistor/messages.dart';
 import 'package:path/path.dart' as path;
 
-const _indexKey = 'index';
+/// The reserved name of the [FileDataStore] that indexes collections to the data stores containing their documents.
+const _collectionDataStoreKey = '__collection__index__';
 
 class FilePersistorWorker {
   /// The persistor's send port.
@@ -14,17 +16,27 @@ class FilePersistorWorker {
   /// This worker's receive port.
   final receivePort = ReceivePort();
 
-  /// A map of file data stores by name.
+  /// The map of relative file data store file names (users.json, etc) to data stores.
   final Map<String, FileDataStore> _fileDataStores = {};
 
+  /// The map of documents to the data store that they currently reside in.
   final _documentDataStoreIndex = IndexedRefValueStore<FileDataStore>();
 
   final FileDataStoreFactory factory;
 
+  late final Logger logger;
+
   FilePersistorWorker._({
     required this.sendPort,
     required this.factory,
-  });
+  }) {
+    logger = Logger('Worker', output: _sendDebugResponse);
+  }
+
+  FileDataStore<List<String>> get collectionDataStore {
+    return _fileDataStores[_collectionDataStoreKey]!
+        as FileDataStore<List<String>>;
+  }
 
   static init(InitMessageRequest request) {
     FilePersistorWorker._(
@@ -42,14 +54,6 @@ class FilePersistorWorker {
 
   _sendDebugResponse(String text) {
     _sendMessageResponse(DebugMessageResponse(text: text));
-  }
-
-  Future<T> _measureOperation<T>(String label, Future<T> Function() operation) {
-    return measureDuration(
-      label,
-      operation,
-      output: _sendDebugResponse,
-    );
   }
 
   void _onMessage(dynamic message) {
@@ -72,13 +76,13 @@ class FilePersistorWorker {
   /// Syncs all dirty file data stores, updating and deleting them as necessary.
   Future<void> _sync() {
     return Future.wait(
-      _fileDataStores.values.toList().map((dataStore) async {
+      _fileDataStores.values.map((dataStore) async {
         if (!dataStore.isDirty) {
           return;
         }
 
-        if (dataStore.data.isEmpty) {
-          _fileDataStores.remove(dataStore.name);
+        if (dataStore.isEmpty) {
+          _fileDataStores.remove(dataStore);
           return dataStore.delete();
         }
 
@@ -87,67 +91,98 @@ class FilePersistorWorker {
     );
   }
 
+  /// Initializes the data stores, reading them from disk and hydrating the collection index.
+  Future<void> _initDataStores() async {
+    final files = factory.directory
+        .listSync()
+        .whereType<File>()
+        .where((file) => factory.fileRegex.hasMatch(path.basename(file.path)))
+        .toList();
+
+    for (final file in files) {
+      final dataStore = factory.fromFile(file);
+      _fileDataStores[dataStore.name] = dataStore;
+    }
+
+    // If no index store exists, initialize it.
+    if (_fileDataStores[_collectionDataStoreKey] == null) {
+      _fileDataStores[_collectionDataStoreKey] = FileDataStore(
+        file: File("${factory.directory.path}/$_collectionDataStoreKey"),
+        name: _collectionDataStoreKey,
+      );
+    } else {
+      // Otherwise immediately hydrate the collection data store, since it is required for subsequent hydrate/persist operations.
+      await collectionDataStore.hydrate();
+    }
+  }
+
   ///
   /// Message request handlers
   ///
 
-  void _init(InitMessageRequest request) {
+  Future<void> _init(InitMessageRequest request) async {
+    await _initDataStores();
+
     // Start listening to messages from the persistor on the worker's receive port.
     receivePort.listen(_onMessage);
+
     // Send a successful message response containing the worker's send port.
     _sendMessageResponse(request.success(receivePort.sendPort));
   }
 
   void _hydrate(HydrateMessageRequest request) {
-    _measureOperation('Hydration operation', () async {
+    logger.measure('Hydration operation', () async {
       try {
-        final SerializedCollectionStore collectionStore = {};
+        final List<FileDataStore> dataStores = [];
 
-        final files = factory.directory
-            .listSync()
-            .whereType<File>()
-            .where(
-                (file) => factory.fileRegex.hasMatch(path.basename(file.path)))
-            .toList();
+        // If the hydration operation is only for certain collections, then only the file data stores
+        // containing documents from those collections and their subcollections are hydrated.
+        final collections = request.collections;
+        if (collections != null) {
+          for (final collection in collections) {
+            dataStores.addAll(
+              // Extract the file data store names associated with the collection and its subcollections
+              // from the collection index data store. This should be performant, as most collections do
+              // not have their own data stores and are bundled into their parent's data store, keeping the tree
+              // depth small.
+              Set.from(collectionDataStore.extractPath(collection.path).values)
+                  .map((name) => _fileDataStores[name]!),
+            );
+          }
+          // If no specific collections have been specified, then hydrate all file data stores.
+        } else {
+          dataStores.addAll(_fileDataStores.values);
+        }
 
-        // Attempt to hydrate the file data stores. If any are corrupt, they are returned as null and omitted
-        // from the document hydration.
-        final hydratedDataStores = await Future.wait(
-          files.map((file) => factory.fromFile(file)).map((dataStore) async {
-            try {
-              await dataStore.hydrate();
-              return dataStore;
-            } catch (e) {
-              _sendDebugResponse(
-                'Error hydrating collection: ${dataStore.name} $e',
-              );
-              return null;
-            }
-          }),
+        await Future.wait(
+          dataStores.map(
+            (dataStore) async {
+              try {
+                await dataStore.hydrate();
+                return dataStore;
+              } catch (e) {
+                logger.log('Error hydrating collection: ${dataStore.name} $e');
+                return dataStore;
+              }
+            },
+          ),
         );
-        final fileDataStores = hydratedDataStores.whereType<FileDataStore>();
 
-        // On hydration, the following actions must be performed for each file data store:
-        // 1. The data store should be added to the data store index.
-        // 2. Each of the data store's documents should be indexed into the document data store index by its collection and ID.
-        // 3. Each of the data store's documents should be grouped into the collection data store by collection.
-        for (final fileDataStore in fileDataStores) {
-          _fileDataStores[fileDataStore.name] = fileDataStore;
+        final Map<String, Json> data = {};
 
-          for (final documentDataEntry in fileDataStore.data.entries) {
-            final documentKey = documentDataEntry.key;
-            final [collection, documentId] = documentKey.split(':');
+        for (final dataStore in dataStores) {
+          final data = dataStore.extract();
 
-            final documentDataStore =
-                _documentDataStoreIndex[collection] ??= {};
-            documentDataStore[documentId] = fileDataStore;
-
-            final documentCollectionStore = collectionStore[collection] ??= {};
-            documentCollectionStore[documentId] = documentDataEntry.value;
+          // For each document extracted from the data stores, add it to the hydration data
+          // and index the document in the data store index.
+          for (final entry in data.entries) {
+            final docPath = entry.key;
+            data[entry.key] = entry.value;
+            _documentDataStoreIndex.write(docPath, dataStore);
           }
         }
 
-        _sendMessageResponse(request.success(collectionStore));
+        _sendMessageResponse(request.success(data));
       } catch (e) {
         _sendMessageResponse(request.error('Hydration error'));
       }
@@ -155,77 +190,104 @@ class FilePersistorWorker {
   }
 
   void _persist(PersistMessageRequest request) {
-    try {
-      _measureOperation('Persist operation', () async {
-        for (final doc in request.data) {
-          final docPath = doc.path;
-          final docJson = doc.data;
-          final documentDataStore = _fileDataStores[doc.dataStoreName] ??=
-              _documentDataStoreIndex.write(docPath, factory.fromDoc(doc));
+    logger.measure('Persist operation', () async {
+      for (final doc in request.data) {
+        final collectionPath = doc.collection;
+        final docPath = doc.path;
+        final docJson = doc.data;
+        final dataStoreName = doc.dataStoreName;
 
-          // If the document has changed the file data store it should be stored in, then it should
-          // be removed from its previous file data store (if one exists) and placed in the new one.
-          final prevDocumentDataStore = _documentDataStoreIndex.get(docPath);
-          if (documentDataStore != prevDocumentDataStore &&
-              prevDocumentDataStore != null) {
-            prevDocumentDataStore.removeDocument(doc);
-          }
+        final prevDocumentDataStore = _documentDataStoreIndex.get(docPath);
+        final documentDataStore =
+            _fileDataStores[doc.dataStoreName] ??= factory.fromDoc(doc);
 
-          if (docJson != null) {
-            documentDataStore.updateDocument(doc, docJson);
-            _documentDataStoreIndex.write(docPath, documentDataStore);
-          } else {
-            documentDataStore.removeDocument(doc);
-            _documentDataStoreIndex.delete(docPath);
+        // If this is the first reference to the given file data store for the document's collection,
+        // then add the data store to the collection index.
+        final dataStoreRefCount =
+            _documentDataStoreIndex.getRefCount(docPath, documentDataStore);
+        if (dataStoreRefCount == 0) {
+          final existingEntry =
+              collectionDataStore.getEntry(collectionPath) ?? [];
+          collectionDataStore.writeEntry(
+            doc.collection,
+            [
+              ...existingEntry,
+              dataStoreName,
+            ],
+          );
+        }
+
+        // If the document has changed the file data store it should be stored in, then it should
+        // be removed from its previous file data store (if one exists) and placed in the new one.
+        if (documentDataStore != prevDocumentDataStore &&
+            prevDocumentDataStore != null) {
+          prevDocumentDataStore.removeEntry(docPath);
+
+          final prevDataStoreRefCount = _documentDataStoreIndex.getRefCount(
+            docPath,
+            prevDocumentDataStore,
+          );
+
+          // If this was the last document in the collection referencing this data store, then
+          // remove the data store from the collection index.
+          if (prevDataStoreRefCount == 1) {
+            final existingEntry = collectionDataStore.getEntry(collectionPath);
+            if (existingEntry != null) {
+              if (existingEntry.length > 1) {
+                collectionDataStore.writeEntry(
+                  collectionPath,
+                  existingEntry..remove(dataStoreName),
+                );
+              } else {
+                collectionDataStore.removeEntry(collectionPath);
+              }
+            }
           }
         }
 
-        await _sync();
+        if (docJson != null) {
+          documentDataStore.writeEntry(docPath, docJson);
+          _documentDataStoreIndex.write(docPath, documentDataStore);
+        } else {
+          documentDataStore.removeEntry(docPath);
+          _documentDataStoreIndex.delete(docPath);
+        }
+      }
 
-        _sendMessageResponse(request.success());
-      });
-    } catch (e) {
-      _sendMessageResponse(request.error('Persist failed'));
-    }
+      await _sync();
+
+      _sendMessageResponse(request.success());
+    });
   }
 
   void _clear(ClearMessageRequest request) {
     final collection = request.collection;
 
-    _measureOperation('Clear operation', () async {
-      try {
-        for (final collectionEntry
-            in _documentDataStoreIndex.entries.toList()) {
-          final collectionName = collectionEntry.key;
-          final documentDataStoreIndex = collectionEntry.value;
+    logger.measure('Clear operation', () async {
+      // Remove the collection path from the document data store index.
+      _documentDataStoreIndex.delete(collection);
 
-          // Delete all documents from the cleared collection and its subcollections.
-          if (collectionName == collection ||
-              collectionName.startsWith('${collection}__')) {
-            for (final docEntry in documentDataStoreIndex.entries) {
-              final documentId = docEntry.key;
-              final documentDataStore = docEntry.value;
+      // Aggregate all data stores associated with the collection and its subcollections
+      // and remove the collection from each store.
+      final dataStores = collectionDataStore
+          .extractPath(collection)
+          .values
+          .expand((e) => e)
+          .toSet()
+          .map((name) => _fileDataStores[name]!);
 
-              documentDataStore.removeDocument('$collectionName:$documentId');
-            }
-
-            _documentDataStoreIndex.remove(collection);
-          }
-        }
-
-        await _sync();
-
-        _sendMessageResponse(request.success());
-      } catch (e) {
-        _sendMessageResponse(
-          request.error('Clear ${request.collection} failed'),
-        );
+      for (final dataStore in dataStores) {
+        dataStore.removeEntry(collection);
       }
+
+      await _sync();
+
+      _sendMessageResponse(request.success());
     });
   }
 
   void _clearAll(ClearAllMessageRequest request) {
-    _measureOperation('ClearAll operation', () async {
+    logger.measure('ClearAll operation', () async {
       try {
         final future = Future.wait(
           _fileDataStores.values.map((dataStore) => dataStore.delete()),
