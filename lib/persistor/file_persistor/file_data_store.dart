@@ -1,12 +1,12 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:encrypt/encrypt.dart';
-import 'package:loon/logger.dart';
 import 'package:loon/loon.dart';
-import 'package:loon/persistor/file_persistor/file_persist_document.dart';
 import 'package:path/path.dart' as path;
 
 final logger = Logger('FileDataStore');
+
+final fileRegex = RegExp(r'^(\w+)(?:\.(encrypted))?\.json$');
 
 class FileDataStore<T> {
   final File file;
@@ -40,6 +40,10 @@ class FileDataStore<T> {
 
   T? getEntry(String path) {
     return _store.get(path);
+  }
+
+  T? getNearestEntry(String path) {
+    return _store.getNearest(path);
   }
 
   void writeEntry(String path, T data) {
@@ -123,9 +127,62 @@ class FileDataStore<T> {
   Map<String, T> extractPath(String path) {
     return _store.extractPath(path);
   }
+
+  /// Grafts the data at the given [path] in the other [FileDataStore] onto
+  /// this data store at that path.
+  void graft(FileDataStore other, String path) {
+    _store.graft(other._store, path);
+  }
+
+  static FileDataStore<Json> parse(
+    File file, {
+    required Encrypter? encrypter,
+  }) {
+    final match = fileRegex.firstMatch(path.basename(file.path));
+    final name = match!.group(1)!;
+    final encryptionEnabled = match.group(2) != null;
+
+    if (encryptionEnabled) {
+      if (encrypter == null) {
+        throw 'Missing encrypter';
+      }
+
+      return EncryptedFileDataStore(
+        file: file,
+        name: "$name.encrypted",
+        encrypter: encrypter,
+      );
+    }
+
+    return FileDataStore(file: file, name: name);
+  }
+
+  static FileDataStore<Json> create(
+    String name, {
+    required bool encryptionEnabled,
+    required Directory directory,
+    required Encrypter? encrypter,
+  }) {
+    if (encryptionEnabled) {
+      if (encrypter == null) {
+        throw 'Missing encrypter';
+      }
+
+      return EncryptedFileDataStore(
+        file: File("${directory.path}/$name.encrypted.json"),
+        name: "$name.encrypted",
+        encrypter: encrypter,
+      );
+    }
+
+    return FileDataStore(
+      file: File("${directory.path}/$name.json"),
+      name: name,
+    );
+  }
 }
 
-class EncryptedFileDataStore extends FileDataStore {
+class EncryptedFileDataStore<T> extends FileDataStore<T> {
   final Encrypter encrypter;
 
   EncryptedFileDataStore({
@@ -155,65 +212,5 @@ class EncryptedFileDataStore extends FileDataStore {
   @override
   writeFile(String value) async {
     return super.writeFile(_encrypt(value));
-  }
-}
-
-/// A factory for building a [FileDataStore] on the worker.
-class FileDataStoreFactory {
-  final fileRegex = RegExp(r'^(\w+)(?:\.(encrypted))?\.json$');
-
-  final Encrypter? encrypter;
-
-  /// The directory in which a file data store is persisted.
-  final Directory directory;
-
-  FileDataStoreFactory({
-    required this.directory,
-    required this.encrypter,
-  });
-
-  FileDataStore fromFile(File file) {
-    final match = fileRegex.firstMatch(path.basename(file.path));
-    final name = match!.group(1)!;
-    final encryptionEnabled = match.group(2) != null;
-
-    if (encryptionEnabled) {
-      if (encrypter == null) {
-        throw 'Missing encrypter';
-      }
-
-      return EncryptedFileDataStore(
-        name: '$name.encrypted',
-        file: file,
-        encrypter: encrypter!,
-      );
-    }
-
-    return FileDataStore(
-      file: file,
-      name: name,
-    );
-  }
-
-  FileDataStore fromDoc(FilePersistDocument doc) {
-    final file = File("${directory.path}/${doc.dataStoreName}.json");
-    final name = doc.dataStoreName;
-
-    if (doc.encryptionEnabled) {
-      if (encrypter == null) {
-        throw 'Missing encrypter';
-      }
-
-      return EncryptedFileDataStore(
-        file: file,
-        name: name,
-        encrypter: encrypter!,
-      );
-    }
-
-    return FileDataStore(
-      file: file,
-      name: name,
-    );
   }
 }

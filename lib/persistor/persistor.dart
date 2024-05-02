@@ -1,6 +1,6 @@
 part of loon;
 
-typedef SerializedCollectionStore = Map<String, Map<String, Json>>;
+typedef HydrationData = Map<String, Json>;
 
 class PersistorSettings<T> {
   final bool persistenceEnabled;
@@ -11,17 +11,19 @@ class PersistorSettings<T> {
 }
 
 /// Abstract persistor that implements the base persistence batching, de-duping and locking of
-/// persistence operations and exposes the public persistence APIs for persistence implementations to implement.
+/// persistence operations. Exposes the public persistence APIs for persistence implementations to implement.
 /// See [FilePersistor] as an example implementation.
 abstract class Persistor {
   final Duration persistenceThrottle;
   final PersistorSettings settings;
   final void Function(List<Document> batch)? onPersist;
-  final void Function(String collection)? onClear;
+  final void Function(Collection collection)? onClear;
   final void Function()? onClearAll;
-  final void Function(SerializedCollectionStore data)? onHydrate;
+  final void Function(HydrationData data)? onHydrate;
 
   final Set<Document> _batch = {};
+
+  final _logger = Logger('Persistor');
 
   /// The operation queue ensures that operations (init, hydrate, persist, clear) are blocking and
   /// that only one is ever running at a time, not concurrently.
@@ -71,10 +73,10 @@ abstract class Persistor {
     }
   }
 
-  Future<void> _clear(String key) {
+  Future<void> _clear(Collection collection) {
     return _runOperation(() async {
-      await clear(key);
-      onClear?.call(key);
+      await clear(collection);
+      onClear?.call(collection);
     });
   }
 
@@ -85,7 +87,7 @@ abstract class Persistor {
     });
   }
 
-  Future<SerializedCollectionStore> _hydrate() {
+  Future<HydrationData> _hydrate() {
     return _runOperation(() async {
       final result = await hydrate();
       onHydrate?.call(result);
@@ -125,7 +127,7 @@ abstract class Persistor {
 
   void _persistDoc(Document doc) {
     if (!doc.isPersistenceEnabled()) {
-      printDebug('Persistence not enabled for document: ${doc.id}');
+      _logger.log('Persistence not enabled for document: ${doc.id}');
       return;
     }
 
@@ -137,15 +139,24 @@ abstract class Persistor {
     _schedulePersist();
   }
 
+  ///
   /// Public APIs to be implemented by any [Persistor] extension like [FilePersistor].
+  ///
 
+  /// Initialization function called when the persistor is instantiated to execute and setup work.
   Future<void> init();
 
+  /// Persist function called with the list of documents that have changed (including been deleted).
   Future<void> persist(List<Document> docs);
 
-  Future<SerializedCollectionStore> hydrate();
+  /// Hydration function called to read data from persistence. If no collections are specified,
+  /// then it hydrations all persisted data. if collections are specified, it hydrates only the data from those
+  /// collections and their subcollections.
+  Future<HydrationData> hydrate([List<Collection>? collections]);
 
-  Future<void> clear(String collection);
+  /// Clear function used to clear all documents in a collection.
+  Future<void> clear(Collection collection);
 
+  /// Clears all documents and removes all persisted data.
   Future<void> clearAll();
 }

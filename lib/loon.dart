@@ -22,6 +22,7 @@ part 'persistor/persistor.dart';
 part 'document_change_snapshot.dart';
 part 'broadcast_manager.dart';
 part 'utils.dart';
+part 'logger.dart';
 
 class Loon {
   Persistor? persistor;
@@ -40,6 +41,8 @@ class Loon {
   final Map<Document, Set<Document>> dependentsStore = {};
 
   final broadcastManager = BroadcastManager();
+
+  final logger = Logger('Loon');
 
   bool enableLogging = false;
 
@@ -183,7 +186,7 @@ class Loon {
     broadcastManager.deleteCollection(collection);
     documentStore.delete(path);
     dependenciesStore.delete(path);
-    // persistor?.delete(path);
+    persistor?._clear(collection);
   }
 
   /// On write of a snapshot, the dependencies manager updates the dependencies
@@ -261,7 +264,7 @@ class Loon {
 
   static Future<void> hydrate() async {
     if (_instance.persistor == null) {
-      printDebug('Hydration skipped - no persistor specified');
+      _instance.logger.log('Hydration skipped - no persistor specified');
       return;
     }
     try {
@@ -282,7 +285,7 @@ class Loon {
       }
     } catch (e) {
       // ignore: avoid_print
-      printDebug('Error hydrating');
+      _instance.logger.log('Error hydrating');
       rethrow;
     }
   }
@@ -291,7 +294,7 @@ class Loon {
     String id, {
     FromJson<T>? fromJson,
     ToJson<T>? toJson,
-    PersistorSettings? persistorSettings,
+    PersistorSettings<T>? persistorSettings,
   }) {
     return collection<T>(
       _rootKey,
@@ -305,7 +308,7 @@ class Loon {
     String name, {
     FromJson<T>? fromJson,
     ToJson<T>? toJson,
-    PersistorSettings? persistorSettings,
+    PersistorSettings<T>? persistorSettings,
     DependenciesBuilder<T>? dependenciesBuilder,
   }) {
     return Document.root.subcollection<T>(

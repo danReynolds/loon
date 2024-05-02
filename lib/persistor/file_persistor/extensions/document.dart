@@ -1,25 +1,20 @@
 import 'package:loon/loon.dart';
 import 'package:loon/persistor/file_persistor/file_persist_document.dart';
+import 'package:loon/persistor/file_persistor/file_persistor_settings.dart';
 
 extension DocumentExtensions<T> on Document<T> {
-  /// Returns the name of a file data store name for a given document and its persistor settings.
-  /// Uses the custom persistence key of the document if specified in its persistor settings,
-  /// otherwise it defaults to the document's collection name.
-  String getDatastoreName() {
-    String dataStoreName;
+  FilePersistorKey? getPersistenceKey() {
     final documentSettings = persistorSettings;
-
     if (documentSettings is FilePersistorSettings) {
-      dataStoreName = documentSettings.getPersistenceKey?.call(this) ?? parent;
-
-      if (isEncryptionEnabled()) {
-        dataStoreName += '.encrypted';
-      }
-    } else {
-      dataStoreName = parent;
+      return switch (documentSettings.key) {
+        FilePersistorCollectionKeyBuilder builder => builder.build(),
+        FilePersistorDocumentKeyBuilder(builder: final builder) =>
+          builder(get()!),
+        _ => null,
+      };
     }
 
-    return dataStoreName;
+    return null;
   }
 
   /// Returns whether encryption is enabled for this document.
@@ -30,9 +25,10 @@ extension DocumentExtensions<T> on Document<T> {
 
   FilePersistDocument toPersistenceDoc() {
     return FilePersistDocument(
-      path: path,
+      id: id,
+      parent: parent,
       encryptionEnabled: isEncryptionEnabled(),
-      dataStoreName: getDatastoreName(),
+      key: getPersistenceKey(),
       data: getJson(),
     );
   }

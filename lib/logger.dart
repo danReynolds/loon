@@ -1,5 +1,4 @@
-import 'package:flutter/foundation.dart';
-import 'package:loon/loon.dart';
+part of loon;
 
 class Logger {
   final String name;

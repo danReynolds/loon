@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:loon/loon.dart';
 import 'test_user_model.dart';
 
@@ -15,15 +13,13 @@ class TestPersistor extends Persistor {
   });
 
   @override
-  Future<SerializedCollectionStore> hydrate() async {
-    return {
-      "users": seedData.fold({}, (acc, doc) {
-        return {
-          ...acc,
-          doc.id: doc.data.toJson(),
-        };
-      }),
-    };
+  hydrate([collections]) async {
+    return seedData.fold<HydrationData>({}, (acc, doc) {
+      return {
+        ...acc,
+        doc.id: doc.data.toJson(),
+      };
+    });
   }
 
   @override

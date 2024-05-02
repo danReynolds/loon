@@ -1,4 +1,5 @@
 import 'package:loon/loon.dart';
+import 'package:loon/persistor/file_persistor/file_persistor_settings.dart';
 
 /// A file data store document is a minimal data model that is sent to the [FilePersistorWorker]
 /// isolate and persisted in the [FileDataStore] of name [dataStoreName] with the updated document data.
@@ -8,15 +9,14 @@ import 'package:loon/loon.dart';
 /// the [Loon] instance which shouldn't be accessed in the isolate.
 class FilePersistDocument {
   /// The document collection path.
-  final String collection;
+  final String parent;
 
   /// The document ID.
   final String id;
 
-  /// The name of the file data store that the document should be persisted in. If not specified,
-  /// then the document is to be persisted in the data store associated with its nearest parent collection
-  /// that has specified a data store. All top-level collections specify a data store by default.
-  final String? dataStoreName;
+  /// The persistence key to use for the document. If not specified, defaults to the
+  /// document's top-level collection key.
+  final FilePersistorKey? key;
 
   /// The updated document data.
   final Json? data;
@@ -26,13 +26,13 @@ class FilePersistDocument {
 
   FilePersistDocument({
     required this.id,
-    required this.collection,
-    required this.dataStoreName,
+    required this.parent,
+    required this.key,
     required this.data,
     required this.encryptionEnabled,
   });
 
   String get path {
-    return "${collection}__$id";
+    return "${parent}__$id";
   }
 }

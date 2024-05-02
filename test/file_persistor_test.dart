@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:loon/loon.dart';
+import 'package:loon/persistor/file_persistor/file_persistor_settings.dart';
 
 // ignore: depend_on_referenced_packages
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
@@ -13,6 +14,8 @@ import 'models/test_user_model.dart';
 import 'utils.dart';
 
 late Directory testDirectory;
+
+final logger = Logger('FilePersistorTest');
 
 class MockPathProvider extends Fake
     with MockPlatformInterfaceMixin
@@ -183,17 +186,17 @@ void main() {
     test(
       'Persists documents by their persistence key',
       () async {
-        final userCollection = Loon.collection(
+        final userCollection = Loon.collection<TestUserModel>(
           'users',
           fromJson: TestUserModel.fromJson,
           toJson: (user) => user.toJson(),
           persistorSettings: FilePersistorSettings(
-            getPersistenceKey: (doc) {
-              if (doc.id == '1') {
+            key: FilePersistor.keyBuilder((snap) {
+              if (snap.id == '1') {
                 return 'users';
               }
               return 'other_users';
-            },
+            }),
           ),
         );
 
@@ -227,17 +230,19 @@ void main() {
     test(
       'Moves documents that change persistence files',
       () async {
-        final userCollection = Loon.collection(
+        final userCollection = Loon.collection<TestUserModel>(
           'users',
           fromJson: TestUserModel.fromJson,
           toJson: (user) => user.toJson(),
           persistorSettings: FilePersistorSettings(
-            getPersistenceKey: (doc) {
-              if (doc.get()?.data.name.endsWith('updated')) {
-                return 'updated_users';
-              }
-              return 'users';
-            },
+            key: FilePersistor.keyBuilder(
+              (snap) {
+                if (snap.data.name.endsWith('updated')) {
+                  return 'updated_users';
+                }
+                return 'users';
+              },
+            ),
           ),
         );
 
@@ -368,7 +373,7 @@ void main() {
         toJson: (user) => user.toJson(),
       );
 
-      final collectionSize = await measureDuration(
+      final collectionSize = await logger.measure(
         'Initial collection query',
         () async {
           return largeModelCollection.get().length;
@@ -416,14 +421,12 @@ void main() {
       test(
         "Deletes all of the collection's data stores",
         () async {
-          final userCollection = Loon.collection(
+          final userCollection = Loon.collection<TestUserModel>(
             'users',
             fromJson: TestUserModel.fromJson,
             toJson: (user) => user.toJson(),
             persistorSettings: FilePersistorSettings(
-              getPersistenceKey: (snap) {
-                return 'users${snap.id}';
-              },
+              key: FilePersistor.keyBuilder((snap) => 'users${snap.id}'),
             ),
           );
 
@@ -497,14 +500,12 @@ void main() {
             fromJson: TestUserModel.fromJson,
             toJson: (user) => user.toJson(),
           );
-          final friendsCollection = Loon.collection(
+          final friendsCollection = Loon.collection<TestUserModel>(
             'friends',
             fromJson: TestUserModel.fromJson,
             toJson: (user) => user.toJson(),
             persistorSettings: FilePersistorSettings(
-              getPersistenceKey: (snap) {
-                return 'users';
-              },
+              key: FilePersistor.key('users'),
             ),
           );
 

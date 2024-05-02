@@ -59,6 +59,45 @@ class IndexedValueStore<T> {
     return node;
   }
 
+  /// Merges the values and child keys of the given other node into the given node.
+  Map _mergeNode(Map node, Map otherNode) {
+    for (final entry in otherNode.entries) {
+      final key = entry.key;
+
+      if (key == _values) {
+        if (node.containsKey(_values)) {
+          node[_values] = {
+            ...(node[_values] as Map),
+            ...entry.value,
+          };
+        } else {
+          node[_values] = entry.value;
+        }
+      } else if (node.containsKey(key)) {
+        node[key] = _mergeNode(node[key], otherNode[key]);
+      } else {
+        node[key] = entry.value;
+      }
+    }
+
+    return node;
+  }
+
+  /// Writes an empty node at the given path if a node does not already exist.
+  Map _touch(Map node, List<String> segments, int index) {
+    final child = node[segments[index]] ??= {};
+
+    if (index < segments.length - 1) {
+      return _touch(child, segments, index + 1);
+    }
+
+    return child;
+  }
+
+  Map touch(String path) {
+    return _touch(_store, path.split(_delimiter), 0);
+  }
+
   /// Returns the value for the given path.
   T? get(String path) {
     final segments = path.split(_delimiter);
@@ -208,5 +247,22 @@ class IndexedValueStore<T> {
     }
 
     return _extract(node, path);
+  }
+
+  /// Removes the subtree at the given [path] of the other provided [IndexedValueStore] and recursively
+  /// merges it onto this store at the given path.
+  void graft(
+    IndexedValueStore other,
+    String path,
+  ) {
+    final otherNode = _getNode(other._store, path.split(_delimiter), 0);
+    if (otherNode == null || otherNode.isEmpty) {
+      return;
+    }
+    other.delete(path);
+
+    final node = _getNode(_store, path.split(_delimiter), 0) ?? touch(path);
+
+    _mergeNode(node, otherNode);
   }
 }

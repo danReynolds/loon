@@ -51,9 +51,9 @@ class InitMessageResponse extends MessageResponse {
 }
 
 class HydrateMessageRequest extends MessageRequest<HydrateMessageResponse> {
-  final List<Collection>? collections;
+  final List<String>? paths;
 
-  HydrateMessageRequest([this.collections]);
+  HydrateMessageRequest([this.paths]);
 
   HydrateMessageResponse success(Map<String, Json> data) {
     return HydrateMessageResponse(
@@ -92,10 +92,10 @@ class PersistMessageResponse extends MessageResponse {
 }
 
 class ClearMessageRequest extends MessageRequest<ClearMessageResponse> {
-  final String collection;
+  final String path;
 
   ClearMessageRequest({
-    required this.collection,
+    required this.path,
   });
 
   ClearMessageResponse success() {
@@ -130,10 +130,10 @@ class ErrorMessageResponse extends MessageResponse {
   });
 }
 
-class DebugMessageResponse extends MessageResponse {
+class LogMessageResponse extends MessageResponse {
   final String text;
 
-  DebugMessageResponse({
+  LogMessageResponse({
     required this.text,
   }) : super(id: '');
 }

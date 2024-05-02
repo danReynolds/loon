@@ -48,7 +48,7 @@ class Collection<T> {
 
   Document<T> doc(String id) {
     return Document<T>(
-      path,
+      parent,
       id,
       fromJson: fromJson,
       toJson: toJson,
