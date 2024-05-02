@@ -23,7 +23,7 @@ class FileDataStoreManager {
   /// in which the documents are stored. It is necessary since the hydration of a particular
   /// collection, for example, needs to know all of the data stores that contain documents
   /// of that collection and its subcollections. The resolver maintains this mapping.
-  late final FileDataStore<String> resolver;
+  late final ResolverFileDataStore resolver;
 
   FileDataStoreManager({
     required this.directory,
@@ -32,11 +32,10 @@ class FileDataStoreManager {
 
   /// Returns the set of [FileDataStore] that contain documents under the given path.
   Set<FileDataStore> _resolve(String path) {
-    // Traversing the resolver tree to extract the set of data stores referencing a give path should be performant
-    // since the resolver tree scales O(n) where n is the number of file data stores and there should not be many distinct stores.
-    return Set.from(resolver.extractPath(path).values)
-        .map((name) => index[name]!)
-        .toSet();
+    // Traversing the resolver tree to extract the set of data stores referencing a give path and its subpaths
+    // is generally performant, since the number of nodes traversed in the resolver tree scales O(n*m) where n is the number
+    // of collections that specify a custom persistence key (small) and m is the number of distinct file data stores (also small).
+    return resolver.extractRefs(path).keys.map((name) => index[name]!).toSet();
   }
 
   /// Syncs all dirty file data stores, updating and deleting them as necessary.
@@ -44,7 +43,7 @@ class FileDataStoreManager {
     return Future.wait(
       [
         ...index.values,
-        resolver,
+        resolver as FileDataStore,
       ].map((dataStore) async {
         if (!dataStore.isDirty) {
           return;
@@ -75,7 +74,7 @@ class FileDataStoreManager {
   }
 
   Future<void> init() async {
-    resolver = FileDataStore(
+    resolver = ResolverFileDataStore(
       file: File("${directory.path}/$_resolverKey"),
       name: _resolverKey,
     );

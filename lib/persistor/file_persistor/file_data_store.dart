@@ -12,7 +12,7 @@ class FileDataStore<T> {
   final File file;
   final String name;
 
-  var _store = IndexedValueStore<T>();
+  final _store = IndexedValueStore<T>();
 
   /// Whether the file data store has pending changes that should be persisted.
   bool isDirty = false;
@@ -89,7 +89,7 @@ class FileDataStore<T> {
       await logger.measure(
         'Parse data store $name',
         () async {
-          _store = jsonDecode(fileStr);
+          _store.hydrate(jsonDecode(fileStr));
         },
       );
       isHydrated = true;
@@ -122,10 +122,6 @@ class FileDataStore<T> {
 
   Map<String, T> extract() {
     return _store.extract();
-  }
-
-  Map<String, T> extractPath(String path) {
-    return _store.extractPath(path);
   }
 
   /// Grafts the data at the given [path] in the other [FileDataStore] onto
@@ -212,5 +208,21 @@ class EncryptedFileDataStore<T> extends FileDataStore<T> {
   @override
   writeFile(String value) async {
     return super.writeFile(_encrypt(value));
+  }
+}
+
+/// A resolver file data store is a variant of a [FileDataStore] used to store the mapping
+/// of documents to the data stores in which those documents are stored. It uses an [IndexedRefValueStore]
+/// instead of an [IndexedValueStore] for more efficient determination of the set of values referenced under
+/// a given path in the store.
+class ResolverFileDataStore extends FileDataStore<String> {
+  @override
+  // ignore: overridden_fields
+  final IndexedRefValueStore<String> _store = IndexedRefValueStore<String>();
+
+  ResolverFileDataStore({required super.file, required super.name});
+
+  Map<String, int> extractRefs([String? path]) {
+    return _store.extractRefs(path);
   }
 }

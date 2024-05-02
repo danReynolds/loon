@@ -9,7 +9,6 @@ export 'persistor/file_persistor/file_persistor.dart';
 
 part 'store/path_ref_store.dart';
 part 'store/indexed_value_store.dart';
-part 'store/indexed_ref_value_store.dart';
 part 'broadcast_observer.dart';
 part 'query.dart';
 part 'observable_query.dart';
