@@ -269,20 +269,20 @@ class IndexedValueStore<T> {
       // necessary for also grafting the final node's value from the parent node.
       final lastSegment = segments.removeLast();
 
-      final node = _getNode(_store, segments, 0)!;
-      final otherNode = _getNode(other._store, segments, 0);
+      final parent = _getNode(_store, segments, 0)!;
+      final otherParent = _getNode(other._store, segments, 0);
 
-      if (otherNode == null || otherNode.isEmpty) {
+      if (otherParent == null || otherParent.isEmpty) {
         return;
       }
 
-      if (otherNode[_values]?.containsKey(lastSegment) ?? false) {
-        node[_values] ??= {};
-        node[_values][lastSegment] = otherNode[_values][lastSegment];
+      if (otherParent[_values]?.containsKey(lastSegment) ?? false) {
+        parent[_values] ??= {};
+        parent[_values][lastSegment] = otherParent[_values][lastSegment];
       }
 
-      final child = node[lastSegment];
-      final otherChild = otherNode[lastSegment];
+      final child = parent[lastSegment];
+      final otherChild = otherParent[lastSegment];
 
       if (otherChild == null) {
         return;
@@ -401,29 +401,43 @@ class IndexedRefValueStore<T> extends IndexedValueStore<T> {
   }
 
   /// Extracts a map of the values with their ref count that exist under a given path.
-  Map<T, int> extractRefs([String? path]) {
-    final segments = path?.split(IndexedValueStore._delimiter) ?? [];
-    final node = segments.isEmpty ? _store : _getNode(_store, segments, 0);
-
-    if (node == null) {
-      return {};
-    }
-
+  Map<T, int> extractRefs([String path = '']) {
     final Map<T, int> index = {};
 
-    // If the path provided has its own value, then the ref count must include
-    // a count for the initial node's value.
-    if (segments.isNotEmpty && node.containsKey(IndexedValueStore._values)) {
+    if (path.isEmpty) {
+      for (final key in _store.keys) {
+        if (key != _refs && key != IndexedValueStore._values) {
+          _extractRefs(_store[key], index);
+        }
+      }
+      return index;
+    }
+
+    final segments = path.split(IndexedValueStore._delimiter);
+    final parent =
+        _getNode(_store, segments.sublist(0, segments.length - 1), 0);
+    if (parent == null) {
+      return index;
+    }
+
+    // If the parent node has the final path segment as a value, then the ref count must include
+    // a count for the final node's value.
+    if (parent.containsKey(IndexedValueStore._values)) {
       final segment = segments.last;
-      if (node[IndexedValueStore._values].containsKey(segment)) {
-        final value = node[IndexedValueStore._values][segment];
+      if (parent[IndexedValueStore._values].containsKey(segment)) {
+        final value = parent[IndexedValueStore._values][segment];
         index[value] = 1;
       }
     }
 
-    for (final key in node.keys) {
+    final child = parent[segments.last];
+    if (child == null) {
+      return index;
+    }
+
+    for (final key in child.keys) {
       if (key != _refs && key != IndexedValueStore._values) {
-        _extractRefs(node[key], index);
+        _extractRefs(child[key], index);
       }
     }
 

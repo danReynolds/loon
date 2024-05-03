@@ -222,7 +222,7 @@ class ResolverFileDataStore extends FileDataStore<String> {
 
   ResolverFileDataStore({required super.file, required super.name});
 
-  Map<String, int> extractRefs([String? path]) {
+  Map<String, int> extractRefs([String path = '']) {
     return _store.extractRefs(path);
   }
 }
