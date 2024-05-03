@@ -42,21 +42,17 @@ class IndexedValueStore<T> {
   static const _values = '__values';
 
   /// Returns the node at the given path.
-  Map? _getNode(Map node, List<String> segments, int index) {
-    if (segments.isEmpty) {
-      return null;
+  Map? _getNode(Map? node, List<String> segments, int index) {
+    if (node == null || index == segments.length) {
+      return node;
     }
 
-    if (index < segments.length - 1) {
-      final Map? child = node[segments[index]];
-      if (child == null) {
-        return null;
-      }
-
-      return _getNode(child, segments, index + 1);
+    final segment = segments[index];
+    if (segment.isEmpty) {
+      return node;
     }
 
-    return node;
+    return _getNode(node[segment], segments, index + 1);
   }
 
   /// Merges the values and child keys of the given other node into the given node.
@@ -101,24 +97,27 @@ class IndexedValueStore<T> {
   /// Returns the value for the given path.
   T? get(String path) {
     final segments = path.split(_delimiter);
-    return _getNode(_store, segments, 0)?[_values]?[segments.last];
+    return _getNode(
+      _store,
+      segments.isEmpty ? segments : segments.sublist(0, segments.length - 1),
+      0,
+    )?[_values][segments.last];
   }
 
-  T? _getNearest(Map node, List<String> segments, int index) {
+  T? _getNearest(Map? node, List<String> segments, int index) {
+    if (node == null) {
+      return null;
+    }
+
     if (index < segments.length - 1) {
       final segment = segments[index];
-      final Map? child = node[segment];
-      if (child == null) {
-        return null;
-      }
 
-      final value = _getNearest(child, segments, index + 1);
-
+      final value = _getNearest(node[segment], segments, index + 1);
       if (value != null) {
         return value;
       }
 
-      return node[_values][segment];
+      return node[_values]?[segment];
     }
 
     return node[_values][segments[index]];
@@ -161,12 +160,16 @@ class IndexedValueStore<T> {
         return false;
       }
 
-      if (_delete(child, segments, index + 1) && node.length == 1) {
-        if (index == 0) {
-          node.remove(segment);
+      if (_delete(child, segments, index + 1)) {
+        if (node.length == 1) {
+          if (index == 0) {
+            node.remove(segment);
+          }
+
+          return true;
         }
 
-        return true;
+        node.remove(segment);
       }
       return false;
     }
@@ -187,6 +190,11 @@ class IndexedValueStore<T> {
   }
 
   void delete(String path) {
+    if (path.isEmpty) {
+      _store = {};
+      return;
+    }
+
     _delete(_store, path.split(_delimiter), 0);
   }
 
@@ -201,7 +209,7 @@ class IndexedValueStore<T> {
   }
 
   void clear() {
-    _store.clear();
+    _store = {};
   }
 
   bool get isEmpty {
@@ -213,9 +221,9 @@ class IndexedValueStore<T> {
   }
 
   Map<String, T> _extract(
-    Map node, [
+    Map node,
+    Map<String, T> index, [
     String path = '',
-    Map<String, T> index = const {},
   ]) {
     if (node.containsKey(_values)) {
       for (final entry in node[_values].entries) {
@@ -227,7 +235,7 @@ class IndexedValueStore<T> {
     for (final key in node.keys) {
       if (key != _values) {
         final childPath = path.isEmpty ? key : "${path}__$key";
-        _extract(node[key], childPath, index);
+        _extract(node[key], index, childPath);
       }
     }
 
@@ -236,24 +244,52 @@ class IndexedValueStore<T> {
 
   /// Extracts all values from the store into a set of flat key-value pairs of paths to values.
   Map<String, T> extract() {
-    return _extract(_store);
+    return _extract(_store, {});
   }
 
   /// Removes the subtree at the given [path] of the other provided [IndexedValueStore] and recursively
   /// merges it onto this store at the given path.
   void graft(
-    IndexedValueStore other,
-    String path,
-  ) {
-    final otherNode = _getNode(other._store, path.split(_delimiter), 0);
-    if (otherNode == null || otherNode.isEmpty) {
-      return;
+    IndexedValueStore other, [
+    String path = '',
+  ]) {
+    if (path.isEmpty) {
+      final otherNode = other._store;
+
+      other.clear();
+
+      _mergeNode(_store, otherNode);
+    } else {
+      // Initialize the nodes of the given path in this store.
+      touch(path);
+
+      final segments = path.split(_delimiter);
+      // Remove the last segment from the path so that resolved node is the
+      // parent node of the node corresponding to the final path segment. This is
+      // necessary for also grafting the final node's value from the parent node.
+      final lastSegment = segments.removeLast();
+
+      final node = _getNode(_store, segments, 0)!;
+      final otherNode = _getNode(other._store, segments, 0);
+
+      if (otherNode == null || otherNode.isEmpty) {
+        return;
+      }
+
+      if (otherNode[_values]?.containsKey(lastSegment) ?? false) {
+        node[_values] ??= {};
+        node[_values][lastSegment] = otherNode[_values][lastSegment];
+      }
+
+      final child = node[lastSegment];
+      final otherChild = otherNode[lastSegment];
+
+      if (otherChild == null) {
+        return;
+      }
+
+      _mergeNode(child, otherChild);
     }
-    other.delete(path);
-
-    final node = _getNode(_store, path.split(_delimiter), 0) ?? touch(path);
-
-    _mergeNode(node, otherNode);
   }
 
   /// Hydrates a store from serialized data.
