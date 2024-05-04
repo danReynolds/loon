@@ -5,13 +5,16 @@ import 'package:loon/persistor/file_persistor/file_persistor_settings.dart';
 extension DocumentExtensions<T> on Document<T> {
   FilePersistorKey? getPersistenceKey() {
     final documentSettings = persistorSettings;
-    if (documentSettings is FilePersistorSettings) {
-      return switch (documentSettings.key) {
-        FilePersistorCollectionKeyBuilder builder => builder.build(),
-        FilePersistorDocumentKeyBuilder(builder: final builder) =>
-          builder(get()!),
-        _ => null,
-      };
+    if (documentSettings is FilePersistorSettings<T>) {
+      final key = documentSettings.key;
+
+      if (key is FilePersistorDocumentKeyBuilder<T>) {
+        return (key as FilePersistorDocumentKeyBuilder).build(get()!);
+      }
+
+      if (key is FilePersistorCollectionKeyBuilder<T>) {
+        return key.build();
+      }
     }
 
     return null;
@@ -19,12 +22,17 @@ extension DocumentExtensions<T> on Document<T> {
 
   /// Returns whether encryption is enabled for this document.
   bool isEncryptionEnabled() {
-    return persistorSettings is FilePersistorSettings &&
-        (persistorSettings as FilePersistorSettings).encryptionEnabled;
+    final settings = persistorSettings ?? Loon.persistorSettings;
+
+    if (settings is FilePersistorSettings) {
+      return settings.encryptionEnabled;
+    }
+
+    return false;
   }
 
-  FilePersistDocument toPersistenceDoc() {
-    return FilePersistDocument(
+  FilePersistDocument<T> toPersistenceDoc() {
+    return FilePersistDocument<T>(
       id: id,
       parent: parent,
       encryptionEnabled: isEncryptionEnabled(),

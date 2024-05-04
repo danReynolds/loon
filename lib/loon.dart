@@ -55,7 +55,7 @@ class Loon {
     DocumentSnapshot snap, {
     required FromJson<T>? fromJson,
     required ToJson<T>? toJson,
-    required PersistorSettings? persistorSettings,
+    required PersistorSettings<T>? persistorSettings,
     required DependenciesBuilder<T>? dependenciesBuilder,
   }) {
     if (snap is DocumentSnapshot<Json> && T != Json && T != dynamic) {
@@ -342,5 +342,9 @@ class Loon {
 
   static bool get isLoggingEnabled {
     return _instance.enableLogging;
+  }
+
+  static PersistorSettings? get persistorSettings {
+    return _instance.persistor?.settings;
   }
 }

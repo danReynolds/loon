@@ -7,7 +7,7 @@ class Document<T> {
   final String parent;
   final FromJson<T>? fromJson;
   final ToJson<T>? toJson;
-  final PersistorSettings? _persistorSettings;
+  final PersistorSettings<T>? persistorSettings;
   final DependenciesBuilder<T>? dependenciesBuilder;
 
   Document(
@@ -15,9 +15,9 @@ class Document<T> {
     this.id, {
     this.fromJson,
     this.toJson,
-    PersistorSettings? persistorSettings,
+    this.persistorSettings,
     this.dependenciesBuilder,
-  }) : _persistorSettings = persistorSettings;
+  });
 
   @override
   bool operator ==(Object other) {
@@ -49,7 +49,7 @@ class Document<T> {
     String name, {
     FromJson<S>? fromJson,
     ToJson<S>? toJson,
-    PersistorSettings? persistorSettings,
+    PersistorSettings<S>? persistorSettings,
     DependenciesBuilder<S>? dependenciesBuilder,
   }) {
     return Collection<S>(
@@ -166,14 +166,11 @@ class Document<T> {
   }
 
   bool isPersistenceEnabled() {
-    return persistorSettings?.persistenceEnabled ?? false;
+    return persistorSettings?.persistenceEnabled ??
+        Loon._instance._isGlobalPersistenceEnabled;
   }
 
   bool isPendingBroadcast() {
     return Loon._instance.broadcastManager.store.has(path);
-  }
-
-  PersistorSettings? get persistorSettings {
-    return _persistorSettings ?? Loon._instance.persistor?.settings;
   }
 }

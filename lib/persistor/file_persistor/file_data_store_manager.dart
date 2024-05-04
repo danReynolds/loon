@@ -30,7 +30,7 @@ class FileDataStoreManager {
     this.encrypter,
   });
 
-  /// Returns the set of [FileDataStore] that contain documents under the given path.
+  /// Resolves the set of [FileDataStore] that contain documents under the given path.
   Set<FileDataStore> _resolve(String path) {
     // Traversing the resolver tree to extract the set of data stores referencing a give path and its subpaths
     // is generally performant, since the number of nodes traversed in the resolver tree scales O(n*m) where n is the number
@@ -60,12 +60,11 @@ class FileDataStoreManager {
   }
 
   /// Clears the provided path and all of its subpaths from the data stores that reference
-  /// those paths.
+  /// that path tree.
   Future<void> _clear(String path) async {
+    // Remove the path from each store that had references to data under that path.
     final stores = _resolve(path);
-
     for (final store in stores) {
-      // Remove the path from each store that had references to data at and under that path.
       store.removeEntry(path);
     }
 
@@ -75,7 +74,7 @@ class FileDataStoreManager {
 
   Future<void> init() async {
     resolver = ResolverFileDataStore(
-      file: File("${directory.path}/$_resolverKey"),
+      file: File("${directory.path}/$_resolverKey.json"),
       name: _resolverKey,
     );
 
@@ -151,6 +150,11 @@ class FileDataStoreManager {
 
       // If the document has been deleted, then clear it and its subcollections from the store.
       if (docData == null) {
+        // Remove the document from its associated data store.
+        final dataStoreName = resolver.getNearestEntry(docPath);
+        index[dataStoreName]?.removeEntry(docPath);
+
+        // Clear any data under this document's path.
         _clear(docPath);
         continue;
       }
@@ -173,20 +177,22 @@ class FileDataStoreManager {
           directory: directory,
         );
 
-        // If the persistence key for the path has changed, then all of the data
-        // under that path needs to be moved to the destination data store.
-        if (prevDataStoreName != null && prevDataStoreName != dataStoreName) {
-          final prevDataStore = index[prevDataStoreName];
-          if (prevDataStore != null) {
-            dataStore.graft(prevDataStore, path);
+        if (prevDataStoreName != dataStoreName) {
+          // If the persistence key for the path has changed, then all of the data
+          // under that path needs to be moved to the destination data store.
+          if (prevDataStoreName != null) {
+            final prevDataStore = index[prevDataStoreName];
+            if (prevDataStore != null) {
+              dataStore.graft(prevDataStore, path);
 
-            // Remove the document itself from the previous data store.
-            prevDataStore.removeEntry(docPath);
+              // Remove the document itself from the previous data store.
+              prevDataStore.removeEntry(docPath);
+            }
           }
-        }
 
-        // Update the resolver for this path to the new data store.
-        resolver.writeEntry(path, dataStoreName);
+          // Update the resolver for this path to the updated data store name.
+          resolver.writeEntry(path, dataStoreName);
+        }
       } else {
         // If the document does not specify a persistence key, then its data store is resolved to the nearest data store
         // found in the resolver tree moving up from the document path. If no data store exists in this path yet, then the
@@ -211,7 +217,7 @@ class FileDataStoreManager {
         );
       }
 
-      // Once the document's data store has been determined, it can be written to the resolved store.
+      // Once the document's data store has been determined, it can be written to its resolved store.
       dataStore.writeEntry(docPath, docData);
     }
 

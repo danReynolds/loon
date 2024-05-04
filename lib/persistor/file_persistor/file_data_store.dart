@@ -11,8 +11,7 @@ final fileRegex = RegExp(r'^(\w+)(?:\.(encrypted))?\.json$');
 class FileDataStore<T> {
   final File file;
   final String name;
-
-  final _store = IndexedValueStore<T>();
+  late final IndexedValueStore<T> _store;
 
   /// Whether the file data store has pending changes that should be persisted.
   bool isDirty = false;
@@ -22,7 +21,10 @@ class FileDataStore<T> {
   FileDataStore({
     required this.file,
     required this.name,
-  });
+    IndexedValueStore<T>? store,
+  }) {
+    _store = store ?? IndexedValueStore<T>();
+  }
 
   @override
   bool operator ==(Object other) {
@@ -94,9 +96,14 @@ class FileDataStore<T> {
       );
       isHydrated = true;
     } catch (e) {
-      // If hydration fails, then this file data store is corrupt and should be removed from the file data store index.
-      logger.log('Corrupt file data store');
-      rethrow;
+      if (e is PathNotFoundException) {
+        logger.log('Missing file data store $name');
+      } else {
+        // If hydration fails for an existing file, then this file data store is corrupt
+        // and should be removed from the file data store index.
+        logger.log('Corrupt file data store $name');
+        rethrow;
+      }
     }
   }
 
@@ -216,11 +223,15 @@ class EncryptedFileDataStore<T> extends FileDataStore<T> {
 /// instead of an [IndexedValueStore] for more efficient determination of the set of values referenced under
 /// a given path in the store.
 class ResolverFileDataStore extends FileDataStore<String> {
-  @override
-  // ignore: overridden_fields
-  final IndexedRefValueStore<String> _store = IndexedRefValueStore<String>();
+  ResolverFileDataStore({
+    required super.file,
+    required super.name,
+  }) : super(store: IndexedRefValueStore<String>());
 
-  ResolverFileDataStore({required super.file, required super.name});
+  @override
+  IndexedRefValueStore<String> get _store {
+    return super._store as IndexedRefValueStore<String>;
+  }
 
   Map<String, int> extractRefs([String path = '']) {
     return _store.extractRefs(path);

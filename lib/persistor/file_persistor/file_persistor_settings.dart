@@ -38,7 +38,7 @@ enum FilePersistorKeyTypes {
   document,
 }
 
-class FilePersistorKey {
+class FilePersistorKey<T> {
   final String value;
   final FilePersistorKeyTypes type;
 
@@ -47,8 +47,7 @@ class FilePersistorKey {
 
 abstract class FilePersistorKeyBuilder<T> {}
 
-class FilePersistorCollectionKeyBuilder<T>
-    implements FilePersistorKeyBuilder<T> {
+class FilePersistorCollectionKeyBuilder<T> extends FilePersistorKeyBuilder<T> {
   final String value;
 
   FilePersistorCollectionKeyBuilder(
@@ -56,17 +55,17 @@ class FilePersistorCollectionKeyBuilder<T>
   );
 
   build() {
-    return FilePersistorKey(value, FilePersistorKeyTypes.collection);
+    return FilePersistorKey<T>(value, FilePersistorKeyTypes.collection);
   }
 }
 
-class FilePersistorDocumentKeyBuilder<T> implements FilePersistorKeyBuilder<T> {
+class FilePersistorDocumentKeyBuilder<T> extends FilePersistorKeyBuilder<T> {
   final String Function(DocumentSnapshot<T> snap) builder;
 
   FilePersistorDocumentKeyBuilder(this.builder);
 
-  FilePersistorKey build(DocumentSnapshot<T> snap) {
-    return FilePersistorKey(builder(snap), FilePersistorKeyTypes.document);
+  FilePersistorKey<T> build(DocumentSnapshot<T> snap) {
+    return FilePersistorKey<T>(builder(snap), FilePersistorKeyTypes.document);
   }
 }
 

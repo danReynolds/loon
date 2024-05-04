@@ -7,7 +7,7 @@ import 'package:loon/persistor/file_persistor/file_persistor_settings.dart';
 /// [FilePersistDocument] is sent to the worker instead of the [Document] class since that class has additional
 /// fields and references that would be unnecessarily copied into the isolate. It also has back references to
 /// the [Loon] instance which shouldn't be accessed in the isolate.
-class FilePersistDocument {
+class FilePersistDocument<T> {
   /// The document collection path.
   final String parent;
 

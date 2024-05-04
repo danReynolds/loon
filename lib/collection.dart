@@ -5,7 +5,7 @@ class Collection<T> {
   final String name;
   final FromJson<T>? fromJson;
   final ToJson<T>? toJson;
-  final PersistorSettings? persistorSettings;
+  final PersistorSettings<T>? persistorSettings;
 
   /// Returns the set of documents that the document associated with the given
   /// [DocumentSnapshot] is dependent on.
@@ -48,7 +48,7 @@ class Collection<T> {
 
   Document<T> doc(String id) {
     return Document<T>(
-      parent,
+      path,
       id,
       fromJson: fromJson,
       toJson: toJson,
