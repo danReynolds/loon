@@ -4,111 +4,85 @@ import 'package:loon/loon.dart';
 import 'package:loon/persistor/file_persistor/file_data_store.dart';
 import 'package:loon/persistor/file_persistor/file_persist_document.dart';
 import 'package:loon/persistor/file_persistor/file_persistor_settings.dart';
-import 'package:path/path.dart' as path;
 
 class FileDataStoreManager {
-  /// The reserved name of the [FileDataStore] that is used to persist and resolve
-  /// the mapping of documents to their corresponding data store.
-  static const _resolverKey = '__resolver__';
-
   final Encrypter? encrypter;
 
   /// The directory in which a file data store is persisted.
   final Directory directory;
 
-  /// The index of relative file data store file names (users.json, etc) to data stores.
-  final Map<String, FileDataStore<Json>> index = {};
+  /// The meta file data store.
+  late final MetaFileDataStore _meta;
 
-  /// The resolver is a separate [FileDataStore] that maps documents to the data stores
-  /// in which the documents are stored. It is necessary since the hydration of a particular
-  /// collection, for example, needs to know all of the data stores that contain documents
-  /// of that collection and its subcollections. The resolver maintains this mapping.
-  late final ResolverFileDataStore resolver;
+  /// The index of [FileDataStore] objects by name.
+  final Map<String, FileDataStore> _index = {};
+
+  /// The index of document paths to the [FileDataStore] object in which the document currently resides.
+  final IndexedValueStore<FileDataStore> _documentIndex = IndexedValueStore();
 
   FileDataStoreManager({
     required this.directory,
     this.encrypter,
   });
 
-  /// Resolves the set of [FileDataStore] that contain documents under the given path.
-  Set<FileDataStore> _resolve(String path) {
-    // Traversing the resolver tree to extract the set of data stores referencing a give path and its subpaths
-    // is generally performant, since the number of nodes traversed in the resolver tree scales O(n*m) where n is the number
-    // of collections that specify a custom persistence key (small) and m is the number of distinct file data stores (also small).
-    return resolver.extractRefs(path).keys.map((name) => index[name]!).toSet();
-  }
+  /// Syncs all file data stores, persisting dirty ones and deleting ones that can now be removed.
+  Future<void> _sync() async {
+    final dirtyStores =
+        _index.values.where((dataStore) => dataStore.isDirty).toList();
 
-  /// Syncs all dirty file data stores, updating and deleting them as necessary.
-  Future<void> _sync() {
-    return Future.wait(
-      [
-        ...index.values,
-        resolver as FileDataStore,
-      ].map((dataStore) async {
-        if (!dataStore.isDirty) {
-          return;
-        }
+    if (dirtyStores.isEmpty) {
+      return;
+    }
 
+    await Future.wait([
+      ...dirtyStores.map((dataStore) async {
         if (dataStore.isEmpty) {
-          index.remove(dataStore);
+          _index.remove(dataStore);
           return dataStore.delete();
         }
 
         return dataStore.persist();
       }),
-    );
+      _meta.persist(),
+    ]);
   }
 
-  /// Clears the provided path and all of its subpaths from the data stores that reference
-  /// that path tree.
-  Future<void> _clear(String path) async {
-    // Remove the path from each store that had references to data under that path.
-    final stores = _resolve(path);
+  /// Clears the provided path and all of its subpaths from each data store that contains
+  /// data under that path.
+  void _clear(String path) {
+    final stores = _index.values.where((store) => store.hasEntry(path));
     for (final store in stores) {
       store.removeEntry(path);
     }
 
-    // Remove the path from the FileDataStore resolver.
-    resolver.removeEntry(path);
+    _documentIndex.delete(path);
   }
 
   Future<void> init() async {
-    resolver = ResolverFileDataStore(
-      file: File("${directory.path}/$_resolverKey.json"),
-      name: _resolverKey,
+    _meta = MetaFileDataStore(
+      index: _index,
+      directory: directory,
+      encrypter: encrypter,
     );
 
-    // Immediately hydrate the resolver, since it is required for any other
-    // hydrate/persist operations.
-    final resolverFuture = resolver.hydrate();
-
-    final files = directory
-        .listSync()
-        .whereType<File>()
-        .where((file) => fileRegex.hasMatch(path.basename(file.path)))
-        .toList();
-
-    for (final file in files) {
-      final dataStore = FileDataStore.parse(file, encrypter: encrypter);
-      index[dataStore.name] = dataStore;
-    }
-
-    await resolverFuture;
+    // Immediately hydrate the meta data store, since the [FileDataStore] meta data is required
+    // for processing subsequent data store hydrate/persist operations.
+    await _meta.hydrate();
   }
 
   /// Hydrates the given paths and returns a map of document paths to their serialized data.
   Future<Map<String, Json>> hydrate(List<String>? paths) async {
-    final List<FileDataStore> dataStores = [];
+    final Set<FileDataStore> dataStores = {};
 
     // If the hydration operation is only for certain paths, then resolve all of the file data stores
     // relevant to the given paths and their subpaths and hydrate those data stores.
     if (paths != null) {
       for (final path in paths) {
-        dataStores.addAll(_resolve(path));
+        dataStores.addAll(_index.values.where((store) => store.hasEntry(path)));
       }
-      // If no specific collections have been specified, then hydrate all file data stores.
     } else {
-      dataStores.addAll(index.values);
+      // If no specific collections have been specified, then hydrate all file data stores.
+      dataStores.addAll(_index.values);
     }
 
     await Future.wait(
@@ -126,11 +100,13 @@ class FileDataStoreManager {
 
     final Map<String, Json> data = {};
     for (final dataStore in dataStores) {
-      final data = dataStore.extract();
+      final extractedData = dataStore.extractValues();
 
-      for (final entry in data.entries) {
-        data[entry.key] = entry.value;
+      for (final key in extractedData.keys) {
+        _documentIndex.write(key, dataStore);
       }
+
+      data.addAll(extractedData);
     }
 
     return data;
@@ -151,8 +127,8 @@ class FileDataStoreManager {
       // If the document has been deleted, then clear it and its subcollections from the store.
       if (docData == null) {
         // Remove the document from its associated data store.
-        final dataStoreName = resolver.getNearestEntry(docPath);
-        index[dataStoreName]?.removeEntry(docPath);
+        final dataStoreName = _documentIndex.getNearest(docPath);
+        _index[dataStoreName]?.removeEntry(docPath);
 
         // Clear any data under this document's path.
         _clear(docPath);
@@ -167,58 +143,44 @@ class FileDataStoreManager {
           FilePersistorKeyTypes.document => docPath,
         };
 
-        final prevDataStoreName = resolver.getNearestEntry(path);
+        final prevDataStore = _documentIndex.getNearest(path);
         final dataStoreName = persistenceKey.value;
 
-        dataStore = index[dataStoreName] ??= FileDataStore.create(
+        dataStore = _index[dataStoreName] ??= FileDataStore.create(
           dataStoreName,
           encrypter: encrypter,
           encryptionEnabled: encryptionEnabled,
           directory: directory,
         );
 
-        if (prevDataStoreName != dataStoreName) {
+        if (prevDataStore != dataStore) {
           // If the persistence key for the path has changed, then all of the data
           // under that path needs to be moved to the destination data store.
-          if (prevDataStoreName != null) {
-            final prevDataStore = index[prevDataStoreName];
-            if (prevDataStore != null) {
-              dataStore.graft(prevDataStore, path);
-
-              // Remove the document itself from the previous data store.
-              prevDataStore.removeEntry(docPath);
-            }
+          if (prevDataStore != null) {
+            dataStore.graft(prevDataStore, path);
           }
 
-          // Update the resolver for this path to the updated data store name.
-          resolver.writeEntry(path, dataStoreName);
+          _documentIndex.write(path, dataStore);
         }
       } else {
         // If the document does not specify a persistence key, then its data store is resolved to the nearest data store
         // found in the resolver tree moving up from the document path. If no data store exists in this path yet, then the
         // it defaults to using one named after the document's top-level collection.
-        String dataStoreName;
+        FileDataStore? dataStore = _documentIndex.getNearest(docPath);
 
-        final nearestDataStoreName = resolver.getNearestEntry(docPath);
-        if (nearestDataStoreName != null) {
-          dataStoreName = nearestDataStoreName;
-        } else {
-          dataStoreName = docPath.split('__').first;
+        if (dataStore == null) {
+          final dataStoreName = docPath.split('__').first;
 
-          // Add the default top-level collection name used for the document's data store to the resolver tree.
-          resolver.writeEntry(dataStoreName, dataStoreName);
+          dataStore = _index[dataStoreName] ??= FileDataStore.create(
+            dataStoreName,
+            encrypter: encrypter,
+            encryptionEnabled: encryptionEnabled,
+            directory: directory,
+          );
+
+          _documentIndex.write(dataStoreName, dataStore);
         }
-
-        dataStore = index[dataStoreName] ??= FileDataStore.create(
-          dataStoreName,
-          encrypter: encrypter,
-          encryptionEnabled: encryptionEnabled,
-          directory: directory,
-        );
       }
-
-      // Once the document's data store has been determined, it can be written to its resolved store.
-      dataStore.writeEntry(docPath, docData);
     }
 
     await _sync();
@@ -230,9 +192,12 @@ class FileDataStoreManager {
   }
 
   Future<void> clearAll() async {
-    await Future.wait(index.values.map((dataStore) => dataStore.delete()));
-    await resolver.delete();
+    await Future.wait([
+      ..._index.values.map((dataStore) => dataStore.delete()),
+      _meta.delete(),
+    ]);
 
-    index.clear();
+    _index.clear();
+    _documentIndex.clear();
   }
 }

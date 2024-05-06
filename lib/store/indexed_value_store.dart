@@ -41,6 +41,18 @@ class IndexedValueStore<T> {
   static const _delimiter = '__';
   static const _values = '__values';
 
+  IndexedValueStore({
+    Map? store,
+  }) {
+    if (store != null) {
+      _store = store;
+    }
+  }
+
+  static IndexedValueStore<Json> fromJson(Json json) {
+    return IndexedValueStore<Json>(store: json);
+  }
+
   /// Returns the node at the given path.
   Map? _getNode(Map? node, List<String> segments, int index) {
     if (node == null || index == segments.length) {
@@ -208,6 +220,15 @@ class IndexedValueStore<T> {
     return getAll(path)?.isNotEmpty ?? false;
   }
 
+  /// Returns whether the store contains the given path.
+  bool hasPath(String path) {
+    if (path.isEmpty) {
+      return true;
+    }
+
+    return has(path) || _getNode(_store, path.split(_delimiter), 0) != null;
+  }
+
   void clear() {
     _store = {};
   }
@@ -216,35 +237,9 @@ class IndexedValueStore<T> {
     return _store.isEmpty;
   }
 
+  /// Returns a map of the values in the store by path.
   Map inspect() {
     return _store;
-  }
-
-  Map<String, T> _extract(
-    Map node,
-    Map<String, T> index, [
-    String path = '',
-  ]) {
-    if (node.containsKey(_values)) {
-      for (final entry in node[_values].entries) {
-        final key = path.isEmpty ? entry.key : "${path}__${entry.key}";
-        index[key] = entry.value;
-      }
-    }
-
-    for (final key in node.keys) {
-      if (key != _values) {
-        final childPath = path.isEmpty ? key : "${path}__$key";
-        _extract(node[key], index, childPath);
-      }
-    }
-
-    return index;
-  }
-
-  /// Extracts all values from the store into a set of flat key-value pairs of paths to values.
-  Map<String, T> extract() {
-    return _extract(_store, {});
   }
 
   /// Removes the subtree at the given [path] of the other provided [IndexedValueStore] and recursively
@@ -281,6 +276,7 @@ class IndexedValueStore<T> {
         parent[_values][lastSegment] = otherParent[_values][lastSegment];
       }
 
+      otherParent[_values]?.remove(lastSegment);
       final child = parent[lastSegment];
       final otherChild = otherParent[lastSegment];
 
@@ -288,159 +284,52 @@ class IndexedValueStore<T> {
         return;
       }
 
+      otherParent.remove(lastSegment);
       _mergeNode(child, otherChild);
     }
   }
 
-  /// Hydrates a store from serialized data.
-  void hydrate(Json data) {
-    _store = data;
-  }
-}
-
-/// A variant of the [IndexedValueStore] that additionally keeps a ref count of each
-/// distinct value in a given path's values.
-class IndexedRefValueStore<T> extends IndexedValueStore<T> {
-  static const _refs = '__refs';
-
-  int _getRefCount(Map? node, List<String> segments, int index, T value) {
-    if (node == null || segments.isEmpty) {
-      return 0;
-    }
-
-    if (index < segments.length) {
-      return _getRefCount(node[segments[index]], segments, index + 1, value);
-    }
-
-    return node[_refs]?[value] ?? 0;
-  }
-
-  /// Returns the ref count for the value at the given path.
-  int getRefCount(String path, T value) {
-    return _getRefCount(
-      _store,
-      path.split(IndexedValueStore._delimiter),
-      0,
-      value,
-    );
-  }
-
-  @override
-  Map _mergeNode(Map node, Map otherNode) {
-    final result = super._mergeNode(node, otherNode);
-
-    final otherValues = otherNode[IndexedValueStore._values];
-    if (otherValues != null) {
-      node[_refs] ??= {};
-
-      for (final value in otherValues) {
-        node[_refs][value] ??= 0;
-        node[_refs][value]++;
-      }
-    }
-
-    return result;
-  }
-
-  @override
-  void _write(Map node, List<String> segments, int index, T value) {
-    super._write(node, segments, index, value);
-
-    if (index == segments.length - 1) {
-      final refs = node[_refs] ??= <T, int>{};
-      final value = node[IndexedValueStore._values][segments.last];
-      refs[value] ??= 0;
-      refs[value]++;
-    }
-  }
-
-  @override
-  bool _delete(Map node, List<String> segments, int index) {
-    if (index == segments.length - 1) {
-      final segment = segments.last;
-
-      if (!node.containsKey(_refs)) {
-        return super._delete(node, segments, index);
-      }
-
-      final value = node[IndexedValueStore._values][segment];
-      if (node[_refs][value] > 1) {
-        node[_refs][value]--;
-      } else {
-        node[_refs].remove(value);
-      }
-
-      if (node[_refs].isEmpty) {
-        node.remove(_refs);
-      }
-    }
-
-    return super._delete(node, segments, index);
-  }
-
-  Map<T, int> _extractRefs(
-    Map node, [
-    Map<T, int> index = const {},
+  Map<String, T> _extractValues(
+    Map node,
+    Map<String, T> index, [
+    String path = '',
   ]) {
-    if (node.containsKey(_refs)) {
-      final Map<T, int> refs = node[_refs];
-      for (final entry in refs.entries) {
-        final key = entry.key;
-        index[key] ??= 0;
-        index[key] = index[key]! + entry.value;
+    if (node.containsKey(_values)) {
+      for (final entry in node[_values].entries) {
+        final key = path.isEmpty ? entry.key : "${path}__${entry.key}";
+        index[key] = entry.value;
       }
     }
 
     for (final key in node.keys) {
-      if (key != _refs && key != IndexedValueStore._values) {
-        _extractRefs(node[key], index);
+      if (key != _values) {
+        final childPath = path.isEmpty ? key : "${path}__$key";
+        _extractValues(node[key], index, childPath);
       }
     }
 
     return index;
   }
 
-  /// Extracts a map of the values with their ref count that exist under a given path.
-  Map<T, int> extractRefs([String path = '']) {
-    final Map<T, int> index = {};
-
-    if (path.isEmpty) {
-      for (final key in _store.keys) {
-        if (key != _refs && key != IndexedValueStore._values) {
-          _extractRefs(_store[key], index);
-        }
-      }
-      return index;
-    }
-
-    final segments = path.split(IndexedValueStore._delimiter);
-    final parent =
-        _getNode(_store, segments.sublist(0, segments.length - 1), 0);
-    if (parent == null) {
-      return index;
-    }
-
-    // If the parent node has the final path segment as a value, then the ref count must include
-    // a count for the final node's value.
-    if (parent.containsKey(IndexedValueStore._values)) {
-      final segment = segments.last;
-      if (parent[IndexedValueStore._values].containsKey(segment)) {
-        final value = parent[IndexedValueStore._values][segment];
-        index[value] = 1;
+  Map _extractStructure(Map map) {
+    final Map structure = {};
+    for (final entry in map.entries) {
+      if (entry.key != _values) {
+        structure[entry.key] = _extractStructure(entry.value);
       }
     }
 
-    final child = parent[segments.last];
-    if (child == null) {
-      return index;
-    }
+    return structure;
+  }
 
-    for (final key in child.keys) {
-      if (key != _refs && key != IndexedValueStore._values) {
-        _extractRefs(child[key], index);
-      }
-    }
+  /// Returns a map of the structure of the values in the store,
+  /// with paths maintained but values removed.
+  Map extractStructure() {
+    return _extractStructure(_store);
+  }
 
-    return index;
+  /// Extracts all values from the store into a set of flat key-value pairs of paths to values.
+  Map<String, T> extractValues() {
+    return _extractValues(_store, {});
   }
 }

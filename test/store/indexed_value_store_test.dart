@@ -122,27 +122,6 @@ void main() {
     });
   });
 
-  group('extract', () {
-    test('Extracts all entries to a path/value map', () {
-      final store = IndexedValueStore<String>();
-      store.write('users__1', 'Dan');
-      store.write('users__2', 'Sonja');
-      store.write('users__1__messages__1', 'Hello');
-      store.write('users__1__messages__2', 'How are you?');
-      store.write('users__2__messages__1', 'Hey!');
-      store.write('users__2__messages__2', "I'm good.");
-
-      expect(store.extract(), {
-        'users__1': 'Dan',
-        'users__2': 'Sonja',
-        'users__1__messages__1': 'Hello',
-        'users__1__messages__2': 'How are you?',
-        'users__2__messages__1': 'Hey!',
-        'users__2__messages__2': "I'm good.",
-      });
-    });
-  });
-
   group(
     'graft',
     () {
@@ -365,6 +344,29 @@ void main() {
               },
             },
           });
+
+          expect(store2.inspect(), {
+            "users": {
+              "__values": {
+                "2": "Nik",
+              },
+              "2": {
+                "messages": {
+                  "__values": {
+                    "6": "Nothing special.",
+                  },
+                },
+              },
+              "3": {
+                "messages": {
+                  "__values": {
+                    "1": "Greetings",
+                    "2": "What's up?",
+                  },
+                },
+              },
+            },
+          });
         },
       );
     },
@@ -421,5 +423,26 @@ void main() {
         expect(store.getNearest('users__1__posts__2__reactions__3'), null);
       },
     );
+  });
+
+  group('extractValues', () {
+    test('Extracts all values in the store to a path/value map', () {
+      final store = IndexedValueStore<String>();
+      store.write('users__1', 'Dan');
+      store.write('users__2', 'Sonja');
+      store.write('users__1__messages__1', 'Hello');
+      store.write('users__1__messages__2', 'How are you?');
+      store.write('users__2__messages__1', 'Hey!');
+      store.write('users__2__messages__2', "I'm good.");
+
+      expect(store.extractValues(), {
+        'users__1': 'Dan',
+        'users__2': 'Sonja',
+        'users__1__messages__1': 'Hello',
+        'users__1__messages__2': 'How are you?',
+        'users__2__messages__1': 'Hey!',
+        'users__2__messages__2': "I'm good.",
+      });
+    });
   });
 }
