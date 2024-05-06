@@ -2,7 +2,6 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:encrypt/encrypt.dart';
 import 'package:loon/loon.dart';
-import 'package:path/path.dart' as path;
 
 final logger = Logger('FileDataStore');
 
@@ -40,12 +39,15 @@ class FileDataStore {
   @override
   int get hashCode => Object.hashAll([name]);
 
-  Json? getEntry(String path) {
-    return _store.get(path);
+  Future<String> _readFile() {
+    return file.readAsString();
   }
 
-  Json? getNearestEntry(String path) {
-    return _store.getNearest(path);
+  Future<void> _writeFile(String value) {
+    return logger.measure(
+      'Write data store $name',
+      () => file.writeAsString(value),
+    );
   }
 
   bool hasEntry(String path) {
@@ -64,17 +66,6 @@ class FileDataStore {
     }
   }
 
-  Future<String> readFile() {
-    return file.readAsString();
-  }
-
-  Future<void> writeFile(String value) {
-    return logger.measure(
-      'Write data store $name',
-      () => file.writeAsString(value),
-    );
-  }
-
   Future<void> delete() async {
     if (!file.existsSync()) {
       logger.log('Attempted to delete non-existent file');
@@ -91,7 +82,7 @@ class FileDataStore {
     }
 
     try {
-      final fileStr = await readFile();
+      final fileStr = await _readFile();
       await logger.measure(
         'Parse data store $name',
         () async {
@@ -133,7 +124,7 @@ class FileDataStore {
       () async => jsonEncode(_store.inspect()),
     );
 
-    await writeFile(encodedStore);
+    await _writeFile(encodedStore);
 
     isDirty = false;
   }
@@ -146,29 +137,6 @@ class FileDataStore {
   /// this data store at that path.
   void graft(FileDataStore other, String path) {
     _store.graft(other._store, path);
-  }
-
-  static FileDataStore parse(
-    File file, {
-    required Encrypter? encrypter,
-  }) {
-    final match = fileRegex.firstMatch(path.basename(file.path));
-    final name = match!.group(1)!;
-    final encryptionEnabled = match.group(2) != null;
-
-    if (encryptionEnabled) {
-      if (encrypter == null) {
-        throw 'Missing encrypter';
-      }
-
-      return EncryptedFileDataStore(
-        file: file,
-        name: "$name.encrypted",
-        encrypter: encrypter,
-      );
-    }
-
-    return FileDataStore(file: file, name: name);
   }
 
   static FileDataStore create(
@@ -234,18 +202,17 @@ class EncryptedFileDataStore extends FileDataStore {
   }
 
   @override
-  Future<String> readFile() async {
-    return _decrypt(await super.readFile());
+  Future<String> _readFile() async {
+    return _decrypt(await super._readFile());
   }
 
   @override
-  writeFile(String value) async {
-    return super.writeFile(_encrypt(value));
+  _writeFile(String value) async {
+    return super._writeFile(_encrypt(value));
   }
 }
 
-/// The [MetaFileDatStore] stores an index of each existing file data store's meta
-/// data including:
+/// The [MetaFileDataStore] stores an index of each existing file data store's meta data including:
 /// 1. The name of the store.
 /// 2. The structure of the store's current data (used for determining which stores to hydrate by path).
 /// 3. The encryption status of the store.
@@ -264,9 +231,8 @@ class MetaFileDataStore {
     _file = File("${directory.path}/$name.json");
   }
 
-  /// Hydrates the [FileDataStore] resolver, which reads its index file from disk containing
-  /// the meta data of all of the existing file data stores. It instantiates each file data store,
-  /// but does not automatically hydrate them. Hydration of data stores is deferred to the client.
+  /// Initializes each [FileDataStore] using the meta data stored in the [MetaFileDataStore]. Does *not*
+  /// hydrate the file data stores, since that is done on-demand by the client.
   Future<void> hydrate() async {
     try {
       await logger.measure(
@@ -296,6 +262,9 @@ class MetaFileDataStore {
     }
   }
 
+  /// Persists the meta file data store which consists of a mapping of all file data stores
+  /// by name to their meta data including their name, encryption status and the structure
+  /// of the data contained in their data store.
   Future<void> persist() async {
     await logger.measure(
       'Persist meta data store',

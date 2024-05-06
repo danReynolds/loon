@@ -92,11 +92,13 @@ class FileDataStoreManager {
       final extractedData = dataStore.extractValues();
 
       for (final docPath in extractedData.keys) {
-        // In the unlikely scenario where this hydrated document already exists in a different data store,
+        // In the unlikely scenario where a hydrated document already exists in a different data store,
         // then it must have been written with an updated persistence key and value before it was hydrated
-        // from this data store. In that case, this hydrated value is stale and should be removed from the data store.
+        // from this data store. In that case, this hydrated value is stale and should be deleted from both
+        // the data store and the extracted data.
         final existingDataStore = _documentIndex.get(docPath);
         if (existingDataStore != dataStore) {
+          extractedData.remove(docPath);
           dataStore.removeEntry(docPath);
         } else {
           // Otherwise write the hydrated document path to the index.
@@ -124,11 +126,6 @@ class FileDataStoreManager {
 
       // If the document has been deleted, then clear it and its subcollections from the store.
       if (docData == null) {
-        // Remove the document from its associated data store.
-        final dataStoreName = _documentIndex.getNearest(docPath);
-        _index[dataStoreName]?.removeEntry(docPath);
-
-        // Clear any data under this document's path.
         _clear(docPath);
         continue;
       }
@@ -162,7 +159,7 @@ class FileDataStoreManager {
         }
       } else {
         // If the document does not specify a persistence key, then its data store is resolved to the nearest data store
-        // found in the resolver tree moving up from the document path. If no data store exists in this path yet, then the
+        // found in the document index moving up from its path. If no data store exists in this path yet, then the
         // it defaults to using one named after the document's top-level collection.
         FileDataStore? dataStore = _documentIndex.getNearest(docPath);
 
