@@ -85,25 +85,23 @@ class FileDataStoreManager {
       dataStores.addAll(_index.values);
     }
 
-    await Future.wait(
-      dataStores.map(
-        (dataStore) async {
-          try {
-            await dataStore.hydrate();
-            return dataStore;
-          } catch (e) {
-            return dataStore;
-          }
-        },
-      ),
-    );
+    await Future.wait(dataStores.map((store) => store.hydrate()));
 
     final Map<String, Json> data = {};
     for (final dataStore in dataStores) {
       final extractedData = dataStore.extractValues();
 
-      for (final key in extractedData.keys) {
-        _documentIndex.write(key, dataStore);
+      for (final docPath in extractedData.keys) {
+        // In the unlikely scenario where this hydrated document already exists in a different data store,
+        // then it must have been written with an updated persistence key and value before it was hydrated
+        // from this data store. In that case, this hydrated value is stale and should be removed from the data store.
+        final existingDataStore = _documentIndex.get(docPath);
+        if (existingDataStore != dataStore) {
+          dataStore.removeEntry(docPath);
+        } else {
+          // Otherwise write the hydrated document path to the index.
+          _documentIndex.write(docPath, dataStore);
+        }
       }
 
       data.addAll(extractedData);
