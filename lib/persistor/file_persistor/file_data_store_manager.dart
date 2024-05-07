@@ -17,7 +17,7 @@ class FileDataStoreManager {
   /// The index of [FileDataStore] objects by name.
   final Map<String, FileDataStore> _index = {};
 
-  /// The index of document paths to the [FileDataStore] object in which the document currently resides.
+  /// The index of document paths to the [FileDataStore] object in which the document currently is stored.
   final IndexedValueStore<FileDataStore> _documentIndex = IndexedValueStore();
 
   FileDataStoreManager({
@@ -47,7 +47,7 @@ class FileDataStoreManager {
         if (_index.isEmpty) {
           return _meta.delete();
         }
-        _meta.persist();
+        return _meta.persist();
       })
     ]);
   }
@@ -109,11 +109,14 @@ class FileDataStoreManager {
         // from this data store. In that case, this hydrated value is stale and should be deleted from both
         // the data store and the extracted data.
         final existingDataStore = _documentIndex.get(docPath);
-        if (existingDataStore != dataStore) {
+        if (existingDataStore != null && existingDataStore != dataStore) {
           extractedData.remove(docPath);
           dataStore.removeEntry(docPath);
         } else {
           // Otherwise write the hydrated document path to the index.
+          // TODO: Figure this out. It shouldn't just write the doc to the index, since
+          // the doc may not have its own persistence key and was put in this store because of a parent key.
+          // Use a separate hydration index to compare?
           _documentIndex.write(docPath, dataStore);
         }
       }
@@ -156,7 +159,7 @@ class FileDataStoreManager {
         dataStore = _index[dataStoreName] ??= FileDataStore.create(
           dataStoreName,
           encrypter: encrypter,
-          encryptionEnabled: encryptionEnabled,
+          encrypted: encryptionEnabled,
           directory: directory,
         );
 
@@ -185,7 +188,7 @@ class FileDataStoreManager {
           dataStore = _index[dataStoreName] ??= FileDataStore.create(
             dataStoreName,
             encrypter: encrypter,
-            encryptionEnabled: encryptionEnabled,
+            encrypted: encryptionEnabled,
             directory: directory,
           );
 

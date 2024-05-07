@@ -118,7 +118,7 @@ void main() {
           metaJson,
           {
             "users": {
-              "encryptionEnabled": false,
+              "encrypted": false,
               "data": {
                 "users": {
                   "2": {
@@ -172,7 +172,7 @@ void main() {
           metaJson,
           {
             "users": {
-              "encryptionEnabled": false,
+              "encrypted": false,
               "data": {"users": {}}
             }
           },
@@ -217,7 +217,7 @@ void main() {
 
         expect(metaJson, {
           "users": {
-            "encryptionEnabled": false,
+            "encrypted": false,
             "data": {
               "users": {},
             }
@@ -307,21 +307,22 @@ void main() {
           },
         );
 
-        final resolverFile =
-            File('${testDirectory.path}/loon/__resolver__.json');
-        final resolverJson = jsonDecode(resolverFile.readAsStringSync());
+        final metaFile = File('${testDirectory.path}/loon/__meta__.json');
+        final metaJson = jsonDecode(metaFile.readAsStringSync());
 
         expect(
-          resolverJson,
+          metaJson,
           {
             "users": {
-              "__refs": {
-                "users": 1,
-                "other_users": 1,
-              },
-              "__values": {
-                "1": "users",
-                "2": "other_users",
+              "encrypted": false,
+              "data": {
+                "users": {},
+              }
+            },
+            "other_users": {
+              "encrypted": false,
+              "data": {
+                "users": {},
               }
             }
           },
@@ -392,27 +393,26 @@ void main() {
           },
         );
 
-        final resolverFile =
-            File('${testDirectory.path}/loon/__resolver__.json');
-        final resolverJson = jsonDecode(resolverFile.readAsStringSync());
+        final metaFile = File('${testDirectory.path}/loon/__meta__.json');
+        final metaJson = jsonDecode(metaFile.readAsStringSync());
 
         expect(
-          resolverJson,
+          metaJson,
           {
-            "__refs": {
-              "users": 1,
-            },
-            "__values": {
-              "users": "users",
-            },
             "users": {
-              "2": {
-                "__refs": {
-                  "friends": 1,
-                },
-                "__values": {
-                  "friends": "friends",
-                },
+              "encrypted": false,
+              "data": {
+                "users": {},
+              },
+            },
+            "friends": {
+              "encrypted": false,
+              "data": {
+                "users": {
+                  "2": {
+                    "friends": {},
+                  }
+                }
               }
             }
           },
@@ -458,14 +458,23 @@ void main() {
         expect(
           usersJson,
           {
-            'users:1': {'name': 'User 1'}
+            "users": {
+              "__values": {
+                "1": {"name": "User 1"},
+                "2": {"name": "User 2"},
+              }
+            }
           },
         );
 
         expect(
           updatedUsersJson,
           {
-            'users:2': {'name': 'User 2 updated'}
+            "users": {
+              "__values": {
+                "2": {"name": "User 2 updated"},
+              }
+            }
           },
         );
       },
@@ -473,20 +482,85 @@ void main() {
   });
 
   group('hydrate', () {
-    test('Hydrates data from persistence files into collections', () async {
+    test('Hydrates all data from persistence files into collections', () async {
       final userCollection = Loon.collection(
         'users',
         fromJson: TestUserModel.fromJson,
         toJson: (user) => user.toJson(),
       );
+      final friendsCollection = Loon.collection(
+        'friends',
+        fromJson: TestUserModel.fromJson,
+        toJson: (user) => user.toJson(),
+      );
 
-      final file = File('${testDirectory.path}/loon/users.json');
       Directory('${testDirectory.path}/loon').createSync();
-      file.writeAsStringSync(
+
+      final usersFile = File('${testDirectory.path}/loon/users.json');
+      usersFile.writeAsStringSync(
         jsonEncode(
           {
-            'users:1': {'name': 'User 1'},
-            'users:2': {'name': 'User 2'}
+            "users": {
+              "__values": {
+                "1": {"name": "User 1"},
+                "2": {"name": "User 2"},
+              }
+            }
+          },
+        ),
+      );
+
+      final otherUsersFile =
+          File('${testDirectory.path}/loon/other_users.json');
+      otherUsersFile.writeAsStringSync(
+        jsonEncode(
+          {
+            "users": {
+              "__values": {
+                "3": {"name": "User 3"},
+              }
+            }
+          },
+        ),
+      );
+
+      final friendsFile = File('${testDirectory.path}/loon/friends.json');
+      friendsFile.writeAsStringSync(
+        jsonEncode(
+          {
+            "friends": {
+              "__values": {
+                "1": {"name": "Friend 1"},
+                "2": {"name": "Friend 2"},
+                "3": {"name": "Friend 3"},
+              }
+            }
+          },
+        ),
+      );
+
+      final metaFile = File('${testDirectory.path}/loon/__meta__.json');
+      metaFile.writeAsStringSync(
+        jsonEncode(
+          {
+            "users": {
+              "encrypted": false,
+              "data": {
+                "users": {},
+              }
+            },
+            "other_users": {
+              "encrypted": false,
+              "data": {
+                "users": {},
+              },
+            },
+            "friends": {
+              "encrypted": false,
+              "data": {
+                "friends": {},
+              }
+            }
           },
         ),
       );
@@ -503,6 +577,10 @@ void main() {
           DocumentSnapshot(
             doc: userCollection.doc('2'),
             data: TestUserModel('User 2'),
+          ),
+          DocumentSnapshot(
+            doc: userCollection.doc('3'),
+            data: TestUserModel('User 3'),
           ),
         ],
       );

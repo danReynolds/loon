@@ -8,13 +8,22 @@ final logger = Logger('FileDataStore');
 final fileRegex = RegExp(r'^(\w+)(?:\.(encrypted))?\.json$');
 
 class FileDataStore {
+  /// The file associated with the data store.
   final File file;
+
+  /// The name of the file data store.
   final String name;
+
+  /// The data contained within the file data store.
   late IndexedValueStore<Json> _store;
+
+  /// A cache of the data store's latest meta data.
+  Json _meta = {};
 
   /// Whether the file data store has pending changes that should be persisted.
   bool isDirty = false;
 
+  /// Whether the file data store has been hydrated yet from its persisted file.
   bool isHydrated;
 
   FileDataStore({
@@ -131,12 +140,12 @@ class FileDataStore {
 
   static FileDataStore create(
     String name, {
-    required bool encryptionEnabled,
+    required bool encrypted,
     required Directory directory,
     required Encrypter? encrypter,
     bool isHydrated = true,
   }) {
-    if (encryptionEnabled) {
+    if (encrypted) {
       if (encrypter == null) {
         throw 'Missing encrypter';
       }
@@ -163,10 +172,14 @@ class FileDataStore {
 
   /// Extracts the meta data for the store into [Json].
   Json extractMeta() {
-    return {
+    if (!isDirty) {
+      return _meta;
+    }
+
+    return _meta = {
       // Only the structure of the store is serialized, its values are not required.
       "data": _store.extractStructure(),
-      "encryptionEnabled": this is EncryptedFileDataStore,
+      "encrypted": this is EncryptedFileDataStore,
     };
   }
 }
@@ -206,9 +219,8 @@ class EncryptedFileDataStore extends FileDataStore {
 }
 
 /// The [MetaFileDataStore] stores an index of each existing file data store's meta data including:
-/// 1. The name of the store.
-/// 2. The structure of the store's current data (used for determining which stores to hydrate by path).
-/// 3. The encryption status of the store.
+/// 1. The structure of the store's current data (used for determining which stores to hydrate by path).
+/// 2. The encryption status of the store.
 class MetaFileDataStore {
   final Map<String, FileDataStore> index;
   final Encrypter? encrypter;
@@ -239,7 +251,7 @@ class MetaFileDataStore {
             final metaJson = entry.value;
             index[name] = FileDataStore.create(
               name,
-              encryptionEnabled: metaJson['encryptionEnabled'],
+              encrypted: metaJson['encrypted'],
               directory: _file.parent,
               encrypter: encrypter,
               isHydrated: false,
@@ -257,8 +269,8 @@ class MetaFileDataStore {
   }
 
   /// Persists the meta file data store which consists of a mapping of all file data stores
-  /// by name to their meta data including their name, encryption status and the structure
-  /// of the data contained in their data store.
+  /// by name to their meta data including their encrypted status and the structure of the data
+  /// contained in their data store.
   Future<void> persist() async {
     await logger.measure(
       'Persist meta data store',

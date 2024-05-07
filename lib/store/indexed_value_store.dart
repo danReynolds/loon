@@ -255,21 +255,19 @@ class IndexedValueStore<T> {
 
       _mergeNode(_store, otherNode);
     } else {
-      // Initialize the nodes of the given path in this store.
-      touch(path);
-
       final segments = path.split(_delimiter);
       // Remove the last segment from the path so that resolved node is the
       // parent node of the node corresponding to the final path segment. This is
       // necessary for also grafting the final node's value from the parent node.
       final lastSegment = segments.removeLast();
 
-      final parent = _getNode(_store, segments, 0)!;
       final otherParent = _getNode(other._store, segments, 0);
-
       if (otherParent == null || otherParent.isEmpty) {
         return;
       }
+
+      // Initialize the parent node of the given path in the store.
+      final parent = _touch(_store, segments, 0);
 
       if (otherParent[_values]?.containsKey(lastSegment) ?? false) {
         parent[_values] ??= {};
