@@ -245,7 +245,7 @@ class IndexedValueStore<T> {
   /// Removes the subtree at the given [path] of the other provided [IndexedValueStore] and recursively
   /// merges it onto this store at the given path.
   void graft(
-    IndexedValueStore other, [
+    IndexedValueStore<T> other, [
     String path = '',
   ]) {
     if (path.isEmpty) {
@@ -309,25 +309,170 @@ class IndexedValueStore<T> {
     return index;
   }
 
-  Map _extractStructure(Map map) {
-    final Map structure = {};
-    for (final entry in map.entries) {
-      if (entry.key != _values) {
-        structure[entry.key] = _extractStructure(entry.value);
-      }
-    }
-
-    return structure;
-  }
-
-  /// Returns a map of the structure of the values in the store,
-  /// with paths maintained but values removed.
-  Map extractStructure() {
-    return _extractStructure(_store);
-  }
-
   /// Extracts all values from the store into a set of flat key-value pairs of paths to values.
   Map<String, T> extractValues() {
     return _extractValues(_store, {});
+  }
+}
+
+/// A variant of the [IndexedValueStore] that additionally keeps a ref count of each
+/// distinct value in a given path's values.
+class IndexedRefValueStore<T> extends IndexedValueStore<T> {
+  static const _refs = '__refs';
+
+  @override
+  Map _mergeNode(Map node, Map otherNode) {
+    final result = super._mergeNode(node, otherNode);
+
+    final otherValues = otherNode[IndexedValueStore._values];
+    if (otherValues != null) {
+      node[_refs] ??= {};
+
+      for (final value in otherValues) {
+        node[_refs][value] ??= 0;
+        node[_refs][value]++;
+      }
+    }
+
+    return result;
+  }
+
+  @override
+  graft(
+    other, [
+    path = '',
+  ]) {
+    if (path.isEmpty) {
+      return super.graft(other, path);
+    }
+
+    final segments = path.split(IndexedValueStore._delimiter);
+    final lastSegment = segments.removeLast();
+    final otherParent = _getNode(other._store, segments, 0);
+
+    final otherValues = otherParent?[IndexedValueStore._values];
+    // An [IndexedRefValueStore] must additionally decrement the ref count on the
+    // source store's parent node of the given path.
+    if (otherValues != null && otherValues.containsKey(lastSegment)) {
+      otherParent![_refs][otherValues[lastSegment]]--;
+    }
+
+    return super.graft(other, path);
+  }
+
+  @override
+  void _write(Map node, List<String> segments, int index, T value) {
+    if (index == segments.length - 1) {
+      final segment = segments[index];
+      final values = node[IndexedValueStore._values];
+      final refs = node[_refs] ??= <T, int>{};
+
+      // Decrement the ref count of the old value (if one exists).
+      if (values != null && values.containsKey(segment)) {
+        final prevValue = values[segment];
+
+        if (refs[prevValue] == 1) {
+          refs.remove(prevValue);
+        } else {
+          refs[prevValue]--;
+        }
+      }
+
+      // Increment the ref count of the new value.
+      refs[value] ??= 0;
+      refs[value]++;
+    }
+
+    super._write(node, segments, index, value);
+  }
+
+  @override
+  bool _delete(Map node, List<String> segments, int index) {
+    if (index == segments.length - 1) {
+      final segment = segments.last;
+
+      if (!node.containsKey(_refs)) {
+        return super._delete(node, segments, index);
+      }
+
+      final value = node[IndexedValueStore._values][segment];
+      if (node[_refs][value] > 1) {
+        node[_refs][value]--;
+      } else {
+        node[_refs].remove(value);
+      }
+
+      if (node[_refs].isEmpty) {
+        node.remove(_refs);
+      }
+    }
+
+    return super._delete(node, segments, index);
+  }
+
+  Map<T, int> _extractRefs(
+    Map node, [
+    Map<T, int> index = const {},
+  ]) {
+    if (node.containsKey(_refs)) {
+      final Map<T, int> refs = node[_refs];
+      for (final entry in refs.entries) {
+        final key = entry.key;
+        index[key] ??= 0;
+        index[key] = index[key]! + entry.value;
+      }
+    }
+
+    for (final key in node.keys) {
+      if (key != _refs && key != IndexedValueStore._values) {
+        _extractRefs(node[key], index);
+      }
+    }
+
+    return index;
+  }
+
+  /// Extracts a map of the values with their ref count that exist under a given path.
+  Map<T, int> extractRefs([String path = '']) {
+    final Map<T, int> index = {};
+
+    if (path.isEmpty) {
+      for (final key in _store.keys) {
+        if (key != _refs && key != IndexedValueStore._values) {
+          _extractRefs(_store[key], index);
+        }
+      }
+      return index;
+    }
+
+    final segments = path.split(IndexedValueStore._delimiter);
+    final parent =
+        _getNode(_store, segments.sublist(0, segments.length - 1), 0);
+    if (parent == null) {
+      return index;
+    }
+
+    // If the parent node has the final path segment as a value, then the ref count must include
+    // a count for the final node's value.
+    if (parent.containsKey(IndexedValueStore._values)) {
+      final segment = segments.last;
+      if (parent[IndexedValueStore._values].containsKey(segment)) {
+        final value = parent[IndexedValueStore._values][segment];
+        index[value] = 1;
+      }
+    }
+
+    final child = parent[segments.last];
+    if (child == null) {
+      return index;
+    }
+
+    for (final key in child.keys) {
+      if (key != _refs && key != IndexedValueStore._values) {
+        _extractRefs(child[key], index);
+      }
+    }
+
+    return index;
   }
 }

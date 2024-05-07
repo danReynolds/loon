@@ -111,22 +111,19 @@ void main() {
           },
         );
 
-        final metaFile = File('${testDirectory.path}/loon/__meta__.json');
-        final metaJson = jsonDecode(metaFile.readAsStringSync());
+        final resolverFile =
+            File('${testDirectory.path}/loon/__resolver__.json');
+        final resolverJson = jsonDecode(resolverFile.readAsStringSync());
 
         expect(
-          metaJson,
+          resolverJson,
           {
-            "users": {
-              "encrypted": false,
-              "data": {
-                "users": {
-                  "2": {
-                    "friends": {},
-                  }
-                }
-              }
-            }
+            "__values": {
+              "users": "users",
+            },
+            "__refs": {
+              "users": 1,
+            },
           },
         );
       },
@@ -165,16 +162,19 @@ void main() {
           },
         );
 
-        final metaFile = File('${testDirectory.path}/loon/__meta__.json');
-        final metaJson = jsonDecode(metaFile.readAsStringSync());
+        final resolverFile =
+            File('${testDirectory.path}/loon/__resolver__.json');
+        final resolverJson = jsonDecode(resolverFile.readAsStringSync());
 
         expect(
-          metaJson,
+          resolverJson,
           {
-            "users": {
-              "encrypted": false,
-              "data": {"users": {}}
-            }
+            "__values": {
+              "users": "users",
+            },
+            "__refs": {
+              "users": 1,
+            },
           },
         );
       },
@@ -212,17 +212,21 @@ void main() {
           },
         );
 
-        final metaFile = File('${testDirectory.path}/loon/__meta__.json');
-        final metaJson = jsonDecode(metaFile.readAsStringSync());
+        final resolverFile =
+            File('${testDirectory.path}/loon/__resolver__.json');
+        final resolverJson = jsonDecode(resolverFile.readAsStringSync());
 
-        expect(metaJson, {
-          "users": {
-            "encrypted": false,
-            "data": {
-              "users": {},
-            }
-          }
-        });
+        expect(
+          resolverJson,
+          {
+            "__values": {
+              "users": "users",
+            },
+            "__refs": {
+              "users": 1,
+            },
+          },
+        );
       },
     );
 
@@ -239,12 +243,10 @@ void main() {
         userCollection.doc('2').create(TestUserModel('User 2'));
 
         final file = File('${testDirectory.path}/loon/users.json');
-        final metaFile = File('${testDirectory.path}/loon/__meta__.json');
 
         await completer.onPersistComplete;
 
         expect(file.existsSync(), true);
-        expect(metaFile.existsSync(), true);
 
         // If all documents of a file are deleted, the file itself should be deleted.
         userCollection.doc('1').delete();
@@ -253,7 +255,6 @@ void main() {
         await completer.onPersistComplete;
 
         expect(file.existsSync(), false);
-        expect(metaFile.existsSync(), false);
       },
     );
 
@@ -307,22 +308,21 @@ void main() {
           },
         );
 
-        final metaFile = File('${testDirectory.path}/loon/__meta__.json');
-        final metaJson = jsonDecode(metaFile.readAsStringSync());
+        final resolverFile =
+            File('${testDirectory.path}/loon/__resolver__.json');
+        final resolverJson = jsonDecode(resolverFile.readAsStringSync());
 
         expect(
-          metaJson,
+          resolverJson,
           {
             "users": {
-              "encrypted": false,
-              "data": {
-                "users": {},
-              }
-            },
-            "other_users": {
-              "encrypted": false,
-              "data": {
-                "users": {},
+              "__refs": {
+                "users": 1,
+                "other_users": 1,
+              },
+              "__values": {
+                "1": "users",
+                "2": "other_users",
               }
             }
           },
@@ -393,26 +393,27 @@ void main() {
           },
         );
 
-        final metaFile = File('${testDirectory.path}/loon/__meta__.json');
-        final metaJson = jsonDecode(metaFile.readAsStringSync());
+        final resolverFile =
+            File('${testDirectory.path}/loon/__resolver__.json');
+        final resolverJson = jsonDecode(resolverFile.readAsStringSync());
 
         expect(
-          metaJson,
+          resolverJson,
           {
-            "users": {
-              "encrypted": false,
-              "data": {
-                "users": {},
-              },
+            "__values": {
+              "users": "users",
             },
-            "friends": {
-              "encrypted": false,
-              "data": {
-                "users": {
-                  "2": {
-                    "friends": {},
-                  }
-                }
+            "__refs": {
+              "users": 1,
+            },
+            "users": {
+              "2": {
+                "__refs": {
+                  "friends": 1,
+                },
+                "__values": {
+                  "friends": "friends",
+                },
               }
             }
           },
@@ -461,7 +462,6 @@ void main() {
             "users": {
               "__values": {
                 "1": {"name": "User 1"},
-                "2": {"name": "User 2"},
               }
             }
           },
@@ -474,6 +474,26 @@ void main() {
               "__values": {
                 "2": {"name": "User 2 updated"},
               }
+            }
+          },
+        );
+
+        final resolverFile =
+            File('${testDirectory.path}/loon/__resolver__.json');
+        final resolverJson = jsonDecode(resolverFile.readAsStringSync());
+
+        expect(
+          resolverJson,
+          {
+            "users": {
+              "__refs": {
+                "users": 1,
+                "updated_users": 1,
+              },
+              "__values": {
+                "1": "users",
+                "2": "updated_users",
+              },
             }
           },
         );

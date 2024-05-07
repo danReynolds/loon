@@ -2,8 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:encrypt/encrypt.dart';
 import 'package:loon/loon.dart';
-
-final logger = Logger('FileDataStore');
+import 'package:path/path.dart' as path;
 
 final fileRegex = RegExp(r'^(\w+)(?:\.(encrypted))?\.json$');
 
@@ -15,10 +14,7 @@ class FileDataStore {
   final String name;
 
   /// The data contained within the file data store.
-  late IndexedValueStore<Json> _store;
-
-  /// A cache of the data store's latest meta data.
-  Json _meta = {};
+  IndexedValueStore<Json> _store = IndexedValueStore<Json>();
 
   /// Whether the file data store has pending changes that should be persisted.
   bool isDirty = false;
@@ -26,14 +22,13 @@ class FileDataStore {
   /// Whether the file data store has been hydrated yet from its persisted file.
   bool isHydrated;
 
+  static final _logger = Logger('FileDataStore');
+
   FileDataStore({
     required this.file,
     required this.name,
-    IndexedValueStore<Json>? store,
     this.isHydrated = false,
-  }) {
-    _store = store ?? IndexedValueStore<Json>();
-  }
+  });
 
   @override
   bool operator ==(Object other) {
@@ -54,7 +49,7 @@ class FileDataStore {
   }
 
   Future<void> _writeFile(String value) {
-    return logger.measure(
+    return _logger.measure(
       'Write data store $name',
       () => file.writeAsString(value),
     );
@@ -78,7 +73,7 @@ class FileDataStore {
 
   Future<void> delete() async {
     if (!file.existsSync()) {
-      logger.log('Attempted to delete non-existent file');
+      _logger.log('Attempted to delete non-existent file');
       return;
     }
 
@@ -92,7 +87,7 @@ class FileDataStore {
     }
 
     try {
-      await logger.measure(
+      await _logger.measure(
         'Parse data store $name',
         () async {
           final fileStr = await _readFile();
@@ -102,11 +97,11 @@ class FileDataStore {
       isHydrated = true;
     } catch (e) {
       if (e is PathNotFoundException) {
-        logger.log('Missing file data store $name');
+        _logger.log('Missing file data store $name');
       } else {
         // If hydration fails for an existing file, then this file data store is corrupt
         // and should be removed from the file data store index.
-        logger.log('Corrupt file data store $name');
+        _logger.log('Corrupt file data store $name');
         rethrow;
       }
     }
@@ -114,11 +109,11 @@ class FileDataStore {
 
   Future<void> persist() async {
     if (_store.isEmpty) {
-      logger.log('Attempted to write empty data store');
+      _logger.log('Attempted to write empty data store');
       return;
     }
 
-    final encodedStore = await logger.measure(
+    final encodedStore = await _logger.measure(
       'Persist data store $name',
       () async => jsonEncode(_store.inspect()),
     );
@@ -136,6 +131,31 @@ class FileDataStore {
   /// this data store at that path.
   void graft(FileDataStore other, String path) {
     _store.graft(other._store, path);
+    isDirty = true;
+    other.isDirty = true;
+  }
+
+  static FileDataStore parse(
+    File file, {
+    required Encrypter? encrypter,
+  }) {
+    final match = fileRegex.firstMatch(path.basename(file.path));
+    final name = match!.group(1)!;
+    final encryptionEnabled = match.group(2) != null;
+
+    if (encryptionEnabled) {
+      if (encrypter == null) {
+        throw 'Missing encrypter';
+      }
+
+      return EncryptedFileDataStore(
+        file: file,
+        name: "$name.encrypted",
+        encrypter: encrypter,
+      );
+    }
+
+    return FileDataStore(file: file, name: name);
   }
 
   static FileDataStore create(
@@ -143,7 +163,6 @@ class FileDataStore {
     required bool encrypted,
     required Directory directory,
     required Encrypter? encrypter,
-    bool isHydrated = true,
   }) {
     if (encrypted) {
       if (encrypter == null) {
@@ -154,33 +173,20 @@ class FileDataStore {
         file: File("${directory.path}/$name.encrypted.json"),
         name: "$name.encrypted",
         encrypter: encrypter,
-        isHydrated: isHydrated,
+        isHydrated: true,
       );
     }
 
     return FileDataStore(
       file: File("${directory.path}/$name.json"),
       name: name,
-      isHydrated: isHydrated,
+      isHydrated: true,
     );
   }
 
   /// Returns a flat map of all values in the store by path.
   Map<String, Json> extractValues() {
     return _store.extractValues();
-  }
-
-  /// Extracts the meta data for the store into [Json].
-  Json extractMeta() {
-    if (!isDirty) {
-      return _meta;
-    }
-
-    return _meta = {
-      // Only the structure of the store is serialized, its values are not required.
-      "data": _store.extractStructure(),
-      "encrypted": this is EncryptedFileDataStore,
-    };
   }
 }
 
@@ -218,85 +224,64 @@ class EncryptedFileDataStore extends FileDataStore {
   }
 }
 
-/// The [MetaFileDataStore] stores an index of each existing file data store's meta data including:
-/// 1. The structure of the store's current data (used for determining which stores to hydrate by path).
-/// 2. The encryption status of the store.
-class MetaFileDataStore {
-  final Map<String, FileDataStore> index;
-  final Encrypter? encrypter;
+class FileDataStoreResolver {
   late final File _file;
 
-  static const name = '__meta__';
+  IndexedRefValueStore<String> store = IndexedRefValueStore<String>();
 
-  MetaFileDataStore({
-    required this.index,
-    required this.encrypter,
+  static const name = '__resolver__';
+
+  final _logger = Logger('FileDataStoreResolver');
+
+  FileDataStoreResolver({
     required Directory directory,
   }) {
     _file = File("${directory.path}/$name.json");
   }
 
-  /// Initializes each [FileDataStore] using the meta data stored in the [MetaFileDataStore]. Does *not*
-  /// hydrate the file data stores, since that is done on-demand by the client.
   Future<void> hydrate() async {
     try {
-      await logger.measure(
-        'Hydrate meta data store',
+      await _logger.measure(
+        'Hydrate',
         () async {
           final fileStr = await _file.readAsString();
-          final Json json = jsonDecode(fileStr);
-
-          for (final entry in json.entries) {
-            final name = entry.key;
-            final metaJson = entry.value;
-            index[name] = FileDataStore.create(
-              name,
-              encrypted: metaJson['encrypted'],
-              directory: _file.parent,
-              encrypter: encrypter,
-              isHydrated: false,
-            );
-          }
+          store = jsonDecode(fileStr);
         },
       );
     } catch (e) {
       if (e is PathNotFoundException) {
-        logger.log('Missing file data store resolver');
+        _logger.log('Missing resolver file.');
       } else {
+        // If hydration fails for an existing file, then this file data store is corrupt
+        // and should be removed from the file data store index.
+        _logger.log('Corrupt resolver file.');
         rethrow;
       }
     }
   }
 
-  /// Persists the meta file data store which consists of a mapping of all file data stores
-  /// by name to their meta data including their encrypted status and the structure of the data
-  /// contained in their data store.
   Future<void> persist() async {
-    await logger.measure(
-      'Persist meta data store',
+    await _logger.measure(
+      'Persist',
       () async {
-        final data = {};
-        for (final entry in index.entries) {
-          data[entry.key] = entry.value.extractMeta();
+        if (store.isEmpty) {
+          _logger.log('Empty persist');
+          return;
         }
-        await _file.writeAsString(jsonEncode(data));
+        await _file.writeAsString(jsonEncode(store.inspect()));
       },
     );
   }
 
   Future<void> delete() async {
-    await logger.measure(
-      'Delete meta data store',
+    await _logger.measure(
+      'Delete',
       () async {
-        try {
-          await _file.delete();
-        } catch (e) {
-          if (e is PathNotFoundException) {
-            logger.log('Missing meta data store');
-          } else {
-            rethrow;
-          }
+        if (!_file.existsSync()) {
+          return;
         }
+        await _file.delete();
+        store.clear();
       },
     );
   }
