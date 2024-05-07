@@ -10,17 +10,18 @@ final fileRegex = RegExp(r'^(\w+)(?:\.(encrypted))?\.json$');
 class FileDataStore {
   final File file;
   final String name;
-  late final IndexedValueStore<Json> _store;
+  late IndexedValueStore<Json> _store;
 
   /// Whether the file data store has pending changes that should be persisted.
   bool isDirty = false;
 
-  bool isHydrated = false;
+  bool isHydrated;
 
   FileDataStore({
     required this.file,
     required this.name,
     IndexedValueStore<Json>? store,
+    this.isHydrated = false,
   }) {
     _store = store ?? IndexedValueStore<Json>();
   }
@@ -82,15 +83,11 @@ class FileDataStore {
     }
 
     try {
-      final fileStr = await _readFile();
       await logger.measure(
         'Parse data store $name',
         () async {
-          final hydratedStore = IndexedValueStore.fromJson(jsonDecode(fileStr));
-          // The file data store can have data marked for persistence before it is hydrated,
-          // in which case the pending data is grafted into the hydrated data.
-          hydratedStore.graft(_store);
-          _store = hydratedStore;
+          final fileStr = await _readFile();
+          _store = IndexedValueStore.fromJson(jsonDecode(fileStr));
         },
       );
       isHydrated = true;
@@ -112,15 +109,8 @@ class FileDataStore {
       return;
     }
 
-    // A data store must be hydrated before it can be persisted, since data stores
-    // are not written incrementally and must merge all of its data before writing
-    // to its underlying file.
-    if (!isHydrated) {
-      await hydrate();
-    }
-
     final encodedStore = await logger.measure(
-      'Serialize data store $name',
+      'Persist data store $name',
       () async => jsonEncode(_store.inspect()),
     );
 
@@ -144,6 +134,7 @@ class FileDataStore {
     required bool encryptionEnabled,
     required Directory directory,
     required Encrypter? encrypter,
+    bool isHydrated = true,
   }) {
     if (encryptionEnabled) {
       if (encrypter == null) {
@@ -154,12 +145,14 @@ class FileDataStore {
         file: File("${directory.path}/$name.encrypted.json"),
         name: "$name.encrypted",
         encrypter: encrypter,
+        isHydrated: isHydrated,
       );
     }
 
     return FileDataStore(
       file: File("${directory.path}/$name.json"),
       name: name,
+      isHydrated: isHydrated,
     );
   }
 
@@ -171,7 +164,6 @@ class FileDataStore {
   /// Extracts the meta data for the store into [Json].
   Json extractMeta() {
     return {
-      "name": name,
       // Only the structure of the store is serialized, its values are not required.
       "data": _store.extractStructure(),
       "encryptionEnabled": this is EncryptedFileDataStore,
@@ -186,6 +178,7 @@ class EncryptedFileDataStore extends FileDataStore {
     required super.name,
     required super.file,
     required this.encrypter,
+    super.isHydrated = false,
   });
 
   String _encrypt(String plainText) {
@@ -242,12 +235,14 @@ class MetaFileDataStore {
           final Json json = jsonDecode(fileStr);
 
           for (final entry in json.entries) {
+            final name = entry.key;
             final metaJson = entry.value;
-            index[entry.key] = FileDataStore.create(
+            index[name] = FileDataStore.create(
               name,
               encryptionEnabled: metaJson['encryptionEnabled'],
               directory: _file.parent,
               encrypter: encrypter,
+              isHydrated: false,
             );
           }
         },
@@ -256,7 +251,6 @@ class MetaFileDataStore {
       if (e is PathNotFoundException) {
         logger.log('Missing file data store resolver');
       } else {
-        logger.log('Corrupt file data store resolver');
         rethrow;
       }
     }
@@ -282,7 +276,15 @@ class MetaFileDataStore {
     await logger.measure(
       'Delete meta data store',
       () async {
-        await _file.delete();
+        try {
+          await _file.delete();
+        } catch (e) {
+          if (e is PathNotFoundException) {
+            logger.log('Missing meta data store');
+          } else {
+            rethrow;
+          }
+        }
       },
     );
   }

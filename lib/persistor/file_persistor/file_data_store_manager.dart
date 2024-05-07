@@ -37,20 +37,32 @@ class FileDataStoreManager {
     await Future.wait([
       ...dirtyStores.map((dataStore) async {
         if (dataStore.isEmpty) {
-          _index.remove(dataStore);
+          _index.remove(dataStore.name);
           return dataStore.delete();
         }
 
         return dataStore.persist();
       }),
-      _meta.persist(),
+      Future.sync(() {
+        if (_index.isEmpty) {
+          return _meta.delete();
+        }
+        _meta.persist();
+      })
     ]);
   }
 
   /// Clears the provided path and all of its subpaths from each data store that contains
   /// data under that path.
-  void _clear(String path) {
+  Future<void> _clear(String path) async {
     final stores = _index.values.where((store) => store.hasEntry(path));
+
+    // Unhydrated stores containing the path must be hydrated before the data can be removed.
+    final unhydratedStores = stores.where((store) => !store.isHydrated);
+    if (unhydratedStores.isNotEmpty) {
+      await Future.wait(unhydratedStores.map((store) => store.hydrate()));
+    }
+
     for (final store in stores) {
       store.removeEntry(path);
     }
@@ -126,7 +138,7 @@ class FileDataStoreManager {
 
       // If the document has been deleted, then clear it and its subcollections from the store.
       if (docData == null) {
-        _clear(docPath);
+        await _clear(docPath);
         continue;
       }
 
@@ -152,6 +164,10 @@ class FileDataStoreManager {
           // If the persistence key for the path has changed, then all of the data
           // under that path needs to be moved to the destination data store.
           if (prevDataStore != null) {
+            if (!dataStore.isHydrated) {
+              await dataStore.hydrate();
+            }
+
             dataStore.graft(prevDataStore, path);
           }
 
@@ -161,9 +177,9 @@ class FileDataStoreManager {
         // If the document does not specify a persistence key, then its data store is resolved to the nearest data store
         // found in the document index moving up from its path. If no data store exists in this path yet, then the
         // it defaults to using one named after the document's top-level collection.
-        FileDataStore? dataStore = _documentIndex.getNearest(docPath);
+        FileDataStore? nearestDataStore = _documentIndex.getNearest(docPath);
 
-        if (dataStore == null) {
+        if (nearestDataStore == null) {
           final dataStoreName = docPath.split('__').first;
 
           dataStore = _index[dataStoreName] ??= FileDataStore.create(
@@ -174,8 +190,17 @@ class FileDataStoreManager {
           );
 
           _documentIndex.write(dataStoreName, dataStore);
+        } else {
+          dataStore = nearestDataStore;
         }
       }
+
+      // A data store must be hydrated before data can be persisted to it.
+      if (!dataStore.isHydrated) {
+        await dataStore.hydrate();
+      }
+
+      dataStore.writeEntry(docPath, docData);
     }
 
     await _sync();

@@ -92,10 +92,6 @@ void main() {
         final file = File('${testDirectory.path}/loon/users.json');
         final json = jsonDecode(file.readAsStringSync());
 
-        final resolverFile =
-            File('${testDirectory.path}/loon/__resolver__.json');
-        final resolverJson = jsonDecode(resolverFile.readAsStringSync());
-
         expect(
           json,
           {
@@ -115,14 +111,21 @@ void main() {
           },
         );
 
+        final metaFile = File('${testDirectory.path}/loon/__meta__.json');
+        final metaJson = jsonDecode(metaFile.readAsStringSync());
+
         expect(
-          resolverJson,
+          metaJson,
           {
-            "__refs": {
-              "users": 1,
-            },
-            "__values": {
-              "users": "users",
+            "users": {
+              "encryptionEnabled": false,
+              "data": {
+                "users": {
+                  "2": {
+                    "friends": {},
+                  }
+                }
+              }
             }
           },
         );
@@ -162,18 +165,15 @@ void main() {
           },
         );
 
-        final resolverFile =
-            File('${testDirectory.path}/loon/__resolver__.json');
-        final resolverJson = jsonDecode(resolverFile.readAsStringSync());
+        final metaFile = File('${testDirectory.path}/loon/__meta__.json');
+        final metaJson = jsonDecode(metaFile.readAsStringSync());
 
         expect(
-          resolverJson,
+          metaJson,
           {
-            "__refs": {
-              "users": 1,
-            },
-            "__values": {
-              "users": "users",
+            "users": {
+              "encryptionEnabled": false,
+              "data": {"users": {}}
             }
           },
         );
@@ -212,21 +212,17 @@ void main() {
           },
         );
 
-        final resolverFile =
-            File('${testDirectory.path}/loon/__resolver__.json');
-        final resolverJson = jsonDecode(resolverFile.readAsStringSync());
+        final metaFile = File('${testDirectory.path}/loon/__meta__.json');
+        final metaJson = jsonDecode(metaFile.readAsStringSync());
 
-        expect(
-          resolverJson,
-          {
-            "__refs": {
-              "users": 1,
-            },
-            "__values": {
-              "users": "users",
+        expect(metaJson, {
+          "users": {
+            "encryptionEnabled": false,
+            "data": {
+              "users": {},
             }
-          },
-        );
+          }
+        });
       },
     );
 
@@ -243,13 +239,12 @@ void main() {
         userCollection.doc('2').create(TestUserModel('User 2'));
 
         final file = File('${testDirectory.path}/loon/users.json');
+        final metaFile = File('${testDirectory.path}/loon/__meta__.json');
 
         await completer.onPersistComplete;
 
-        expect(
-          file.existsSync(),
-          true,
-        );
+        expect(file.existsSync(), true);
+        expect(metaFile.existsSync(), true);
 
         // If all documents of a file are deleted, the file itself should be deleted.
         userCollection.doc('1').delete();
@@ -257,10 +252,8 @@ void main() {
 
         await completer.onPersistComplete;
 
-        expect(
-          file.existsSync(),
-          false,
-        );
+        expect(file.existsSync(), false);
+        expect(metaFile.existsSync(), false);
       },
     );
 

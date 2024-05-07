@@ -445,4 +445,28 @@ void main() {
       });
     });
   });
+
+  group('extractStructure', () {
+    test('Extracts the structure of the store to a map', () {
+      final store = IndexedValueStore<String>();
+
+      store.write('users__1', 'Dan');
+      store.write('users__2', 'Sonja');
+      store.write('users__1__messages__1', 'Hello');
+      store.write('users__1__messages__2', 'How are you?');
+      store.write('users__2__messages__1', 'Hey!');
+      store.write('users__2__messages__2', "I'm good.");
+
+      expect(store.extractStructure(), {
+        "users": {
+          "1": {
+            "messages": {},
+          },
+          "2": {
+            "messages": {},
+          }
+        }
+      });
+    });
+  });
 }
