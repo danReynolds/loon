@@ -124,13 +124,28 @@ class FileDataStore {
   }
 
   bool get isEmpty {
-    return _store.isEmpty;
+    return isHydrated && _store.isEmpty;
   }
 
   /// Grafts the data at the given [path] in the other [FileDataStore] onto
   /// this data store at that path.
-  void graft(FileDataStore other, String path) {
+  Future<void> graft(FileDataStore other, String path) async {
+    final List<Future<void>> futures = [];
+
+    // Both data stores involved in the graft operation must be hydrated in order
+    // to move the data from one to the other.
+    if (!isHydrated) {
+      futures.add(hydrate());
+    }
+    if (!other.isHydrated) {
+      futures.add(other.hydrate());
+    }
+
+    await Future.wait(futures);
+
     _store.graft(other._store, path);
+
+    // After the graft, both affected data stores must be marked as dirty.
     isDirty = true;
     other.isDirty = true;
   }

@@ -611,7 +611,10 @@ void main() {
 
       // After clearing the data and reinitializing it from disk to verify with hydration,
       // the persistor needs to be re-created so that it re-reads all data stores from disk.
-      Loon.configure(persistor: FilePersistor());
+      Loon.configure(
+        persistor:
+            FilePersistor(persistenceThrottle: const Duration(milliseconds: 1)),
+      );
 
       await Loon.hydrate();
 
@@ -648,25 +651,49 @@ void main() {
       ]);
     });
 
-    test('Merges existing collections', () async {
+    // In this scenario, the document `users__1` was persisted to other_users.json in a previous session,
+    // but now before hydration it has been re-persisted to users.json. The subsequent hydration of other_users.json
+    // should favor the current value in the store over the hydrated value, and remove the stale persisted value from
+    // the other_users.json file store.
+    test('Handles merging data from a stale file store', () async {
+      // The file to be hydrated needs to be created before the persistor is initialized
+      // so that the persistor discovers the file data store as part of its initialization.
+      final file = File('${testDirectory.path}/loon/other_users.json');
+      file.writeAsStringSync(
+        jsonEncode(
+          {
+            "users": {
+              "__values": {
+                "1": {
+                  "name": "User 1",
+                },
+                "2": {
+                  "name": "User 2",
+                }
+              }
+            }
+          },
+        ),
+      );
+
+      Loon.configure(
+        persistor: FilePersistor(
+          persistenceThrottle: const Duration(milliseconds: 1),
+          onPersist: (_) {
+            completer.persistComplete();
+          },
+        ),
+      );
+
       final userCollection = Loon.collection(
         'users',
         fromJson: TestUserModel.fromJson,
         toJson: (user) => user.toJson(),
       );
 
-      userCollection.doc('1').create(TestUserModel('User 1'));
+      userCollection.doc('1').create(TestUserModel('User 1 latest'));
 
       await completer.onPersistComplete;
-
-      final file = File('${testDirectory.path}/loon/users.json');
-      file.writeAsStringSync(
-        jsonEncode(
-          {
-            'users:2': {'name': 'User 2'}
-          },
-        ),
-      );
 
       await Loon.hydrate();
 
@@ -675,7 +702,7 @@ void main() {
         [
           DocumentSnapshot(
             doc: userCollection.doc('1'),
-            data: TestUserModel('User 1'),
+            data: TestUserModel('User 1 latest'),
           ),
           DocumentSnapshot(
             doc: userCollection.doc('2'),
@@ -683,6 +710,50 @@ void main() {
           ),
         ],
       );
+
+      // The other_users file data store should have moved its data to the users data store, since the resolver
+      // points the users collection to the users file data store.
+      //
+      // In order to verify this, we need to trigger another persist since the hydration just makes this data
+      // migration from stale data stores in memory and delays writing the change until the next persist event
+      // to make hydration faster.
+      userCollection.doc('3').create(TestUserModel('User 3'));
+
+      await completer.onPersistComplete;
+
+      final resolverFile = File('${testDirectory.path}/loon/__resolver__.json');
+      final resolverJson = jsonDecode(resolverFile.readAsStringSync());
+
+      expect(
+        resolverJson,
+        {
+          "__values": {
+            "users": "users",
+          },
+          "__refs": {
+            "users": 1,
+          },
+        },
+      );
+
+      final usersFile = File('${testDirectory.path}/loon/users.json');
+      final usersJson = jsonDecode(usersFile.readAsStringSync());
+
+      expect(usersJson, {
+        "users": {
+          "__values": {
+            "1": {"name": "User 1 latest"},
+            "2": {"name": "User 2"},
+            "3": {"name": "User 3"},
+          },
+        },
+      });
+
+      // Since all the data has been moved from the other_users data store to the users data store,
+      // the other_users store should have been removed.
+      final otherUsersFile =
+          File('${testDirectory.path}/loon/other_users.json');
+      expect(otherUsersFile.existsSync(), false);
     });
 
     test('Hydrates large persistence files', () async {

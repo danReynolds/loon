@@ -118,18 +118,27 @@ class FileDataStoreManager {
     await Future.wait(dataStores.map((store) => store.hydrate()));
 
     final Map<String, Json> data = {};
-    for (final dataStore in dataStores) {
-      final extractedData = dataStore.extractValues();
+    for (final hydratedStore in dataStores) {
+      final extractedData = hydratedStore.extractValues();
 
-      for (final docPath in extractedData.keys) {
-        // In the unlikely scenario where a hydrated document already exists in a different data store,
-        // then it must have been written with an updated persistence key and value before it was hydrated
-        // from this data store. In that case, this hydrated value is stale and should be deleted from both
-        // the data store and the extracted data.
-        final existingDataStore = _index[_resolver.store.get(docPath)];
-        if (existingDataStore != null && existingDataStore != dataStore) {
-          extractedData.remove(docPath);
-          dataStore.removeEntry(docPath);
+      for (final docPath in extractedData.keys.toList()) {
+        // In the situation where a hydrated document is now resolved to a different data store
+        // then it was when it was persisted, then there are two scenarios:
+        //
+        // 1. If the document already exists in the resolved data store, then that means that the
+        //    document has been updated since it was persisted and that the hydrated value is stale.
+        //    In this scenario, the stale hydrated document should be removed from the extracted hydration data and
+        //    removed from its old data store.
+        // 2. The document does not exist in the resolved data store, in which case it should be moved from
+        //    its old data store to the updated one and delivered in the extracted hydration data.
+        final resolvedDataStore = _index[_resolver.store.getNearest(docPath)];
+        if (resolvedDataStore != null && resolvedDataStore != hydratedStore) {
+          if (resolvedDataStore.hasEntry(docPath)) {
+            extractedData.remove(docPath);
+          } else {
+            resolvedDataStore.writeEntry(docPath, extractedData[docPath]!);
+          }
+          hydratedStore.removeEntry(docPath);
         }
       }
 
@@ -179,13 +188,6 @@ class FileDataStoreManager {
           // If the persistence key for the path has changed, then all of the data
           // under that path needs to be moved to the destination data store.
           if (prevDataStore != null) {
-            if (!prevDataStore.isHydrated) {
-              await prevDataStore.hydrate();
-            }
-            if (!dataStore.isHydrated) {
-              await dataStore.hydrate();
-            }
-
             dataStore.graft(prevDataStore, path);
           }
 
