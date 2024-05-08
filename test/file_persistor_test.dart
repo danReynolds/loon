@@ -514,76 +514,104 @@ void main() {
         toJson: (user) => user.toJson(),
       );
 
+      final userFriendsCollection =
+          Loon.collection('users').doc('1').subcollection<TestUserModel>(
+                'friends',
+                fromJson: TestUserModel.fromJson,
+                toJson: (user) => user.toJson(),
+                persistorSettings:
+                    FilePersistorSettings(key: FilePersistor.key('my_friends')),
+              );
+
       Directory('${testDirectory.path}/loon').createSync();
 
-      final usersFile = File('${testDirectory.path}/loon/users.json');
-      usersFile.writeAsStringSync(
-        jsonEncode(
-          {
-            "users": {
-              "__values": {
-                "1": {"name": "User 1"},
-                "2": {"name": "User 2"},
-              }
-            }
-          },
-        ),
-      );
+      userCollection.doc('1').create(TestUserModel('User 1'));
+      userCollection.doc('2').create(TestUserModel('User 2'));
 
-      final otherUsersFile =
-          File('${testDirectory.path}/loon/other_users.json');
-      otherUsersFile.writeAsStringSync(
-        jsonEncode(
-          {
-            "users": {
-              "__values": {
-                "3": {"name": "User 3"},
-              }
-            }
-          },
-        ),
-      );
+      friendsCollection.doc('1').create(TestUserModel('Friend 1'));
+      friendsCollection.doc('2').create(TestUserModel('Friend 2'));
+
+      userFriendsCollection.doc('3').create(TestUserModel('Friend 3'));
+
+      await completer.onPersistComplete;
+
+      final usersFile = File('${testDirectory.path}/loon/users.json');
+      final usersJson = jsonDecode(usersFile.readAsStringSync());
+
+      expect(usersJson, {
+        "users": {
+          "__values": {
+            "1": {"name": "User 1"},
+            "2": {"name": "User 2"},
+          }
+        }
+      });
 
       final friendsFile = File('${testDirectory.path}/loon/friends.json');
-      friendsFile.writeAsStringSync(
-        jsonEncode(
-          {
+      final friendsJson = jsonDecode(friendsFile.readAsStringSync());
+
+      expect(friendsJson, {
+        "friends": {
+          "__values": {
+            "1": {"name": "Friend 1"},
+            "2": {"name": "Friend 2"},
+          }
+        }
+      });
+
+      final myFriendsFile = File('${testDirectory.path}/loon/my_friends.json');
+      final myFriendsJson = jsonDecode(myFriendsFile.readAsStringSync());
+
+      expect(myFriendsJson, {
+        "users": {
+          "1": {
             "friends": {
               "__values": {
-                "1": {"name": "Friend 1"},
-                "2": {"name": "Friend 2"},
                 "3": {"name": "Friend 3"},
               }
             }
-          },
-        ),
-      );
+          }
+        }
+      });
 
-      final metaFile = File('${testDirectory.path}/loon/__meta__.json');
-      metaFile.writeAsStringSync(
-        jsonEncode(
-          {
-            "users": {
-              "encrypted": false,
-              "data": {
-                "users": {},
-              }
+      final resolverFile = File('${testDirectory.path}/loon/__resolver__.json');
+      final resolverJson = jsonDecode(resolverFile.readAsStringSync());
+
+      expect(resolverJson, {
+        "__refs": {
+          "users": 1,
+          "friends": 1,
+        },
+        "__values": {
+          "users": "users",
+          "friends": "friends",
+        },
+        "users": {
+          "1": {
+            "__refs": {
+              "my_friends": 1,
             },
-            "other_users": {
-              "encrypted": false,
-              "data": {
-                "users": {},
-              },
+            "__values": {
+              "friends": "my_friends",
             },
-            "friends": {
-              "encrypted": false,
-              "data": {
-                "friends": {},
-              }
-            }
-          },
-        ),
-      );
+          }
+        }
+      });
+
+      await Loon.clearAll();
+
+      expect(usersFile.existsSync(), false);
+      expect(friendsFile.existsSync(), false);
+      expect(myFriendsFile.existsSync(), false);
+      expect(resolverFile.existsSync(), false);
+
+      usersFile.writeAsStringSync(jsonEncode(usersJson));
+      myFriendsFile.writeAsStringSync(jsonEncode(myFriendsJson));
+      friendsFile.writeAsStringSync(jsonEncode(friendsJson));
+
+      // After clearing the data and reinitializing it from disk to verify with hydration,
+      // the persistor needs to be re-created so that it re-reads all data stores from disk.
+      Loon.configure(persistor: FilePersistor());
 
       await Loon.hydrate();
 
@@ -598,12 +626,26 @@ void main() {
             doc: userCollection.doc('2'),
             data: TestUserModel('User 2'),
           ),
-          DocumentSnapshot(
-            doc: userCollection.doc('3'),
-            data: TestUserModel('User 3'),
-          ),
         ],
       );
+
+      expect(friendsCollection.get(), [
+        DocumentSnapshot(
+          doc: friendsCollection.doc('1'),
+          data: TestUserModel('Friend 1'),
+        ),
+        DocumentSnapshot(
+          doc: friendsCollection.doc('2'),
+          data: TestUserModel('Friend 2'),
+        ),
+      ]);
+
+      expect(userFriendsCollection.get(), [
+        DocumentSnapshot(
+          doc: userFriendsCollection.doc('3'),
+          data: TestUserModel('Friend 3'),
+        ),
+      ]);
     });
 
     test('Merges existing collections', () async {

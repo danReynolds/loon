@@ -19,6 +19,33 @@ class Document<T> {
     this.dependenciesBuilder,
   });
 
+  static Document<Json> _fromPath(
+    dynamic ref,
+    List<String> segments,
+    int index,
+  ) {
+    if (index == segments.length) {
+      return ref;
+    }
+
+    final segment = segments[index];
+    if (ref is Document) {
+      return Document._fromPath(
+        ref.subcollection<Json>(segment),
+        segments,
+        index + 1,
+      );
+    } else if (ref is Collection) {
+      return Document._fromPath(ref.doc(segment), segments, index + 1);
+    }
+
+    throw 'Invalid path';
+  }
+
+  static Document<Json> fromPath(String path) {
+    return Document._fromPath(Document.root, path.split('__'), 0);
+  }
+
   @override
   bool operator ==(Object other) {
     if (identical(this, other)) {

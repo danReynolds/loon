@@ -113,7 +113,7 @@ class IndexedValueStore<T> {
       _store,
       segments.isEmpty ? segments : segments.sublist(0, segments.length - 1),
       0,
-    )?[_values][segments.last];
+    )?[_values]?[segments.last];
   }
 
   T? _getNearest(Map? node, List<String> segments, int index) {
@@ -319,6 +319,14 @@ class IndexedValueStore<T> {
 /// distinct value in a given path's values.
 class IndexedRefValueStore<T> extends IndexedValueStore<T> {
   static const _refs = '__refs';
+
+  IndexedRefValueStore({
+    Map? store,
+  }) {
+    if (store != null) {
+      _store = store;
+    }
+  }
 
   @override
   Map _mergeNode(Map node, Map otherNode) {

@@ -41,7 +41,7 @@ class Loon {
 
   final broadcastManager = BroadcastManager();
 
-  final logger = Logger('Loon');
+  static final logger = Logger('Loon');
 
   bool enableLogging = false;
 
@@ -263,28 +263,26 @@ class Loon {
 
   static Future<void> hydrate() async {
     if (_instance.persistor == null) {
-      _instance.logger.log('Hydration skipped - no persistor specified');
+      logger.log('Hydration skipped - no persistor specified');
       return;
     }
     try {
       final data = await _instance.persistor!._hydrate();
 
-      for (final collectionDataStore in data.entries) {
-        final collectionName = collectionDataStore.key;
-        final documentDataStore = collectionDataStore.value;
+      for (final entry in data.entries) {
+        final docPath = entry.key;
+        final data = entry.value;
 
-        for (final documentDataEntry in documentDataStore.entries) {
-          _instance.writeDocument(
-            Loon.collection<Json>(collectionName).doc(documentDataEntry.key),
-            documentDataEntry.value,
-            event: EventTypes.hydrated,
-            persist: false,
-          );
-        }
+        _instance.writeDocument<Json>(
+          Document.fromPath(docPath),
+          data,
+          event: EventTypes.hydrated,
+          persist: false,
+        );
       }
     } catch (e) {
       // ignore: avoid_print
-      _instance.logger.log('Error hydrating');
+      logger.log('Error hydrating');
       rethrow;
     }
   }

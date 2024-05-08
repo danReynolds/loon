@@ -4,7 +4,7 @@ import 'package:encrypt/encrypt.dart';
 import 'package:loon/loon.dart';
 import 'package:path/path.dart' as path;
 
-final fileRegex = RegExp(r'^(\w+)(?:\.(encrypted))?\.json$');
+final fileRegex = RegExp(r'^(?!__resolver__)(\w+)(?:\.(encrypted))?\.json$');
 
 class FileDataStore {
   /// The file associated with the data store.
@@ -245,7 +245,7 @@ class FileDataStoreResolver {
         'Hydrate',
         () async {
           final fileStr = await _file.readAsString();
-          store = jsonDecode(fileStr);
+          store = IndexedRefValueStore(store: jsonDecode(fileStr));
         },
       );
     } catch (e) {
