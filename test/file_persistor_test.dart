@@ -502,7 +502,7 @@ void main() {
   });
 
   group('hydrate', () {
-    test('Hydrates all data from persistence files into collections', () async {
+    test('Hydrates all data from persistence files', () async {
       final userCollection = Loon.collection(
         'users',
         fromJson: TestUserModel.fromJson,
@@ -522,8 +522,6 @@ void main() {
                 persistorSettings:
                     FilePersistorSettings(key: FilePersistor.key('my_friends')),
               );
-
-      Directory('${testDirectory.path}/loon').createSync();
 
       userCollection.doc('1').create(TestUserModel('User 1'));
       userCollection.doc('2').create(TestUserModel('User 2'));
@@ -650,6 +648,100 @@ void main() {
         ),
       ]);
     });
+
+    test(
+      "Hydrates all data under the given path from persistence files",
+      () async {
+        final userCollection = Loon.collection(
+          'users',
+          fromJson: TestUserModel.fromJson,
+          toJson: (user) => user.toJson(),
+        );
+        final friendsCollection = Loon.collection(
+          'friends',
+          fromJson: TestUserModel.fromJson,
+          toJson: (user) => user.toJson(),
+        );
+
+        final userFriendsCollection = Loon.collection('users')
+            .doc('1')
+            .subcollection<TestUserModel>(
+              'friends',
+              fromJson: TestUserModel.fromJson,
+              toJson: (user) => user.toJson(),
+              persistorSettings:
+                  FilePersistorSettings(key: FilePersistor.key('my_friends')),
+            );
+
+        userCollection.doc('1').create(TestUserModel('User 1'));
+        userCollection.doc('2').create(TestUserModel('User 2'));
+
+        friendsCollection.doc('1').create(TestUserModel('Friend 1'));
+        friendsCollection.doc('2').create(TestUserModel('Friend 2'));
+
+        userFriendsCollection.doc('3').create(TestUserModel('Friend 3'));
+
+        await completer.onPersistComplete;
+
+        final usersFile = File('${testDirectory.path}/loon/users.json');
+        final usersJson = jsonDecode(usersFile.readAsStringSync());
+
+        final friendsFile = File('${testDirectory.path}/loon/friends.json');
+        final friendsJson = jsonDecode(friendsFile.readAsStringSync());
+
+        final myFriendsFile =
+            File('${testDirectory.path}/loon/my_friends.json');
+        final myFriendsJson = jsonDecode(myFriendsFile.readAsStringSync());
+
+        final resolverFile =
+            File('${testDirectory.path}/loon/__resolver__.json');
+        final resolverJson = jsonDecode(resolverFile.readAsStringSync());
+
+        await Loon.clearAll();
+
+        usersFile.writeAsStringSync(jsonEncode(usersJson));
+        myFriendsFile.writeAsStringSync(jsonEncode(myFriendsJson));
+        friendsFile.writeAsStringSync(jsonEncode(friendsJson));
+        resolverFile.writeAsStringSync(jsonEncode(resolverJson));
+
+        // After clearing the data and reinitializing it from disk to verify with hydration,
+        // the persistor needs to be re-created so that it re-reads all data stores from disk.
+        Loon.configure(
+          persistor: FilePersistor(
+            persistenceThrottle: const Duration(milliseconds: 1),
+          ),
+        );
+
+        await Loon.hydrate([userCollection]);
+
+        // Only the user collection and its subcollections should have been hydrated.
+        // The `friends` collection should remain empty, while `users` and `users__1__friends`
+        // should be been hydrated from persistence.
+
+        expect(
+          userCollection.get(),
+          [
+            DocumentSnapshot(
+              doc: userCollection.doc('1'),
+              data: TestUserModel('User 1'),
+            ),
+            DocumentSnapshot(
+              doc: userCollection.doc('2'),
+              data: TestUserModel('User 2'),
+            ),
+          ],
+        );
+
+        expect(friendsCollection.get(), []);
+
+        expect(userFriendsCollection.get(), [
+          DocumentSnapshot(
+            doc: userFriendsCollection.doc('3'),
+            data: TestUserModel('Friend 3'),
+          ),
+        ]);
+      },
+    );
 
     // In this scenario, the document `users__1` was persisted to other_users.json in a previous session,
     // but now before hydration it has been re-persisted to users.json. The subsequent hydration of other_users.json

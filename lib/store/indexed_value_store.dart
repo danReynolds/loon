@@ -132,7 +132,7 @@ class IndexedValueStore<T> {
       return node[_values]?[segment];
     }
 
-    return node[_values][segments[index]];
+    return node[_values]?[segments[index]];
   }
 
   /// Returns the nearest value along the given path, beginning at the full path
@@ -334,7 +334,7 @@ class IndexedRefValueStore<T> extends IndexedValueStore<T> {
 
     final otherValues = otherNode[IndexedValueStore._values];
     if (otherValues != null) {
-      node[_refs] ??= {};
+      node[_refs] ??= <T, int>{};
 
       for (final value in otherValues) {
         node[_refs][value] ??= 0;
@@ -423,11 +423,11 @@ class IndexedRefValueStore<T> extends IndexedValueStore<T> {
     Map<T, int> index = const {},
   ]) {
     if (node.containsKey(_refs)) {
-      final Map<T, int> refs = node[_refs];
+      final Map refs = node[_refs];
       for (final entry in refs.entries) {
         final key = entry.key;
         index[key] ??= 0;
-        index[key] = index[key]! + entry.value;
+        index[key] = index[key]! + entry.value as int;
       }
     }
 

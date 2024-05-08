@@ -87,9 +87,9 @@ abstract class Persistor {
     });
   }
 
-  Future<HydrationData> _hydrate() {
+  Future<HydrationData> _hydrate([List<Collection>? collections]) {
     return _runOperation(() async {
-      final result = await hydrate();
+      final result = await hydrate(collections);
       onHydrate?.call(result);
       return result;
     });

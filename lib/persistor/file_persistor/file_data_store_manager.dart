@@ -31,9 +31,11 @@ class FileDataStoreManager {
 
     return {
       if (store != null) store,
-      // Traversing the resolver tree to extract the set of data stores referencing a given path and its subpaths
-      // is generally performant, since the number of nodes traversed in the resolver tree scales O(m) where m is the
-      // number of distinct collections that specify a unique persistence key under the given path and is generally small.
+      // Then resolve all of the data stores under the given path.
+      //
+      // Traversing the resolver tree to extract the set of data stores referenced under a given path is generally performant,
+      // since the number of nodes traversed in the resolver tree scales O(m) where m is the number of distinct collections that
+      // specify a unique persistence key under the given path and is generally small.
       ..._resolver.store
           .extractRefs(path)
           .keys
@@ -108,7 +110,7 @@ class FileDataStoreManager {
     // relevant to the given paths and their subpaths and hydrate those data stores.
     if (paths != null) {
       for (final path in paths) {
-        dataStores.addAll(_index.values.where((store) => store.hasEntry(path)));
+        dataStores.addAll(_resolve(path));
       }
     } else {
       // If no specific collections have been specified, then hydrate all file data stores.

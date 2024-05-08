@@ -261,13 +261,13 @@ class Loon {
     _instance.persistor = persistor;
   }
 
-  static Future<void> hydrate() async {
+  static Future<void> hydrate([List<Collection>? collections]) async {
     if (_instance.persistor == null) {
       logger.log('Hydration skipped - no persistor specified');
       return;
     }
     try {
-      final data = await _instance.persistor!._hydrate();
+      final data = await _instance.persistor!._hydrate(collections);
 
       for (final entry in data.entries) {
         final docPath = entry.key;
