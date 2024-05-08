@@ -275,7 +275,7 @@ class IndexedValueStore<T> {
       }
 
       otherParent[_values]?.remove(lastSegment);
-      final child = parent[lastSegment];
+      final child = parent[lastSegment] ??= {};
       final otherChild = otherParent[lastSegment];
 
       if (otherChild == null) {

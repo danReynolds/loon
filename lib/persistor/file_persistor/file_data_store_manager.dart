@@ -190,7 +190,7 @@ class FileDataStoreManager {
           // If the persistence key for the path has changed, then all of the data
           // under that path needs to be moved to the destination data store.
           if (prevDataStore != null) {
-            dataStore.graft(prevDataStore, path);
+            await dataStore.graft(prevDataStore, path);
           }
 
           _resolver.store.write(path, dataStoreName);
@@ -218,11 +218,7 @@ class FileDataStoreManager {
         }
       }
 
-      if (!dataStore.isHydrated) {
-        await dataStore.hydrate();
-      }
-
-      dataStore.writeEntry(docPath, docData);
+      await dataStore.writeEntry(docPath, docData);
     }
 
     await _sync();

@@ -59,7 +59,11 @@ class FileDataStore {
     return _store.hasPath(path);
   }
 
-  void writeEntry(String path, Json data) {
+  Future<void> writeEntry(String path, Json data) async {
+    if (!isHydrated) {
+      await hydrate();
+    }
+
     _store.write(path, data);
     isDirty = true;
   }

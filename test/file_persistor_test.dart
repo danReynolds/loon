@@ -440,22 +440,50 @@ void main() {
           ),
         );
 
-        userCollection.doc('1').create(TestUserModel('User 1'));
-        userCollection.doc('2').create(TestUserModel('User 2'));
+        final userDoc = userCollection.doc('1');
+        final userDoc2 = userCollection.doc('2');
+
+        userDoc.create(TestUserModel('User 1'));
+        userDoc2.create(TestUserModel('User 2'));
+
+        userDoc2
+            .subcollection(
+              'friends',
+              fromJson: TestUserModel.fromJson,
+              toJson: (user) => user.toJson(),
+            )
+            .doc('1')
+            .create(TestUserModel('Friend 1'));
 
         await completer.onPersistComplete;
+
+        final usersFile = File('${testDirectory.path}/loon/users.json');
+        var usersJson = jsonDecode(usersFile.readAsStringSync());
+
+        expect(
+          usersJson,
+          {
+            "users": {
+              "__values": {
+                "1": {"name": "User 1"},
+                "2": {"name": "User 2"},
+              },
+              "2": {
+                "friends": {
+                  "__values": {
+                    "1": {"name": "Friend 1"},
+                  }
+                }
+              }
+            }
+          },
+        );
 
         userCollection.doc('2').update(TestUserModel('User 2 updated'));
 
         await completer.onPersistComplete;
 
-        final usersFile = File('${testDirectory.path}/loon/users.json');
-        final updatedUsersFile =
-            File('${testDirectory.path}/loon/updated_users.json');
-        final usersJson = jsonDecode(usersFile.readAsStringSync());
-        final updatedUsersJson =
-            jsonDecode(updatedUsersFile.readAsStringSync());
-
+        usersJson = jsonDecode(usersFile.readAsStringSync());
         expect(
           usersJson,
           {
@@ -467,12 +495,25 @@ void main() {
           },
         );
 
+        final updatedUsersFile =
+            File('${testDirectory.path}/loon/updated_users.json');
+        final updatedUsersJson =
+            jsonDecode(updatedUsersFile.readAsStringSync());
+
+        // Both `users__2` and its subcollections should have been moved to the `updated_users` data store.
         expect(
           updatedUsersJson,
           {
             "users": {
               "__values": {
                 "2": {"name": "User 2 updated"},
+              },
+              "2": {
+                "friends": {
+                  "__values": {
+                    "1": {"name": "Friend 1"},
+                  }
+                }
               }
             }
           },
