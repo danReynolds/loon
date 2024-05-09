@@ -193,7 +193,7 @@ class Document<T> {
   }
 
   bool isPersistenceEnabled() {
-    return persistorSettings?.persistenceEnabled ??
+    return persistorSettings?.enabled ??
         Loon._instance._isGlobalPersistenceEnabled;
   }
 

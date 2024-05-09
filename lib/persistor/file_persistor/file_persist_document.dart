@@ -22,14 +22,14 @@ class FilePersistDocument<T> {
   final Json? data;
 
   /// Whether encryption is enabled for this document.
-  final bool encryptionEnabled;
+  final bool encrypted;
 
   FilePersistDocument({
     required this.id,
     required this.parent,
     required this.key,
     required this.data,
-    required this.encryptionEnabled,
+    required this.encrypted,
   });
 
   String get path {

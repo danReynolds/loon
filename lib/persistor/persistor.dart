@@ -3,10 +3,12 @@ part of loon;
 typedef HydrationData = Map<String, Json>;
 
 class PersistorSettings<T> {
-  final bool persistenceEnabled;
+  final bool enabled;
+  final Duration persistenceThrottle;
 
   const PersistorSettings({
-    this.persistenceEnabled = true,
+    this.enabled = true,
+    this.persistenceThrottle = const Duration(milliseconds: 100),
   });
 }
 
@@ -14,7 +16,6 @@ class PersistorSettings<T> {
 /// persistence operations. Exposes the public persistence APIs for persistence implementations to implement.
 /// See [FilePersistor] as an example implementation.
 abstract class Persistor {
-  final Duration persistenceThrottle;
   final PersistorSettings settings;
   final void Function(List<Document> batch)? onPersist;
   final void Function(Collection collection)? onClear;
@@ -36,7 +37,6 @@ abstract class Persistor {
 
   Persistor({
     this.settings = const PersistorSettings(),
-    this.persistenceThrottle = const Duration(milliseconds: 100),
     this.onPersist,
     this.onClear,
     this.onClearAll,
@@ -120,7 +120,7 @@ abstract class Persistor {
 
   /// Schedules the current batch of documents to be persisted using a timer set to the persistence throttle.
   void _schedulePersist() {
-    _persistTimer ??= Timer(persistenceThrottle, () {
+    _persistTimer ??= Timer(settings.persistenceThrottle, () {
       _persist();
     });
   }

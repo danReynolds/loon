@@ -42,7 +42,7 @@ class Collection<T> {
   int get hashCode => Object.hashAll([parent, name]);
 
   bool isPersistenceEnabled() {
-    return persistorSettings?.persistenceEnabled ??
+    return persistorSettings?.enabled ??
         Loon._instance._isGlobalPersistenceEnabled;
   }
 

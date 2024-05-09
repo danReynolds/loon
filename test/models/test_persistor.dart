@@ -7,10 +7,13 @@ class TestPersistor extends Persistor {
   final List<DocumentSnapshot<TestUserModel>> seedData;
 
   TestPersistor({
-    super.persistenceThrottle,
     super.onPersist,
     required this.seedData,
-  });
+  }) : super(
+          settings: const PersistorSettings(
+            persistenceThrottle: Duration(milliseconds: 1),
+          ),
+        );
 
   @override
   hydrate([collections]) async {

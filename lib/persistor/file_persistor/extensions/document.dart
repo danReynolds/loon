@@ -6,14 +6,14 @@ extension DocumentExtensions<T> on Document<T> {
   FilePersistorKey? getPersistenceKey() {
     final documentSettings = persistorSettings;
     if (documentSettings is FilePersistorSettings<T>) {
-      final key = documentSettings.key;
+      final keyBuilder = documentSettings.key;
 
-      if (key is FilePersistorDocumentKeyBuilder<T>) {
-        return (key as FilePersistorDocumentKeyBuilder).build(get()!);
+      if (keyBuilder is FilePersistorDocumentKeyBuilder<T>) {
+        return (keyBuilder as FilePersistorDocumentKeyBuilder).build(get()!);
       }
 
-      if (key is FilePersistorCollectionKeyBuilder<T>) {
-        return key.build();
+      if (keyBuilder is FilePersistorCollectionKeyBuilder<T>) {
+        return keyBuilder.build();
       }
     }
 
@@ -21,11 +21,11 @@ extension DocumentExtensions<T> on Document<T> {
   }
 
   /// Returns whether encryption is enabled for this document.
-  bool isEncryptionEnabled() {
+  bool isEncrypted() {
     final settings = persistorSettings ?? Loon.persistorSettings;
 
     if (settings is FilePersistorSettings) {
-      return settings.encryptionEnabled;
+      return settings.encrypted;
     }
 
     return false;
@@ -35,7 +35,7 @@ extension DocumentExtensions<T> on Document<T> {
     return FilePersistDocument<T>(
       id: id,
       parent: parent,
-      encryptionEnabled: isEncryptionEnabled(),
+      encrypted: isEncrypted(),
       key: getPersistenceKey(),
       data: getJson(),
     );

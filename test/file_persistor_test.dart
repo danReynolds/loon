@@ -9,6 +9,7 @@ import 'package:path_provider_platform_interface/path_provider_platform_interfac
 // ignore: depend_on_referenced_packages
 import 'package:plugin_platform_interface/plugin_platform_interface.dart';
 
+import 'models/test_file_persistor.dart';
 import 'models/test_large_model.dart';
 import 'models/test_user_model.dart';
 import 'utils.dart';
@@ -31,28 +32,15 @@ class MockPathProvider extends Fake
 }
 
 void main() {
-  PersistorCompleter completer = PersistorCompleter();
+  var completer = TestFilePersistor.completer = PersistorCompleter();
 
   setUp(() {
-    completer = PersistorCompleter();
+    completer = TestFilePersistor.completer = PersistorCompleter();
     testDirectory = Directory.systemTemp.createTempSync('test_dir');
     final mockPathProvider = MockPathProvider();
     PathProviderPlatform.instance = mockPathProvider;
 
-    Loon.configure(
-      persistor: FilePersistor(
-        persistenceThrottle: const Duration(milliseconds: 1),
-        onPersist: (_) {
-          completer.persistComplete();
-        },
-        onClear: (_) {
-          completer.clearComplete();
-        },
-        onClearAll: () {
-          completer.clearAllComplete();
-        },
-      ),
-    );
+    Loon.configure(persistor: TestFilePersistor());
   });
 
   tearDown(() async {
@@ -87,7 +75,7 @@ void main() {
             .doc('1')
             .create(user);
 
-        await completer.onPersistComplete;
+        await completer.onPersist;
 
         final file = File('${testDirectory.path}/loon/users.json');
         final json = jsonDecode(file.readAsStringSync());
@@ -141,11 +129,11 @@ void main() {
         userCollection.doc('1').create(TestUserModel('User 1'));
         userCollection.doc('2').create(TestUserModel('User 2'));
 
-        await completer.onPersistComplete;
+        await completer.onPersist;
 
         userCollection.doc('2').update(TestUserModel('User 2 updated'));
 
-        await completer.onPersistComplete;
+        await completer.onPersist;
 
         final file = File('${testDirectory.path}/loon/users.json');
         final json = jsonDecode(file.readAsStringSync());
@@ -192,11 +180,11 @@ void main() {
         userCollection.doc('1').create(TestUserModel('User 1'));
         userCollection.doc('2').create(TestUserModel('User 2'));
 
-        await completer.onPersistComplete;
+        await completer.onPersist;
 
         userCollection.doc('2').delete();
 
-        await completer.onPersistComplete;
+        await completer.onPersist;
 
         final file = File('${testDirectory.path}/loon/users.json');
         final json = jsonDecode(file.readAsStringSync());
@@ -244,7 +232,7 @@ void main() {
 
         final file = File('${testDirectory.path}/loon/users.json');
 
-        await completer.onPersistComplete;
+        await completer.onPersist;
 
         expect(file.existsSync(), true);
 
@@ -252,7 +240,7 @@ void main() {
         userCollection.doc('1').delete();
         userCollection.doc('2').delete();
 
-        await completer.onPersistComplete;
+        await completer.onPersist;
 
         expect(file.existsSync(), false);
       },
@@ -278,7 +266,7 @@ void main() {
         userCollection.doc('1').create(TestUserModel('User 1'));
         userCollection.doc('2').create(TestUserModel('User 2'));
 
-        await completer.onPersistComplete;
+        await completer.onPersist;
 
         final usersFile = File('${testDirectory.path}/loon/users.json');
         final otherUsersFile =
@@ -359,7 +347,7 @@ void main() {
             .doc('1')
             .create(user);
 
-        await completer.onPersistComplete;
+        await completer.onPersist;
 
         final usersFile = File('${testDirectory.path}/loon/users.json');
         final friendsFile = File('${testDirectory.path}/loon/friends.json');
@@ -455,7 +443,7 @@ void main() {
             .doc('1')
             .create(TestUserModel('Friend 1'));
 
-        await completer.onPersistComplete;
+        await completer.onPersist;
 
         final usersFile = File('${testDirectory.path}/loon/users.json');
         var usersJson = jsonDecode(usersFile.readAsStringSync());
@@ -481,7 +469,7 @@ void main() {
 
         userCollection.doc('2').update(TestUserModel('User 2 updated'));
 
-        await completer.onPersistComplete;
+        await completer.onPersist;
 
         usersJson = jsonDecode(usersFile.readAsStringSync());
         expect(
@@ -572,7 +560,7 @@ void main() {
 
       userFriendsCollection.doc('3').create(TestUserModel('Friend 3'));
 
-      await completer.onPersistComplete;
+      await completer.onPersist;
 
       final usersFile = File('${testDirectory.path}/loon/users.json');
       final usersJson = jsonDecode(usersFile.readAsStringSync());
@@ -650,10 +638,7 @@ void main() {
 
       // After clearing the data and reinitializing it from disk to verify with hydration,
       // the persistor needs to be re-created so that it re-reads all data stores from disk.
-      Loon.configure(
-        persistor:
-            FilePersistor(persistenceThrottle: const Duration(milliseconds: 1)),
-      );
+      Loon.configure(persistor: TestFilePersistor());
 
       await Loon.hydrate();
 
@@ -722,7 +707,7 @@ void main() {
 
         userFriendsCollection.doc('3').create(TestUserModel('Friend 3'));
 
-        await completer.onPersistComplete;
+        await completer.onPersist;
 
         final usersFile = File('${testDirectory.path}/loon/users.json');
         final usersJson = jsonDecode(usersFile.readAsStringSync());
@@ -747,11 +732,7 @@ void main() {
 
         // After clearing the data and reinitializing it from disk to verify with hydration,
         // the persistor needs to be re-created so that it re-reads all data stores from disk.
-        Loon.configure(
-          persistor: FilePersistor(
-            persistenceThrottle: const Duration(milliseconds: 1),
-          ),
-        );
+        Loon.configure(persistor: TestFilePersistor());
 
         await Loon.hydrate([userCollection]);
 
@@ -809,14 +790,7 @@ void main() {
         ),
       );
 
-      Loon.configure(
-        persistor: FilePersistor(
-          persistenceThrottle: const Duration(milliseconds: 1),
-          onPersist: (_) {
-            completer.persistComplete();
-          },
-        ),
-      );
+      Loon.configure(persistor: TestFilePersistor());
 
       final userCollection = Loon.collection(
         'users',
@@ -826,7 +800,7 @@ void main() {
 
       userCollection.doc('1').create(TestUserModel('User 1 latest'));
 
-      await completer.onPersistComplete;
+      await completer.onPersist;
 
       await Loon.hydrate();
 
@@ -852,7 +826,7 @@ void main() {
       // to make hydration faster.
       userCollection.doc('3').create(TestUserModel('User 3'));
 
-      await completer.onPersistComplete;
+      await completer.onPersist;
 
       final resolverFile = File('${testDirectory.path}/loon/__resolver__.json');
       final resolverJson = jsonDecode(resolverFile.readAsStringSync());
@@ -954,13 +928,13 @@ void main() {
 
           final file = File('${testDirectory.path}/loon/users.json');
 
-          await completer.onPersistComplete;
+          await completer.onPersist;
 
           expect(file.existsSync(), true);
 
           userCollection.delete();
 
-          await completer.onClearComplete;
+          await completer.onClear;
 
           expect(file.existsSync(), false);
         },
@@ -988,7 +962,7 @@ void main() {
           final file2 = File('${testDirectory.path}/loon/users2.json');
           final file3 = File('${testDirectory.path}/loon/users3.json');
 
-          await completer.onPersistComplete;
+          await completer.onPersist;
 
           expect(file1.existsSync(), true);
           expect(file2.existsSync(), true);
@@ -996,7 +970,7 @@ void main() {
 
           userCollection.delete();
 
-          await completer.onClearComplete;
+          await completer.onClear;
 
           expect(file1.existsSync(), false);
           expect(file2.existsSync(), false);
@@ -1028,14 +1002,14 @@ void main() {
           final userFile = File('${testDirectory.path}/loon/users.json');
           final friendsFile = File('${testDirectory.path}/loon/friends.json');
 
-          await completer.onPersistComplete;
+          await completer.onPersist;
 
           expect(userFile.existsSync(), true);
           expect(friendsFile.existsSync(), true);
 
           userCollection.delete();
 
-          await completer.onClearComplete;
+          await completer.onClear;
 
           expect(userFile.existsSync(), false);
           expect(friendsFile.existsSync(), false);
@@ -1071,7 +1045,7 @@ void main() {
 
           final file = File('${testDirectory.path}/loon/shared.json');
 
-          await completer.onPersistComplete;
+          await completer.onPersist;
 
           Json json = jsonDecode(file.readAsStringSync());
           expect(
@@ -1094,7 +1068,7 @@ void main() {
 
           userCollection.delete();
 
-          await completer.onClearComplete;
+          await completer.onClear;
 
           json = jsonDecode(file.readAsStringSync());
           expect(
@@ -1132,7 +1106,7 @@ void main() {
           final resolverFile =
               File('${testDirectory.path}/loon/__resolver__.json');
 
-          await completer.onPersistComplete;
+          await completer.onPersist;
 
           expect(file.existsSync(), true);
           expect(resolverFile.existsSync(), true);

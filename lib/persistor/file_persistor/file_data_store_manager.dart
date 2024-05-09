@@ -44,6 +44,35 @@ class FileDataStoreManager {
     };
   }
 
+  /// Returns the name of the data store that the given document path resolves to.
+  String _resolveDataStoreName(
+    String docPath, {
+    required FilePersistorKey? key,
+    required bool isEncrypted,
+  }) {
+    final encryptionSuffix = isEncrypted ? '.encrypted' : '';
+
+    // If a persistence key is specified, then return the data store determined by that key.
+    if (key != null) {
+      return "${key.value}$encryptionSuffix";
+    }
+
+    // If the document does not specify a persistence key, then its data store is resolved to the nearest data store
+    // found in the document index moving up from its path. If no data store exists in this path yet, then the
+    // it defaults to using one named after the document's top-level collection.
+    final nearestDataStoreName = _resolver.store.getNearest(docPath);
+    if (nearestDataStoreName != null) {
+      return "$nearestDataStoreName$encryptionSuffix";
+    }
+
+    final dataStoreName = "${docPath.split('__').first}$encryptionSuffix";
+
+    // Write the new top-level data store name into the resolver tree.
+    _resolver.store.write(dataStoreName, dataStoreName);
+
+    return dataStoreName;
+  }
+
   /// Syncs all file data stores, persisting dirty ones and deleting ones that can now be removed.
   Future<void> _sync() async {
     final dirtyStores =
@@ -71,7 +100,7 @@ class FileDataStoreManager {
   Future<void> _clear(String path) async {
     final stores = _resolve(path);
 
-    await Future.wait(stores.map((store) => store.removeEntry(path)));
+    await Future.wait(stores.map((store) => store.removePath(path)));
 
     _resolver.store.delete(path);
   }
@@ -127,12 +156,12 @@ class FileDataStoreManager {
         //    its old data store to the updated one and delivered in the extracted hydration data.
         final resolvedDataStore = _index[_resolver.store.getNearest(docPath)];
         if (resolvedDataStore != null && resolvedDataStore != hydratedStore) {
-          if (resolvedDataStore.hasEntry(docPath)) {
+          if (resolvedDataStore.hasPath(docPath)) {
             extractedData.remove(docPath);
           } else {
-            resolvedDataStore.writeEntry(docPath, extractedData[docPath]!);
+            resolvedDataStore.writePath(docPath, extractedData[docPath]!);
           }
-          hydratedStore.removeEntry(docPath);
+          hydratedStore.removePath(docPath);
         }
       }
 
@@ -148,11 +177,11 @@ class FileDataStoreManager {
     }
 
     for (final doc in docs) {
-      final docPath = doc.path;
       final collectionPath = doc.parent;
+      final docPath = doc.path;
       final docData = doc.data;
       final persistenceKey = doc.key;
-      final encryptionEnabled = doc.encryptionEnabled;
+      final isEncrypted = doc.encrypted;
 
       // If the document has been deleted, then clear it and its subcollections from the store.
       if (docData == null) {
@@ -160,57 +189,46 @@ class FileDataStoreManager {
         continue;
       }
 
-      FileDataStore dataStore;
+      final dataStoreName = _resolveDataStoreName(
+        docPath,
+        key: persistenceKey,
+        isEncrypted: isEncrypted,
+      );
+      final dataStore = _index[dataStoreName] ??= FileDataStore.create(
+        dataStoreName,
+        encrypter: encrypter,
+        encrypted: isEncrypted,
+        directory: directory,
+      );
 
       if (persistenceKey != null) {
+        final prevDataStore = _index[_resolver.store.getNearest(docPath)];
+
         final path = switch (persistenceKey.type) {
           FilePersistorKeyTypes.collection => collectionPath,
           FilePersistorKeyTypes.document => docPath,
         };
 
-        final prevDataStore = _index[_resolver.store.getNearest(path)];
-        final dataStoreName = persistenceKey.value;
-
-        dataStore = _index[dataStoreName] ??= FileDataStore.create(
-          dataStoreName,
-          encrypter: encrypter,
-          encrypted: encryptionEnabled,
-          directory: directory,
-        );
-
         if (prevDataStore != dataStore) {
           // If the persistence key for the path has changed, then all of the data
-          // under that path needs to be moved to the destination data store.
+          // under that path needs to be moved to the resolved data store.
           if (prevDataStore != null) {
-            await dataStore.graft(prevDataStore, path);
+            await dataStore.graft(prevDataStore, docPath);
           }
+
+          // If the persistence key for the document is a collection key, then
+          // the resolver entry for the data store should be written at the collection
+          // path, otherwise it should be written at the document path.
+          final path = switch (persistenceKey.type) {
+            FilePersistorKeyTypes.collection => collectionPath,
+            FilePersistorKeyTypes.document => docPath,
+          };
 
           _resolver.store.write(path, dataStoreName);
         }
-      } else {
-        // If the document does not specify a persistence key, then its data store is resolved to the nearest data store
-        // found in the document index moving up from its path. If no data store exists in this path yet, then the
-        // it defaults to using one named after the document's top-level collection.
-        FileDataStore? nearestDataStore =
-            _index[_resolver.store.getNearest(docPath)];
-
-        if (nearestDataStore == null) {
-          final dataStoreName = docPath.split('__').first;
-
-          dataStore = _index[dataStoreName] ??= FileDataStore.create(
-            dataStoreName,
-            encrypter: encrypter,
-            encrypted: encryptionEnabled,
-            directory: directory,
-          );
-
-          _resolver.store.write(dataStoreName, dataStoreName);
-        } else {
-          dataStore = nearestDataStore;
-        }
       }
 
-      await dataStore.writeEntry(docPath, docData);
+      await dataStore.writePath(docPath, docData);
     }
 
     await _sync();

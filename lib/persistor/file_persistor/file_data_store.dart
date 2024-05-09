@@ -55,11 +55,11 @@ class FileDataStore {
     );
   }
 
-  bool hasEntry(String path) {
+  bool hasPath(String path) {
     return _store.hasPath(path);
   }
 
-  Future<void> writeEntry(String path, Json data) async {
+  Future<void> writePath(String path, Json data) async {
     // Unhydrated stores must be hydrated before data can be written to them.
     if (!isHydrated) {
       await hydrate();
@@ -69,7 +69,7 @@ class FileDataStore {
     isDirty = true;
   }
 
-  Future<void> removeEntry(String path) async {
+  Future<void> removePath(String path) async {
     // Unhydrated stores containing the path must be hydrated before the data can be removed.
     if (!isHydrated) {
       await hydrate();
@@ -166,9 +166,9 @@ class FileDataStore {
   }) {
     final match = fileRegex.firstMatch(path.basename(file.path));
     final name = match!.group(1)!;
-    final encryptionEnabled = match.group(2) != null;
+    final encrypted = match.group(2) != null;
 
-    if (encryptionEnabled) {
+    if (encrypted) {
       if (encrypter == null) {
         throw 'Missing encrypter';
       }
@@ -189,21 +189,23 @@ class FileDataStore {
     required Directory directory,
     required Encrypter? encrypter,
   }) {
+    final file = File("${directory.path}/$name.json");
+
     if (encrypted) {
       if (encrypter == null) {
         throw 'Missing encrypter';
       }
 
       return EncryptedFileDataStore(
-        file: File("${directory.path}/$name.encrypted.json"),
-        name: "$name.encrypted",
+        file: file,
+        name: name,
         encrypter: encrypter,
         isHydrated: true,
       );
     }
 
     return FileDataStore(
-      file: File("${directory.path}/$name.json"),
+      file: file,
       name: name,
       isHydrated: true,
     );

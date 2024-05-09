@@ -26,13 +26,14 @@ class FilePersistor extends Persistor {
   final _logger = Logger('FilePersistor');
 
   FilePersistor({
-    super.persistenceThrottle = const Duration(milliseconds: 100),
-    super.settings = const FilePersistorSettings(),
+    FilePersistorSettings? settings,
     super.onPersist,
     super.onClear,
     super.onClearAll,
     super.onHydrate,
-  });
+  }) : super(
+          settings: settings ?? const FilePersistorSettings(),
+        );
 
   static FilePersistorCollectionKeyBuilder<T> key<T>(String value) {
     return FilePersistorCollectionKeyBuilder(value);
@@ -75,14 +76,6 @@ class FilePersistor extends Persistor {
   /// as opposed to the worker since it requires access to plugins that are not easily available in the worker
   /// isolate context.
   Future<Encrypter?> initEncrypter() async {
-    final persistorSettings = settings;
-
-    // The encrypter is only initialized if the global settings are encrypted file persistor settings.
-    if (persistorSettings is! FilePersistorSettings ||
-        !persistorSettings.encryptionEnabled) {
-      return null;
-    }
-
     const storage = FlutterSecureStorage();
     final base64Key = await storage.read(key: _secureStorageKey);
     Key key;
@@ -124,7 +117,7 @@ class FilePersistor extends Persistor {
     final initMessage = InitMessageRequest(
       sendPort: _receivePort.sendPort,
       directory: directory as Directory,
-      encrypter: encrypter as Encrypter?,
+      encrypter: encrypter as Encrypter,
     );
 
     final completer =

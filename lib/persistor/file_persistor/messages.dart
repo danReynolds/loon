@@ -28,7 +28,7 @@ abstract class MessageResponse {
 class InitMessageRequest extends MessageRequest<InitMessageResponse> {
   final SendPort sendPort;
   final Directory directory;
-  final Encrypter? encrypter;
+  final Encrypter encrypter;
 
   InitMessageRequest({
     required this.sendPort,

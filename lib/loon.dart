@@ -46,7 +46,7 @@ class Loon {
   bool enableLogging = false;
 
   bool get _isGlobalPersistenceEnabled {
-    return persistor?.settings.persistenceEnabled ?? false;
+    return persistor?.settings.enabled ?? false;
   }
 
   // When a document is read, if it is still in JSON format from hydration and is now being accessed

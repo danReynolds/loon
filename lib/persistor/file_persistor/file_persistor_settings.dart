@@ -104,11 +104,26 @@ class FilePersistorSettings<T> extends PersistorSettings<T> {
   final FilePersistorKeyBuilder<T>? key;
 
   /// Whether encryption is enabled globally for all collections in the store.
-  final bool encryptionEnabled;
+  final bool encrypted;
 
   const FilePersistorSettings({
     this.key,
-    super.persistenceEnabled = true,
-    this.encryptionEnabled = false,
+    this.encrypted = false,
+    super.enabled = true,
+    super.persistenceThrottle = const Duration(milliseconds: 100),
   });
+
+  FilePersistorSettings<T> copyWith({
+    FilePersistorKeyBuilder<T>? key,
+    bool? encrypted,
+    bool? enabled,
+    Duration? persistenceThrottle,
+  }) {
+    return FilePersistorSettings<T>(
+      key: key ?? this.key,
+      encrypted: encrypted ?? this.encrypted,
+      enabled: enabled ?? this.enabled,
+      persistenceThrottle: persistenceThrottle ?? this.persistenceThrottle,
+    );
+  }
 }

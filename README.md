@@ -306,7 +306,7 @@ Persistence options can be specified globally or on a per-collection basis.
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
 
-  Loon.configure(persistor: FilePersistor(encryptionEnabled: true));
+  Loon.configure(persistor: FilePersistor(encrypted: true));
 
   Loon.hydrate().then(() {
     print('Hydration complete');
@@ -331,7 +331,7 @@ class BirdModel {
       fromJson: BirdModel.fromJson,
       toJson: (bird) => bird.toJson(),
       settings: FilePersistorSettings(
-        encryptionEnabled: false,
+        encrypted: false,
       ),
     )
   }
