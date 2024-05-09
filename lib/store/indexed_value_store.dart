@@ -475,11 +475,7 @@ class IndexedRefValueStore<T> extends IndexedValueStore<T> {
       return index;
     }
 
-    for (final key in child.keys) {
-      if (key != _refs && key != IndexedValueStore._values) {
-        _extractRefs(child[key], index);
-      }
-    }
+    _extractRefs(child, index);
 
     return index;
   }

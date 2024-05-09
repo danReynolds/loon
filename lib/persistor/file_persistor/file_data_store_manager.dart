@@ -71,15 +71,7 @@ class FileDataStoreManager {
   Future<void> _clear(String path) async {
     final stores = _resolve(path);
 
-    // Unhydrated stores containing the path must be hydrated before the data can be removed.
-    final unhydratedStores = stores.where((store) => !store.isHydrated);
-    if (unhydratedStores.isNotEmpty) {
-      await Future.wait(unhydratedStores.map((store) => store.hydrate()));
-    }
-
-    for (final store in stores) {
-      store.removeEntry(path);
-    }
+    await Future.wait(stores.map((store) => store.removeEntry(path)));
 
     _resolver.store.delete(path);
   }
@@ -225,7 +217,7 @@ class FileDataStoreManager {
   }
 
   Future<void> clear(String path) async {
-    _clear(path);
+    await _clear(path);
     await _sync();
   }
 

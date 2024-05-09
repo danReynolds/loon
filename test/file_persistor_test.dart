@@ -422,7 +422,7 @@ void main() {
     );
 
     test(
-      'Moves documents that change persistence files',
+      'Moves documents and their subcollections that change persistence files',
       () async {
         final userCollection = Loon.collection<TestUserModel>(
           'users',
@@ -788,7 +788,7 @@ void main() {
     // but now before hydration it has been re-persisted to users.json. The subsequent hydration of other_users.json
     // should favor the current value in the store over the hydrated value, and remove the stale persisted value from
     // the other_users.json file store.
-    test('Handles merging data from a stale file store', () async {
+    test('Correctly merges data from a stale file store', () async {
       // The file to be hydrated needs to be created before the persistor is initialized
       // so that the persistor discovers the file data store as part of its initialization.
       final file = File('${testDirectory.path}/loon/other_users.json');
@@ -892,15 +892,28 @@ void main() {
     test('Hydrates large persistence files', () async {
       int size = 20000;
 
+      final store = IndexedValueStore<Json>();
       List<TestLargeModel> models =
           List.generate(size, (_) => generateRandomModel());
 
-      final collectionJson = models.fold({}, (acc, model) {
-        acc['users:${model.id}'] = model.toJson();
-        return acc;
-      });
+      for (final model in models) {
+        store.write('users__${model.id}', model.toJson());
+      }
+
       final file = File('${testDirectory.path}/loon/users.json');
-      file.writeAsStringSync(jsonEncode(collectionJson));
+      file.writeAsStringSync(jsonEncode(store.inspect()));
+
+      final resolverFile = File('${testDirectory.path}/loon/__resolver__.json');
+      resolverFile.writeAsStringSync(jsonEncode(
+        {
+          "__refs": {
+            "users": 1,
+          },
+          "__values": {
+            "users": "users",
+          },
+        },
+      ));
 
       await Loon.hydrate();
 
@@ -911,7 +924,7 @@ void main() {
       );
 
       final collectionSize = await logger.measure(
-        'Initial collection query',
+        'Large collection query',
         () async {
           return largeModelCollection.get().length;
         },
@@ -1003,6 +1016,9 @@ void main() {
                 'friends',
                 fromJson: TestUserModel.fromJson,
                 toJson: (user) => user.toJson(),
+                persistorSettings: FilePersistorSettings(
+                  key: FilePersistor.key('friends'),
+                ),
               );
 
           userCollection.doc('1').create(TestUserModel('User 1'));
@@ -1010,8 +1026,7 @@ void main() {
           friendsCollection.doc('1').create(TestUserModel('Friend 1'));
 
           final userFile = File('${testDirectory.path}/loon/users.json');
-          final friendsFile =
-              File('${testDirectory.path}/loon/users__1__friends.json');
+          final friendsFile = File('${testDirectory.path}/loon/friends.json');
 
           await completer.onPersistComplete;
 
@@ -1027,8 +1042,8 @@ void main() {
         },
       );
 
-      // In this scenario, multiple collections share data stores and the data store should not be deleted
-      // since it still has documents from another collection.
+      // In this scenario, multiple collections share a file data store and therefore
+      // the file should not be deleted since it still has documents from another collection.
       test(
         'Retains data stores that share collections',
         () async {
@@ -1036,13 +1051,16 @@ void main() {
             'users',
             fromJson: TestUserModel.fromJson,
             toJson: (user) => user.toJson(),
+            persistorSettings: FilePersistorSettings(
+              key: FilePersistor.key('shared'),
+            ),
           );
           final friendsCollection = Loon.collection<TestUserModel>(
             'friends',
             fromJson: TestUserModel.fromJson,
             toJson: (user) => user.toJson(),
             persistorSettings: FilePersistorSettings(
-              key: FilePersistor.key('users'),
+              key: FilePersistor.key('shared'),
             ),
           );
 
@@ -1051,7 +1069,7 @@ void main() {
           friendsCollection.doc('1').create(TestUserModel('Friend 1'));
           friendsCollection.doc('2').create(TestUserModel('Friend 2'));
 
-          final file = File('${testDirectory.path}/loon/users.json');
+          final file = File('${testDirectory.path}/loon/shared.json');
 
           await completer.onPersistComplete;
 
@@ -1059,10 +1077,18 @@ void main() {
           expect(
             json,
             {
-              'users:1': {'name': 'User 1'},
-              'users:2': {'name': 'User 2'},
-              'friends:1': {'name': 'Friend 1'},
-              'friends:2': {'name': 'Friend 2'}
+              "users": {
+                "__values": {
+                  "1": {'name': 'User 1'},
+                  "2": {'name': 'User 2'},
+                }
+              },
+              "friends": {
+                "__values": {
+                  "1": {'name': 'Friend 1'},
+                  "2": {'name': 'Friend 2'},
+                },
+              },
             },
           );
 
@@ -1074,8 +1100,12 @@ void main() {
           expect(
             json,
             {
-              'friends:1': {'name': 'Friend 1'},
-              'friends:2': {'name': 'Friend 2'}
+              "friends": {
+                "__values": {
+                  "1": {'name': 'Friend 1'},
+                  "2": {'name': 'Friend 2'},
+                },
+              },
             },
           );
         },
@@ -1099,14 +1129,18 @@ void main() {
           userCollection.doc('2').create(TestUserModel('User 2'));
 
           final file = File('${testDirectory.path}/loon/users.json');
+          final resolverFile =
+              File('${testDirectory.path}/loon/__resolver__.json');
 
           await completer.onPersistComplete;
 
           expect(file.existsSync(), true);
+          expect(resolverFile.existsSync(), true);
 
           await Loon.clearAll();
 
           expect(file.existsSync(), false);
+          expect(resolverFile.existsSync(), false);
         },
       );
     },

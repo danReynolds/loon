@@ -60,6 +60,7 @@ class FileDataStore {
   }
 
   Future<void> writeEntry(String path, Json data) async {
+    // Unhydrated stores must be hydrated before data can be written to them.
     if (!isHydrated) {
       await hydrate();
     }
@@ -68,8 +69,13 @@ class FileDataStore {
     isDirty = true;
   }
 
-  void removeEntry(String path) {
-    if (_store.has(path)) {
+  Future<void> removeEntry(String path) async {
+    // Unhydrated stores containing the path must be hydrated before the data can be removed.
+    if (!isHydrated) {
+      await hydrate();
+    }
+
+    if (_store.hasPath(path)) {
       _store.delete(path);
       isDirty = true;
     }

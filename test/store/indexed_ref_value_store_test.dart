@@ -166,6 +166,11 @@ void main() {
           "Nik": 1,
         });
 
+        expect(store.extractRefs('users__1__friends'), {
+          "Dan": 1,
+          "Nik": 1,
+        });
+
         store.delete('users__1__friends');
 
         expect(store.extractRefs(), {
