@@ -194,6 +194,8 @@ class FileDataStoreManager {
         key: persistenceKey,
         isEncrypted: isEncrypted,
       );
+
+      final prevDataStore = _index[_resolver.store.getNearest(docPath)];
       final dataStore = _index[dataStoreName] ??= FileDataStore.create(
         dataStoreName,
         encrypter: encrypter,
@@ -201,30 +203,38 @@ class FileDataStoreManager {
         directory: directory,
       );
 
-      if (persistenceKey != null) {
-        final prevDataStore = _index[_resolver.store.getNearest(docPath)];
+      if (prevDataStore != dataStore) {
+        switch (persistenceKey?.type) {
+          case null:
+            // If the document is persisted without its own key, then if it previously had one specified,
+            // it should be removed.
 
-        final path = switch (persistenceKey.type) {
-          FilePersistorKeyTypes.collection => collectionPath,
-          FilePersistorKeyTypes.document => docPath,
-        };
+            // TODO: Make a deleteValue API so that the subtree for the document path is preserved.
+            _resolver.store.delete(docPath);
+            break;
+          case FilePersistorKeyTypes.collection:
+            if (prevDataStore != null) {
+              dataStore.graft(prevDataStore, docPath);
 
-        if (prevDataStore != dataStore) {
-          // If the persistence key for the path has changed, then all of the data
-          // under that path needs to be moved to the resolved data store.
-          if (prevDataStore != null) {
-            await dataStore.graft(prevDataStore, docPath);
-          }
+              // If the document is persisted with a collection-level key, then if it previously had a document-level
+              // key, it should move just its document to the collection's store.
+              final documentKey = _resolver.store.get(docPath);
+              if (documentKey != null) {
+                _resolver.store.write(docPath, dataStoreName);
+              } else {
+                final collectionKey = _resolver.store.get(collectionPath);
+                // Otherwise, if the collection does not exist in the resolver tree, it should be added.
+                if (collectionKey == null) {
+                  _resolver.store.write(collectionPath, dataStoreName);
+                } else {
+                  // If the collection key associated with this document is different from the collection's key
+                  // in the resolver store, then move all of the data under the collection's key to the
+                  // updated collection key, since the old key is stale.
+                }
+              }
+            }
 
-          // If the persistence key for the document is a collection key, then
-          // the resolver entry for the data store should be written at the collection
-          // path, otherwise it should be written at the document path.
-          final path = switch (persistenceKey.type) {
-            FilePersistorKeyTypes.collection => collectionPath,
-            FilePersistorKeyTypes.document => docPath,
-          };
-
-          _resolver.store.write(path, dataStoreName);
+            break;
         }
       }
 
