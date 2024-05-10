@@ -986,8 +986,14 @@ void main() {
             '5. document-level key -> collection-level key',
             () {
               test(
-                'Moves the document and its subcollections in the previous document store to the store specified by its collection key',
+                'Moves the document, its subcollections, and any other documents in the previous default document store, to the store specified by its collection key',
                 () async {
+                  final usersCollection = Loon.collection<TestUserModel>(
+                    'users',
+                    fromJson: TestUserModel.fromJson,
+                    toJson: (user) => user.toJson(),
+                  );
+
                   final documentKeyUsersCollection =
                       Loon.collection<TestUserModel>(
                     'users',
@@ -1024,8 +1030,21 @@ void main() {
                       )
                       .doc('1')
                       .create(TestUserModel('Friend 1'));
+                  usersCollection.doc('3').create(TestUserModel('User 3'));
 
                   await completer.onPersist;
+
+                  final usersFile =
+                      File('${testDirectory.path}/loon/users.json');
+                  var usersJson = jsonDecode(usersFile.readAsStringSync());
+
+                  expect(usersJson, {
+                    "users": {
+                      "__values": {
+                        "3": {"name": "User 3"},
+                      },
+                    }
+                  });
 
                   final users1File =
                       File('${testDirectory.path}/loon/users_1.json');
@@ -1058,7 +1077,7 @@ void main() {
                     {
                       "users": {
                         "__values": {
-                          "2": {"name": "User 1"},
+                          "2": {"name": "User 2"},
                         },
                       }
                     },
@@ -1072,6 +1091,12 @@ void main() {
                   expect(
                     resolverJson,
                     {
+                      "__refs": {
+                        "users": 1,
+                      },
+                      "__values": {
+                        "users": "users",
+                      },
                       "users": {
                         "__refs": {
                           "users_1": 1,
@@ -1102,6 +1127,7 @@ void main() {
                       "users": {
                         "__values": {
                           "1": {"name": "User 1 updated"},
+                          "3": {"name": "User 3"},
                         },
                         "1": {
                           "friends": {
@@ -1114,6 +1140,7 @@ void main() {
                     },
                   );
 
+                  expect(usersFile.existsSync(), false);
                   expect(users1File.existsSync(), false);
 
                   users2Json = jsonDecode(users2File.readAsStringSync());
@@ -1136,7 +1163,7 @@ void main() {
                         "other_users": 1,
                       },
                       "__values": {
-                        "other_users": "other_users",
+                        "users": "other_users",
                       },
                       "users": {
                         "__refs": {

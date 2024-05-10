@@ -490,15 +490,18 @@ class IndexedRefValueStore<T> extends IndexedValueStore<T> {
         return super._delete(node, segments, index, recursive);
       }
 
-      final value = node[IndexedValueStore._values][segment];
-      if (node[_refs][value] > 1) {
-        node[_refs][value]--;
-      } else {
-        node[_refs].remove(value);
-      }
+      if (node[IndexedValueStore._values].containsKey(segment)) {
+        final value = node[IndexedValueStore._values][segment];
 
-      if (node[_refs].isEmpty) {
-        node.remove(_refs);
+        if (node[_refs][value] > 1) {
+          node[_refs][value]--;
+        } else {
+          node[_refs].remove(value);
+        }
+
+        if (node[_refs].isEmpty) {
+          node.remove(_refs);
+        }
       }
     }
 
