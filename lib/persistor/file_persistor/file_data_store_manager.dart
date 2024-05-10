@@ -189,13 +189,19 @@ class FileDataStoreManager {
         continue;
       }
 
+      final prevDataStore = _index[_resolver.store.getNearest(docPath)];
+
+      // If the persistence key for the document is now null, then remove the previous
+      // key for the document (if it exists) ahead of resolving the updated data store name.
+      if (persistenceKey == null) {
+        _resolver.store.deleteValue(docPath);
+      }
+
       final dataStoreName = _resolveDataStoreName(
         docPath,
         key: persistenceKey,
         isEncrypted: isEncrypted,
       );
-
-      final prevDataStore = _index[_resolver.store.getNearest(docPath)];
       final dataStore = _index[dataStoreName] ??= FileDataStore.create(
         dataStoreName,
         encrypter: encrypter,
@@ -211,9 +217,6 @@ class FileDataStoreManager {
 
       switch (persistenceKey?.type) {
         case null:
-          // If the resolver already has a persistence key for this document, then it
-          // should be removed since the document has been updated without a persistence key.
-          _resolver.store.deleteValue(docPath);
           break;
         case FilePersistorKeyTypes.document:
           // Update the resolver's persistence key for the document.

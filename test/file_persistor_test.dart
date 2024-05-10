@@ -691,7 +691,7 @@ void main() {
             '3. document-level key -> null',
             () {
               test(
-                'Moves the document and its subcollections in the old document store to the default store',
+                'Moves the document and its subcollections in the previous document store to the default store',
                 () async {
                   final documentKeyUsersCollection =
                       Loon.collection<TestUserModel>(
@@ -759,7 +759,7 @@ void main() {
                     {
                       "users": {
                         "__values": {
-                          "2": {"name": "User 1"},
+                          "2": {"name": "User 2"},
                         },
                       }
                     },
@@ -974,6 +974,177 @@ void main() {
                           "1": "users",
                           "2": "updated_users",
                         },
+                      }
+                    },
+                  );
+                },
+              );
+            },
+          );
+
+          group(
+            '5. document-level key -> collection-level key',
+            () {
+              test(
+                'Moves the document and its subcollections in the previous document store to the store specified by its collection key',
+                () async {
+                  final documentKeyUsersCollection =
+                      Loon.collection<TestUserModel>(
+                    'users',
+                    fromJson: TestUserModel.fromJson,
+                    toJson: (user) => user.toJson(),
+                    persistorSettings: FilePersistorSettings(
+                      key: FilePersistor.keyBuilder(
+                        (snap) => "users_${snap.id}",
+                      ),
+                    ),
+                  );
+
+                  final otherUsersCollection = Loon.collection<TestUserModel>(
+                    'users',
+                    fromJson: TestUserModel.fromJson,
+                    toJson: (user) => user.toJson(),
+                    persistorSettings: FilePersistorSettings(
+                      key: FilePersistor.key('other_users'),
+                    ),
+                  );
+
+                  documentKeyUsersCollection
+                      .doc('1')
+                      .create(TestUserModel('User 1'));
+                  documentKeyUsersCollection
+                      .doc('2')
+                      .create(TestUserModel('User 2'));
+                  documentKeyUsersCollection
+                      .doc('1')
+                      .subcollection(
+                        'friends',
+                        fromJson: TestUserModel.fromJson,
+                        toJson: (user) => user.toJson(),
+                      )
+                      .doc('1')
+                      .create(TestUserModel('Friend 1'));
+
+                  await completer.onPersist;
+
+                  final users1File =
+                      File('${testDirectory.path}/loon/users_1.json');
+                  var users1Json = jsonDecode(users1File.readAsStringSync());
+
+                  expect(
+                    users1Json,
+                    {
+                      "users": {
+                        "__values": {
+                          "1": {"name": "User 1"},
+                        },
+                        "1": {
+                          "friends": {
+                            "__values": {
+                              "1": {"name": "Friend 1"},
+                            }
+                          }
+                        }
+                      }
+                    },
+                  );
+
+                  final users2File =
+                      File('${testDirectory.path}/loon/users_2.json');
+                  var users2Json = jsonDecode(users2File.readAsStringSync());
+
+                  expect(
+                    users2Json,
+                    {
+                      "users": {
+                        "__values": {
+                          "2": {"name": "User 1"},
+                        },
+                      }
+                    },
+                  );
+
+                  final resolverFile =
+                      File('${testDirectory.path}/loon/__resolver__.json');
+                  var resolverJson =
+                      jsonDecode(resolverFile.readAsStringSync());
+
+                  expect(
+                    resolverJson,
+                    {
+                      "users": {
+                        "__refs": {
+                          "users_1": 1,
+                          "users_2": 1,
+                        },
+                        "__values": {
+                          "1": "users_1",
+                          "2": "users_2",
+                        }
+                      }
+                    },
+                  );
+
+                  otherUsersCollection
+                      .doc('1')
+                      .update(TestUserModel('User 1 updated'));
+
+                  await completer.onPersist;
+
+                  final otherUsersFile =
+                      File('${testDirectory.path}/loon/other_users.json');
+                  var otherUsersJson =
+                      jsonDecode(otherUsersFile.readAsStringSync());
+
+                  expect(
+                    otherUsersJson,
+                    {
+                      "users": {
+                        "__values": {
+                          "1": {"name": "User 1 updated"},
+                        },
+                        "1": {
+                          "friends": {
+                            "__values": {
+                              "1": {"name": "Friend 1"},
+                            }
+                          }
+                        }
+                      }
+                    },
+                  );
+
+                  expect(users1File.existsSync(), false);
+
+                  users2Json = jsonDecode(users2File.readAsStringSync());
+                  expect(
+                    users2Json,
+                    {
+                      "users": {
+                        "__values": {
+                          "2": {"name": "User 2"},
+                        },
+                      }
+                    },
+                  );
+
+                  resolverJson = jsonDecode(resolverFile.readAsStringSync());
+                  expect(
+                    resolverJson,
+                    {
+                      "__refs": {
+                        "other_users": 1,
+                      },
+                      "__values": {
+                        "other_users": "other_users",
+                      },
+                      "users": {
+                        "__refs": {
+                          "users_2": 1,
+                        },
+                        "__values": {
+                          "2": "users_2",
+                        }
                       }
                     },
                   );

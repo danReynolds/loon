@@ -245,4 +245,127 @@ void main() {
       },
     );
   });
+
+  group('graft', () {
+    test(
+      "Merges the ref count from the source store into the destination store",
+      () {
+        final store = IndexedRefValueStore<String>();
+        store.write('users__1', 'Dan');
+        store.write('users__2', 'Chris');
+        store.write('users__1__messages__1', 'Hello');
+
+        final store2 = IndexedRefValueStore<String>();
+        store2.write('users__3', 'Sonja');
+        store2.write('users__1__messages__2', 'How are you');
+        store2.write('users__3__messages__1', 'Hey there');
+
+        expect(store.inspect(), {
+          "users": {
+            "__refs": {
+              "Dan": 1,
+              "Chris": 1,
+            },
+            "__values": {
+              "1": "Dan",
+              "2": "Chris",
+            },
+            "1": {
+              "messages": {
+                "__refs": {
+                  "Hello": 1,
+                },
+                "__values": {
+                  "1": "Hello",
+                },
+              }
+            }
+          }
+        });
+
+        expect(store2.inspect(), {
+          "users": {
+            "__refs": {
+              "Sonja": 1,
+            },
+            "__values": {
+              "3": "Sonja",
+            },
+            "1": {
+              "messages": {
+                "__refs": {
+                  "How are you": 1,
+                },
+                "__values": {
+                  "2": "How are you",
+                },
+              }
+            },
+            "3": {
+              "messages": {
+                "__refs": {
+                  "Hey there": 1,
+                },
+                "__values": {
+                  "1": "Hey there",
+                }
+              },
+            }
+          },
+        });
+
+        store.graft(store2, 'users__3');
+
+        expect(store.inspect(), {
+          "users": {
+            "__refs": {
+              "Dan": 1,
+              "Chris": 1,
+              "Sonja": 1,
+            },
+            "__values": {
+              "1": "Dan",
+              "2": "Chris",
+              "3": "Sonja",
+            },
+            "1": {
+              "messages": {
+                "__refs": {
+                  "Hello": 1,
+                },
+                "__values": {
+                  "1": "Hello",
+                },
+              }
+            },
+            "3": {
+              "messages": {
+                "__refs": {
+                  "Hey there": 1,
+                },
+                "__values": {
+                  "1": "Hey there",
+                },
+              }
+            }
+          }
+        });
+
+        expect(store2.inspect(), {
+          "users": {
+            "1": {
+              "messages": {
+                "__refs": {
+                  "How are you": 1,
+                },
+                "__values": {
+                  "2": "How are you",
+                },
+              }
+            },
+          },
+        });
+      },
+    );
+  });
 }

@@ -412,6 +412,53 @@ void main() {
           });
         },
       );
+
+      test(
+        "Deletes the source store's path if now empty",
+        () {
+          final store = IndexedValueStore<String>();
+          store.write('users__1', 'Dan');
+
+          final store2 = IndexedValueStore<String>();
+          store2.write('users__2', 'Chris');
+          store2.write('users__3', 'Sonja');
+
+          store.graft(store2, 'users__2');
+
+          expect(store.inspect(), {
+            "users": {
+              "__values": {
+                "1": "Dan",
+                "2": "Chris",
+              },
+            },
+          });
+
+          expect(store2.inspect(), {
+            "users": {
+              "__values": {
+                "3": "Sonja",
+              },
+            },
+          });
+
+          store.graft(store2, 'users__3');
+
+          expect(store.inspect(), {
+            "users": {
+              "__values": {
+                "1": "Dan",
+                "2": "Chris",
+                "3": "Sonja",
+              },
+            },
+          });
+
+          // Now that the last value under the `users` collection in the source collection
+          // has been removed, it should delete the source's `users` collection path as well.
+          expect(store2.inspect(), {});
+        },
+      );
     },
   );
 

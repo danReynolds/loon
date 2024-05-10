@@ -258,6 +258,63 @@ class IndexedValueStore<T> {
     return _store;
   }
 
+  bool _graft(Map node, Map? otherNode, List<String> segments, int index) {
+    if (otherNode == null) {
+      return true;
+    }
+
+    final segment = segments[index];
+
+    if (index < segments.length - 1) {
+      final Map? otherChildNode = otherNode[segment];
+
+      if (otherChildNode == null) {
+        return true;
+      }
+
+      final Map childNode = node[segment] ??= {};
+
+      if (_graft(childNode, otherChildNode, segments, index + 1)) {
+        if (otherNode.length == 1) {
+          if (index == 0) {
+            otherNode.remove(segment);
+          }
+          return true;
+        }
+      }
+
+      return false;
+    }
+
+    if (otherNode.containsKey(_values)) {
+      final otherValues = otherNode[_values];
+
+      if (otherValues.containsKey(segment)) {
+        final value = otherValues.remove(segment);
+
+        final values = node[_values] ??= {};
+        values[segment] = value;
+      }
+
+      if (otherNode[_values].isEmpty) {
+        otherNode.remove(_values);
+      }
+    }
+
+    final Map? otherChildNode = otherNode[segment];
+    if (otherChildNode == null) {
+      return otherNode.isEmpty;
+    }
+
+    otherNode.remove(segment);
+
+    final Map childNode = node[segment] ??= {};
+
+    _mergeNode(childNode, otherChildNode);
+
+    return otherNode.isEmpty;
+  }
+
   /// Removes the subtree at the given [path] of the other provided [IndexedValueStore] and recursively
   /// merges it onto this store at the given path.
   void graft(
@@ -266,40 +323,10 @@ class IndexedValueStore<T> {
   ]) {
     if (path.isEmpty) {
       final otherNode = other._store;
-
       other.clear();
-
       _mergeNode(_store, otherNode);
     } else {
-      final segments = path.split(_delimiter);
-      // Remove the last segment from the path so that resolved node is the
-      // parent node of the node corresponding to the final path segment. This is
-      // necessary for also grafting the final node's value from the parent node.
-      final lastSegment = segments.removeLast();
-
-      final otherParent = _getNode(other._store, segments, 0);
-      if (otherParent == null || otherParent.isEmpty) {
-        return;
-      }
-
-      // Initialize the parent node of the given path in the store.
-      final parent = _touch(_store, segments, 0);
-
-      if (otherParent[_values]?.containsKey(lastSegment) ?? false) {
-        parent[_values] ??= {};
-        parent[_values][lastSegment] = otherParent[_values][lastSegment];
-      }
-
-      otherParent[_values]?.remove(lastSegment);
-      final child = parent[lastSegment] ??= {};
-      final otherChild = otherParent[lastSegment];
-
-      if (otherChild == null) {
-        return;
-      }
-
-      otherParent.remove(lastSegment);
-      _mergeNode(child, otherChild);
+      _graft(_store, other._store, path.split(_delimiter), 0);
     }
   }
 
@@ -362,6 +389,50 @@ class IndexedRefValueStore<T> extends IndexedValueStore<T> {
   }
 
   @override
+  bool _graft(node, otherNode, segments, index) {
+    if (index == segments.length - 1) {
+      final segment = segments[index];
+      final otherValues = otherNode?[IndexedValueStore._values];
+
+      // An [IndexedRefValueStore] must additionally update the ref count on the
+      // source and destination store's parent node's value.
+      if (otherValues != null && otherValues.containsKey(segment)) {
+        final otherValue = otherValues[segment];
+        final Map otherRefs = otherNode![_refs];
+
+        if (otherRefs[otherValue] == 1) {
+          otherRefs.remove(otherValue);
+        } else {
+          otherRefs[otherValue]--;
+        }
+
+        if (otherRefs.isEmpty) {
+          otherNode.remove(_refs);
+        }
+
+        if (node[IndexedValueStore._values].containsKey(segment)) {
+          final value = node[IndexedValueStore._values][segment];
+          if (node[_refs][value] == 1) {
+            node[_refs].remove(value);
+          } else {
+            node[_refs][value]--;
+          }
+
+          if (value != otherValue) {
+            node[_refs][otherValue] ??= 0;
+            node[_refs][otherValue]++;
+          }
+        } else {
+          node[_refs][otherValue] ??= 0;
+          node[_refs][otherValue]++;
+        }
+      }
+    }
+
+    return super._graft(node, otherNode, segments, index);
+  }
+
+  @override
   graft(
     other, [
     path = '',
@@ -370,18 +441,7 @@ class IndexedRefValueStore<T> extends IndexedValueStore<T> {
       return super.graft(other, path);
     }
 
-    final segments = path.split(IndexedValueStore._delimiter);
-    final lastSegment = segments.removeLast();
-    final otherParent = _getNode(other._store, segments, 0);
-
-    final otherValues = otherParent?[IndexedValueStore._values];
-    // An [IndexedRefValueStore] must additionally decrement the ref count on the
-    // source store's parent node of the given path.
-    if (otherValues != null && otherValues.containsKey(lastSegment)) {
-      otherParent![_refs][otherValues[lastSegment]]--;
-    }
-
-    return super.graft(other, path);
+    _graft(_store, other._store, path.split(IndexedValueStore._delimiter), 0);
   }
 
   @override
