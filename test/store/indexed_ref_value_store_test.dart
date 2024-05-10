@@ -2,75 +2,130 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:loon/loon.dart';
 
 void main() {
-  group('write', () {
-    test('Writes the value to the given path and updates the ref count', () {
-      final store = IndexedRefValueStore<String>();
+  group(
+    'write',
+    () {
+      test('Writes the value to the given path and updates the ref count', () {
+        final store = IndexedRefValueStore<String>();
 
-      store.write('users', 'Collection value');
-      store.write('users__1', 'Dan');
-      store.write('users__2', 'Sonja');
-      store.write('users__1__messages__2', 'Hey there!');
+        store.write('users', 'Collection value');
+        store.write('users__1', 'Dan');
+        store.write('users__2', 'Sonja');
+        store.write('users__1__messages__2', 'Hey there!');
 
-      expect(store.inspect(), {
-        "__refs": {
-          "Collection value": 1,
-        },
-        "__values": {
-          "users": "Collection value",
-        },
-        "users": {
+        expect(store.inspect(), {
           "__refs": {
-            "Dan": 1,
-            "Sonja": 1,
+            "Collection value": 1,
           },
           "__values": {
-            "1": "Dan",
-            "2": "Sonja",
+            "users": "Collection value",
           },
-          "1": {
-            "messages": {
-              "__refs": {
-                "Hey there!": 1,
-              },
-              "__values": {
-                "2": "Hey there!",
+          "users": {
+            "__refs": {
+              "Dan": 1,
+              "Sonja": 1,
+            },
+            "__values": {
+              "1": "Dan",
+              "2": "Sonja",
+            },
+            "1": {
+              "messages": {
+                "__refs": {
+                  "Hey there!": 1,
+                },
+                "__values": {
+                  "2": "Hey there!",
+                },
               },
             },
-          },
-        }
-      });
+          }
+        });
 
-      store.write('users__1', 'Sonja');
+        store.write('users__1', 'Sonja');
 
-      expect(store.inspect(), {
-        "__refs": {
-          "Collection value": 1,
-        },
-        "__values": {
-          "users": "Collection value",
-        },
-        "users": {
+        expect(store.inspect(), {
           "__refs": {
-            "Sonja": 2,
+            "Collection value": 1,
           },
           "__values": {
-            "1": "Sonja",
-            "2": "Sonja",
+            "users": "Collection value",
           },
-          "1": {
-            "messages": {
-              "__refs": {
-                "Hey there!": 1,
-              },
-              "__values": {
-                "2": "Hey there!",
+          "users": {
+            "__refs": {
+              "Sonja": 2,
+            },
+            "__values": {
+              "1": "Sonja",
+              "2": "Sonja",
+            },
+            "1": {
+              "messages": {
+                "__refs": {
+                  "Hey there!": 1,
+                },
+                "__values": {
+                  "2": "Hey there!",
+                },
               },
             },
-          },
-        }
+          }
+        });
       });
-    });
-  });
+
+      test(
+        'Should not increment the ref count when writing the same value multiple times',
+        () {
+          final store = IndexedRefValueStore<String>();
+
+          store.write('users', 'Collection value');
+          store.write('users__1', 'Dan');
+
+          expect(
+            store.inspect(),
+            {
+              "__refs": {
+                "Collection value": 1,
+              },
+              "__values": {
+                "users": "Collection value",
+              },
+              "users": {
+                "__refs": {
+                  "Dan": 1,
+                },
+                "__values": {
+                  "1": 'Dan',
+                },
+              }
+            },
+          );
+
+          store.write('users__1', 'Dan');
+
+          expect(
+            store.inspect(),
+            {
+              "__refs": {
+                "Collection value": 1,
+              },
+              "__values": {
+                "users": "Collection value",
+              },
+              "users": {
+                "__refs": {
+                  "Dan": 1,
+                },
+                "__values": {
+                  "1": 'Dan',
+                },
+              }
+            },
+          );
+        },
+      );
+    },
+  );
 
   group('delete', () {
     test(

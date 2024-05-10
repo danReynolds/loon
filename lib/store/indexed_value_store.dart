@@ -93,6 +93,10 @@ class IndexedValueStore<T> {
 
   /// Writes an empty node at the given path if a node does not already exist.
   Map _touch(Map node, List<String> segments, int index) {
+    if (segments.isEmpty) {
+      return node;
+    }
+
     final child = node[segments[index]] ??= {};
 
     if (index < segments.length - 1) {
@@ -162,8 +166,12 @@ class IndexedValueStore<T> {
     return value;
   }
 
-  // Deletes the path from the store. Returns whether the node is empty after the removal.
-  bool _delete(Map node, List<String> segments, int index) {
+  bool _delete(
+    Map node,
+    List<String> segments,
+    int index, [
+    bool recursive = true,
+  ]) {
     if (index < segments.length - 1) {
       final segment = segments[index];
       final Map? child = node[segment];
@@ -172,7 +180,7 @@ class IndexedValueStore<T> {
         return false;
       }
 
-      if (_delete(child, segments, index + 1)) {
+      if (_delete(child, segments, index + 1, recursive)) {
         if (node.length == 1) {
           if (index == 0) {
             node.remove(segment);
@@ -187,7 +195,9 @@ class IndexedValueStore<T> {
     }
 
     final segment = segments.last;
-    node.remove(segment);
+    if (recursive) {
+      node.remove(segment);
+    }
 
     if (node.containsKey(_values)) {
       final Map values = node[_values];
@@ -201,6 +211,7 @@ class IndexedValueStore<T> {
     return node.isEmpty;
   }
 
+  /// Deletes the path and its subpaths from the store.
   void delete(String path) {
     if (path.isEmpty) {
       _store = {};
@@ -208,6 +219,11 @@ class IndexedValueStore<T> {
     }
 
     _delete(_store, path.split(_delimiter), 0);
+  }
+
+  /// Deletes the value at the given path, retaining its subpaths.
+  void deleteValue(String path) {
+    _delete(_store, path.split(_delimiter), 0, false);
   }
 
   /// Returns whether the store has a value for the given path.
@@ -375,10 +391,16 @@ class IndexedRefValueStore<T> extends IndexedValueStore<T> {
       final values = node[IndexedValueStore._values];
       final refs = node[_refs] ??= <T, int>{};
 
-      // Decrement the ref count of the old value (if one exists).
+      // Check if there was a previous value for this path.
       if (values != null && values.containsKey(segment)) {
         final prevValue = values[segment];
 
+        // If the value has not changed, then do not modify the ref count.
+        if (prevValue == value) {
+          return;
+        }
+
+        // Otherwise decrement the ref count of the old value.
         if (refs[prevValue] == 1) {
           refs.remove(prevValue);
         } else {
@@ -395,12 +417,17 @@ class IndexedRefValueStore<T> extends IndexedValueStore<T> {
   }
 
   @override
-  bool _delete(Map node, List<String> segments, int index) {
+  bool _delete(
+    Map node,
+    List<String> segments,
+    int index, [
+    bool recursive = true,
+  ]) {
     if (index == segments.length - 1) {
       final segment = segments.last;
 
       if (!node.containsKey(_refs)) {
-        return super._delete(node, segments, index);
+        return super._delete(node, segments, index, recursive);
       }
 
       final value = node[IndexedValueStore._values][segment];
@@ -415,7 +442,7 @@ class IndexedRefValueStore<T> extends IndexedValueStore<T> {
       }
     }
 
-    return super._delete(node, segments, index);
+    return super._delete(node, segments, index, recursive);
   }
 
   Map<T, int> _extractRefs(

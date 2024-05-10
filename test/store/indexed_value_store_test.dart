@@ -122,6 +122,49 @@ void main() {
     });
   });
 
+  group('deleteValue', () {
+    test("Should delete the value at the path and retain subpaths", () {
+      final store = IndexedValueStore<String>();
+
+      store.write('users__1', 'Dan');
+      store.write('users__2', 'Chris');
+      store.write('users__1__posts__1', 'Hello');
+
+      expect(store.inspect(), {
+        "users": {
+          "__values": {
+            "1": "Dan",
+            "2": "Chris",
+          },
+          "1": {
+            "posts": {
+              "__values": {
+                "1": "Hello",
+              }
+            }
+          }
+        },
+      });
+
+      store.deleteValue('users__1');
+
+      expect(store.inspect(), {
+        "users": {
+          "__values": {
+            "2": "Chris",
+          },
+          "1": {
+            "posts": {
+              "__values": {
+                "1": "Hello",
+              }
+            }
+          }
+        },
+      });
+    });
+  });
+
   group(
     'graft',
     () {

@@ -203,39 +203,37 @@ class FileDataStoreManager {
         directory: directory,
       );
 
-      if (prevDataStore != dataStore) {
-        switch (persistenceKey?.type) {
-          case null:
-            // If the document is persisted without its own key, then if it previously had one specified,
-            // it should be removed.
+      // If the resolved data store for the document has changed, then its data
+      // should be grafted from its previous data store to the updated one.
+      if (prevDataStore != null && prevDataStore != dataStore) {
+        await dataStore.graft(prevDataStore, docPath);
+      }
 
-            // TODO: Make a deleteValue API so that the subtree for the document path is preserved.
-            _resolver.store.delete(docPath);
-            break;
-          case FilePersistorKeyTypes.collection:
-            if (prevDataStore != null) {
-              dataStore.graft(prevDataStore, docPath);
+      switch (persistenceKey?.type) {
+        case null:
+          // If the resolver already has a persistence key for this document, then it
+          // should be removed since the document has been updated without a persistence key.
+          _resolver.store.deleteValue(docPath);
+          break;
+        case FilePersistorKeyTypes.document:
+          // Update the resolver's persistence key for the document.
+          _resolver.store.write(docPath, dataStoreName);
+          break;
+        case FilePersistorKeyTypes.collection:
+          // If there is already a document-level persistence key in the resolver tree for this
+          // document then it should be removed, since the document is being persisted with a
+          // collection-level key.
+          _resolver.store.deleteValue(docPath);
 
-              // If the document is persisted with a collection-level key, then if it previously had a document-level
-              // key, it should move just its document to the collection's store.
-              final documentKey = _resolver.store.get(docPath);
-              if (documentKey != null) {
-                _resolver.store.write(docPath, dataStoreName);
-              } else {
-                final collectionKey = _resolver.store.get(collectionPath);
-                // Otherwise, if the collection does not exist in the resolver tree, it should be added.
-                if (collectionKey == null) {
-                  _resolver.store.write(collectionPath, dataStoreName);
-                } else {
-                  // If the collection key associated with this document is different from the collection's key
-                  // in the resolver store, then move all of the data under the collection's key to the
-                  // updated collection key, since the old key is stale.
-                }
-              }
-            }
-
-            break;
-        }
+          // If the resolved data store for the document's collection has changed, then its data
+          // should be grafted from its previous data store to the updated one.
+          final collectionDataStore =
+              _index[_resolver.store.getNearest(collectionPath)];
+          if (collectionDataStore != null && collectionDataStore != dataStore) {
+            _resolver.store.write(collectionPath, dataStoreName);
+            dataStore.graft(collectionDataStore, collectionPath);
+          }
+          break;
       }
 
       await dataStore.writePath(docPath, docData);
