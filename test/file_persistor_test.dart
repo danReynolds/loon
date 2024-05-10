@@ -1179,6 +1179,106 @@ void main() {
               );
             },
           );
+
+          group(
+            '6. collection-level key -> updated collection-level key',
+            () {
+              test(
+                'Moves all documents of the collection in the previous default document store to the store specified by its collection key',
+                () async {
+                  final otherUsersCollection = Loon.collection<TestUserModel>(
+                    'users',
+                    fromJson: TestUserModel.fromJson,
+                    toJson: (user) => user.toJson(),
+                    persistorSettings: FilePersistorSettings(
+                      key: FilePersistor.key('other_users'),
+                    ),
+                  );
+
+                  final otherUsersUpdatedCollection =
+                      Loon.collection<TestUserModel>(
+                    'users',
+                    fromJson: TestUserModel.fromJson,
+                    toJson: (user) => user.toJson(),
+                    persistorSettings: FilePersistorSettings(
+                      key: FilePersistor.key('other_users_updated'),
+                    ),
+                  );
+
+                  otherUsersCollection.doc('1').create(TestUserModel('User 1'));
+                  otherUsersCollection.doc('2').create(TestUserModel('User 2'));
+
+                  await completer.onPersist;
+
+                  final otherUsersFile =
+                      File('${testDirectory.path}/loon/other_users.json');
+                  var otherUsersJson =
+                      jsonDecode(otherUsersFile.readAsStringSync());
+
+                  expect(otherUsersJson, {
+                    "users": {
+                      "__values": {
+                        "1": {"name": "User 1"},
+                        "2": {"name": "User 2"},
+                      }
+                    }
+                  });
+
+                  final resolverFile =
+                      File('${testDirectory.path}/loon/__resolver__.json');
+                  var resolverJson =
+                      jsonDecode(resolverFile.readAsStringSync());
+
+                  expect(
+                    resolverJson,
+                    {
+                      "__refs": {
+                        "other_users": 1,
+                      },
+                      "__values": {
+                        "users": "other_users",
+                      },
+                    },
+                  );
+
+                  otherUsersUpdatedCollection
+                      .doc('1')
+                      .update(TestUserModel('Updated user 1'));
+
+                  await completer.onPersist;
+
+                  final otherUsersUpdatedFile = File(
+                      '${testDirectory.path}/loon/other_users_updated.json');
+                  var otherUsersUpdatedJson =
+                      jsonDecode(otherUsersUpdatedFile.readAsStringSync());
+
+                  expect(otherUsersUpdatedJson, {
+                    "users": {
+                      "__values": {
+                        "1": {"name": "Updated user 1"},
+                        "2": {"name": "User 2"},
+                      }
+                    }
+                  });
+
+                  expect(otherUsersFile.existsSync(), false);
+
+                  resolverJson = jsonDecode(resolverFile.readAsStringSync());
+                  expect(
+                    resolverJson,
+                    {
+                      "__refs": {
+                        "other_users_updated": 1,
+                      },
+                      "__values": {
+                        "users": "other_users_updated",
+                      },
+                    },
+                  );
+                },
+              );
+            },
+          );
         },
       );
     },

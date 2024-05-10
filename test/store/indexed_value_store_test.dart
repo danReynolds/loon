@@ -442,6 +442,26 @@ void main() {
             },
           });
 
+          // Grafting a deeper path that doesn't exist should not remove any parent path.
+          store.graft(store2, 'users__3__messages__1');
+
+          expect(store.inspect(), {
+            "users": {
+              "__values": {
+                "1": "Dan",
+                "2": "Chris",
+              },
+            },
+          });
+
+          expect(store2.inspect(), {
+            "users": {
+              "__values": {
+                "3": "Sonja",
+              },
+            },
+          });
+
           store.graft(store2, 'users__3');
 
           expect(store.inspect(), {

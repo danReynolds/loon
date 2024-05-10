@@ -258,9 +258,11 @@ class IndexedValueStore<T> {
     return _store;
   }
 
+  /// Grafts the data under the given path from the other store into this store. Returns
+  /// whether the other store's node can be deleted after grafted.
   bool _graft(Map node, Map? otherNode, List<String> segments, int index) {
     if (otherNode == null) {
-      return true;
+      return false;
     }
 
     final segment = segments[index];
@@ -269,7 +271,7 @@ class IndexedValueStore<T> {
       final Map? otherChildNode = otherNode[segment];
 
       if (otherChildNode == null) {
-        return true;
+        return false;
       }
 
       final Map childNode = node[segment] ??= {};

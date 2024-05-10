@@ -232,9 +232,12 @@ class FileDataStoreManager {
           // should be grafted from its previous data store to the updated one.
           final collectionDataStore =
               _index[_resolver.store.getNearest(collectionPath)];
-          if (collectionDataStore != null && collectionDataStore != dataStore) {
+          if (collectionDataStore != dataStore) {
             _resolver.store.write(collectionPath, dataStoreName);
-            dataStore.graft(collectionDataStore, collectionPath);
+
+            if (collectionDataStore != null) {
+              dataStore.graft(collectionDataStore, collectionPath);
+            }
           }
           break;
       }
