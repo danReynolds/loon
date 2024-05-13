@@ -146,7 +146,7 @@ class IndexedValueStore<T> {
   }
 
   /// Returns a map of all values that are immediate children of the given path.
-  Map<String, T>? getAll(String path) {
+  Map<String, T>? getChildValues(String path) {
     return _getNode(_store, path.split(_delimiter), 0)?[_values];
   }
 
@@ -212,18 +212,18 @@ class IndexedValueStore<T> {
   }
 
   /// Deletes the path and its subpaths from the store.
-  void delete(String path) {
+  void delete(
+    String path, {
+    /// Whether the data in the subtree under the given path should also be deleted.
+    /// If false, only the value at the given path is deleted and the subtree is maintained.
+    bool recursive = true,
+  }) {
     if (path.isEmpty) {
       _store = {};
       return;
     }
 
-    _delete(_store, path.split(_delimiter), 0);
-  }
-
-  /// Deletes the value at the given path, retaining its subpaths.
-  void deleteValue(String path) {
-    _delete(_store, path.split(_delimiter), 0, false);
+    _delete(_store, path.split(_delimiter), 0, recursive);
   }
 
   /// Returns whether the store has a value for the given path.
@@ -231,9 +231,9 @@ class IndexedValueStore<T> {
     return get(path) != null;
   }
 
-  /// Returns whether the store has any values for the given path.
-  bool hasAny(String path) {
-    return getAll(path)?.isNotEmpty ?? false;
+  /// Returns whether the store has any child values under the given path.
+  bool hasChildValues(String path) {
+    return getChildValues(path)?.isNotEmpty ?? false;
   }
 
   /// Returns whether the store contains the given path.

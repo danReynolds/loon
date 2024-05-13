@@ -79,7 +79,7 @@ class BroadcastManager {
   }
 
   /// Deletes the given path from the broadcast store.
-  void _deletePath(String path) {
+  void _delete(String path) {
     /// When a path is deleted, the broadcast store is updated to remove all broadcasts
     /// scheduled for that path and paths under it, since that subtree is now invalid,
     /// and replace the root of the subtree with a single [EventTypes.removed] event for that path.
@@ -110,11 +110,11 @@ class BroadcastManager {
   }
 
   void deleteCollection(Collection collection) {
-    _deletePath(collection.path);
+    _delete(collection.path);
   }
 
   void deleteDocument(Document doc) {
-    _deletePath(doc.path);
+    _delete(doc.path);
 
     _broadcastDependents(doc);
   }

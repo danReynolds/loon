@@ -54,113 +54,119 @@ void main() {
       store.write('users__2', 'Sonja');
       store.write('users__1__friends__1', 'Nik');
 
-      expect(store.getAll('users__1'), null);
-      expect(store.getAll('users__2'), null);
-      expect(store.getAll('users'), {
+      expect(store.getChildValues('users__1'), null);
+      expect(store.getChildValues('users__2'), null);
+      expect(store.getChildValues('users'), {
         "1": "Dan",
         "2": "Sonja",
       });
-      expect(store.getAll('users__1__friends'), {
+      expect(store.getChildValues('users__1__friends'), {
         "1": "Nik",
       });
     });
   });
 
   group('delete', () {
-    test('Removes the value at the given path from the store.', () {
-      final store = IndexedValueStore<String>();
+    group(
+      "when recursive",
+      () {
+        test('Removes the value at the given path recursively from the store.',
+            () {
+          final store = IndexedValueStore<String>();
 
-      store.write('users__1', 'Dan');
-      store.write('users__2', 'Sonja');
-      store.write('users__1__friends__1', 'Nik');
+          store.write('users__1', 'Dan');
+          store.write('users__2', 'Sonja');
+          store.write('users__1__friends__1', 'Nik');
 
-      expect(store.inspect(), {
-        "users": {
-          "__values": {
-            "1": "Dan",
-            "2": "Sonja",
-          },
-          "1": {
-            "friends": {
+          expect(store.inspect(), {
+            "users": {
               "__values": {
-                "1": "Nik",
+                "1": "Dan",
+                "2": "Sonja",
+              },
+              "1": {
+                "friends": {
+                  "__values": {
+                    "1": "Nik",
+                  },
+                },
               },
             },
-          },
-        },
-      });
+          });
 
-      store.delete('users__1');
+          store.delete('users__1');
 
-      expect(store.inspect(), {
-        "users": {
-          "__values": {
-            "2": "Sonja",
-          },
-        },
-      });
-
-      store.delete('users__2');
-
-      expect(store.inspect(), {});
-
-      store.write('users__1', 'Dan');
-      store.write('users__2', 'Sonja');
-
-      expect(store.inspect(), {
-        "users": {
-          "__values": {
-            "1": "Dan",
-            "2": "Sonja",
-          },
-        },
-      });
-
-      store.delete('users');
-
-      expect(store.inspect(), {});
-    });
-  });
-
-  group('deleteValue', () {
-    test("Should delete the value at the path and retain subpaths", () {
-      final store = IndexedValueStore<String>();
-
-      store.write('users__1', 'Dan');
-      store.write('users__2', 'Chris');
-      store.write('users__1__posts__1', 'Hello');
-
-      expect(store.inspect(), {
-        "users": {
-          "__values": {
-            "1": "Dan",
-            "2": "Chris",
-          },
-          "1": {
-            "posts": {
+          expect(store.inspect(), {
+            "users": {
               "__values": {
-                "1": "Hello",
+                "2": "Sonja",
+              },
+            },
+          });
+
+          store.delete('users__2');
+
+          expect(store.inspect(), {});
+
+          store.write('users__1', 'Dan');
+          store.write('users__2', 'Sonja');
+
+          expect(store.inspect(), {
+            "users": {
+              "__values": {
+                "1": "Dan",
+                "2": "Sonja",
+              },
+            },
+          });
+
+          store.delete('users');
+
+          expect(store.inspect(), {});
+        });
+      },
+    );
+
+    group('when not recursive', () {
+      test("Should delete the value at the path and retain subpaths", () {
+        final store = IndexedValueStore<String>();
+
+        store.write('users__1', 'Dan');
+        store.write('users__2', 'Chris');
+        store.write('users__1__posts__1', 'Hello');
+
+        expect(store.inspect(), {
+          "users": {
+            "__values": {
+              "1": "Dan",
+              "2": "Chris",
+            },
+            "1": {
+              "posts": {
+                "__values": {
+                  "1": "Hello",
+                }
               }
             }
-          }
-        },
-      });
-
-      store.deleteValue('users__1');
-
-      expect(store.inspect(), {
-        "users": {
-          "__values": {
-            "2": "Chris",
           },
-          "1": {
-            "posts": {
-              "__values": {
-                "1": "Hello",
+        });
+
+        store.delete('users__1', recursive: false);
+
+        expect(store.inspect(), {
+          "users": {
+            "__values": {
+              "2": "Chris",
+            },
+            "1": {
+              "posts": {
+                "__values": {
+                  "1": "Hello",
+                }
               }
             }
-          }
-        },
+          },
+        });
       });
     });
   });

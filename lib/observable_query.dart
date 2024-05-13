@@ -111,7 +111,7 @@ class ObservableQuery<T> extends Query<T>
     }
 
     final events =
-        Loon._instance.broadcastManager.store.getAll(collection.path);
+        Loon._instance.broadcastManager.store.getChildValues(collection.path);
     if (events != null) {
       for (final entry in events.entries) {
         final docId = entry.key;

@@ -100,7 +100,7 @@ class FileDataStoreManager {
   Future<void> _clear(String path) async {
     final stores = _resolve(path);
 
-    await Future.wait(stores.map((store) => store.removePath(path)));
+    await Future.wait(stores.map((store) => store.remove(path)));
 
     _resolver.store.delete(path);
   }
@@ -156,12 +156,12 @@ class FileDataStoreManager {
         //    its old data store to the updated one and delivered in the extracted hydration data.
         final resolvedDataStore = _index[_resolver.store.getNearest(docPath)];
         if (resolvedDataStore != null && resolvedDataStore != hydratedStore) {
-          if (resolvedDataStore.hasPath(docPath)) {
+          if (resolvedDataStore.has(docPath)) {
             extractedData.remove(docPath);
           } else {
-            resolvedDataStore.writePath(docPath, extractedData[docPath]!);
+            resolvedDataStore.write(docPath, extractedData[docPath]!);
           }
-          hydratedStore.removePath(docPath);
+          hydratedStore.remove(docPath);
         }
       }
 
@@ -194,7 +194,7 @@ class FileDataStoreManager {
       // If the persistence key for the document is now null, then remove the previous
       // key for the document (if it exists) ahead of resolving the updated data store name.
       if (persistenceKey == null) {
-        _resolver.store.deleteValue(docPath);
+        _resolver.store.delete(docPath, recursive: false);
       }
 
       final dataStoreName = _resolveDataStoreName(
@@ -226,7 +226,7 @@ class FileDataStoreManager {
           // If there is already a document-level persistence key in the resolver tree for this
           // document then it should be removed, since the document is being persisted with a
           // collection-level key.
-          _resolver.store.deleteValue(docPath);
+          _resolver.store.delete(docPath, recursive: false);
 
           // If the resolved data store for the document's collection has changed, then its data
           // should be grafted from its previous data store to the updated one.
@@ -242,7 +242,7 @@ class FileDataStoreManager {
           break;
       }
 
-      await dataStore.writePath(docPath, docData);
+      await dataStore.write(docPath, docData);
     }
 
     await _sync();

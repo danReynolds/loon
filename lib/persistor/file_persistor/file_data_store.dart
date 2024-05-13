@@ -55,28 +55,34 @@ class FileDataStore {
     );
   }
 
-  bool hasPath(String path) {
-    return _store.hasPath(path);
+  bool has(String path) {
+    return _store.has(path);
   }
 
-  Future<void> writePath(String path, Json data) async {
+  Future<void> write(String path, Json value) async {
     // Unhydrated stores must be hydrated before data can be written to them.
     if (!isHydrated) {
       await hydrate();
     }
 
-    _store.write(path, data);
+    _store.write(path, value);
     isDirty = true;
   }
 
-  Future<void> removePath(String path) async {
+  Future<void> remove(
+    String path, {
+    bool recursive = true,
+  }) async {
     // Unhydrated stores containing the path must be hydrated before the data can be removed.
     if (!isHydrated) {
       await hydrate();
     }
 
-    if (_store.hasPath(path)) {
+    if (recursive && _store.hasPath(path)) {
       _store.delete(path);
+      isDirty = true;
+    } else if (_store.has(path)) {
+      _store.delete(path, recursive: false);
       isDirty = true;
     }
   }

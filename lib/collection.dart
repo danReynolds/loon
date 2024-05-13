@@ -73,14 +73,14 @@ class Collection<T> {
   }
 
   bool exists() {
-    return Loon._instance.documentStore.hasAny(path);
+    return Loon._instance.documentStore.hasChildValues(path);
   }
 
   /// A collection is pending broadcast if the collection itself has any pending events
   /// or if any of its documents have any events.
   bool isPendingBroadcast() {
     return Loon._instance.broadcastManager.store.has(path) ||
-        Loon._instance.broadcastManager.store.hasAny(path);
+        Loon._instance.broadcastManager.store.hasChildValues(path);
   }
 
   Stream<List<DocumentSnapshot<T>>> stream() {
