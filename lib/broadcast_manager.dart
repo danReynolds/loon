@@ -24,6 +24,9 @@ class BroadcastManager {
   /// The store of broadcast observers that should be notified on broadcast.
   final Set<BroadcastObserver> _observers = {};
 
+  /// The subset of broadcast observers from [_observers] with dependencies.
+  final Set<BroadcastObserver> _depObservers = {};
+
   /// Whether the broadcast store is dirty and has a pending broadcast scheduled.
   bool _pendingBroadcast = false;
 
@@ -35,13 +38,26 @@ class BroadcastManager {
       // async so that multiple broadcast events can be batched together into one update
       // across all changes that occur in the current task of the event loop.
       scheduleMicrotask(() {
-        for (final observer in _observers) {
-          observer._onBroadcast();
-        }
-        store.clear();
-        _pendingBroadcast = false;
+        _broadcast();
       });
     }
+  }
+
+  void _broadcast() {
+    _depObservers.clear();
+
+    for (final observer in _observers) {
+      observer._onBroadcast();
+
+      // Recalculate the set of observers with dependencies after they process the broadcast
+      // and update their dependency stores.
+      if (!observer._deps.isEmpty) {
+        _depObservers.add(observer);
+      }
+    }
+
+    store.clear();
+    _pendingBroadcast = false;
   }
 
   /// Schedules all dependents of the given document for broadcast.
@@ -86,17 +102,10 @@ class BroadcastManager {
     store.delete(path);
     store.write(path, BroadcastEvents.removed);
 
-    /// Deleting paths should be infrequent, so iterating over every active observer for each delete
-    /// is presumed to be reasonable for performance, given the small number of deletions and observers.
-    for (final observer in _observers) {
-      // If the observer's path is a child of the deleted path, then the observer is rebroadcast
-      // as having been removed.
-      if (observer.exists() && observer.path.startsWith(path)) {
-        store.write(observer.path, BroadcastEvents.removed);
-
-        /// If any observer's dependencies contain the deleted path, then the observer must
-        /// be scheduled for rebroadcast, since its dependencies are dirty.
-      } else if (observer._deps.has(path)) {
+    /// Deleting a path is relatively infrequent, so iterating over the subset of active observers with dependencies
+    /// is presumed to be reasonable for performance, given the small number of deletions and deps observers.
+    for (final observer in _depObservers) {
+      if (observer._deps.has(path)) {
         store.write(observer.path, BroadcastEvents.touched);
       }
     }
@@ -129,10 +138,15 @@ class BroadcastManager {
 
   void addObserver(BroadcastObserver observer) {
     _observers.add(observer);
+
+    if (!observer._deps.isEmpty) {
+      _depObservers.add(observer);
+    }
   }
 
   void removeObserver(BroadcastObserver observer) {
     _observers.remove(observer);
+    _depObservers.remove(observer);
   }
 
   Map inspect() {

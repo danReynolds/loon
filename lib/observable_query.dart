@@ -66,9 +66,9 @@ class ObservableQuery<T> extends Query<T>
   /// On broadcast, the [ObservableQuery] examines the broadcast events that have occurred
   /// since the last broadcast and determines if the query needs to rebroadcast to its listeners.
   ///
-  /// The conditions for rebroadcasting the updated query are as follows:
+  /// The scenarios for rebroadcasting the updated query are as follows:
   ///
-  /// 1. The query's collection has been removed.
+  /// 1. Any path above or equal to the query's collection has been removed.
   /// 2. The query collection documents have broadcast events. These events include:
   ///   a. A new document has been added that satisfies the query filter.
   ///   b. A document that previously satisfied the query filter has been removed.
@@ -91,9 +91,11 @@ class ObservableQuery<T> extends Query<T>
     final List<DocumentChangeSnapshot<T>> changeSnaps = [];
     final hasChangeListener = _changeController.hasListener;
 
-    // 1. The query's collection has been removed.
-    if (Loon._instance.broadcastManager.store.get(path) ==
-        BroadcastEvents.removed) {
+    // 1.  Any path above or equal to the query's collection has been removed. This is determined by finding
+    //     a [BroadcastEvents.removed] event anywhere above or at the query's collection path.
+    if (Loon._instance.broadcastManager.store
+            .findValue(path, BroadcastEvents.removed) !=
+        null) {
       if (_value.isNotEmpty) {
         shouldUpdate = true;
 

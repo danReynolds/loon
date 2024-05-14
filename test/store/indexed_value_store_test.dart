@@ -46,7 +46,7 @@ void main() {
     });
   });
 
-  group('getAll', () {
+  group('getChildValues', () {
     test('Retrieves all of the values of the children of the given path', () {
       final store = IndexedValueStore<String>();
 
@@ -64,6 +64,36 @@ void main() {
         "1": "Nik",
       });
     });
+  });
+
+  group('hasValue', () {
+    test('Returns whether a value exists at the given path', () {
+      final store = IndexedValueStore<String>();
+      store.write('users__1', 'Test');
+
+      expect(store.hasValue('users__1'), true);
+      expect(store.hasValue('users__2'), false);
+      expect(store.hasValue('users'), false);
+    });
+  });
+
+  group('findValue', () {
+    test(
+      "Returns the first subpath along the given path with the provided value",
+      () {
+        final store = IndexedValueStore<String>();
+        store.write('users__1', 'Dan');
+        store.write('users__1__messages__1', 'Dan');
+        store.write('users__1__messages__2', 'Sonja');
+
+        expect(store.findValue('users__1__messages__1', 'Dan'), 'users__1');
+        expect(
+          store.findValue('users__1__messages__2', 'Sonja'),
+          'users__1__messages__2',
+        );
+        expect(store.findValue('users__1__messages__1', 'Sonja'), null);
+      },
+    );
   });
 
   group('delete', () {

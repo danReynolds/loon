@@ -156,6 +156,10 @@ class PathRefStore {
     return _has(_store, path.split(delimiter));
   }
 
+  bool get isEmpty {
+    return _store.isEmpty;
+  }
+
   void clear() {
     _store.clear();
   }

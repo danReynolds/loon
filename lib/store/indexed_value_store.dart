@@ -253,6 +253,34 @@ class IndexedValueStore<T> {
         _getNode(_store, path.split(_delimiter), 0) != null;
   }
 
+  String? _findValue(
+    Map? node,
+    List<String> segments,
+    int index,
+    dynamic value,
+  ) {
+    if (node == null) {
+      return null;
+    }
+
+    final segment = segments[index];
+    if (node[_values]?[segment] == value) {
+      return segments.take(index + 1).join(_delimiter);
+    }
+
+    if (index < segments.length - 1) {
+      return _findValue(node[segment], segments, index + 1, value);
+    }
+
+    return null;
+  }
+
+  /// Returns the first subpath along the given path that has a value equal to the
+  /// provided value (if any).
+  String? findValue(String path, dynamic value) {
+    return _findValue(_store, path.split(_delimiter), 0, value);
+  }
+
   void clear() {
     _store = {};
   }
