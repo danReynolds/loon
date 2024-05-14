@@ -11,8 +11,6 @@ class DualFileDataStore {
   late final FileDataStore _plaintextStore;
   late final EncryptedFileDataStore _encryptedStore;
 
-  bool isHydrated;
-
   final String name;
 
   static final _logger = Logger('DualFileDataStore');
@@ -21,16 +19,18 @@ class DualFileDataStore {
     required this.name,
     required Directory directory,
     required Encrypter encrypter,
-    this.isHydrated = false,
+    bool isHydrated = false,
   }) {
     _plaintextStore = FileDataStore(
       directory: directory,
       name: name,
+      isHydrated: isHydrated,
     );
     _encryptedStore = EncryptedFileDataStore(
       name: name,
       encrypter: encrypter,
       directory: directory,
+      isHydrated: isHydrated,
     );
   }
 
@@ -86,8 +86,6 @@ class DualFileDataStore {
     }
 
     await Future.wait([_plaintextStore.hydrate(), _encryptedStore.hydrate()]);
-
-    isHydrated = true;
   }
 
   Future<void> persist() async {
@@ -97,6 +95,10 @@ class DualFileDataStore {
     }
 
     await Future.wait([_plaintextStore.persist(), _encryptedStore.persist()]);
+  }
+
+  bool get isHydrated {
+    return _plaintextStore.isHydrated && _encryptedStore.isHydrated;
   }
 
   bool get isEmpty {

@@ -211,6 +211,7 @@ class FileDataStoreManager {
         name: dataStoreName,
         encrypter: encrypter,
         directory: directory,
+        isHydrated: true,
       );
 
       // If the resolved data store for the document has changed, then its data
