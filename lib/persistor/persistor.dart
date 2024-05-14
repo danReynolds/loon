@@ -100,6 +100,7 @@ abstract class Persistor {
   Future<void> _persist() async {
     try {
       await _runOperation(() async {
+        _logger.log('Persist batch size: ${_batch.length}');
         final batchDocs = _batch.toList();
 
         // The current batch is eagerly cleared so that after persistence completes, it can be re-checked to see if there
