@@ -7,6 +7,8 @@ import '../utils.dart';
 class TestFilePersistor extends FilePersistor {
   static PersistorCompleter completer = PersistorCompleter();
 
+  final encrypter = Encrypter(AES(testEncryptionKey, mode: AESMode.cbc));
+
   TestFilePersistor({
     FilePersistorSettings? settings,
   }) : super(
@@ -26,6 +28,14 @@ class TestFilePersistor extends FilePersistor {
   /// Override the initialization of the encrypter to use a test key instead of accessing FlutterSecureStorage
   /// which is not available in the test environment.
   Future<Encrypter?> initEncrypter() async {
-    return Encrypter(AES(testEncryptionKey, mode: AESMode.cbc));
+    return encrypter;
+  }
+
+  String decrypt(String encrypted) {
+    final iv = IV.fromBase64(encrypted.substring(0, 24));
+    return encrypter.decrypt64(
+      encrypted.substring(24),
+      iv: iv,
+    );
   }
 }

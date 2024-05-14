@@ -112,6 +112,10 @@ class IndexedValueStore<T> {
 
   /// Returns the value for the given path.
   T? get(String path) {
+    if (_store.isEmpty) {
+      return null;
+    }
+
     final segments = path.split(_delimiter);
     return _getNode(
       _store,

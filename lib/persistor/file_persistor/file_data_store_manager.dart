@@ -7,7 +7,7 @@ import 'package:loon/persistor/file_persistor/file_persistor_settings.dart';
 import 'package:path/path.dart' as path;
 
 class FileDataStoreManager {
-  final Encrypter? encrypter;
+  final Encrypter encrypter;
 
   /// The directory in which a file data store is persisted.
   final Directory directory;
@@ -17,15 +17,15 @@ class FileDataStoreManager {
   late final FileDataStoreResolver _resolver;
 
   /// The index of [FileDataStore] objects by name.
-  final Map<String, FileDataStore> _index = {};
+  final Map<String, DualFileDataStore> _index = {};
 
   FileDataStoreManager({
     required this.directory,
-    this.encrypter,
+    required this.encrypter,
   });
 
   /// Resolves the set of [FileDataStore] that contain the under and including the given path.
-  Set<FileDataStore> _resolve(String path) {
+  Set<DualFileDataStore> _resolve(String path) {
     // Resolve the store for the document path itself separately.
     final store = _index[_resolver.store.getNearest(path)];
 
@@ -46,15 +46,12 @@ class FileDataStoreManager {
 
   /// Returns the name of the data store that the given document path resolves to.
   String _resolveDataStoreName(
-    String docPath, {
-    required FilePersistorKey? key,
-    required bool isEncrypted,
-  }) {
-    final encryptionSuffix = isEncrypted ? '.encrypted' : '';
-
+    String docPath,
+    FilePersistorKey? key,
+  ) {
     // If a persistence key is specified, then return the data store determined by that key.
     if (key != null) {
-      return "${key.value}$encryptionSuffix";
+      return key.value;
     }
 
     // If the document does not specify a persistence key, then its data store is resolved to the nearest data store
@@ -62,10 +59,10 @@ class FileDataStoreManager {
     // it defaults to using one named after the document's top-level collection.
     final nearestDataStoreName = _resolver.store.getNearest(docPath);
     if (nearestDataStoreName != null) {
-      return "$nearestDataStoreName$encryptionSuffix";
+      return nearestDataStoreName;
     }
 
-    final dataStoreName = "${docPath.split('__').first}$encryptionSuffix";
+    final dataStoreName = docPath.split('__').first;
 
     // Write the new top-level data store name into the resolver tree.
     _resolver.store.write(dataStoreName, dataStoreName);
@@ -113,7 +110,11 @@ class FileDataStoreManager {
         .where((file) => fileRegex.hasMatch(path.basename(file.path)))
         .toList();
     for (final file in files) {
-      final dataStore = FileDataStore.parse(file, encrypter: encrypter);
+      final dataStore = DualFileDataStore.parse(
+        file,
+        encrypter: encrypter,
+        directory: directory,
+      );
       _index[dataStore.name] = dataStore;
     }
 
@@ -125,7 +126,7 @@ class FileDataStoreManager {
 
   /// Hydrates the given paths and returns a map of document paths to their serialized data.
   Future<Map<String, Json>> hydrate(List<String>? paths) async {
-    final Set<FileDataStore> dataStores = {};
+    final Set<DualFileDataStore> dataStores = {};
 
     // If the hydration operation is only for certain paths, then resolve all of the file data stores
     // relevant to the given paths and their subpaths and hydrate those data stores.
@@ -142,30 +143,38 @@ class FileDataStoreManager {
 
     final Map<String, Json> data = {};
     for (final hydratedStore in dataStores) {
-      final extractedData = hydratedStore.extractValues();
+      final (plaintextData, encryptedData) = hydratedStore.extractValues();
 
-      for (final docPath in extractedData.keys.toList()) {
-        // In the situation where a hydrated document is now resolved to a different data store
-        // then it was when it was persisted, then there are two scenarios:
-        //
-        // 1. If the document already exists in the resolved data store, then that means that the
-        //    document has been updated since it was persisted and that the hydrated value is stale.
-        //    In this scenario, the stale hydrated document should be removed from the extracted hydration data and
-        //    removed from its old data store.
-        // 2. The document does not exist in the resolved data store, in which case it should be moved from
-        //    its old data store to the updated one and delivered in the extracted hydration data.
-        final resolvedDataStore = _index[_resolver.store.getNearest(docPath)];
-        if (resolvedDataStore != null && resolvedDataStore != hydratedStore) {
-          if (resolvedDataStore.has(docPath)) {
-            extractedData.remove(docPath);
-          } else {
-            resolvedDataStore.write(docPath, extractedData[docPath]!);
+      for (final extractedData in [plaintextData, encryptedData]) {
+        for (final docPath in extractedData.keys.toList()) {
+          // In the situation where a hydrated document is now resolved to a different data store
+          // then it was when it was persisted, then there are two scenarios:
+          //
+          // 1. If the document already exists in the resolved data store, then that means that the
+          //    document has been updated since it was persisted and that the hydrated value is stale.
+          //    In this scenario, the stale hydrated document should be removed from the extracted hydration data and
+          //    removed from its old data store.
+          // 2. The document does not exist in the resolved data store, in which case it should be moved from
+          //    its old data store to the updated one and delivered in the extracted hydration data.
+          final resolvedDataStore = _index[_resolver.store.getNearest(docPath)];
+          if (resolvedDataStore != null && resolvedDataStore != hydratedStore) {
+            if (resolvedDataStore.has(docPath)) {
+              extractedData.remove(docPath);
+            } else {
+              resolvedDataStore.write(
+                docPath,
+                extractedData[docPath]!,
+                extractedData == encryptedData,
+              );
+            }
+            // In either scenario, the document should be removed from the hydrated data store
+            // since it now belongs in the updated resolved data store.
+            hydratedStore.remove(docPath, recursive: false);
           }
-          hydratedStore.remove(docPath);
         }
-      }
 
-      data.addAll(extractedData);
+        data.addAll(extractedData);
+      }
     }
 
     return data;
@@ -181,7 +190,7 @@ class FileDataStoreManager {
       final docPath = doc.path;
       final docData = doc.data;
       final persistenceKey = doc.key;
-      final isEncrypted = doc.encrypted;
+      final encrypted = doc.encrypted;
 
       // If the document has been deleted, then clear it and its subcollections from the store.
       if (docData == null) {
@@ -192,20 +201,15 @@ class FileDataStoreManager {
       final prevDataStore = _index[_resolver.store.getNearest(docPath)];
 
       // If the persistence key for the document is now null, then remove the previous
-      // key for the document (if it exists) ahead of resolving the updated data store name.
+      // key for the document (if it exists) ahead of resolving its data store name.
       if (persistenceKey == null) {
         _resolver.store.delete(docPath, recursive: false);
       }
 
-      final dataStoreName = _resolveDataStoreName(
-        docPath,
-        key: persistenceKey,
-        isEncrypted: isEncrypted,
-      );
-      final dataStore = _index[dataStoreName] ??= FileDataStore.create(
-        dataStoreName,
+      final dataStoreName = _resolveDataStoreName(docPath, persistenceKey);
+      final dataStore = _index[dataStoreName] ??= DualFileDataStore(
+        name: dataStoreName,
         encrypter: encrypter,
-        encrypted: isEncrypted,
         directory: directory,
       );
 
@@ -242,7 +246,7 @@ class FileDataStoreManager {
           break;
       }
 
-      await dataStore.write(docPath, docData);
+      await dataStore.write(docPath, docData, encrypted);
     }
 
     await _sync();

@@ -28,13 +28,18 @@ class MockPathProvider extends Fake
 }
 
 void main() {
-  var completer = TestFilePersistor.completer = PersistorCompleter();
+  late PersistorCompleter completer;
+  late TestFilePersistor persistor;
 
   setUp(() {
-    completer = TestFilePersistor.completer = PersistorCompleter();
     testDirectory = Directory.systemTemp.createTempSync('test_dir');
     final mockPathProvider = MockPathProvider();
     PathProviderPlatform.instance = mockPathProvider;
+
+    completer = TestFilePersistor.completer = PersistorCompleter();
+    persistor = TestFilePersistor(
+      settings: const FilePersistorSettings(encrypted: true),
+    );
   });
 
   tearDown(() async {
@@ -44,14 +49,11 @@ void main() {
 
   group('hydrate', () {
     setUp(() {
-      Loon.configure(
-        persistor: TestFilePersistor(
-          settings: const FilePersistorSettings(encrypted: true),
-        ),
-      );
+      Loon.configure(persistor: persistor);
     });
 
-    test('Hydrates data from encrypted persistence files into collections',
+    test(
+        'Merges data from plaintext and encrypted persistence files into collections',
         () async {
       final userCollection = Loon.collection<TestUserModel>(
         'users',
@@ -84,8 +86,9 @@ void main() {
 
       final encryptedUsersFile =
           File('${testDirectory.path}/loon/users.encrypted.json');
-      final encryptedUsersJson =
-          jsonDecode(encryptedUsersFile.readAsStringSync());
+      final encryptedUsersJson = jsonDecode(
+        persistor.decrypt(encryptedUsersFile.readAsStringSync()),
+      );
 
       expect(encryptedUsersJson, {
         "users": {
@@ -103,93 +106,25 @@ void main() {
         {
           "__refs": {
             "users": 1,
-            "users.encrypted": 1,
           },
           "__values": {
             "users": "users",
-            "users.encrypted": "users.encrypted",
           }
         },
       );
 
-      // await Loon.hydrate();
-
-      // expect(
-      //   userCollection.get(),
-      //   [
-      //     DocumentSnapshot(
-      //       doc: userCollection.doc('1'),
-      //       data: TestUserModel('User 1'),
-      //     ),
-      //     DocumentSnapshot(
-      //       doc: userCollection.doc('2'),
-      //       data: TestUserModel('User 2'),
-      //     ),
-      //     DocumentSnapshot(
-      //       doc: userCollection.doc('3'),
-      //       data: TestUserModel('User 3'),
-      //     ),
-      //   ],
-      // );
-
-      // final resolverFile = File('${testDirectory.path}/loon/__resolver__.json');
-      // final resolverJson = jsonDecode(resolverFile.readAsStringSync());
-
-      // expect(resolverJson, {
-      //   "__refs": {
-      //     "users.encrypted": 1,
-      //   },
-      //   "__values": {
-      //     "users.encrypted": "users.encrypted",
-      //   }
-      // });
-    });
-
-    test(
-        'Merges hydrated data from encrypted and non-encrypted persistence files into collection',
-        () async {
-      Directory('${testDirectory.path}/loon').createSync();
-      final plaintextFile = File('${testDirectory.path}/loon/users.json');
-
-      plaintextFile.writeAsStringSync(
-        jsonEncode({
-          "users": {
-            "__values": {
-              "2": {'name': 'User 2'},
-              "3": {'name': 'User 3'},
-            }
-          }
-        }),
+      // Reinitialize the persistor ahead of hydration.
+      Loon.configure(
+        persistor: TestFilePersistor(
+          settings: const FilePersistorSettings(encrypted: true),
+        ),
       );
-
-      final encryptedFile =
-          File('${testDirectory.path}/loon/users.encrypted.json');
-
-      encryptedFile.writeAsStringSync(
-        encryptData({
-          "users": {
-            "__values": {
-              "4": {'name': 'User 4'},
-            },
-          }
-        }),
-      );
-
-      final userCollection = Loon.collection(
-        'users',
-        fromJson: TestUserModel.fromJson,
-        toJson: (user) => user.toJson(),
-      );
-
-      userCollection.doc('1').create(TestUserModel('User 1'));
-
-      await completer.onPersist;
 
       await Loon.hydrate();
 
       expect(
         userCollection.get(),
-        unorderedEquals([
+        [
           DocumentSnapshot(
             doc: userCollection.doc('1'),
             data: TestUserModel('User 1'),
@@ -198,30 +133,8 @@ void main() {
             doc: userCollection.doc('2'),
             data: TestUserModel('User 2'),
           ),
-          DocumentSnapshot(
-            doc: userCollection.doc('3'),
-            data: TestUserModel('User 3'),
-          ),
-          DocumentSnapshot(
-            doc: userCollection.doc('4'),
-            data: TestUserModel('User 4'),
-          ),
-        ]),
+        ],
       );
-
-      final resolverFile = File('${testDirectory.path}/loon/__resolver__.json');
-      final resolverJson = jsonDecode(resolverFile.readAsStringSync());
-
-      expect(resolverJson, {
-        "__refs": {
-          "users": 1,
-          "users.encrypted": 1,
-        },
-        "__values": {
-          "users": "users",
-          "users.encrypted": "users.encrypted",
-        }
-      });
     });
   });
 
@@ -329,8 +242,31 @@ void main() {
     expect(
       json,
       {
-        'users:1': {'name': 'User 1'},
-        'users:2': {'name': 'User 2'}
+        "users": {
+          "__values": {
+            "1": {'name': 'User 1'},
+            "2": {'name': 'User 2'},
+          }
+        },
+      },
+    );
+
+    final encryptedFile =
+        File('${testDirectory.path}/loon/users.encrypted.json');
+    expect(encryptedFile.existsSync(), false);
+
+    final resolverFile = File('${testDirectory.path}/loon/__resolver__.json');
+    final resolverJson = jsonDecode(resolverFile.readAsStringSync());
+
+    expect(
+      resolverJson,
+      {
+        "__refs": {
+          "users": 1,
+        },
+        "__values": {
+          "users": "users",
+        }
       },
     );
   });

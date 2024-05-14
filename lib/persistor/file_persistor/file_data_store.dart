@@ -2,71 +2,65 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:encrypt/encrypt.dart';
 import 'package:loon/loon.dart';
+import 'package:loon/persistor/file_persistor/extensions/future.dart';
 import 'package:path/path.dart' as path;
 
-final fileRegex = RegExp(r'^(?!__resolver__)(\w+)(?:\.(encrypted))?\.json$');
+final fileRegex = RegExp(r'^(?!__resolver__)(\w+)\.json$');
 
-class FileDataStore {
-  /// The file associated with the data store.
-  final File file;
+class DualFileDataStore {
+  late final FileDataStore _plaintextStore;
+  late final EncryptedFileDataStore _encryptedStore;
 
-  /// The name of the file data store.
-  final String name;
-
-  /// The data contained within the file data store.
-  IndexedValueStore<Json> _store = IndexedValueStore<Json>();
-
-  /// Whether the file data store has pending changes that should be persisted.
-  bool isDirty = false;
-
-  /// Whether the file data store has been hydrated yet from its persisted file.
   bool isHydrated;
 
-  static final _logger = Logger('FileDataStore');
+  final String name;
 
-  FileDataStore({
-    required this.file,
+  static final _logger = Logger('DualFileDataStore');
+
+  DualFileDataStore({
     required this.name,
+    required Directory directory,
+    required Encrypter encrypter,
     this.isHydrated = false,
-  });
-
-  @override
-  bool operator ==(Object other) {
-    if (identical(this, other)) {
-      return true;
-    }
-    if (other is FileDataStore) {
-      return other.name == name;
-    }
-    return false;
-  }
-
-  @override
-  int get hashCode => Object.hashAll([name]);
-
-  Future<String> _readFile() {
-    return file.readAsString();
-  }
-
-  Future<void> _writeFile(String value) {
-    return _logger.measure(
-      'Write data store $name',
-      () => file.writeAsString(value),
+  }) {
+    _plaintextStore = FileDataStore(
+      directory: directory,
+      name: name,
+    );
+    _encryptedStore = EncryptedFileDataStore(
+      name: name,
+      encrypter: encrypter,
+      directory: directory,
     );
   }
 
   bool has(String path) {
-    return _store.has(path);
+    return _plaintextStore.has(path) || _encryptedStore.has(path);
   }
 
-  Future<void> write(String path, Json value) async {
+  bool hasPath(String path) {
+    return _plaintextStore.hasPath(path) || _encryptedStore.hasPath(path);
+  }
+
+  Future<void> write(String path, Json value, bool encrypted) async {
     // Unhydrated stores must be hydrated before data can be written to them.
     if (!isHydrated) {
       await hydrate();
     }
 
-    _store.write(path, value);
-    isDirty = true;
+    // If the document was previously not encrypted and now is, then it should be removed
+    // from the plaintext store and added to the encrypted one and vice-versa.
+    if (encrypted) {
+      if (_plaintextStore.has(path)) {
+        _plaintextStore.remove(path, recursive: false);
+      }
+      _encryptedStore.write(path, value);
+    } else {
+      if (_encryptedStore.has(path)) {
+        _encryptedStore.remove(path, recursive: false);
+      }
+      _plaintextStore.write(path, value);
+    }
   }
 
   Future<void> remove(
@@ -78,23 +72,141 @@ class FileDataStore {
       await hydrate();
     }
 
-    if (recursive && _store.hasPath(path)) {
-      _store.delete(path);
-      isDirty = true;
-    } else if (_store.has(path)) {
-      _store.delete(path, recursive: false);
+    _plaintextStore.remove(path, recursive: recursive);
+    _encryptedStore.remove(path, recursive: recursive);
+  }
+
+  Future<void> delete() async {
+    await Future.wait([_plaintextStore.delete(), _encryptedStore.delete()]);
+  }
+
+  Future<void> hydrate() async {
+    if (isHydrated) {
+      return;
+    }
+
+    await Future.wait([_plaintextStore.hydrate(), _encryptedStore.hydrate()]);
+
+    isHydrated = true;
+  }
+
+  Future<void> persist() async {
+    if (isEmpty) {
+      _logger.log('Attempted to write empty store');
+      return;
+    }
+
+    await Future.wait([_plaintextStore.persist(), _encryptedStore.persist()]);
+  }
+
+  bool get isEmpty {
+    return isHydrated && _plaintextStore.isEmpty && _encryptedStore.isEmpty;
+  }
+
+  bool get isDirty {
+    return _plaintextStore.isDirty || _encryptedStore.isDirty;
+  }
+
+  Future<void> graft(DualFileDataStore other, String path) async {
+    await Future.wait([
+      _plaintextStore.graft(other._plaintextStore, path),
+      _encryptedStore.graft(other._encryptedStore, path),
+    ]);
+  }
+
+  static DualFileDataStore parse(
+    File file, {
+    required Encrypter encrypter,
+    required Directory directory,
+  }) {
+    final match = fileRegex.firstMatch(path.basename(file.path));
+    final name = match!.group(1)!;
+
+    return DualFileDataStore(
+      name: name,
+      directory: directory,
+      encrypter: encrypter,
+    );
+  }
+
+  /// Returns a flat map of all the values in the plaintext and encrypted data by path.
+  (Map<String, Json> plainText, Map<String, Json> encrypted) extractValues() {
+    return (_plaintextStore.extractValues(), _encryptedStore.extractValues());
+  }
+}
+
+class FileDataStore {
+  late final Logger _logger;
+
+  /// The file associated with the data store.
+  late final File _file;
+
+  /// The data contained within the file data store.
+  IndexedValueStore<Json> _store = IndexedValueStore<Json>();
+
+  /// The name of the file data store.
+  final String name;
+
+  /// Whether the plaintext store has pending changes that should be persisted.
+  bool isDirty = false;
+
+  /// Whether the file data store has been hydrated yet from its persisted file.
+  bool isHydrated;
+
+  FileDataStore({
+    required this.name,
+    required Directory directory,
+    this.isHydrated = false,
+  }) {
+    _file = File("${directory.path}/$name.json");
+    _logger = Logger('FileDataStore $name');
+  }
+
+  Future<String> _readFile() {
+    return _file.readAsString();
+  }
+
+  Future<void> _writeFile(String value) {
+    return _logger.measure(
+      'Write data store $name',
+      () => _file.writeAsString(value),
+    );
+  }
+
+  bool has(String path) {
+    return _store.has(path);
+  }
+
+  bool hasPath(String path) {
+    return _store.hasPath(path);
+  }
+
+  Future<void> write(String path, Json value) async {
+    // Unhydrated stores must be hydrated before data can be written to them.
+    if (!isHydrated) {
+      await hydrate();
+    }
+
+    _store.write(path, value);
+  }
+
+  Future<void> remove(
+    String path, {
+    bool recursive = true,
+  }) async {
+    // Unhydrated stores containing the path must be hydrated before the data can be removed.
+    if (!isHydrated) {
+      await hydrate();
+    }
+
+    if (_store.has(path) || recursive && _store.hasPath(path)) {
+      _store.delete(path, recursive: recursive);
       isDirty = true;
     }
   }
 
   Future<void> delete() async {
-    if (!file.existsSync()) {
-      _logger.log('Attempted to delete non-existent file');
-      return;
-    }
-
-    await file.delete();
-    isDirty = false;
+    await _file.delete().catchType<PathNotFoundException>();
   }
 
   Future<void> hydrate() async {
@@ -106,35 +218,36 @@ class FileDataStore {
       await _logger.measure(
         'Parse data store $name',
         () async {
-          final fileStr = await _readFile();
-          _store = IndexedValueStore.fromJson(jsonDecode(fileStr));
+          final encodedStore =
+              await _file.readAsString().catchType<PathNotFoundException>();
+
+          if (encodedStore != null) {
+            _store = IndexedValueStore.fromJson(jsonDecode(encodedStore));
+          }
         },
       );
+
       isHydrated = true;
     } catch (e) {
-      if (e is PathNotFoundException) {
-        _logger.log('Missing file data store $name');
-      } else {
-        // If hydration fails for an existing file, then this file data store is corrupt
-        // and should be removed from the file data store index.
-        _logger.log('Corrupt file data store $name');
-        rethrow;
-      }
+      // If hydration fails for an existing file, then this file data store is corrupt
+      // and should be removed from the file data store index.
+      _logger.log('Corrupt file data store $name');
+      rethrow;
     }
   }
 
   Future<void> persist() async {
-    if (_store.isEmpty) {
-      _logger.log('Attempted to write empty data store');
+    if (isEmpty) {
+      _logger.log('Attempted to persist empty store');
       return;
     }
 
-    final encodedStore = await _logger.measure(
-      'Persist data store $name',
-      () async => jsonEncode(_store.inspect()),
-    );
+    if (!isDirty) {
+      _logger.log('Attempted to persist clean store');
+      return;
+    }
 
-    await _writeFile(encodedStore);
+    await _file.writeAsString(jsonEncode(_store.inspect()));
 
     isDirty = false;
   }
@@ -166,57 +279,6 @@ class FileDataStore {
     other.isDirty = true;
   }
 
-  static FileDataStore parse(
-    File file, {
-    required Encrypter? encrypter,
-  }) {
-    final match = fileRegex.firstMatch(path.basename(file.path));
-    final name = match!.group(1)!;
-    final encrypted = match.group(2) != null;
-
-    if (encrypted) {
-      if (encrypter == null) {
-        throw 'Missing encrypter';
-      }
-
-      return EncryptedFileDataStore(
-        file: file,
-        name: "$name.encrypted",
-        encrypter: encrypter,
-      );
-    }
-
-    return FileDataStore(file: file, name: name);
-  }
-
-  static FileDataStore create(
-    String name, {
-    required bool encrypted,
-    required Directory directory,
-    required Encrypter? encrypter,
-  }) {
-    final file = File("${directory.path}/$name.json");
-
-    if (encrypted) {
-      if (encrypter == null) {
-        throw 'Missing encrypter';
-      }
-
-      return EncryptedFileDataStore(
-        file: file,
-        name: name,
-        encrypter: encrypter,
-        isHydrated: true,
-      );
-    }
-
-    return FileDataStore(
-      file: file,
-      name: name,
-      isHydrated: true,
-    );
-  }
-
   /// Returns a flat map of all values in the store by path.
   Map<String, Json> extractValues() {
     return _store.extractValues();
@@ -228,7 +290,7 @@ class EncryptedFileDataStore extends FileDataStore {
 
   EncryptedFileDataStore({
     required super.name,
-    required super.file,
+    required super.directory,
     required this.encrypter,
     super.isHydrated = false,
   });
