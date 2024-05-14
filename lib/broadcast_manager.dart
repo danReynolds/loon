@@ -53,7 +53,7 @@ class BroadcastManager {
         // If a dependent document does not exist in the store, then it is lazily removed.
         if (!doc.exists()) {
           dependents.remove(doc);
-        } else if (!store.has(doc.path)) {
+        } else if (!store.hasValue(doc.path)) {
           writeDocument(doc, EventTypes.touched);
         }
       }

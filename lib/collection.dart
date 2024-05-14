@@ -79,7 +79,7 @@ class Collection<T> {
   /// A collection is pending broadcast if the collection itself has any pending events
   /// or if any of its documents have any events.
   bool isPendingBroadcast() {
-    return Loon._instance.broadcastManager.store.has(path) ||
+    return Loon._instance.broadcastManager.store.hasValue(path) ||
         Loon._instance.broadcastManager.store.hasChildValues(path);
   }
 

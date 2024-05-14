@@ -215,7 +215,7 @@ class IndexedValueStore<T> {
     return node.isEmpty;
   }
 
-  /// Deletes the path and its subpaths from the store.
+  /// Deletes the value at the given path and optionally its subtree from the store.
   void delete(
     String path, {
     /// Whether the data in the subtree under the given path should also be deleted.
@@ -231,7 +231,7 @@ class IndexedValueStore<T> {
   }
 
   /// Returns whether the store has a value for the given path.
-  bool has(String path) {
+  bool hasValue(String path) {
     return get(path) != null;
   }
 
@@ -240,13 +240,15 @@ class IndexedValueStore<T> {
     return getChildValues(path)?.isNotEmpty ?? false;
   }
 
-  /// Returns whether the store contains the given path.
+  /// Returns whether the store contains the given path either as a value or a path
+  /// to subtree values.
   bool hasPath(String path) {
     if (path.isEmpty) {
       return true;
     }
 
-    return has(path) || _getNode(_store, path.split(_delimiter), 0) != null;
+    return hasValue(path) ||
+        _getNode(_store, path.split(_delimiter), 0) != null;
   }
 
   void clear() {

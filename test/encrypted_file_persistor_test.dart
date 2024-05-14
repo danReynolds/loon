@@ -168,8 +168,12 @@ void main() {
       expect(
         json,
         {
-          'users:1': {'name': 'User 1'},
-          'users:2': {'name': 'User 2'}
+          "users": {
+            "__values": {
+              "1": {'name': 'User 1'},
+              "2": {'name': 'User 2'},
+            }
+          }
         },
       );
     });
@@ -181,31 +185,51 @@ void main() {
         ),
       );
 
-      final userCollection = Loon.collection(
+      final friendsCollection = Loon.collection<TestUserModel>(
+        'friends',
+        fromJson: TestUserModel.fromJson,
+        toJson: (user) => user.toJson(),
+      );
+
+      final usersCollection = Loon.collection<TestUserModel>(
         'users',
         fromJson: TestUserModel.fromJson,
         toJson: (user) => user.toJson(),
         persistorSettings: const FilePersistorSettings(encrypted: true),
       );
 
-      final user1 = TestUserModel('User 1');
-      final userDoc1 = userCollection.doc('1');
-      final user2 = TestUserModel('User 2');
-      final userDoc2 = userCollection.doc('2');
-
-      userDoc1.create(user1);
-      userDoc2.create(user2);
+      friendsCollection.doc('1').create(TestUserModel('Friend 1'));
+      usersCollection.doc('1').create(TestUserModel('User 1'));
+      usersCollection.doc('2').create(TestUserModel('User 2'));
 
       await completer.onPersist;
 
-      final file = File('${testDirectory.path}/loon/users.encrypted.json');
-      final json = decryptData(file.readAsStringSync());
+      final friendsFile = File('${testDirectory.path}/loon/friends.json');
+      final friendsJson = jsonDecode(friendsFile.readAsStringSync());
 
       expect(
-        json,
+        friendsJson,
         {
-          'users:1': {'name': 'User 1'},
-          'users:2': {'name': 'User 2'}
+          "friends": {
+            "__values": {
+              "1": {'name': 'Friend 1'},
+            }
+          },
+        },
+      );
+
+      final usersFile = File('${testDirectory.path}/loon/users.encrypted.json');
+      final usersJson = decryptData(usersFile.readAsStringSync());
+
+      expect(
+        usersJson,
+        {
+          "users": {
+            "__values": {
+              "1": {'name': 'User 1'},
+              "2": {'name': 'User 2'},
+            }
+          },
         },
       );
     });
@@ -219,20 +243,15 @@ void main() {
       ),
     );
 
-    final userCollection = Loon.collection(
+    final usersCollection = Loon.collection(
       'users',
       fromJson: TestUserModel.fromJson,
       toJson: (user) => user.toJson(),
       persistorSettings: const FilePersistorSettings(encrypted: false),
     );
 
-    final user1 = TestUserModel('User 1');
-    final userDoc1 = userCollection.doc('1');
-    final user2 = TestUserModel('User 2');
-    final userDoc2 = userCollection.doc('2');
-
-    userDoc1.create(user1);
-    userDoc2.create(user2);
+    usersCollection.doc('1').create(TestUserModel('User 1'));
+    usersCollection.doc('2').create(TestUserModel('User 2'));
 
     await completer.onPersist;
 
@@ -272,35 +291,77 @@ void main() {
   });
 
 // This scenario takes a bit of a description. In the situation where a file for a collection is unencrypted,
-// but encryption settings now specify that the collection should be encrypted, then the unencrypted file should be hydrated into memory,
-// but any subsequent persistence calls for that collection should move the updated data from the unencrypted data store to the encrypted data store.
-// Once all the data has been moved, the unencrypted file should be deleted.
+// but encryption settings now specify that the collection should be encrypted, then the unencrypted file should
+// be hydrated into memory, but any subsequent persistence calls for that collection should move the updated data
+// from the unencrypted data store to the encrypted data store. Once all the data has been moved, the unencrypted
+// file should be deleted.
   test('Encrypts collections hydrated from unencrypted files', () async {
+    Loon.configure(persistor: TestFilePersistor());
+
+    final usersCollection = Loon.collection(
+      'users',
+      fromJson: TestUserModel.fromJson,
+      toJson: (user) => user.toJson(),
+    );
+
+    usersCollection.doc('1').create(TestUserModel('User 1'));
+    usersCollection.doc('2').create(TestUserModel('User 2'));
+
+    await completer.onPersist;
+
+    final usersFile = File('${testDirectory.path}/loon/users.json');
+    var usersJson = jsonDecode(usersFile.readAsStringSync());
+
+    expect(
+      usersJson,
+      {
+        "users": {
+          "__values": {
+            "1": {"name": "User 1"},
+            "2": {"name": "User 2"},
+          }
+        }
+      },
+    );
+
+    final resolverFile = File('${testDirectory.path}/loon/__resolver__.json');
+    final resolverJson = jsonDecode(resolverFile.readAsStringSync());
+
+    expect(
+      resolverJson,
+      {
+        "__refs": {
+          "users": 1,
+        },
+        "__values": {
+          "users": "users",
+        },
+      },
+    );
+
     Loon.configure(
       persistor: TestFilePersistor(
         settings: const FilePersistorSettings(encrypted: true),
       ),
     );
 
-    Directory('${testDirectory.path}/loon').createSync();
-    final plaintextFile = File('${testDirectory.path}/loon/users.json');
-    plaintextFile.writeAsStringSync(
-      jsonEncode({
-        'users:1': {'name': 'User 1'},
-        'users:2': {'name': 'User 2'}
-      }),
-    );
-
     await Loon.hydrate();
 
-    final userCollection = Loon.collection(
-      'users',
-      fromJson: TestUserModel.fromJson,
-      toJson: (user) => user.toJson(),
+    expect(
+      usersCollection.get(),
+      [
+        DocumentSnapshot(
+          doc: usersCollection.doc('1'),
+          data: TestUserModel('User 1'),
+        ),
+        DocumentSnapshot(
+          doc: usersCollection.doc('2'),
+          data: TestUserModel('User 2'),
+        ),
+      ],
     );
 
-    final user3 = TestUserModel('User 3');
-    userCollection.doc('3').create(user3);
+    usersCollection.doc('3').create(TestUserModel('User 3'));
 
     await completer.onPersist;
 
@@ -313,32 +374,50 @@ void main() {
     expect(
       json,
       {
-        'users:3': {'name': 'User 3'}
+        "users": {
+          "__values": {
+            "3": {'name': 'User 3'},
+          }
+        },
       },
     );
 
-    final user1 = TestUserModel('User 1 updated');
-    final user2 = TestUserModel('User 2 updated');
+    // The existing hydrated data should still be unencrypted, as the documents are not moved until they are updated.
+    usersJson = jsonDecode(usersFile.readAsStringSync());
+    expect(
+      usersJson,
+      {
+        "users": {
+          "__values": {
+            "1": {"name": "User 1"},
+            "2": {"name": "User 2"},
+          }
+        }
+      },
+    );
 
-    userCollection.doc('1').update(user1);
-    userCollection.doc('2').update(user2);
+    usersCollection.doc('1').update(TestUserModel('User 1 updated'));
+    usersCollection.doc('2').update(TestUserModel('User 2 updated'));
 
     await completer.onPersist;
 
-    // The changes to the documents hydrated from the unencrypted data store should be persisted into the encrypted data store
-    // and now that the unencrypted store is empty, it should have been deleted.
-
-    final updatedJson = decryptData(encryptedFile.readAsStringSync());
+    // The documents should now have been updated to exist in the encrypted users file.
+    final encryptedUsersJson = decryptData(encryptedFile.readAsStringSync());
 
     expect(
-      updatedJson,
+      encryptedUsersJson,
       {
-        'users:1': {'name': 'User 1 updated'},
-        'users:2': {'name': 'User 2 updated'},
-        'users:3': {'name': 'User 3'}
+        "users": {
+          "__values": {
+            "1": {'name': 'User 1 updated'},
+            "2": {'name': 'User 2 updated'},
+            "3": {"name": "User 3"},
+          },
+        },
       },
     );
 
-    expect(plaintextFile.existsSync(), false);
+    // The now empty plaintext users file should have been deleted.
+    expect(usersFile.existsSync(), false);
   });
 }

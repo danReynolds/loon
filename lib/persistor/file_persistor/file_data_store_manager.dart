@@ -80,16 +80,15 @@ class FileDataStoreManager {
     }
 
     await Future.wait([
-      ...dirtyStores.map((dataStore) async {
-        if (dataStore.isEmpty) {
-          _index.remove(dataStore.name);
-          return dataStore.delete();
-        }
-
-        return dataStore.persist();
-      }),
+      ...dirtyStores.map((store) => store.sync()),
       _resolver.persist(),
     ]);
+
+    for (final store in dirtyStores) {
+      if (store.isEmpty) {
+        _index.remove(store.name);
+      }
+    }
   }
 
   /// Clears the provided path and all of its subpaths from each data store that contains
@@ -97,7 +96,7 @@ class FileDataStoreManager {
   Future<void> _clear(String path) async {
     final stores = _resolve(path);
 
-    await Future.wait(stores.map((store) => store.remove(path)));
+    await Future.wait(stores.map((store) => store.deletePath(path)));
 
     _resolver.store.delete(path);
   }
@@ -158,10 +157,10 @@ class FileDataStoreManager {
           //    its old data store to the updated one and delivered in the extracted hydration data.
           final resolvedDataStore = _index[_resolver.store.getNearest(docPath)];
           if (resolvedDataStore != null && resolvedDataStore != hydratedStore) {
-            if (resolvedDataStore.has(docPath)) {
+            if (resolvedDataStore.hasValue(docPath)) {
               extractedData.remove(docPath);
             } else {
-              resolvedDataStore.write(
+              resolvedDataStore.writePath(
                 docPath,
                 extractedData[docPath]!,
                 extractedData == encryptedData,
@@ -169,7 +168,7 @@ class FileDataStoreManager {
             }
             // In either scenario, the document should be removed from the hydrated data store
             // since it now belongs in the updated resolved data store.
-            hydratedStore.remove(docPath, recursive: false);
+            hydratedStore.deletePath(docPath, recursive: false);
           }
         }
 
@@ -247,7 +246,7 @@ class FileDataStoreManager {
           break;
       }
 
-      await dataStore.write(docPath, docData, encrypted);
+      await dataStore.writePath(docPath, docData, encrypted);
     }
 
     await _sync();

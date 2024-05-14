@@ -13,8 +13,6 @@ class DualFileDataStore {
 
   final String name;
 
-  static final _logger = Logger('DualFileDataStore');
-
   DualFileDataStore({
     required this.name,
     required Directory directory,
@@ -34,15 +32,11 @@ class DualFileDataStore {
     );
   }
 
-  bool has(String path) {
-    return _plaintextStore.has(path) || _encryptedStore.has(path);
+  bool hasValue(String path) {
+    return _plaintextStore.hasValue(path) || _encryptedStore.hasValue(path);
   }
 
-  bool hasPath(String path) {
-    return _plaintextStore.hasPath(path) || _encryptedStore.hasPath(path);
-  }
-
-  Future<void> write(String path, Json value, bool encrypted) async {
+  Future<void> writePath(String path, Json value, bool encrypted) async {
     // Unhydrated stores must be hydrated before data can be written to them.
     if (!isHydrated) {
       await hydrate();
@@ -51,19 +45,19 @@ class DualFileDataStore {
     // If the document was previously not encrypted and now is, then it should be removed
     // from the plaintext store and added to the encrypted one and vice-versa.
     if (encrypted) {
-      if (_plaintextStore.has(path)) {
-        _plaintextStore.remove(path, recursive: false);
+      if (_plaintextStore.hasValue(path)) {
+        _plaintextStore.deletePath(path, recursive: false);
       }
-      _encryptedStore.write(path, value);
+      _encryptedStore.writePath(path, value);
     } else {
-      if (_encryptedStore.has(path)) {
-        _encryptedStore.remove(path, recursive: false);
+      if (_encryptedStore.hasValue(path)) {
+        _encryptedStore.deletePath(path, recursive: false);
       }
-      _plaintextStore.write(path, value);
+      _plaintextStore.writePath(path, value);
     }
   }
 
-  Future<void> remove(
+  Future<void> deletePath(
     String path, {
     bool recursive = true,
   }) async {
@@ -72,12 +66,8 @@ class DualFileDataStore {
       await hydrate();
     }
 
-    _plaintextStore.remove(path, recursive: recursive);
-    _encryptedStore.remove(path, recursive: recursive);
-  }
-
-  Future<void> delete() async {
-    await Future.wait([_plaintextStore.delete(), _encryptedStore.delete()]);
+    _plaintextStore.deletePath(path, recursive: recursive);
+    _encryptedStore.deletePath(path, recursive: recursive);
   }
 
   Future<void> hydrate() async {
@@ -88,13 +78,12 @@ class DualFileDataStore {
     await Future.wait([_plaintextStore.hydrate(), _encryptedStore.hydrate()]);
   }
 
-  Future<void> persist() async {
-    if (isEmpty) {
-      _logger.log('Attempted to write empty store');
-      return;
-    }
+  Future<void> sync() async {
+    await Future.wait([_plaintextStore.sync(), _encryptedStore.sync()]);
+  }
 
-    await Future.wait([_plaintextStore.persist(), _encryptedStore.persist()]);
+  Future<void> delete() async {
+    await Future.wait([_plaintextStore.delete(), _encryptedStore.delete()]);
   }
 
   bool get isHydrated {
@@ -164,8 +153,8 @@ class FileDataStore {
     _logger = Logger('FileDataStore $name');
   }
 
-  Future<String> _readFile() {
-    return _file.readAsString();
+  Future<String?> _readFile() {
+    return _file.readAsString().catchType<PathNotFoundException>();
   }
 
   Future<void> _writeFile(String value) {
@@ -175,24 +164,22 @@ class FileDataStore {
     );
   }
 
-  bool has(String path) {
-    return _store.has(path);
+  bool hasValue(String path) {
+    return _store.hasValue(path);
   }
 
-  bool hasPath(String path) {
-    return _store.hasPath(path);
-  }
-
-  Future<void> write(String path, Json value) async {
+  Future<void> writePath(String path, Json value) async {
     // Unhydrated stores must be hydrated before data can be written to them.
     if (!isHydrated) {
       await hydrate();
     }
 
     _store.write(path, value);
+
+    isDirty = true;
   }
 
-  Future<void> remove(
+  Future<void> deletePath(
     String path, {
     bool recursive = true,
   }) async {
@@ -201,14 +188,10 @@ class FileDataStore {
       await hydrate();
     }
 
-    if (_store.has(path) || recursive && _store.hasPath(path)) {
+    if (_store.hasValue(path) || recursive && _store.hasPath(path)) {
       _store.delete(path, recursive: recursive);
       isDirty = true;
     }
-  }
-
-  Future<void> delete() async {
-    await _file.delete().catchType<PathNotFoundException>();
   }
 
   Future<void> hydrate() async {
@@ -218,11 +201,9 @@ class FileDataStore {
 
     try {
       await _logger.measure(
-        'Parse data store $name',
+        'Hydrate',
         () async {
-          final encodedStore =
-              await _file.readAsString().catchType<PathNotFoundException>();
-
+          final encodedStore = await _readFile();
           if (encodedStore != null) {
             _store = IndexedValueStore.fromJson(jsonDecode(encodedStore));
           }
@@ -238,20 +219,37 @@ class FileDataStore {
     }
   }
 
+  Future<void> sync() async {
+    if (isEmpty) {
+      await delete();
+    } else if (isDirty) {
+      await persist();
+    }
+  }
+
   Future<void> persist() async {
     if (isEmpty) {
-      _logger.log('Attempted to persist empty store');
+      _logger.log('Empty store persist');
       return;
     }
 
     if (!isDirty) {
-      _logger.log('Attempted to persist clean store');
+      _logger.log('Clean store persist');
       return;
     }
 
-    await _file.writeAsString(jsonEncode(_store.inspect()));
+    await _logger.measure(
+      'Persist',
+      () => _writeFile(jsonEncode(_store.inspect())),
+    );
 
     isDirty = false;
+  }
+
+  Future<void> delete() async {
+    if (await _file.exists()) {
+      await _file.delete();
+    }
   }
 
   bool get isEmpty {
@@ -291,11 +289,11 @@ class EncryptedFileDataStore extends FileDataStore {
   final Encrypter encrypter;
 
   EncryptedFileDataStore({
-    required super.name,
+    required String name,
     required super.directory,
     required this.encrypter,
     super.isHydrated = false,
-  });
+  }) : super(name: "$name.encrypted");
 
   String _encrypt(String plainText) {
     final iv = IV.fromSecureRandom(16);
@@ -311,8 +309,14 @@ class EncryptedFileDataStore extends FileDataStore {
   }
 
   @override
-  Future<String> _readFile() async {
-    return _decrypt(await super._readFile());
+  _readFile() async {
+    final encodedStore = await super._readFile();
+
+    if (encodedStore != null) {
+      return _decrypt(encodedStore);
+    }
+
+    return null;
   }
 
   @override
@@ -358,15 +362,14 @@ class FileDataStoreResolver {
   }
 
   Future<void> persist() async {
+    if (store.isEmpty) {
+      _logger.log('Empty persist');
+      return;
+    }
+
     await _logger.measure(
       'Persist',
-      () async {
-        if (store.isEmpty) {
-          _logger.log('Empty persist');
-          return;
-        }
-        await _file.writeAsString(jsonEncode(store.inspect()));
-      },
+      () => _file.writeAsString(jsonEncode(store.inspect())),
     );
   }
 
@@ -374,10 +377,7 @@ class FileDataStoreResolver {
     await _logger.measure(
       'Delete',
       () async {
-        if (!_file.existsSync()) {
-          return;
-        }
-        await _file.delete();
+        await _file.delete().catchType<PathNotFoundException>();
         store.clear();
       },
     );

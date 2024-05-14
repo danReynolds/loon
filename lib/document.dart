@@ -198,6 +198,6 @@ class Document<T> {
   }
 
   bool isPendingBroadcast() {
-    return Loon._instance.broadcastManager.store.has(path);
+    return Loon._instance.broadcastManager.store.hasValue(path);
   }
 }
