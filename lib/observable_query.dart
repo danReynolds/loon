@@ -225,14 +225,12 @@ class ObservableQuery<T> extends Query<T>
           // result set, then the query should be rebroadcasted.
           case BroadcastEvents.touched:
             if (_snapIndex.containsKey(doc)) {
-              _updateIndex(snap!);
-
               shouldRebroadcast = true;
 
               if (hasChangeListener) {
                 changeSnaps.add(
                   DocumentChangeSnapshot(
-                    doc: snap.doc,
+                    doc: snap!.doc,
                     event: BroadcastEvents.touched,
                     prevData: prevSnap?.data,
                     data: snap.data,

@@ -680,6 +680,59 @@ void main() {
         ],
       );
     });
+
+    test(
+        'Discards changes that occur to a collection in the same task as a subsequent deletion of that collection',
+        () async {
+      final user = TestUserModel('User 1');
+      final user2 = TestUserModel('User 2');
+      final userDoc = TestUserModel.store.doc('1');
+      final userDoc2 = TestUserModel.store.doc('2');
+
+      final changeSnaps = TestUserModel.store.streamChanges().take(2).toList();
+
+      userDoc.create(user);
+      userDoc2.create(user2);
+
+      await asyncEvent();
+
+      userDoc.update(TestUserModel('User 1 updated'));
+      TestUserModel.store.delete();
+
+      expect(
+        await changeSnaps,
+        [
+          [
+            DocumentChangeSnapshot(
+              doc: userDoc,
+              data: user,
+              prevData: null,
+              event: BroadcastEvents.added,
+            ),
+            DocumentChangeSnapshot(
+              doc: userDoc2,
+              data: user2,
+              prevData: null,
+              event: BroadcastEvents.added,
+            )
+          ],
+          [
+            DocumentChangeSnapshot(
+              doc: userDoc,
+              data: null,
+              prevData: user,
+              event: BroadcastEvents.removed,
+            ),
+            DocumentChangeSnapshot(
+              doc: userDoc2,
+              data: null,
+              prevData: user2,
+              event: BroadcastEvents.removed,
+            ),
+          ],
+        ],
+      );
+    });
   });
 
   group(
