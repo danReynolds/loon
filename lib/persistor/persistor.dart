@@ -26,7 +26,7 @@ abstract class Persistor {
 
   final Set<Document> _batch = {};
 
-  final _logger = Logger('Persistor', output: print);
+  late final _logger;
 
   /// The operation queue ensures that operations (init, hydrate, persist, clear) are blocking and
   /// that only one is ever running at a time, not concurrently.
@@ -44,6 +44,8 @@ abstract class Persistor {
     this.onClearAll,
     this.onHydrate,
   }) {
+    _logger = Logger('Persistor', output: Loon.logger.log);
+
     _runOperation(() {
       return init();
     });

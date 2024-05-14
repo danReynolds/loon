@@ -202,7 +202,12 @@ class FileDataStore {
   }
 
   Future<void> hydrate() async {
-    if (isHydrated || !(await _file.exists())) {
+    if (isHydrated) {
+      return;
+    }
+
+    if (!(await _file.exists())) {
+      isHydrated = true;
       return;
     }
 

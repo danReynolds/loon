@@ -41,7 +41,7 @@ class Loon {
 
   final broadcastManager = BroadcastManager();
 
-  final _logger = Logger('Loon');
+  final _logger = Logger('Loon', enabled: false);
 
   bool get _isGlobalPersistenceEnabled {
     return persistor?.settings.enabled ?? false;

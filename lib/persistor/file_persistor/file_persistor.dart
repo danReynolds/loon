@@ -32,7 +32,11 @@ class FilePersistor extends Persistor {
     super.onClearAll,
     super.onHydrate,
   }) : super(settings: settings ?? const FilePersistorSettings()) {
-    _logger = Logger('FilePersistor', output: Loon.logger.log);
+    _logger = Logger(
+      'FilePersistor',
+      output: Loon.logger.log,
+      enabled: Loon.logger.enabled,
+    );
   }
 
   static FilePersistorCollectionKeyBuilder<T> key<T>(String value) {
