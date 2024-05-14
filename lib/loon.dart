@@ -41,9 +41,7 @@ class Loon {
 
   final broadcastManager = BroadcastManager();
 
-  static final logger = Logger('Loon');
-
-  bool enableLogging = false;
+  final _logger = Logger('Loon');
 
   bool get _isGlobalPersistenceEnabled {
     return persistor?.settings.enabled ?? false;
@@ -259,7 +257,7 @@ class Loon {
     Persistor? persistor,
     bool enableLogging = false,
   }) {
-    _instance.enableLogging = enableLogging;
+    logger.enabled = enableLogging;
     _instance.persistor = persistor;
   }
 
@@ -283,7 +281,6 @@ class Loon {
         );
       }
     } catch (e) {
-      // ignore: avoid_print
       logger.log('Error hydrating');
       rethrow;
     }
@@ -340,8 +337,8 @@ class Loon {
     };
   }
 
-  static bool get isLoggingEnabled {
-    return _instance.enableLogging;
+  static Logger get logger {
+    return _instance._logger;
   }
 
   static PersistorSettings? get persistorSettings {

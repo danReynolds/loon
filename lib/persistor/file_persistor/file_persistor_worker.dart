@@ -1,4 +1,6 @@
+import 'dart:io';
 import 'dart:isolate';
+import 'package:encrypt/encrypt.dart';
 import 'package:loon/loon.dart';
 import 'package:loon/persistor/file_persistor/file_data_store_manager.dart';
 import 'package:loon/persistor/file_persistor/messages.dart';
@@ -12,24 +14,28 @@ class FilePersistorWorker {
   /// This worker's receive port.
   final receivePort = ReceivePort();
 
-  final FileDataStoreManager manager;
+  late final FileDataStoreManager manager;
 
-  late final Logger logger;
+  static late final Logger logger;
 
   FilePersistorWorker._({
     required this.sendPort,
-    required this.manager,
+    required Directory directory,
+    required Encrypter encrypter,
   }) {
     logger = Logger('Worker', output: _sendLog);
+
+    manager = FileDataStoreManager(
+      directory: directory,
+      encrypter: encrypter,
+    );
   }
 
   static init(InitMessageRequest request) {
     FilePersistorWorker._(
       sendPort: request.sendPort,
-      manager: FileDataStoreManager(
-        directory: request.directory,
-        encrypter: request.encrypter,
-      ),
+      directory: request.directory,
+      encrypter: request.encrypter,
     )._onMessage(request);
   }
 

@@ -4,15 +4,25 @@ class Logger {
   final String name;
   final void Function(String message)? output;
 
+  bool enabled;
+
   Logger(
     this.name, {
     this.output,
+    this.enabled = true,
   });
 
   void log(String message) {
-    if (Loon.isLoggingEnabled) {
-      // ignore: avoid_print
-      print('Loon $name: $message');
+    if (!enabled) {
+      return;
+    }
+
+    final formattedMessage = '$name->$message';
+
+    if (output != null) {
+      output!(formattedMessage);
+    } else if (kDebugMode) {
+      print(formattedMessage);
     }
   }
 
@@ -33,14 +43,13 @@ class Logger {
 
       stopwatch.stop();
 
-      (output ?? log)
-          .call('$label completed in ${stopwatch.elapsedMilliseconds}ms');
+      log('$label completed in ${stopwatch.elapsedMilliseconds}ms.');
 
       return result;
     } catch (e) {
       stopwatch.stop();
 
-      log('$label failed in ${stopwatch.elapsedMilliseconds}ms');
+      log('$label failed in ${stopwatch.elapsedMilliseconds}ms.');
 
       rethrow;
     }

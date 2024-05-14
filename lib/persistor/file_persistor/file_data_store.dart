@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:encrypt/encrypt.dart';
 import 'package:loon/loon.dart';
 import 'package:loon/persistor/file_persistor/extensions/future.dart';
+import 'package:loon/persistor/file_persistor/file_persistor_worker.dart';
 import 'package:path/path.dart' as path;
 
 final fileRegex = RegExp(r'^(?!__resolver__)(\w+)\.json$');
@@ -127,8 +128,6 @@ class DualFileDataStore {
 }
 
 class FileDataStore {
-  late final Logger _logger;
-
   /// The file associated with the data store.
   late final File _file;
 
@@ -144,22 +143,30 @@ class FileDataStore {
   /// Whether the file data store has been hydrated yet from its persisted file.
   bool isHydrated;
 
+  late final Logger _logger;
+
   FileDataStore({
     required this.name,
     required Directory directory,
     this.isHydrated = false,
   }) {
+    _logger = Logger(
+      'FileDataStore:$name',
+      output: FilePersistorWorker.logger.log,
+    );
     _file = File("${directory.path}/$name.json");
-    _logger = Logger('FileDataStore $name');
   }
 
   Future<String?> _readFile() {
-    return _file.readAsString().catchType<PathNotFoundException>();
+    return _logger.measure(
+      "Read file",
+      () => _file.readAsString().catchType<PathNotFoundException>(),
+    );
   }
 
   Future<void> _writeFile(String value) {
     return _logger.measure(
-      'Write data store $name',
+      'Write file',
       () => _file.writeAsString(value),
     );
   }
@@ -195,7 +202,7 @@ class FileDataStore {
   }
 
   Future<void> hydrate() async {
-    if (isHydrated) {
+    if (isHydrated || !(await _file.exists())) {
       return;
     }
 
@@ -332,11 +339,15 @@ class FileDataStoreResolver {
 
   static const name = '__resolver__';
 
-  final _logger = Logger('FileDataStoreResolver');
+  late final Logger _logger;
 
   FileDataStoreResolver({
     required Directory directory,
   }) {
+    _logger = Logger(
+      'FileDataStoreResolver',
+      output: FilePersistorWorker.logger.log,
+    );
     _file = File("${directory.path}/$name.json");
   }
 
@@ -351,11 +362,11 @@ class FileDataStoreResolver {
       );
     } catch (e) {
       if (e is PathNotFoundException) {
-        _logger.log('Missing resolver file.');
+        _logger.log('Missing file.');
       } else {
         // If hydration fails for an existing file, then this file data store is corrupt
         // and should be removed from the file data store index.
-        _logger.log('Corrupt resolver file.');
+        _logger.log('Corrupt file.');
         rethrow;
       }
     }

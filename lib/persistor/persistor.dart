@@ -26,7 +26,7 @@ abstract class Persistor {
 
   final Set<Document> _batch = {};
 
-  final _logger = Logger('Persistor');
+  final _logger = Logger('Persistor', output: print);
 
   /// The operation queue ensures that operations (init, hydrate, persist, clear) are blocking and
   /// that only one is ever running at a time, not concurrently.

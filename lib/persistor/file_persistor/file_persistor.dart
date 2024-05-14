@@ -23,7 +23,7 @@ class FilePersistor extends Persistor {
 
   final _secureStorageKey = 'loon_encrypted_file_persistor_key';
 
-  final _logger = Logger('FilePersistor');
+  late final Logger _logger;
 
   FilePersistor({
     FilePersistorSettings? settings,
@@ -31,9 +31,9 @@ class FilePersistor extends Persistor {
     super.onClear,
     super.onClearAll,
     super.onHydrate,
-  }) : super(
-          settings: settings ?? const FilePersistorSettings(),
-        );
+  }) : super(settings: settings ?? const FilePersistorSettings()) {
+    _logger = Logger('FilePersistor', output: Loon.logger.log);
+  }
 
   static FilePersistorCollectionKeyBuilder<T> key<T>(String value) {
     return FilePersistorCollectionKeyBuilder(value);
@@ -135,7 +135,7 @@ class FilePersistor extends Persistor {
       final response = await completer.future;
       _sendPort = response.sendPort;
     } catch (e) {
-      _logger.log("Failed to initialize file persistor worker");
+      _logger.log("Worker initialization failed.");
       _receivePort.close();
       rethrow;
     }
