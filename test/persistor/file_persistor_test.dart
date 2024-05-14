@@ -1281,6 +1281,49 @@ void main() {
           );
         },
       );
+
+      test(
+        'Data stored under the root collection is persisted in the root data store',
+        () async {
+          Loon.doc(
+            'current_user',
+            fromJson: TestUserModel.fromJson,
+            toJson: (user) => user.toJson(),
+          ).create(TestUserModel('Dan'));
+
+          await completer.onPersist;
+
+          final file = File('${testDirectory.path}/loon/ROOT.json');
+          final json = jsonDecode(file.readAsStringSync());
+
+          expect(
+            json,
+            {
+              "ROOT": {
+                "__values": {
+                  "current_user": {'name': 'Dan'},
+                },
+              }
+            },
+          );
+
+          final resolverFile =
+              File('${testDirectory.path}/loon/__resolver__.json');
+          final resolverJson = jsonDecode(resolverFile.readAsStringSync());
+
+          expect(
+            resolverJson,
+            {
+              "__refs": {
+                "ROOT": 1,
+              },
+              "__values": {
+                "ROOT": "ROOT",
+              },
+            },
+          );
+        },
+      );
     },
   );
 
@@ -1663,6 +1706,63 @@ void main() {
         size,
       );
     });
+
+    test(
+      "Hydrates data into the root collection",
+      () async {
+        final currentUserDoc = Loon.doc(
+          'current_user',
+          fromJson: TestUserModel.fromJson,
+          toJson: (user) => user.toJson(),
+        );
+
+        currentUserDoc.create(TestUserModel('Dan'));
+
+        await completer.onPersist;
+
+        final file = File('${testDirectory.path}/loon/ROOT.json');
+        final json = jsonDecode(file.readAsStringSync());
+
+        expect(
+          json,
+          {
+            "ROOT": {
+              "__values": {
+                "current_user": {'name': 'Dan'},
+              },
+            }
+          },
+        );
+
+        final resolverFile =
+            File('${testDirectory.path}/loon/__resolver__.json');
+        final resolverJson = jsonDecode(resolverFile.readAsStringSync());
+
+        expect(
+          resolverJson,
+          {
+            "__refs": {
+              "ROOT": 1,
+            },
+            "__values": {
+              "ROOT": "ROOT",
+            },
+          },
+        );
+
+        Loon.configure(persistor: TestFilePersistor());
+
+        await Loon.hydrate();
+
+        expect(
+          currentUserDoc.get(),
+          DocumentSnapshot(
+            doc: currentUserDoc,
+            data: TestUserModel('Dan'),
+          ),
+        );
+      },
+    );
   });
 
   group(

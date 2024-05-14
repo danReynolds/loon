@@ -368,7 +368,7 @@ void main() {
       // Add document
       expect(
         snaps[0].event,
-        EventTypes.added,
+        BroadcastEvents.added,
       );
       expect(
         snaps[0].prevData,
@@ -382,7 +382,7 @@ void main() {
       // Update document
       expect(
         snaps[1].event,
-        EventTypes.modified,
+        BroadcastEvents.modified,
       );
       expect(
         snaps[1].prevData,
@@ -567,13 +567,13 @@ void main() {
             DocumentChangeSnapshot(
               doc: userDoc,
               data: user,
-              event: EventTypes.added,
+              event: BroadcastEvents.added,
               prevData: null,
             ),
             DocumentChangeSnapshot(
               doc: userDoc2,
               data: user2,
-              event: EventTypes.added,
+              event: BroadcastEvents.added,
               prevData: null,
             ),
           ],
@@ -581,7 +581,7 @@ void main() {
             DocumentChangeSnapshot(
               doc: userDoc,
               data: updatedUser,
-              event: EventTypes.modified,
+              event: BroadcastEvents.modified,
               prevData: user,
             ),
           ]
@@ -611,10 +611,10 @@ void main() {
             DocumentChangeSnapshot(
               doc: userDoc,
               data: updatedUser,
-              // The global event is a [BroadcastEventTypes.modified] when the user is updated,
-              // but to this query, it should be a [BroadcastEventTypes.added] event since previously
+              // The global event is a [BroadcastBroadcastEvents.modified] when the user is updated,
+              // but to this query, it should be a [BroadcastBroadcastEvents.added] event since previously
               // it was not included and now it is.
-              event: EventTypes.added,
+              event: BroadcastEvents.added,
               prevData: null,
             ),
           ],
@@ -648,13 +648,13 @@ void main() {
               doc: userDoc,
               data: user,
               prevData: null,
-              event: EventTypes.added,
+              event: BroadcastEvents.added,
             ),
             DocumentChangeSnapshot(
               doc: userDoc2,
               data: user2,
               prevData: null,
-              event: EventTypes.added,
+              event: BroadcastEvents.added,
             )
           ],
           [
@@ -662,19 +662,19 @@ void main() {
               doc: userDoc,
               data: null,
               prevData: user,
-              event: EventTypes.removed,
+              event: BroadcastEvents.removed,
             ),
             DocumentChangeSnapshot(
               doc: userDoc2,
               data: null,
               prevData: user2,
-              event: EventTypes.removed,
+              event: BroadcastEvents.removed,
             ),
             DocumentChangeSnapshot(
               doc: userDoc,
               data: user,
               prevData: null,
-              event: EventTypes.added,
+              event: BroadcastEvents.added,
             ),
           ],
         ],
@@ -997,13 +997,13 @@ void main() {
                 DocumentChangeSnapshot(
                   doc: userDoc,
                   data: userData,
-                  event: EventTypes.added,
+                  event: BroadcastEvents.added,
                   prevData: null,
                 ),
                 DocumentChangeSnapshot(
                   doc: userDoc2,
                   data: userData2,
-                  event: EventTypes.added,
+                  event: BroadcastEvents.added,
                   prevData: null,
                 ),
               ],
@@ -1011,25 +1011,25 @@ void main() {
                 DocumentChangeSnapshot(
                   doc: userDoc,
                   data: null,
-                  event: EventTypes.removed,
+                  event: BroadcastEvents.removed,
                   prevData: userData,
                 ),
                 DocumentChangeSnapshot(
                   doc: userDoc2,
                   data: null,
-                  event: EventTypes.removed,
+                  event: BroadcastEvents.removed,
                   prevData: userData2,
                 ),
                 DocumentChangeSnapshot(
                   doc: userDoc2,
                   data: updatedUser2,
-                  event: EventTypes.added,
+                  event: BroadcastEvents.added,
                   prevData: null,
                 ),
                 DocumentChangeSnapshot(
                   doc: userDoc3,
                   data: userData3,
-                  event: EventTypes.added,
+                  event: BroadcastEvents.added,
                   prevData: null,
                 ),
               ]

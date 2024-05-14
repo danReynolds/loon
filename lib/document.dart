@@ -101,7 +101,7 @@ class Document<T> {
       this,
       data,
       broadcast: broadcast,
-      event: EventTypes.added,
+      event: BroadcastEvents.added,
     );
   }
 
@@ -119,7 +119,7 @@ class Document<T> {
       // As an optimization, broadcasting is skipped when updating a document if the document
       // data is unchanged.
       broadcast: data != get()!.data,
-      event: EventTypes.modified,
+      event: BroadcastEvents.modified,
     );
   }
 

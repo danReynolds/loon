@@ -30,10 +30,10 @@ class Loon {
 
   Loon._();
 
-  /// The store of document snapshots indexed by their document path.
+  /// The store of document snapshots indexed by document path.
   final documentStore = IndexedValueStore<DocumentSnapshot>();
 
-  /// The store of dependencies of documents.
+  /// The store of dependencies of documents indexed by document path.
   final dependenciesStore = IndexedValueStore<Set<Document>>();
 
   /// The store of dependents of documents.
@@ -75,7 +75,7 @@ class Loon {
           dependenciesBuilder: dependenciesBuilder,
         ),
         fromJson!(snap.data),
-        event: EventTypes.modified,
+        event: BroadcastEvents.modified,
         broadcast: false,
         persist: false,
       );
@@ -121,7 +121,7 @@ class Loon {
   DocumentSnapshot<T> writeDocument<T>(
     Document<T> doc,
     T data, {
-    required EventTypes event,
+    required BroadcastEvents event,
     bool broadcast = true,
     bool persist = true,
   }) {
@@ -160,7 +160,7 @@ class Loon {
       writeDocument(
         snap.doc,
         snap.data,
-        event: EventTypes.added,
+        event: BroadcastEvents.added,
       );
     }
 
@@ -188,8 +188,8 @@ class Loon {
     persistor?._clear(collection);
   }
 
-  /// On write of a snapshot, the dependencies manager updates the dependencies
-  /// store with the updated document dependencies and
+  /// When a snapshot is written, its dependencies and dependents are recalculated
+  /// based on its updated data.
   void updateDependencies<T>(DocumentSnapshot<T> snap) {
     final doc = snap.doc;
     final prevDeps = dependenciesStore.get(doc.path);
@@ -220,12 +220,12 @@ class Loon {
         dependenciesStore.write(doc.path, deps);
       }
     } else if (deps != null) {
-      dependenciesStore.write(doc.path, deps);
       for (final dep in deps) {
         (dependentsStore[dep] ??= {}).add(doc);
       }
+
+      dependenciesStore.write(doc.path, deps);
     } else if (prevDeps != null) {
-      dependenciesStore.delete(doc.path);
       for (final dep in prevDeps) {
         if (dependentsStore[dep]!.length == 1) {
           dependentsStore.remove(dep);
@@ -233,6 +233,8 @@ class Loon {
           dependentsStore[dep]!.remove(doc);
         }
       }
+
+      dependenciesStore.delete(doc.path);
     }
   }
 
@@ -250,7 +252,7 @@ class Loon {
     dependenciesStore.clear();
     dependentsStore.clear();
 
-    return persistor?._clearAll();
+    await persistor?._clearAll();
   }
 
   static void configure({
@@ -276,7 +278,7 @@ class Loon {
         _instance.writeDocument<Json>(
           Document.fromPath(docPath),
           data,
-          event: EventTypes.hydrated,
+          event: BroadcastEvents.hydrated,
           persist: false,
         );
       }
@@ -325,7 +327,7 @@ class Loon {
 
   /// Schedules a document to be rebroadcasted, updating all listeners that are subscribed to that document.
   static void rebroadcast(Document doc) {
-    _instance.broadcastManager.writeDocument(doc, EventTypes.touched);
+    _instance.broadcastManager.writeDocument(doc, BroadcastEvents.touched);
   }
 
   /// Returns a Map of all of the data and metadata of the store for debugging and inspection purposes.

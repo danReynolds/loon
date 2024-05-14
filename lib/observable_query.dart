@@ -8,7 +8,7 @@ class ObservableQuery<T> extends Query<T>
   final Map<Document<T>, DocumentSnapshot<T>> _snapIndex = {};
 
   /// A query maintains an index of the dependencies of documents in its current result set.
-  final Map<Document<T>, Set<Document>> _dependenciesIndex = {};
+  final Map<Document<T>, Set<Document>> _dependencyIndex = {};
 
   ObservableQuery(
     super.collection, {
@@ -24,23 +24,23 @@ class ObservableQuery<T> extends Query<T>
     init(snaps, multicast: multicast);
   }
 
-  /// Adds the doc to both the snapshot and dependencies indices.
+  /// Update the doc in the snapshot and dependency indices.
   void _updateIndex(DocumentSnapshot<T> snap) {
     final doc = snap.doc;
-    final prevDeps = _dependenciesIndex[doc];
+    final prevDeps = _dependencyIndex[doc];
     final deps = doc.dependencies();
 
     _snapIndex[doc] = snap;
 
     if (deps != prevDeps) {
       if (deps != null) {
-        _dependenciesIndex[doc] = deps;
+        _dependencyIndex[doc] = deps;
 
         for (final dep in deps) {
           _deps.inc(dep.path);
         }
       } else if (prevDeps != null) {
-        _dependenciesIndex.remove(doc);
+        _dependencyIndex.remove(doc);
 
         for (final dep in prevDeps) {
           _deps.dec(dep.path);
@@ -49,9 +49,9 @@ class ObservableQuery<T> extends Query<T>
     }
   }
 
-  /// Removes the doc from the index, clearing it in both the snapshot and dependencies indices.
+  /// Removes the doc from the index, clearing it in both the snapshot and dependency indices.
   void _removeIndex(Document<T> doc) {
-    final deps = _dependenciesIndex[doc];
+    final deps = _dependencyIndex[doc];
 
     if (deps != null) {
       for (final dep in deps) {
@@ -59,7 +59,7 @@ class ObservableQuery<T> extends Query<T>
       }
     }
 
-    _dependenciesIndex.remove(doc);
+    _dependencyIndex.remove(doc);
     _snapIndex.remove(doc);
   }
 
@@ -83,7 +83,7 @@ class ObservableQuery<T> extends Query<T>
     bool shouldRebroadcast = false;
     bool shouldUpdate = false;
 
-    // The list of changes to the query. Note that the [EventTypes] of the document
+    // The list of changes to the query. Note that the [BroadcastEvents] of the document
     // local to the query are different from the global broadcast events. For example, if a document
     // was modified globally such that now it should be included in the query and before was not,
     // then its event type at the query-level is [BroadcastEventTypes.added] while its global event was
@@ -92,18 +92,23 @@ class ObservableQuery<T> extends Query<T>
     final hasChangeListener = _changeController.hasListener;
 
     // 1. The query's collection has been removed.
-    if (Loon._instance.broadcastManager.store.get(path) == EventTypes.removed) {
+    if (Loon._instance.broadcastManager.store.get(path) ==
+        BroadcastEvents.removed) {
       if (_value.isNotEmpty) {
         shouldUpdate = true;
 
-        changeSnaps.addAll(_value.map((snap) {
-          return DocumentChangeSnapshot<T>(
-            doc: snap.doc,
-            event: EventTypes.removed,
-            prevData: snap.data,
-            data: null,
-          );
-        }).toList());
+        changeSnaps.addAll(
+          _value.map(
+            (snap) {
+              return DocumentChangeSnapshot<T>(
+                doc: snap.doc,
+                event: BroadcastEvents.removed,
+                prevData: snap.data,
+                data: null,
+              );
+            },
+          ),
+        );
 
         _snapIndex.clear();
         _deps.clear();
@@ -122,8 +127,8 @@ class ObservableQuery<T> extends Query<T>
         final snap = doc.get();
 
         switch (event) {
-          case EventTypes.added:
-          case EventTypes.hydrated:
+          case BroadcastEvents.added:
+          case BroadcastEvents.hydrated:
             // 2.a Add new documents that satisfy the query filter.
             if (_filter(snap!)) {
               _updateIndex(snap);
@@ -142,7 +147,7 @@ class ObservableQuery<T> extends Query<T>
               }
             }
             break;
-          case EventTypes.removed:
+          case BroadcastEvents.removed:
             // 2.b Remove old documents that previously satisfied the query filter and have been removed.
             if (_snapIndex.containsKey(doc)) {
               _removeIndex(doc);
@@ -153,7 +158,7 @@ class ObservableQuery<T> extends Query<T>
                 changeSnaps.add(
                   DocumentChangeSnapshot(
                     doc: doc,
-                    event: EventTypes.removed,
+                    event: BroadcastEvents.removed,
                     prevData: prevSnap?.data,
                     data: null,
                   ),
@@ -163,7 +168,7 @@ class ObservableQuery<T> extends Query<T>
             break;
 
           // 2.c Add / remove modified documents.
-          case EventTypes.modified:
+          case BroadcastEvents.modified:
             if (_snapIndex.containsKey(doc)) {
               shouldUpdate = true;
 
@@ -175,7 +180,7 @@ class ObservableQuery<T> extends Query<T>
                   changeSnaps.add(
                     DocumentChangeSnapshot(
                       doc: snap.doc,
-                      event: EventTypes.modified,
+                      event: BroadcastEvents.modified,
                       prevData: prevSnap?.data,
                       data: snap.data,
                     ),
@@ -189,7 +194,7 @@ class ObservableQuery<T> extends Query<T>
                   changeSnaps.add(
                     DocumentChangeSnapshot(
                       doc: doc,
-                      event: EventTypes.removed,
+                      event: BroadcastEvents.removed,
                       prevData: prevSnap?.data,
                       data: null,
                     ),
@@ -207,7 +212,7 @@ class ObservableQuery<T> extends Query<T>
                   changeSnaps.add(
                     DocumentChangeSnapshot(
                       doc: snap.doc,
-                      event: EventTypes.added,
+                      event: BroadcastEvents.added,
                       prevData: prevSnap?.data,
                       data: snap.data,
                     ),
@@ -218,7 +223,7 @@ class ObservableQuery<T> extends Query<T>
             break;
           // 2.d If the broadcast documents include any documents that were manually touched for rebroadcast and are part of this query's
           // result set, then the query should be rebroadcasted.
-          case EventTypes.touched:
+          case BroadcastEvents.touched:
             if (_snapIndex.containsKey(doc)) {
               _updateIndex(snap!);
 
@@ -228,7 +233,7 @@ class ObservableQuery<T> extends Query<T>
                 changeSnaps.add(
                   DocumentChangeSnapshot(
                     doc: snap.doc,
-                    event: EventTypes.touched,
+                    event: BroadcastEvents.touched,
                     prevData: prevSnap?.data,
                     data: snap.data,
                   ),
@@ -241,7 +246,8 @@ class ObservableQuery<T> extends Query<T>
     }
 
     // 3. The query itself has been touched for rebroadcast.
-    if (Loon._instance.broadcastManager.store.get(path) == EventTypes.touched) {
+    if (Loon._instance.broadcastManager.store.get(path) ==
+        BroadcastEvents.touched) {
       shouldRebroadcast = true;
     }
 
