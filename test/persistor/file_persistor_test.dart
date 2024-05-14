@@ -1694,15 +1694,24 @@ void main() {
         toJson: (user) => user.toJson(),
       );
 
-      final collectionSize = await logger.measure(
-        'Large collection query',
+      final queryResponseSize = await logger.measure(
+        'Lazy parse large collection query',
+        () async {
+          return largeModelCollection.get().length;
+        },
+      );
+
+      // The second query should be significantly faster, since it does not need to lazily
+      // parse each of the documents from their JSON representation.
+      await logger.measure(
+        'Already parsed collection query',
         () async {
           return largeModelCollection.get().length;
         },
       );
 
       expect(
-        collectionSize,
+        queryResponseSize,
         size,
       );
     });
