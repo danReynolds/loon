@@ -1,5 +1,7 @@
 part of loon;
 
+/// The data returned on hydration from the hydration layer as a map of document
+/// paths to document data.
 typedef HydrationData = Map<String, Json>;
 
 class PersistorSettings<T> {

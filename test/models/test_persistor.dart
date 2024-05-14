@@ -20,7 +20,7 @@ class TestPersistor extends Persistor {
     return seedData.fold<HydrationData>({}, (acc, doc) {
       return {
         ...acc,
-        doc.id: doc.data.toJson(),
+        doc.path: doc.data.toJson(),
       };
     });
   }

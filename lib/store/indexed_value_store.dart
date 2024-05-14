@@ -9,6 +9,8 @@ part of loon;
 /// final store = IndexedValueStore<String>();
 /// store.write('users__2__messages__1', 'Test');
 /// store.write('users__2__messages__2', 'Test again');
+///
+/// print(store.inspect());
 /// {
 ///   users: {
 ///     2: {
@@ -26,15 +28,15 @@ part of loon;
 /// All values of the given path can then be retrieved as shown below:
 ///
 /// ```dart
-/// final values = store.getAll('users__2__messages');
+/// final values = store.getChildValues('users__2__messages');
+///
+/// print(values);
 /// {
 ///   1: 'Test',
 ///   2: 'Test again',
 /// }
 /// ```
-///
-/// This is used in modeling collections, which index their documents by key and require
-/// efficient access to all of their values.
+/// The [IndexedValueStore] is used as the data structure used throughout the library for storing collections of documents.
 class IndexedValueStore<T> {
   Map _store = {};
 
@@ -366,8 +368,35 @@ class IndexedValueStore<T> {
   }
 }
 
-/// A variant of the [IndexedValueStore] that additionally keeps a ref count of each
-/// distinct value in a given path's values.
+/// An extension of the [IndexedValueStore] that additionally keeps a ref count of each distinct
+/// value indexed under a path.
+///
+/// Ex.
+/// ```dart
+/// final store = IndexedRefValueStore<String>();
+/// store.write('users__2__messages__1', 'Test');
+/// store.write('users__2__messages__2', 'Test again');
+/// store.write('users__2__messages__3', 'Test again');
+///
+/// print(store.inspect());
+/// {
+///   users: {
+///     2: {
+///       messages: {
+///         "__refs": {
+///            "Test": 1,
+///            "Test again": 2,
+///          },
+///         __values: {
+///           1: "Test",
+///           2: "Test again",
+///           3: "Test again",
+///         }
+///       }
+///     }
+///   }
+/// }
+/// ```
 class IndexedRefValueStore<T> extends IndexedValueStore<T> {
   static const _refs = '__refs';
 

@@ -1,9 +1,9 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:loon/loon.dart';
 
-import 'models/test_persistor.dart';
-import 'models/test_user_model.dart';
-import 'utils.dart';
+import '../models/test_persistor.dart';
+import '../models/test_user_model.dart';
+import '../utils.dart';
 
 void main() {
   final completer = PersistorCompleter();

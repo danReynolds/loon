@@ -1241,28 +1241,19 @@ void main() {
 
       Loon.configure(
         persistor: TestPersistor(
-          seedData: [
-            DocumentSnapshot(
-              doc: userDoc,
-              data: userData,
-            )
-          ],
+          seedData: [DocumentSnapshot(doc: userDoc, data: userData)],
         ),
       );
 
       await Loon.hydrate();
 
-      // The data is hydrated as Json
       expect(
         Loon.inspect()['store'],
         {
           "users": {
             "__values": {
               "1": DocumentSnapshotMatcher(
-                DocumentSnapshot(
-                  doc: userDoc,
-                  data: userData.toJson(),
-                ),
+                DocumentSnapshot(doc: userDoc, data: userData.toJson()),
               ),
             }
           }
@@ -1270,24 +1261,15 @@ void main() {
       );
 
       // It is then de-serialized when it is first accessed.
-      expect(
-        userDoc.get(),
-        DocumentSnapshot(
-          doc: userDoc,
-          data: userData,
-        ),
-      );
+      expect(userDoc.get(), DocumentSnapshot(doc: userDoc, data: userData));
 
-      // Afterwards first read, it is stored de-serialized.
+      // After the document is read, it is lazily de-serialized.
       expect(
         Loon.inspect()['store'],
         {
           "users": {
             "__values": {
-              "1": DocumentSnapshot(
-                doc: userDoc,
-                data: userData,
-              ),
+              "1": DocumentSnapshot(doc: userDoc, data: userData),
             }
           }
         },
