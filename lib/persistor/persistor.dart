@@ -26,7 +26,7 @@ abstract class Persistor {
 
   final Set<Document> _batch = {};
 
-  late final _logger;
+  late final Logger _logger;
 
   /// The operation queue ensures that operations (init, hydrate, persist, clear) are blocking and
   /// that only one is ever running at a time, not concurrently.
