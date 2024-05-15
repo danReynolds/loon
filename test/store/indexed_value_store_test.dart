@@ -590,5 +590,23 @@ void main() {
         'users__2__messages__2': "I'm good.",
       });
     });
+
+    test(
+        'Extracts all values under the given path in the store to a path/value map',
+        () {
+      final store = IndexedValueStore<String>();
+      store.write('users__1', 'Dan');
+      store.write('users__2', 'Sonja');
+      store.write('users__1__messages__1', 'Hello');
+      store.write('users__1__messages__2', 'How are you?');
+      store.write('users__2__messages__1', 'Hey!');
+      store.write('users__2__messages__2', "I'm good.");
+
+      expect(store.extractValues('users__1'), {
+        'users__1': 'Dan',
+        'users__1__messages__1': 'Hello',
+        'users__1__messages__2': 'How are you?',
+      });
+    });
   });
 }

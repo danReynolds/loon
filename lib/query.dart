@@ -1,6 +1,10 @@
 part of loon;
 
-class Query<T> {
+abstract class Queryable<T> {
+  Query<T> toQuery();
+}
+
+class Query<T> extends Queryable<T> {
   final Collection<T> collection;
   final List<FilterFn<T>> filters;
   final SortFn<T>? sort;
@@ -81,5 +85,10 @@ class Query<T> {
       filters: [...filters, filter],
       sort: sort,
     );
+  }
+
+  @override
+  toQuery() {
+    return this;
   }
 }

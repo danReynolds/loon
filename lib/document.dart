@@ -2,7 +2,7 @@ part of loon;
 
 const _rootKey = 'ROOT';
 
-class Document<T> {
+class Document<T> implements StoreEntity {
   final String id;
   final String parent;
   final FromJson<T>? fromJson;
@@ -62,6 +62,7 @@ class Document<T> {
   @override
   int get hashCode => Object.hashAll([parent, id]);
 
+  @override
   String get path {
     if (parent.isEmpty) {
       return id;

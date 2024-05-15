@@ -369,30 +369,52 @@ class IndexedValueStore<T> {
   }
 
   Map<String, T> _extractValues(
-    Map node,
-    Map<String, T> index, [
-    String path = '',
-  ]) {
+    Map? node,
+    Map<String, T> values,
+    String path,
+  ) {
+    if (node == null) {
+      return values;
+    }
+
     if (node.containsKey(_values)) {
       for (final entry in node[_values].entries) {
-        final key = path.isEmpty ? entry.key : "${path}__${entry.key}";
-        index[key] = entry.value;
+        final key = path.isEmpty ? entry.key : "$path$_delimiter${entry.key}";
+        values[key] = entry.value;
       }
     }
 
     for (final key in node.keys) {
       if (key != _values) {
-        final childPath = path.isEmpty ? key : "${path}__$key";
-        _extractValues(node[key], index, childPath);
+        final childPath = path.isEmpty ? key : "$path$_delimiter$key";
+        _extractValues(node[key], values, childPath);
       }
     }
 
-    return index;
+    return values;
   }
 
-  /// Extracts all values from the store into a set of flat key-value pairs of paths to values.
-  Map<String, T> extractValues() {
-    return _extractValues(_store, {});
+  /// Extracts all values under the given path in the store into a set of flat key-value pairs of paths to values.
+  Map<String, T> extractValues([String path = '']) {
+    if (path.isEmpty) {
+      return _extractValues(_store, {}, path);
+    }
+
+    final Map<String, T> values = {};
+    final segments = path.split(_delimiter);
+    final lastSegment = segments.removeLast();
+
+    final parentNode = _getNode(_store, segments, 0);
+
+    if (parentNode == null) {
+      return values;
+    }
+
+    if (parentNode[_values]?.containsKey(lastSegment) ?? false) {
+      values[path] = parentNode[_values][lastSegment];
+    }
+
+    return _extractValues(parentNode[lastSegment], values, path);
   }
 }
 

@@ -6,7 +6,7 @@ import 'package:loon/persistor/file_persistor/extensions/future.dart';
 import 'package:loon/persistor/file_persistor/file_persistor_worker.dart';
 import 'package:path/path.dart' as path;
 
-final fileRegex = RegExp(r'^(?!__resolver__)(\w+)\.json$');
+final fileRegex = RegExp(r'^(?!__resolver__)(\w+)(?:.encrypted)?\.json$');
 
 class DualFileDataStore {
   late final FileDataStore _plaintextStore;
@@ -32,6 +32,20 @@ class DualFileDataStore {
       isHydrated: isHydrated,
     );
   }
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) {
+      return true;
+    }
+    if (other is DualFileDataStore) {
+      return other.name == name;
+    }
+    return false;
+  }
+
+  @override
+  int get hashCode => Object.hashAll([name]);
 
   bool hasValue(String path) {
     return _plaintextStore.hasValue(path) || _encryptedStore.hasValue(path);
@@ -122,8 +136,13 @@ class DualFileDataStore {
   }
 
   /// Returns a flat map of all the values in the plaintext and encrypted data by path.
-  (Map<String, Json> plainText, Map<String, Json> encrypted) extractValues() {
-    return (_plaintextStore.extractValues(), _encryptedStore.extractValues());
+  (Map<String, Json> plainText, Map<String, Json> encrypted) extractValues([
+    String path = '',
+  ]) {
+    return (
+      _plaintextStore.extractValues(path),
+      _encryptedStore.extractValues(path),
+    );
   }
 }
 
@@ -292,8 +311,8 @@ class FileDataStore {
   }
 
   /// Returns a flat map of all values in the store by path.
-  Map<String, Json> extractValues() {
-    return _store.extractValues();
+  Map<String, Json> extractValues([String path = '']) {
+    return _store.extractValues(path);
   }
 }
 

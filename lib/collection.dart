@@ -1,6 +1,6 @@
 part of loon;
 
-class Collection<T> {
+class Collection<T> implements Queryable<T>, StoreEntity {
   final String parent;
   final String name;
   final FromJson<T>? fromJson;
@@ -11,6 +11,8 @@ class Collection<T> {
   /// [DocumentSnapshot] is dependent on.
   final DependenciesBuilder<T>? dependenciesBuilder;
 
+  static final root = Document.root.subcollection(_rootKey);
+
   Collection(
     this.parent,
     this.name, {
@@ -20,6 +22,7 @@ class Collection<T> {
     this.dependenciesBuilder,
   });
 
+  @override
   String get path {
     if (parent == _rootKey) {
       return name;
@@ -93,5 +96,14 @@ class Collection<T> {
 
   Query<T> where(FilterFn<T> filter) {
     return Query<T>(this, filters: [filter]);
+  }
+
+  Query<T> sortBy(SortFn<T> sort) {
+    return Query<T>(this, sort: sort);
+  }
+
+  @override
+  Query<T> toQuery() {
+    return Query(this);
   }
 }

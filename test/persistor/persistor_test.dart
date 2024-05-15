@@ -14,7 +14,7 @@ void main() {
 
   group('Persistor', () {
     test(
-      'Persistence batches using the throttle',
+      'Persists batches using the throttle',
       () async {
         List<List<Document>> batches = [];
 

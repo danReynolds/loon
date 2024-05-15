@@ -22,6 +22,7 @@ part 'document_change_snapshot.dart';
 part 'broadcast_manager.dart';
 part 'utils.dart';
 part 'logger.dart';
+part 'store_entity.dart';
 
 class Loon {
   Persistor? persistor;
@@ -261,13 +262,17 @@ class Loon {
     _instance.persistor = persistor;
   }
 
-  static Future<void> hydrate([List<Collection>? collections]) async {
+  /// Hydrates persisted data from the store using the persistor specified in [Loon.configure].
+  /// If no arguments are provided, then the entire store is hydrated by default. If specific
+  /// [StoreEntity] documents and collections are provided, then only data in the store under those
+  /// entities is hydrated.
+  static Future<void> hydrate([List<StoreEntity>? entities]) async {
     if (_instance.persistor == null) {
       logger.log('Hydration skipped - no persistor specified');
       return;
     }
     try {
-      final data = await _instance.persistor!._hydrate(collections);
+      final data = await _instance.persistor!._hydrate(entities);
 
       for (final entry in data.entries) {
         final docPath = entry.key;

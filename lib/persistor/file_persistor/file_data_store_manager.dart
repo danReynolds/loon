@@ -114,7 +114,11 @@ class FileDataStoreManager {
         encrypter: encrypter,
         directory: directory,
       );
-      _index[dataStore.name] = dataStore;
+      final dataStoreName = dataStore.name;
+
+      if (!_index.containsKey(dataStoreName)) {
+        _index[dataStoreName] = dataStore;
+      }
     }
 
     // Initialize and immediately hydrate the resolver data, since it is required
@@ -125,13 +129,16 @@ class FileDataStoreManager {
 
   /// Hydrates the given paths and returns a map of document paths to their serialized data.
   Future<Map<String, Json>> hydrate(List<String>? paths) async {
+    final Map<String, Set<DualFileDataStore>> pathDataStores = {};
     final Set<DualFileDataStore> dataStores = {};
 
     // If the hydration operation is only for certain paths, then resolve all of the file data stores
     // relevant to the given paths and their subpaths and hydrate those data stores.
     if (paths != null) {
       for (final path in paths) {
-        dataStores.addAll(_resolve(path));
+        final stores = _resolve(path);
+        pathDataStores[path] = stores;
+        dataStores.addAll(stores);
       }
     } else {
       // If no specific collections have been specified, then hydrate all file data stores.
@@ -141,38 +148,30 @@ class FileDataStoreManager {
     await Future.wait(dataStores.map((store) => store.hydrate()));
 
     final Map<String, Json> data = {};
-    for (final hydratedStore in dataStores) {
-      final (plaintextData, encryptedData) = hydratedStore.extractValues();
-
-      for (final extractedData in [plaintextData, encryptedData]) {
-        for (final docPath in extractedData.keys.toList()) {
-          // In the situation where a hydrated document is now resolved to a different data store
-          // then it was when it was persisted, then there are two scenarios:
+    if (paths != null) {
+      for (final path in paths) {
+        for (final dataStore in pathDataStores[path]!) {
+          // Since many different paths can be contained within the same file data store,
+          // we only extract the data in the hydrated store that falls under the requested path.
           //
-          // 1. If the document already exists in the resolved data store, then that means that the
-          //    document has been updated since it was persisted and that the hydrated value is stale.
-          //    In this scenario, the stale hydrated document should be removed from the extracted hydration data and
-          //    removed from its old data store.
-          // 2. The document does not exist in the resolved data store, in which case it should be moved from
-          //    its old data store to the updated one and delivered in the extracted hydration data.
-          final resolvedDataStore = _index[_resolver.store.getNearest(docPath)];
-          if (resolvedDataStore != null && resolvedDataStore != hydratedStore) {
-            if (resolvedDataStore.hasValue(docPath)) {
-              extractedData.remove(docPath);
-            } else {
-              resolvedDataStore.writePath(
-                docPath,
-                extractedData[docPath]!,
-                extractedData == encryptedData,
-              );
-            }
-            // In either scenario, the document should be removed from the hydrated data store
-            // since it now belongs in the updated resolved data store.
-            hydratedStore.deletePath(docPath, recursive: false);
-          }
+          // Doing this ensures that the client's contract to only hydrate the data that the requested
+          // is fulfilled and it also offers a performance benefit since no unnecessary data is copied
+          // back from the worker to the main isolate.
+          //
+          // If later on the client requests to hydrate a path for a data store that has already been
+          // hydrated but has not yet delivered the data under that path to the client, then this still
+          // works as expected, as the hydration operation will just extract that data from the already hydrated
+          // data store and deliver it to the client as expected.
+          final (plaintextData, encryptedData) = dataStore.extractValues(path);
+          data.addAll(plaintextData);
+          data.addAll(encryptedData);
         }
-
-        data.addAll(extractedData);
+      }
+    } else {
+      for (final dataStore in dataStores) {
+        final (plaintextData, encryptedData) = dataStore.extractValues();
+        data.addAll(plaintextData);
+        data.addAll(encryptedData);
       }
     }
 

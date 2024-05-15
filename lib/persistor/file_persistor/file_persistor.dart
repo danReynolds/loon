@@ -146,11 +146,9 @@ class FilePersistor extends Persistor {
   }
 
   @override
-  hydrate([List<Collection>? collections]) async {
+  hydrate([List<StoreEntity>? entities]) async {
     final response = await _sendMessage(
-      HydrateMessageRequest(
-        collections?.map((collection) => collection.path).toList(),
-      ),
+      HydrateMessageRequest(entities?.map((entity) => entity.path).toList()),
     );
     return response.data;
   }

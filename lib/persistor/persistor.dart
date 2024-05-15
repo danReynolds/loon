@@ -91,9 +91,9 @@ abstract class Persistor {
     });
   }
 
-  Future<HydrationData> _hydrate([List<Collection>? collections]) {
+  Future<HydrationData> _hydrate([List<StoreEntity>? entities]) {
     return _runOperation(() async {
-      final result = await hydrate(collections);
+      final result = await hydrate(entities);
       onHydrate?.call(result);
       return result;
     });
@@ -154,10 +154,10 @@ abstract class Persistor {
   /// Persist function called with the list of documents that have changed (including been deleted).
   Future<void> persist(List<Document> docs);
 
-  /// Hydration function called to read data from persistence. If no collections are specified,
-  /// then it hydrations all persisted data. if collections are specified, it hydrates only the data from those
-  /// collections and their subcollections.
-  Future<HydrationData> hydrate([List<Collection>? collections]);
+  /// Hydration function called to read data from persistence. If no entities are specified,
+  /// then it hydrations all persisted data. if entities are specified, it hydrates only the data from
+  /// the paths under those entities.
+  Future<HydrationData> hydrate([List<StoreEntity>? entities]);
 
   /// Clear function used to clear all documents in a collection.
   Future<void> clear(Collection collection);
