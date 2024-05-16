@@ -32,11 +32,7 @@ class FilePersistor extends Persistor {
     super.onClearAll,
     super.onHydrate,
   }) : super(settings: settings ?? const FilePersistorSettings()) {
-    _logger = Logger(
-      'FilePersistor',
-      output: Loon.logger.log,
-      enabled: Loon.logger.enabled,
-    );
+    _logger = Logger('FilePersistor', output: Loon.logger.log);
   }
 
   static FilePersistorCollectionKeyBuilder<T> key<T>(String value) {
@@ -146,7 +142,7 @@ class FilePersistor extends Persistor {
   }
 
   @override
-  hydrate([List<StoreEntity>? entities]) async {
+  hydrate([List<StoreReference>? entities]) async {
     final response = await _sendMessage(
       HydrateMessageRequest(entities?.map((entity) => entity.path).toList()),
     );

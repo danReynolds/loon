@@ -4,19 +4,12 @@ class Logger {
   final String name;
   final void Function(String message)? output;
 
-  bool enabled;
-
   Logger(
     this.name, {
     this.output,
-    this.enabled = true,
   });
 
   void log(String message) {
-    if (!enabled) {
-      return;
-    }
-
     final formattedMessage = '$name->$message';
 
     if (output != null) {

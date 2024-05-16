@@ -2,7 +2,7 @@ part of loon;
 
 const _rootKey = 'ROOT';
 
-class Document<T> implements StoreEntity {
+class Document<T> implements StoreReference {
   final String id;
   final String parent;
   final FromJson<T>? fromJson;

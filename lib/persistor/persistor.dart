@@ -91,7 +91,7 @@ abstract class Persistor {
     });
   }
 
-  Future<HydrationData> _hydrate([List<StoreEntity>? entities]) {
+  Future<HydrationData> _hydrate([List<StoreReference>? entities]) {
     return _runOperation(() async {
       final result = await hydrate(entities);
       onHydrate?.call(result);
@@ -157,7 +157,7 @@ abstract class Persistor {
   /// Hydration function called to read data from persistence. If no entities are specified,
   /// then it hydrations all persisted data. if entities are specified, it hydrates only the data from
   /// the paths under those entities.
-  Future<HydrationData> hydrate([List<StoreEntity>? entities]);
+  Future<HydrationData> hydrate([List<StoreReference>? entities]);
 
   /// Clear function used to clear all documents in a collection.
   Future<void> clear(Collection collection);

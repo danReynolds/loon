@@ -22,14 +22,21 @@ part 'document_change_snapshot.dart';
 part 'broadcast_manager.dart';
 part 'utils.dart';
 part 'logger.dart';
-part 'store_entity.dart';
+part 'store_reference.dart';
 
 class Loon {
   Persistor? persistor;
 
   static final Loon _instance = Loon._();
 
-  Loon._();
+  Loon._() {
+    _logger = Logger('Loon', output: (message) {
+      if (_isLoggingEnabled && kDebugMode) {
+        // ignore: avoid_print
+        print(message);
+      }
+    });
+  }
 
   /// The store of document snapshots indexed by document path.
   final documentStore = IndexedValueStore<DocumentSnapshot>();
@@ -42,7 +49,9 @@ class Loon {
 
   final broadcastManager = BroadcastManager();
 
-  final _logger = Logger('Loon', enabled: false);
+  late final Logger _logger;
+
+  bool _isLoggingEnabled = false;
 
   bool get _isGlobalPersistenceEnabled {
     return persistor?.settings.enabled ?? false;
@@ -258,15 +267,15 @@ class Loon {
     Persistor? persistor,
     bool enableLogging = false,
   }) {
-    logger.enabled = enableLogging;
+    _instance._isLoggingEnabled = enableLogging;
     _instance.persistor = persistor;
   }
 
   /// Hydrates persisted data from the store using the persistor specified in [Loon.configure].
   /// If no arguments are provided, then the entire store is hydrated by default. If specific
-  /// [StoreEntity] documents and collections are provided, then only data in the store under those
+  /// [StoreReference] documents and collections are provided, then only data in the store under those
   /// entities is hydrated.
-  static Future<void> hydrate([List<StoreEntity>? entities]) async {
+  static Future<void> hydrate([List<StoreReference>? entities]) async {
     if (_instance.persistor == null) {
       logger.log('Hydration skipped - no persistor specified');
       return;

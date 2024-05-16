@@ -1,6 +1,6 @@
 part of loon;
 
-class Collection<T> implements Queryable<T>, StoreEntity {
+class Collection<T> implements Queryable<T>, StoreReference {
   final String parent;
   final String name;
   final FromJson<T>? fromJson;

@@ -1,5 +1,5 @@
 part of loon;
 
-abstract class StoreEntity {
+abstract class StoreReference {
   String get path;
 }
