@@ -1184,9 +1184,15 @@ void main() {
     },
   );
 
-  group('Root collection', () {
+  group('Root document', () {
     tearDown(() {
       Loon.clearAll();
+    });
+
+    test('Has the expected paths', () {
+      expect(Document.root.path, 'ROOT');
+      expect(Loon.doc('1').path, 'ROOT__1');
+      expect(Loon.doc('1').subcollection('friends').path, 'ROOT__1__friends');
     });
 
     test('Writes documents successfully', () {
@@ -1326,6 +1332,51 @@ void main() {
             }
           }
         },
+      );
+    });
+
+    test('Does not overwrite existing documents', () async {
+      final userCollection = Loon.collection<TestUserModel>(
+        'users',
+        fromJson: TestUserModel.fromJson,
+        toJson: (user) => user.toJson(),
+      );
+      final userDoc = userCollection.doc('1');
+      final userDoc2 = userCollection.doc('2');
+
+      userDoc.create(TestUserModel('User 1'));
+
+      Loon.configure(
+        persistor: TestPersistor(
+          seedData: [
+            DocumentSnapshot(
+              doc: userDoc,
+              data: TestUserModel('User 1 cached'),
+            ),
+            DocumentSnapshot(
+              doc: userDoc2,
+              data: TestUserModel('User 2 cached'),
+            ),
+          ],
+        ),
+      );
+
+      await Loon.hydrate();
+
+      expect(
+        userCollection.get(),
+        [
+          // User 1 should not have been overwritten by the data hydrated from persistence,
+          // since that data is stale and User 1 already exists in memory.
+          DocumentSnapshot(
+            doc: userDoc,
+            data: TestUserModel('User 1'),
+          ),
+          DocumentSnapshot(
+            doc: userDoc2,
+            data: TestUserModel('User 2 cached'),
+          ),
+        ],
       );
     });
   });

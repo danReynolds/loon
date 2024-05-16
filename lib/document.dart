@@ -19,31 +19,33 @@ class Document<T> implements StoreReference {
     this.dependenciesBuilder,
   });
 
-  static Document<Json> _fromPath(
-    dynamic ref,
+  static Document<T> _fromPath<T>(
+    StoreReference ref,
     List<String> segments,
     int index,
   ) {
     if (index == segments.length) {
-      return ref;
-    }
-
-    final segment = segments[index];
-    if (ref is Document) {
-      return Document._fromPath(
-        ref.subcollection<Json>(segment),
-        segments,
-        index + 1,
-      );
-    } else if (ref is Collection) {
-      return Document._fromPath(ref.doc(segment), segments, index + 1);
+      if (ref is Document<T>) {
+        return ref;
+      }
+    } else {
+      final segment = segments[index];
+      if (ref is Document) {
+        return Document._fromPath(
+          ref.subcollection<T>(segment),
+          segments,
+          index + 1,
+        );
+      } else if (ref is Collection) {
+        return Document._fromPath(ref.doc(segment), segments, index + 1);
+      }
     }
 
     throw 'Invalid path';
   }
 
-  static Document<Json> fromPath(String path) {
-    return Document._fromPath(Document.root, path.split('__'), 0);
+  static Document<T> fromPath<T>(String path) {
+    return Document._fromPath<T>(Document.root, path.split('__'), 0);
   }
 
   @override

@@ -11,8 +11,6 @@ class Collection<T> implements Queryable<T>, StoreReference {
   /// [DocumentSnapshot] is dependent on.
   final DependenciesBuilder<T>? dependenciesBuilder;
 
-  static final root = Document.root.subcollection(_rootKey);
-
   Collection(
     this.parent,
     this.name, {

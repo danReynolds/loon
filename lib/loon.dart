@@ -287,12 +287,14 @@ class Loon {
         final docPath = entry.key;
         final data = entry.value;
 
-        _instance.writeDocument<Json>(
-          Document.fromPath(docPath),
-          data,
-          event: BroadcastEvents.hydrated,
-          persist: false,
-        );
+        if (!_instance.documentStore.hasValue(docPath)) {
+          _instance.writeDocument<Json>(
+            Document.fromPath<Json>(docPath),
+            data,
+            event: BroadcastEvents.hydrated,
+            persist: false,
+          );
+        }
       }
     } catch (e) {
       logger.log('Error hydrating');
