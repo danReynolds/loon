@@ -152,7 +152,7 @@ class Loon {
     documentStore.write(doc.path, snap);
 
     if (persist && doc.isPersistenceEnabled()) {
-      persistor!._persistDoc(doc);
+      persistor?._persistDoc(doc);
     }
 
     return snap;
@@ -184,7 +184,7 @@ class Loon {
     documentStore.delete(doc.path);
 
     if (doc.isPersistenceEnabled()) {
-      persistor!._persistDoc(doc);
+      persistor?._persistDoc(doc);
     }
   }
 
@@ -275,13 +275,13 @@ class Loon {
   /// If no arguments are provided, then the entire store is hydrated by default. If specific
   /// [StoreReference] documents and collections are provided, then only data in the store under those
   /// entities is hydrated.
-  static Future<void> hydrate([List<StoreReference>? entities]) async {
+  static Future<void> hydrate([List<StoreReference>? refs]) async {
     if (_instance.persistor == null) {
       logger.log('Hydration skipped - no persistor specified');
       return;
     }
     try {
-      final data = await _instance.persistor!._hydrate(entities);
+      final data = await _instance.persistor!._hydrate(refs);
 
       for (final entry in data.entries) {
         final docPath = entry.key;
