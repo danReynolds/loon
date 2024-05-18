@@ -14,9 +14,8 @@ class TestFilePersistor extends FilePersistor {
   }) : super(
           // To make tests run faster, in the test environment the persistence throttle
           // is decreased to 1 millisecond.
-          settings: (settings ?? const FilePersistorSettings()).copyWith(
-            persistenceThrottle: const Duration(milliseconds: 1),
-          ),
+          persistenceThrottle: const Duration(milliseconds: 1),
+          settings: settings ?? const FilePersistorSettings(),
           onPersist: (_) => completer.persistComplete(),
           onHydrate: (_) => completer.hydrateComplete(),
           onClear: (_) => completer.clearComplete(),

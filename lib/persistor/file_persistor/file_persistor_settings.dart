@@ -110,20 +110,17 @@ class FilePersistorSettings<T> extends PersistorSettings<T> {
     this.key,
     this.encrypted = false,
     super.enabled = true,
-    super.persistenceThrottle = const Duration(milliseconds: 100),
   });
 
   FilePersistorSettings<T> copyWith({
     FilePersistorKeyBuilder<T>? key,
     bool? encrypted,
     bool? enabled,
-    Duration? persistenceThrottle,
   }) {
     return FilePersistorSettings<T>(
       key: key ?? this.key,
       encrypted: encrypted ?? this.encrypted,
       enabled: enabled ?? this.enabled,
-      persistenceThrottle: persistenceThrottle ?? this.persistenceThrottle,
     );
   }
 }

@@ -10,9 +10,8 @@ class TestPersistor extends Persistor {
     super.onPersist,
     required this.seedData,
   }) : super(
-          settings: const PersistorSettings(
-            persistenceThrottle: Duration(milliseconds: 1),
-          ),
+          persistenceThrottle: const Duration(milliseconds: 1),
+          settings: const PersistorSettings(),
         );
 
   @override

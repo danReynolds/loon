@@ -31,6 +31,7 @@ class FilePersistor extends Persistor {
     super.onClear,
     super.onClearAll,
     super.onHydrate,
+    super.persistenceThrottle,
   }) : super(settings: settings ?? const FilePersistorSettings()) {
     _logger = Logger('FilePersistor', output: Loon.logger.log);
   }

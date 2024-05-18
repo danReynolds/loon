@@ -6,11 +6,9 @@ typedef HydrationData = Map<String, Json>;
 
 class PersistorSettings<T> {
   final bool enabled;
-  final Duration persistenceThrottle;
 
   const PersistorSettings({
     this.enabled = true,
-    this.persistenceThrottle = const Duration(milliseconds: 100),
   });
 }
 
@@ -23,6 +21,10 @@ abstract class Persistor {
   final void Function(Collection collection)? onClear;
   final void Function()? onClearAll;
   final void Function(HydrationData data)? onHydrate;
+
+  /// The throttle for batching persisted documents. All documents updated within the throttle
+  /// duration are batched together into a single persist operation.
+  final Duration persistenceThrottle;
 
   final Set<Document> _batch = {};
 
@@ -39,6 +41,7 @@ abstract class Persistor {
 
   Persistor({
     this.settings = const PersistorSettings(),
+    this.persistenceThrottle = const Duration(milliseconds: 100),
     this.onPersist,
     this.onClear,
     this.onClearAll,
@@ -125,7 +128,7 @@ abstract class Persistor {
 
   /// Schedules the current batch of documents to be persisted using a timer set to the persistence throttle.
   void _schedulePersist() {
-    _persistTimer ??= Timer(settings.persistenceThrottle, () {
+    _persistTimer ??= Timer(persistenceThrottle, () {
       _persist();
     });
   }
