@@ -1539,18 +1539,6 @@ void main() {
       final file = File('${testDirectory.path}/loon/users.json');
       file.writeAsStringSync(jsonEncode(store.inspect()));
 
-      final resolverFile = File('${testDirectory.path}/loon/__resolver__.json');
-      resolverFile.writeAsStringSync(jsonEncode(
-        {
-          "__refs": {
-            "users": 1,
-          },
-          "__values": {
-            "users": "users",
-          },
-        },
-      ));
-
       await Loon.hydrate();
 
       final largeModelCollection = Loon.collection(
@@ -1608,7 +1596,11 @@ void main() {
           },
         );
 
+        await Loon.clearAll();
+
         Loon.configure(persistor: TestFilePersistor());
+
+        file.writeAsStringSync(jsonEncode(json));
 
         await Loon.hydrate();
 
@@ -1619,6 +1611,122 @@ void main() {
             data: TestUserModel('Dan'),
           ),
         );
+      },
+    );
+
+    test(
+      "Hydrates only data under the specified root document",
+      () async {
+        final userCollection = Loon.collection(
+          'users',
+          fromJson: TestUserModel.fromJson,
+          toJson: (user) => user.toJson(),
+        );
+        final currentUserDoc = Loon.doc(
+          'current_user',
+          fromJson: TestUserModel.fromJson,
+          toJson: (user) => user.toJson(),
+        );
+
+        userCollection.doc('1').create(TestUserModel('User 1'));
+        currentUserDoc.create(TestUserModel('Dan'));
+
+        await completer.onPersist;
+
+        final file = File('${testDirectory.path}/loon/__root__.json');
+        final json = jsonDecode(file.readAsStringSync());
+
+        expect(
+          json,
+          {
+            "root": {
+              "__values": {
+                "current_user": {'name': 'Dan'},
+              },
+            },
+            "users": {
+              "__values": {
+                "1": {'name': 'User 1'},
+              }
+            }
+          },
+        );
+
+        await Loon.clearAll();
+
+        file.writeAsStringSync(jsonEncode(json));
+
+        Loon.configure(persistor: TestFilePersistor());
+
+        await Loon.hydrate([currentUserDoc]);
+
+        expect(
+          currentUserDoc.get(),
+          DocumentSnapshot(
+            doc: currentUserDoc,
+            data: TestUserModel('Dan'),
+          ),
+        );
+
+        expect(userCollection.get(), []);
+      },
+    );
+
+    test(
+      "Hydrates only data under the root document",
+      () async {
+        final userCollection = Loon.collection(
+          'users',
+          fromJson: TestUserModel.fromJson,
+          toJson: (user) => user.toJson(),
+        );
+        final currentUserDoc = Loon.doc(
+          'current_user',
+          fromJson: TestUserModel.fromJson,
+          toJson: (user) => user.toJson(),
+        );
+
+        userCollection.doc('1').create(TestUserModel('User 1'));
+        currentUserDoc.create(TestUserModel('Dan'));
+
+        await completer.onPersist;
+
+        final file = File('${testDirectory.path}/loon/__root__.json');
+        final json = jsonDecode(file.readAsStringSync());
+
+        expect(
+          json,
+          {
+            "root": {
+              "__values": {
+                "current_user": {'name': 'Dan'},
+              },
+            },
+            "users": {
+              "__values": {
+                "1": {'name': 'User 1'},
+              }
+            }
+          },
+        );
+
+        await Loon.clearAll();
+
+        file.writeAsStringSync(jsonEncode(json));
+
+        Loon.configure(persistor: TestFilePersistor());
+
+        await Loon.hydrate([Document.root]);
+
+        expect(
+          currentUserDoc.get(),
+          DocumentSnapshot(
+            doc: currentUserDoc,
+            data: TestUserModel('Dan'),
+          ),
+        );
+
+        expect(userCollection.get(), []);
       },
     );
   });
