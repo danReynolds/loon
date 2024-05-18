@@ -1,7 +1,5 @@
 part of loon;
 
-const _rootKey = 'ROOT';
-
 class Document<T> implements StoreReference {
   final String id;
   final String parent;
@@ -66,14 +64,14 @@ class Document<T> implements StoreReference {
 
   @override
   String get path {
-    if (parent.isEmpty) {
-      return id;
+    if (id.isEmpty) {
+      return parent;
     }
 
     return "${parent}__$id";
   }
 
-  static final root = Document('', _rootKey);
+  static final root = Document(_rootKey, '');
 
   Collection<S> subcollection<S>(
     String name, {

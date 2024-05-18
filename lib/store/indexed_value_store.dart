@@ -450,9 +450,7 @@ class IndexedValueStore<T> {
 class IndexedRefValueStore<T> extends IndexedValueStore<T> {
   static const _refs = '__refs';
 
-  IndexedRefValueStore({
-    Map? store,
-  }) {
+  IndexedRefValueStore([Map? store]) {
     if (store != null) {
       _store = store;
     }

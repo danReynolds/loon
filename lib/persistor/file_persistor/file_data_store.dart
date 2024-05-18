@@ -6,7 +6,9 @@ import 'package:loon/persistor/file_persistor/extensions/future.dart';
 import 'package:loon/persistor/file_persistor/file_persistor_worker.dart';
 import 'package:path/path.dart' as path;
 
-final fileRegex = RegExp(r'^(?!__resolver__)(\w+)(?:.encrypted)?\.json$');
+final fileRegex = RegExp(
+  r'^(?!__resolver__)(?:__)?(\w+?)(?<!__)(?:__)?(?:.encrypted)?\.json$',
+);
 
 class DualFileDataStore {
   late final FileDataStore _plaintextStore;
@@ -156,6 +158,9 @@ class FileDataStore {
   /// The name of the file data store.
   final String name;
 
+  /// The file data store name suffix.
+  final String suffix;
+
   /// Whether the plaintext store has pending changes that should be persisted.
   bool isDirty = false;
 
@@ -168,12 +173,16 @@ class FileDataStore {
     required this.name,
     required Directory directory,
     this.isHydrated = false,
+    this.suffix = '',
   }) {
+    final fileName =
+        "${name == Collection.root.name ? '__root__' : name}$suffix";
+
     _logger = Logger(
       'FileDataStore:$name',
       output: FilePersistorWorker.logger.log,
     );
-    _file = File("${directory.path}/$name.json");
+    _file = File("${directory.path}/$fileName.json");
   }
 
   Future<String?> _readFile() {
@@ -320,11 +329,11 @@ class EncryptedFileDataStore extends FileDataStore {
   final Encrypter encrypter;
 
   EncryptedFileDataStore({
-    required String name,
+    required super.name,
     required super.directory,
     required this.encrypter,
     super.isHydrated = false,
-  }) : super(name: "$name.encrypted");
+  }) : super(suffix: '.encrypted');
 
   String _encrypt(String plainText) {
     final iv = IV.fromSecureRandom(16);
@@ -359,7 +368,7 @@ class EncryptedFileDataStore extends FileDataStore {
 class FileDataStoreResolver {
   late final File _file;
 
-  IndexedRefValueStore<String> store = IndexedRefValueStore<String>();
+  var store = IndexedRefValueStore<String>();
 
   static const name = '__resolver__';
 
@@ -381,7 +390,7 @@ class FileDataStoreResolver {
         'Hydrate',
         () async {
           final fileStr = await _file.readAsString();
-          store = IndexedRefValueStore(store: jsonDecode(fileStr));
+          store = IndexedRefValueStore(jsonDecode(fileStr));
         },
       );
     } catch (e) {

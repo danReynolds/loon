@@ -1184,15 +1184,15 @@ void main() {
     },
   );
 
-  group('Root document', () {
+  group('Root collection', () {
     tearDown(() {
       Loon.clearAll();
     });
 
     test('Has the expected paths', () {
-      expect(Document.root.path, 'ROOT');
-      expect(Loon.doc('1').path, 'ROOT__1');
-      expect(Loon.doc('1').subcollection('friends').path, 'ROOT__1__friends');
+      expect(Document.root.path, 'root');
+      expect(Loon.doc('1').path, 'root__1');
+      expect(Loon.doc('1').subcollection('friends').path, 'root__1__friends');
     });
 
     test('Writes documents successfully', () {
@@ -1204,7 +1204,7 @@ void main() {
       expect(
         Loon.inspect()['store'],
         {
-          "ROOT": {
+          "root": {
             "__values": {
               "1": DocumentSnapshot(
                 doc: rootDoc,
@@ -1225,7 +1225,7 @@ void main() {
       expect(
         Loon.inspect()['store'],
         {
-          "ROOT": {
+          "root": {
             "__values": {
               "1": DocumentSnapshot(
                 doc: rootDoc,

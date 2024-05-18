@@ -52,7 +52,7 @@ void main() {
     'persist',
     () {
       test(
-        'Persists new documents in their top-level collection by default',
+        'Persists new documents in the root data store by default',
         () async {
           final userCollection = Loon.collection(
             'users',
@@ -79,7 +79,7 @@ void main() {
 
           await completer.onPersist;
 
-          final file = File('${testDirectory.path}/loon/users.json');
+          final file = File('${testDirectory.path}/loon/__root__.json');
           final json = jsonDecode(file.readAsStringSync());
 
           expect(
@@ -101,21 +101,10 @@ void main() {
             },
           );
 
+          // The resolver is not necessary for data only persisted in the root data store.
           final resolverFile =
               File('${testDirectory.path}/loon/__resolver__.json');
-          final resolverJson = jsonDecode(resolverFile.readAsStringSync());
-
-          expect(
-            resolverJson,
-            {
-              "__values": {
-                "users": "users",
-              },
-              "__refs": {
-                "users": 1,
-              },
-            },
-          );
+          expect(resolverFile.existsSync(), false);
         },
       );
 
@@ -137,7 +126,7 @@ void main() {
 
           await completer.onPersist;
 
-          final file = File('${testDirectory.path}/loon/users.json');
+          final file = File('${testDirectory.path}/loon/__root__.json');
           final json = jsonDecode(file.readAsStringSync());
 
           expect(
@@ -149,22 +138,6 @@ void main() {
                   "2": {'name': 'User 2 updated'},
                 }
               }
-            },
-          );
-
-          final resolverFile =
-              File('${testDirectory.path}/loon/__resolver__.json');
-          final resolverJson = jsonDecode(resolverFile.readAsStringSync());
-
-          expect(
-            resolverJson,
-            {
-              "__values": {
-                "users": "users",
-              },
-              "__refs": {
-                "users": 1,
-              },
             },
           );
         },
@@ -188,7 +161,7 @@ void main() {
 
           await completer.onPersist;
 
-          final file = File('${testDirectory.path}/loon/users.json');
+          final file = File('${testDirectory.path}/loon/__root__.json');
           final json = jsonDecode(file.readAsStringSync());
 
           expect(
@@ -199,22 +172,6 @@ void main() {
                   "1": {"name": "User 1"}
                 },
               }
-            },
-          );
-
-          final resolverFile =
-              File('${testDirectory.path}/loon/__resolver__.json');
-          final resolverJson = jsonDecode(resolverFile.readAsStringSync());
-
-          expect(
-            resolverJson,
-            {
-              "__values": {
-                "users": "users",
-              },
-              "__refs": {
-                "users": 1,
-              },
             },
           );
         },
@@ -232,7 +189,7 @@ void main() {
           userCollection.doc('1').create(TestUserModel('User 1'));
           userCollection.doc('2').create(TestUserModel('User 2'));
 
-          final file = File('${testDirectory.path}/loon/users.json');
+          final file = File('${testDirectory.path}/loon/__root__.json');
 
           await completer.onPersist;
 
@@ -351,13 +308,13 @@ void main() {
 
           await completer.onPersist;
 
-          final usersFile = File('${testDirectory.path}/loon/users.json');
+          final rootFile = File('${testDirectory.path}/loon/__root__.json');
           final friendsFile = File('${testDirectory.path}/loon/friends.json');
-          final usersJson = jsonDecode(usersFile.readAsStringSync());
+          final rootJson = jsonDecode(rootFile.readAsStringSync());
           final friendsJson = jsonDecode(friendsFile.readAsStringSync());
 
           expect(
-            usersJson,
+            rootJson,
             {
               "users": {
                 "__values": {
@@ -390,12 +347,6 @@ void main() {
           expect(
             resolverJson,
             {
-              "__values": {
-                "users": "users",
-              },
-              "__refs": {
-                "users": 1,
-              },
               "users": {
                 "2": {
                   "__refs": {
@@ -425,7 +376,7 @@ void main() {
             '1. null -> document-level key',
             () {
               test(
-                'Moves the document and its subcollections in the default store to the store specified by its document-level key',
+                'Moves the document and its subcollections in root default store to the store specified by its document-level key',
                 () async {
                   final usersCollection = Loon.collection<TestUserModel>(
                     'users',
@@ -458,12 +409,12 @@ void main() {
 
                   await completer.onPersist;
 
-                  final usersFile =
-                      File('${testDirectory.path}/loon/users.json');
-                  var usersJson = jsonDecode(usersFile.readAsStringSync());
+                  final rootFile =
+                      File('${testDirectory.path}/loon/__root__.json');
+                  var rootJson = jsonDecode(rootFile.readAsStringSync());
 
                   expect(
-                    usersJson,
+                    rootJson,
                     {
                       "users": {
                         "__values": {
@@ -483,20 +434,7 @@ void main() {
 
                   final resolverFile =
                       File('${testDirectory.path}/loon/__resolver__.json');
-                  var resolverJson =
-                      jsonDecode(resolverFile.readAsStringSync());
-
-                  expect(
-                    resolverJson,
-                    {
-                      "__refs": {
-                        "users": 1,
-                      },
-                      "__values": {
-                        "users": "users",
-                      },
-                    },
-                  );
+                  expect(resolverFile.existsSync(), false);
 
                   updatedUsersCollection
                       .doc('1')
@@ -504,9 +442,9 @@ void main() {
 
                   await completer.onPersist;
 
-                  usersJson = jsonDecode(usersFile.readAsStringSync());
+                  rootJson = jsonDecode(rootFile.readAsStringSync());
                   expect(
-                    usersJson,
+                    rootJson,
                     {
                       "users": {
                         "__values": {
@@ -538,16 +476,11 @@ void main() {
                     },
                   );
 
-                  resolverJson = jsonDecode(resolverFile.readAsStringSync());
+                  var resolverJson =
+                      jsonDecode(resolverFile.readAsStringSync());
                   expect(
                     resolverJson,
                     {
-                      "__refs": {
-                        "users": 1,
-                      },
-                      "__values": {
-                        "users": "users",
-                      },
                       "users": {
                         "__refs": {
                           "users_1": 1,
@@ -598,12 +531,12 @@ void main() {
 
                   await completer.onPersist;
 
-                  final usersFile =
-                      File('${testDirectory.path}/loon/users.json');
-                  var usersJson = jsonDecode(usersFile.readAsStringSync());
+                  final rootFile =
+                      File('${testDirectory.path}/loon/__root__.json');
+                  var rootJson = jsonDecode(rootFile.readAsStringSync());
 
                   expect(
-                    usersJson,
+                    rootJson,
                     {
                       "users": {
                         "__values": {
@@ -623,28 +556,13 @@ void main() {
 
                   final resolverFile =
                       File('${testDirectory.path}/loon/__resolver__.json');
-                  var resolverJson =
-                      jsonDecode(resolverFile.readAsStringSync());
-
-                  expect(
-                    resolverJson,
-                    {
-                      "__refs": {
-                        "users": 1,
-                      },
-                      "__values": {
-                        "users": "users",
-                      },
-                    },
-                  );
+                  expect(resolverFile.existsSync(), false);
 
                   updatedUsersCollection
                       .doc('1')
                       .update(TestUserModel('User 1 updated'));
 
                   await completer.onPersist;
-
-                  expect(usersFile.existsSync(), false);
 
                   final otherUsersFile =
                       File('${testDirectory.path}/loon/other_users.json');
@@ -670,7 +588,8 @@ void main() {
                     },
                   );
 
-                  resolverJson = jsonDecode(resolverFile.readAsStringSync());
+                  var resolverJson =
+                      jsonDecode(resolverFile.readAsStringSync());
                   expect(
                     resolverJson,
                     {
@@ -691,7 +610,7 @@ void main() {
             '3. document-level key -> null',
             () {
               test(
-                'Moves the document and its subcollections in the previous document store to the default store',
+                'Moves the document and its subcollections in the previous document store to the root store',
                 () async {
                   final documentKeyUsersCollection =
                       Loon.collection<TestUserModel>(
@@ -792,12 +711,12 @@ void main() {
 
                   await completer.onPersist;
 
-                  final usersFile =
-                      File('${testDirectory.path}/loon/users.json');
-                  var usersJson = jsonDecode(usersFile.readAsStringSync());
+                  final rootFile =
+                      File('${testDirectory.path}/loon/__root__.json');
+                  var rootJson = jsonDecode(rootFile.readAsStringSync());
 
                   expect(
-                    usersJson,
+                    rootJson,
                     {
                       "users": {
                         "__values": {
@@ -832,12 +751,6 @@ void main() {
                   expect(
                     resolverJson,
                     {
-                      "__refs": {
-                        "users": 1,
-                      },
-                      "__values": {
-                        "users": "users",
-                      },
                       "users": {
                         "__refs": {
                           "users_2": 1,
@@ -1034,11 +947,11 @@ void main() {
 
                   await completer.onPersist;
 
-                  final usersFile =
-                      File('${testDirectory.path}/loon/users.json');
-                  var usersJson = jsonDecode(usersFile.readAsStringSync());
+                  final rootFile =
+                      File('${testDirectory.path}/loon/__root__.json');
+                  var rootJson = jsonDecode(rootFile.readAsStringSync());
 
-                  expect(usersJson, {
+                  expect(rootJson, {
                     "users": {
                       "__values": {
                         "3": {"name": "User 3"},
@@ -1091,12 +1004,6 @@ void main() {
                   expect(
                     resolverJson,
                     {
-                      "__refs": {
-                        "users": 1,
-                      },
-                      "__values": {
-                        "users": "users",
-                      },
                       "users": {
                         "__refs": {
                           "users_1": 1,
@@ -1140,7 +1047,7 @@ void main() {
                     },
                   );
 
-                  expect(usersFile.existsSync(), false);
+                  expect(rootFile.existsSync(), false);
                   expect(users1File.existsSync(), false);
 
                   users2Json = jsonDecode(users2File.readAsStringSync());
@@ -1293,33 +1200,54 @@ void main() {
 
           await completer.onPersist;
 
-          final file = File('${testDirectory.path}/loon/ROOT.json');
+          final file = File('${testDirectory.path}/loon/__root__.json');
           final json = jsonDecode(file.readAsStringSync());
 
           expect(
             json,
             {
-              "ROOT": {
+              "root": {
                 "__values": {
                   "current_user": {'name': 'Dan'},
                 },
               }
             },
           );
+        },
+      );
 
-          final resolverFile =
-              File('${testDirectory.path}/loon/__resolver__.json');
-          final resolverJson = jsonDecode(resolverFile.readAsStringSync());
+      test(
+        'Collections that disable persistence are not persisted',
+        () async {
+          final usersCollection = Loon.collection(
+            'users',
+            fromJson: TestUserModel.fromJson,
+            toJson: (user) => user.toJson(),
+          );
+
+          final friendsCollection = Loon.collection(
+            'friends',
+            fromJson: TestUserModel.fromJson,
+            toJson: (user) => user.toJson(),
+            persistorSettings: const FilePersistorSettings(enabled: false),
+          );
+
+          usersCollection.doc('1').create(TestUserModel('User 1'));
+          friendsCollection.doc('1').create(TestUserModel('Friend 1'));
+
+          await completer.onPersist;
+
+          final file = File('${testDirectory.path}/loon/__root__.json');
+          final json = jsonDecode(file.readAsStringSync());
 
           expect(
-            resolverJson,
+            json,
             {
-              "__refs": {
-                "ROOT": 1,
-              },
-              "__values": {
-                "ROOT": "ROOT",
-              },
+              "users": {
+                "__values": {
+                  "1": {'name': 'User 1'},
+                },
+              }
             },
           );
         },
@@ -1359,22 +1287,16 @@ void main() {
 
       await completer.onPersist;
 
-      final usersFile = File('${testDirectory.path}/loon/users.json');
-      final usersJson = jsonDecode(usersFile.readAsStringSync());
+      final rootFile = File('${testDirectory.path}/loon/__root__.json');
+      final rootJson = jsonDecode(rootFile.readAsStringSync());
 
-      expect(usersJson, {
+      expect(rootJson, {
         "users": {
           "__values": {
             "1": {"name": "User 1"},
             "2": {"name": "User 2"},
           }
-        }
-      });
-
-      final friendsFile = File('${testDirectory.path}/loon/friends.json');
-      final friendsJson = jsonDecode(friendsFile.readAsStringSync());
-
-      expect(friendsJson, {
+        },
         "friends": {
           "__values": {
             "1": {"name": "Friend 1"},
@@ -1402,14 +1324,6 @@ void main() {
       final resolverJson = jsonDecode(resolverFile.readAsStringSync());
 
       expect(resolverJson, {
-        "__refs": {
-          "users": 1,
-          "friends": 1,
-        },
-        "__values": {
-          "users": "users",
-          "friends": "friends",
-        },
         "users": {
           "1": {
             "__refs": {
@@ -1424,14 +1338,12 @@ void main() {
 
       await Loon.clearAll();
 
-      expect(usersFile.existsSync(), false);
-      expect(friendsFile.existsSync(), false);
+      expect(rootFile.existsSync(), false);
       expect(myFriendsFile.existsSync(), false);
       expect(resolverFile.existsSync(), false);
 
-      usersFile.writeAsStringSync(jsonEncode(usersJson));
+      rootFile.writeAsStringSync(jsonEncode(rootJson));
       myFriendsFile.writeAsStringSync(jsonEncode(myFriendsJson));
-      friendsFile.writeAsStringSync(jsonEncode(friendsJson));
 
       // After clearing the data and reinitializing it from disk to verify with hydration,
       // the persistor needs to be re-created so that it re-reads all data stores from disk.
@@ -1492,7 +1404,7 @@ void main() {
                   fromJson: TestUserModel.fromJson,
                   toJson: (user) => user.toJson(),
                   persistorSettings: FilePersistorSettings(
-                    key: FilePersistor.key('friends'),
+                    key: FilePersistor.key('user_friends'),
                   ),
                 );
 
@@ -1506,28 +1418,29 @@ void main() {
 
         await completer.onPersist;
 
-        final usersFile = File('${testDirectory.path}/loon/users.json');
-        final usersJson = jsonDecode(usersFile.readAsStringSync());
+        final rootFile = File('${testDirectory.path}/loon/__root__.json');
+        final rootJson = jsonDecode(rootFile.readAsStringSync());
 
-        expect(usersJson, {
+        expect(rootJson, {
           "users": {
             "__values": {
               "1": {"name": "User 1"},
               "2": {"name": "User 2"},
             }
-          }
-        });
-
-        final friendsFile = File('${testDirectory.path}/loon/friends.json');
-        final friendsJson = jsonDecode(friendsFile.readAsStringSync());
-
-        expect(friendsJson, {
+          },
           "friends": {
             "__values": {
               "1": {"name": "Friend 1"},
               "2": {"name": "Friend 2"},
             },
           },
+        });
+
+        final userFriendsFile =
+            File('${testDirectory.path}/loon/user_friends.json');
+        final userFriendsJson = jsonDecode(userFriendsFile.readAsStringSync());
+
+        expect(userFriendsJson, {
           "users": {
             "1": {
               "friends": {
@@ -1544,21 +1457,13 @@ void main() {
         final resolverJson = jsonDecode(resolverFile.readAsStringSync());
 
         expect(resolverJson, {
-          "__refs": {
-            "users": 1,
-            "friends": 1,
-          },
-          "__values": {
-            "users": "users",
-            "friends": "friends",
-          },
           "users": {
             "1": {
               "__refs": {
-                "friends": 1,
+                "user_friends": 1,
               },
               "__values": {
-                "friends": "friends",
+                "friends": "user_friends",
               }
             }
           }
@@ -1566,8 +1471,8 @@ void main() {
 
         await Loon.clearAll();
 
-        usersFile.writeAsStringSync(jsonEncode(usersJson));
-        friendsFile.writeAsStringSync(jsonEncode(friendsJson));
+        rootFile.writeAsStringSync(jsonEncode(rootJson));
+        userFriendsFile.writeAsStringSync(jsonEncode(userFriendsJson));
         resolverFile.writeAsStringSync(jsonEncode(resolverJson));
 
         // After clearing the data and reinitializing it from disk to verify with hydration,
@@ -1580,8 +1485,8 @@ void main() {
         // The `friends` collection should remain empty, while `users` and `users__1__friends`
         // should have been hydrated from persistence.
         //
-        // Note that while the `friends` data store contains the data for both the `friends` collection
-        // as well a the `users__1__friends` data, only the data in the store under the `users` path should
+        // Note that while the `__root__` data store contains the data for both the `users` collection
+        // as well as the `friends` data, only the data in the store under the `users` path should
         // be extracted from the data store and delivered in the hydration response.
 
         expect(
@@ -1677,7 +1582,7 @@ void main() {
     });
 
     test(
-      "Hydrates data into the root collection",
+      "Hydrates root documents into the root collection",
       () async {
         final currentUserDoc = Loon.doc(
           'current_user',
@@ -1689,33 +1594,17 @@ void main() {
 
         await completer.onPersist;
 
-        final file = File('${testDirectory.path}/loon/ROOT.json');
+        final file = File('${testDirectory.path}/loon/__root__.json');
         final json = jsonDecode(file.readAsStringSync());
 
         expect(
           json,
           {
-            "ROOT": {
+            "root": {
               "__values": {
                 "current_user": {'name': 'Dan'},
               },
             }
-          },
-        );
-
-        final resolverFile =
-            File('${testDirectory.path}/loon/__resolver__.json');
-        final resolverJson = jsonDecode(resolverFile.readAsStringSync());
-
-        expect(
-          resolverJson,
-          {
-            "__refs": {
-              "ROOT": 1,
-            },
-            "__values": {
-              "ROOT": "ROOT",
-            },
           },
         );
 
@@ -1749,7 +1638,7 @@ void main() {
           userCollection.doc('1').create(TestUserModel('User 1'));
           userCollection.doc('2').create(TestUserModel('User 2'));
 
-          final file = File('${testDirectory.path}/loon/users.json');
+          final file = File('${testDirectory.path}/loon/__root__.json');
 
           await completer.onPersist;
 
@@ -1822,19 +1711,19 @@ void main() {
           userCollection.doc('2').create(TestUserModel('User 2'));
           friendsCollection.doc('1').create(TestUserModel('Friend 1'));
 
-          final userFile = File('${testDirectory.path}/loon/users.json');
+          final rootFile = File('${testDirectory.path}/loon/__root__.json');
           final friendsFile = File('${testDirectory.path}/loon/friends.json');
 
           await completer.onPersist;
 
-          expect(userFile.existsSync(), true);
+          expect(rootFile.existsSync(), true);
           expect(friendsFile.existsSync(), true);
 
           userCollection.delete();
 
           await completer.onClear;
 
-          expect(userFile.existsSync(), false);
+          expect(rootFile.existsSync(), false);
           expect(friendsFile.existsSync(), false);
         },
       );
@@ -1842,23 +1731,17 @@ void main() {
       // In this scenario, multiple collections share a file data store and therefore
       // the file should not be deleted since it still has documents from another collection.
       test(
-        'Retains data stores that share collections',
+        'Retains data stores that still contain other collections',
         () async {
           final userCollection = Loon.collection(
             'users',
             fromJson: TestUserModel.fromJson,
             toJson: (user) => user.toJson(),
-            persistorSettings: FilePersistorSettings(
-              key: FilePersistor.key('shared'),
-            ),
           );
           final friendsCollection = Loon.collection<TestUserModel>(
             'friends',
             fromJson: TestUserModel.fromJson,
             toJson: (user) => user.toJson(),
-            persistorSettings: FilePersistorSettings(
-              key: FilePersistor.key('shared'),
-            ),
           );
 
           userCollection.doc('1').create(TestUserModel('User 1'));
@@ -1866,7 +1749,7 @@ void main() {
           friendsCollection.doc('1').create(TestUserModel('Friend 1'));
           friendsCollection.doc('2').create(TestUserModel('Friend 2'));
 
-          final file = File('${testDirectory.path}/loon/shared.json');
+          final file = File('${testDirectory.path}/loon/__root__.json');
 
           await completer.onPersist;
 
@@ -1920,6 +1803,9 @@ void main() {
             'users',
             fromJson: TestUserModel.fromJson,
             toJson: (user) => user.toJson(),
+            persistorSettings: FilePersistorSettings(
+              key: FilePersistor.key('users'),
+            ),
           );
 
           userCollection.doc('1').create(TestUserModel('User 1'));

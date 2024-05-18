@@ -24,10 +24,16 @@ class FileDataStoreManager {
     required this.encrypter,
   });
 
-  /// Resolves the set of [FileDataStore] that contain the under and including the given path.
-  Set<DualFileDataStore> _resolve(String path) {
+  /// Resolves the data store name for the given path as the nearest value found working up from
+  /// the full path, defaulting to the root collection.
+  String _resolveStoreName(String path) {
+    return _resolver.store.getNearest(path) ?? Collection.root.name;
+  }
+
+  /// Resolves the set of [FileDataStore] that exist under and at the given path.
+  Set<DualFileDataStore> _resolveStores(String path) {
     // Resolve the store for the document path itself separately.
-    final store = _index[_resolver.store.getNearest(path)];
+    final store = _index[_resolveStoreName(path)];
 
     return {
       if (store != null) store,
@@ -42,32 +48,6 @@ class FileDataStoreManager {
           .map((name) => _index[name]!)
           .toSet(),
     };
-  }
-
-  /// Returns the name of the data store that the given document path resolves to.
-  String _resolveDataStoreName(
-    String docPath,
-    FilePersistorKey? key,
-  ) {
-    // If a persistence key is specified, then return the data store determined by that key.
-    if (key != null) {
-      return key.value;
-    }
-
-    // If the document does not specify a persistence key, then its data store is resolved to the nearest data store
-    // found in the document index moving up from its path. If no data store exists in this path yet, then the
-    // it defaults to using one named after the document's top-level collection.
-    final nearestDataStoreName = _resolver.store.getNearest(docPath);
-    if (nearestDataStoreName != null) {
-      return nearestDataStoreName;
-    }
-
-    final dataStoreName = docPath.split('__').first;
-
-    // Write the new top-level data store name into the resolver tree.
-    _resolver.store.write(dataStoreName, dataStoreName);
-
-    return dataStoreName;
   }
 
   /// Syncs all file data stores, persisting dirty ones and deleting ones that can now be removed.
@@ -94,7 +74,7 @@ class FileDataStoreManager {
   /// Clears the provided path and all of its subpaths from each data store that contains
   /// data under that path.
   Future<void> _clear(String path) async {
-    final stores = _resolve(path);
+    final stores = _resolveStores(path);
 
     await Future.wait(stores.map((store) => store.deletePath(path)));
 
@@ -136,7 +116,7 @@ class FileDataStoreManager {
     // relevant to the given paths and their subpaths and hydrate those data stores.
     if (paths != null) {
       for (final path in paths) {
-        final stores = _resolve(path);
+        final stores = _resolveStores(path);
         pathDataStores[path] = stores;
         dataStores.addAll(stores);
       }
@@ -196,7 +176,8 @@ class FileDataStoreManager {
         continue;
       }
 
-      final prevDataStore = _index[_resolver.store.getNearest(docPath)];
+      final prevDataStoreName = _resolveStoreName(docPath);
+      final prevDataStore = _index[prevDataStoreName];
 
       // If the persistence key for the document is now null, then remove the previous
       // key for the document (if it exists) ahead of resolving its data store name.
@@ -204,7 +185,7 @@ class FileDataStoreManager {
         _resolver.store.delete(docPath, recursive: false);
       }
 
-      final dataStoreName = _resolveDataStoreName(docPath, persistenceKey);
+      final dataStoreName = persistenceKey?.value ?? _resolveStoreName(docPath);
       final dataStore = _index[dataStoreName] ??= DualFileDataStore(
         name: dataStoreName,
         encrypter: encrypter,
@@ -233,8 +214,7 @@ class FileDataStoreManager {
 
           // If the resolved data store for the document's collection has changed, then its data
           // should be grafted from its previous data store to the updated one.
-          final collectionDataStore =
-              _index[_resolver.store.getNearest(collectionPath)];
+          final collectionDataStore = _index[_resolveStoreName(collectionPath)];
           if (collectionDataStore != dataStore) {
             _resolver.store.write(collectionPath, dataStoreName);
 

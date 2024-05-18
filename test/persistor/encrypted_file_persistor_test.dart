@@ -73,10 +73,10 @@ void main() {
 
       await completer.onPersist;
 
-      final usersFile = File('${testDirectory.path}/loon/users.json');
-      final usersJson = jsonDecode(usersFile.readAsStringSync());
+      final rootFile = File('${testDirectory.path}/loon/__root__.json');
+      final rootJson = jsonDecode(rootFile.readAsStringSync());
 
-      expect(usersJson, {
+      expect(rootJson, {
         "users": {
           "__values": {
             '1': {'name': 'User 1'},
@@ -84,34 +84,19 @@ void main() {
         },
       });
 
-      final encryptedUsersFile =
-          File('${testDirectory.path}/loon/users.encrypted.json');
-      final encryptedUsersJson = jsonDecode(
-        persistor.decrypt(encryptedUsersFile.readAsStringSync()),
+      final encryptedRootFile =
+          File('${testDirectory.path}/loon/__root__.encrypted.json');
+      final encryptedRootJson = jsonDecode(
+        persistor.decrypt(encryptedRootFile.readAsStringSync()),
       );
 
-      expect(encryptedUsersJson, {
+      expect(encryptedRootJson, {
         "users": {
           "__values": {
             '2': {'name': 'User 2'},
           },
         },
       });
-
-      final resolverFile = File('${testDirectory.path}/loon/__resolver__.json');
-      final resolverJson = jsonDecode(resolverFile.readAsStringSync());
-
-      expect(
-        resolverJson,
-        {
-          "__refs": {
-            "users": 1,
-          },
-          "__values": {
-            "users": "users",
-          }
-        },
-      );
 
       // Reinitialize the persistor ahead of hydration.
       Loon.configure(
@@ -162,7 +147,7 @@ void main() {
 
       await completer.onPersist;
 
-      final file = File('${testDirectory.path}/loon/users.encrypted.json');
+      final file = File('${testDirectory.path}/loon/__root__.encrypted.json');
       final json = decryptData(file.readAsStringSync());
 
       expect(
@@ -204,11 +189,11 @@ void main() {
 
       await completer.onPersist;
 
-      final friendsFile = File('${testDirectory.path}/loon/friends.json');
-      final friendsJson = jsonDecode(friendsFile.readAsStringSync());
+      final rootFile = File('${testDirectory.path}/loon/__root__.json');
+      final rootJson = jsonDecode(rootFile.readAsStringSync());
 
       expect(
-        friendsJson,
+        rootJson,
         {
           "friends": {
             "__values": {
@@ -218,7 +203,8 @@ void main() {
         },
       );
 
-      final usersFile = File('${testDirectory.path}/loon/users.encrypted.json');
+      final usersFile =
+          File('${testDirectory.path}/loon/__root__.encrypted.json');
       final usersJson = decryptData(usersFile.readAsStringSync());
 
       expect(
@@ -243,7 +229,7 @@ void main() {
       ),
     );
 
-    final usersCollection = Loon.collection(
+    final usersCollection = Loon.collection<TestUserModel>(
       'users',
       fromJson: TestUserModel.fromJson,
       toJson: (user) => user.toJson(),
@@ -255,7 +241,7 @@ void main() {
 
     await completer.onPersist;
 
-    final file = File('${testDirectory.path}/loon/users.json');
+    final file = File('${testDirectory.path}/loon/__root__.json');
     final json = jsonDecode(file.readAsStringSync());
 
     expect(
@@ -271,23 +257,8 @@ void main() {
     );
 
     final encryptedFile =
-        File('${testDirectory.path}/loon/users.encrypted.json');
+        File('${testDirectory.path}/loon/__root__.encrypted.json');
     expect(encryptedFile.existsSync(), false);
-
-    final resolverFile = File('${testDirectory.path}/loon/__resolver__.json');
-    final resolverJson = jsonDecode(resolverFile.readAsStringSync());
-
-    expect(
-      resolverJson,
-      {
-        "__refs": {
-          "users": 1,
-        },
-        "__values": {
-          "users": "users",
-        }
-      },
-    );
   });
 
 // This scenario takes a bit of a description. In the situation where a file for a collection is unencrypted,
@@ -309,11 +280,11 @@ void main() {
 
     await completer.onPersist;
 
-    final usersFile = File('${testDirectory.path}/loon/users.json');
-    var usersJson = jsonDecode(usersFile.readAsStringSync());
+    final rootFile = File('${testDirectory.path}/loon/__root__.json');
+    var rootJson = jsonDecode(rootFile.readAsStringSync());
 
     expect(
-      usersJson,
+      rootJson,
       {
         "users": {
           "__values": {
@@ -321,21 +292,6 @@ void main() {
             "2": {"name": "User 2"},
           }
         }
-      },
-    );
-
-    final resolverFile = File('${testDirectory.path}/loon/__resolver__.json');
-    final resolverJson = jsonDecode(resolverFile.readAsStringSync());
-
-    expect(
-      resolverJson,
-      {
-        "__refs": {
-          "users": 1,
-        },
-        "__values": {
-          "users": "users",
-        },
       },
     );
 
@@ -365,14 +321,14 @@ void main() {
 
     await completer.onPersist;
 
-    final encryptedFile =
-        File('${testDirectory.path}/loon/users.encrypted.json');
-    final json = decryptData(encryptedFile.readAsStringSync());
+    final encryptedRootFile =
+        File('${testDirectory.path}/loon/__root__.encrypted.json');
+    var encryptedRootJson = decryptData(encryptedRootFile.readAsStringSync());
 
-    // The new user should have been written to an encrypted file, since the persistor was configured with encryption
+    // The new user should have been written to an encrypted root file, since the persistor was configured with encryption
     // enabled globally.
     expect(
-      json,
+      encryptedRootJson,
       {
         "users": {
           "__values": {
@@ -383,9 +339,9 @@ void main() {
     );
 
     // The existing hydrated data should still be unencrypted, as the documents are not moved until they are updated.
-    usersJson = jsonDecode(usersFile.readAsStringSync());
+    rootJson = jsonDecode(rootFile.readAsStringSync());
     expect(
-      usersJson,
+      rootJson,
       {
         "users": {
           "__values": {
@@ -401,11 +357,11 @@ void main() {
 
     await completer.onPersist;
 
-    // The documents should now have been updated to exist in the encrypted users file.
-    final encryptedUsersJson = decryptData(encryptedFile.readAsStringSync());
+    // The documents should now have been updated to exist in the encrypted root file.
+    encryptedRootJson = decryptData(encryptedRootFile.readAsStringSync());
 
     expect(
-      encryptedUsersJson,
+      encryptedRootJson,
       {
         "users": {
           "__values": {
@@ -417,7 +373,7 @@ void main() {
       },
     );
 
-    // The now empty plaintext users file should have been deleted.
-    expect(usersFile.existsSync(), false);
+    // The now empty plaintext root file should have been deleted.
+    expect(rootFile.existsSync(), false);
   });
 }

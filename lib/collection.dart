@@ -1,5 +1,7 @@
 part of loon;
 
+const _rootKey = 'root';
+
 class Collection<T> implements Queryable<T>, StoreReference {
   final String parent;
   final String name;
@@ -10,6 +12,8 @@ class Collection<T> implements Queryable<T>, StoreReference {
   /// Returns the set of documents that the document associated with the given
   /// [DocumentSnapshot] is dependent on.
   final DependenciesBuilder<T>? dependenciesBuilder;
+
+  static final root = Collection('', _rootKey);
 
   Collection(
     this.parent,
@@ -22,7 +26,7 @@ class Collection<T> implements Queryable<T>, StoreReference {
 
   @override
   String get path {
-    if (parent == _rootKey) {
+    if (parent.isEmpty || parent == _rootKey) {
       return name;
     }
     return "${parent}__$name";
