@@ -153,6 +153,7 @@ class Document<T> implements StoreReference {
 
   ObservableDocument<T> observe({
     bool multicast = false,
+    bool sync = false,
   }) {
     return ObservableDocument<T>(
       parent,
@@ -162,6 +163,7 @@ class Document<T> implements StoreReference {
       persistorSettings: persistorSettings,
       multicast: multicast,
       dependenciesBuilder: dependenciesBuilder,
+      sync: sync,
     );
   }
 

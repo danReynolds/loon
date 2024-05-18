@@ -10,11 +10,9 @@ class ObservableDocument<T> extends Document<T>
     super.persistorSettings,
     super.dependenciesBuilder,
     required bool multicast,
+    required bool sync,
   }) {
-    init(
-      super.get(),
-      multicast: multicast,
-    );
+    init(super.get(), multicast: multicast, sync: sync);
   }
 
   /// On broadcast, the [ObservableDocument] examines the broadcast events that have occurred
@@ -52,7 +50,10 @@ class ObservableDocument<T> extends Document<T>
   }
 
   @override
-  ObservableDocument<T> observe({bool multicast = false}) {
+  ObservableDocument<T> observe({
+    bool multicast = false,
+    bool sync = false,
+  }) {
     return this;
   }
 }

@@ -15,13 +15,14 @@ class ObservableQuery<T> extends Query<T>
     required super.filters,
     required super.sort,
     required bool multicast,
+    required bool sync,
   }) {
     final snaps = super.get();
     for (final snap in snaps) {
       _updateIndex(snap);
     }
 
-    init(snaps, multicast: multicast);
+    init(snaps, multicast: multicast, sync: sync);
   }
 
   /// Update the doc in the snapshot and dependency indices.
@@ -263,7 +264,7 @@ class ObservableQuery<T> extends Query<T>
   }
 
   @override
-  ObservableQuery<T> observe({bool multicast = false}) {
+  ObservableQuery<T> observe({bool multicast = false, bool sync = false,}) {
     return this;
   }
 

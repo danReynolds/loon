@@ -46,12 +46,14 @@ class Query<T> extends Queryable<T> {
 
   ObservableQuery<T> observe({
     bool multicast = false,
+    bool sync = false,
   }) {
     return ObservableQuery<T>(
       collection,
       filters: filters,
       sort: sort,
       multicast: multicast,
+      sync: sync,
     );
   }
 
