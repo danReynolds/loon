@@ -73,7 +73,7 @@ void main() {
 
       await completer.onPersist;
 
-      final rootFile = File('${testDirectory.path}/loon/__root__.json');
+      final rootFile = File('${testDirectory.path}/loon/__store__.json');
       final rootJson = jsonDecode(rootFile.readAsStringSync());
 
       expect(rootJson, {
@@ -85,7 +85,7 @@ void main() {
       });
 
       final encryptedRootFile =
-          File('${testDirectory.path}/loon/__root__.encrypted.json');
+          File('${testDirectory.path}/loon/__store__.encrypted.json');
       final encryptedRootJson = jsonDecode(
         persistor.decrypt(encryptedRootFile.readAsStringSync()),
       );
@@ -147,7 +147,7 @@ void main() {
 
       await completer.onPersist;
 
-      final file = File('${testDirectory.path}/loon/__root__.encrypted.json');
+      final file = File('${testDirectory.path}/loon/__store__.encrypted.json');
       final json = decryptData(file.readAsStringSync());
 
       expect(
@@ -189,7 +189,7 @@ void main() {
 
       await completer.onPersist;
 
-      final rootFile = File('${testDirectory.path}/loon/__root__.json');
+      final rootFile = File('${testDirectory.path}/loon/__store__.json');
       final rootJson = jsonDecode(rootFile.readAsStringSync());
 
       expect(
@@ -204,7 +204,7 @@ void main() {
       );
 
       final usersFile =
-          File('${testDirectory.path}/loon/__root__.encrypted.json');
+          File('${testDirectory.path}/loon/__store__.encrypted.json');
       final usersJson = decryptData(usersFile.readAsStringSync());
 
       expect(
@@ -241,7 +241,7 @@ void main() {
 
     await completer.onPersist;
 
-    final file = File('${testDirectory.path}/loon/__root__.json');
+    final file = File('${testDirectory.path}/loon/__store__.json');
     final json = jsonDecode(file.readAsStringSync());
 
     expect(
@@ -257,7 +257,7 @@ void main() {
     );
 
     final encryptedFile =
-        File('${testDirectory.path}/loon/__root__.encrypted.json');
+        File('${testDirectory.path}/loon/__store__.encrypted.json');
     expect(encryptedFile.existsSync(), false);
   });
 
@@ -280,7 +280,7 @@ void main() {
 
     await completer.onPersist;
 
-    final rootFile = File('${testDirectory.path}/loon/__root__.json');
+    final rootFile = File('${testDirectory.path}/loon/__store__.json');
     var rootJson = jsonDecode(rootFile.readAsStringSync());
 
     expect(
@@ -322,7 +322,7 @@ void main() {
     await completer.onPersist;
 
     final encryptedRootFile =
-        File('${testDirectory.path}/loon/__root__.encrypted.json');
+        File('${testDirectory.path}/loon/__store__.encrypted.json');
     var encryptedRootJson = decryptData(encryptedRootFile.readAsStringSync());
 
     // The new user should have been written to an encrypted root file, since the persistor was configured with encryption

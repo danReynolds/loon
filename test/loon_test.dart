@@ -16,7 +16,28 @@ void main() {
     });
 
     test(
-      'User document created successfully',
+      'Creates primitive documents',
+      () {
+        final usersCollection = Loon.collection('users');
+        final userDoc = usersCollection.doc('1');
+
+        userDoc.create('Test');
+
+        expect(
+          Loon.inspect()['store'],
+          {
+            "users": {
+              "__values": {
+                "1": DocumentSnapshot(doc: userDoc, data: 'Test'),
+              }
+            }
+          },
+        );
+      },
+    );
+
+    test(
+      'Creates serializable documents',
       () {
         final user = TestUserModel('User 1');
         final userDoc = TestUserModel.store.doc('1');
@@ -39,7 +60,7 @@ void main() {
       },
     );
 
-    test('JSON user document created successfully', () {
+    test('Creates JSON documents successfully', () {
       final userCollection = Loon.collection('users');
       final userDoc = userCollection.doc('2');
       final userJson = {
@@ -63,7 +84,7 @@ void main() {
       );
     });
 
-    test('Persisted instance document added without serializer throws error',
+    test('Creating persisted documents without a serializer throws an error',
         () {
       expect(
         () => Loon.collection(
@@ -74,7 +95,7 @@ void main() {
       );
     });
 
-    test('Duplicate user document created fails', () {
+    test('Creating duplicate documents throws an error', () {
       final user = TestUserModel('User 1');
       final userDoc = TestUserModel.store.doc('1');
 
@@ -131,7 +152,29 @@ void main() {
       Loon.clearAll();
     });
 
-    test('Deserialized document updated successfully', () {
+    test(
+      'Updates primitive documents',
+      () {
+        final usersCollection = Loon.collection('users');
+        final userDoc = usersCollection.doc('1');
+
+        userDoc.create('Test');
+        userDoc.update('Test updated');
+
+        expect(
+          Loon.inspect()['store'],
+          {
+            "users": {
+              "__values": {
+                "1": DocumentSnapshot(doc: userDoc, data: 'Test updated'),
+              }
+            }
+          },
+        );
+      },
+    );
+
+    test('Creates serializable documents', () {
       final updatedUser = TestUserModel('User 1 updated');
       final userDoc = TestUserModel.store.doc('1');
 
@@ -147,7 +190,7 @@ void main() {
       );
     });
 
-    test('JSON document updated successfully', () {
+    test('Creates JSON documents', () {
       final userCollection = Loon.collection('users');
       final userDoc = userCollection.doc('2');
       final userJson = {
@@ -179,8 +222,7 @@ void main() {
       );
     });
 
-    test('Persisted instance document updated without serializer throws error',
-        () {
+    test('Updating a persisted document without a serializer throws error', () {
       expect(
         () => Loon.collection(
           'users',
@@ -267,7 +309,23 @@ void main() {
       Loon.clearAll();
     });
 
-    test('Document deleted successfully', () {
+    test(
+      'Deletes primitive documents',
+      () {
+        final usersCollection = Loon.collection('users');
+        final userDoc = usersCollection.doc('1');
+
+        userDoc.create('Test');
+        userDoc.delete();
+
+        expect(
+          Loon.inspect()['store'],
+          {},
+        );
+      },
+    );
+
+    test('Deletes serializable documents', () {
       final user = TestUserModel('User 1');
       final userDoc = TestUserModel.store.doc('1');
 
@@ -1189,34 +1247,26 @@ void main() {
       Loon.clearAll();
     });
 
-    test('Has the expected paths', () {
-      expect(Document.root.path, 'root');
-      expect(Loon.doc('1').path, 'root__1');
-      expect(Loon.doc('1').subcollection('friends').path, 'root__1__friends');
-    });
+    test('Writes documents', () {
+      final rootDoc1 = Loon.doc('1');
+      final rootSubcollection = rootDoc1.subcollection('friends');
+      final rootSubcollectionDoc = rootSubcollection.doc('1');
 
-    test('Writes documents successfully', () {
-      final data = {"test": true};
-      final rootDoc = Loon.doc('1');
+      expect(rootDoc1.path, 'root__1');
+      expect(rootSubcollection.path, 'root__1__friends');
+      expect(rootSubcollectionDoc.path, 'root__1__friends__1');
 
-      rootDoc.create(data);
+      rootDoc1.create('Test');
+      rootSubcollectionDoc.create('Test 2');
 
+      expect(rootDoc1.get(), DocumentSnapshot(doc: rootDoc1, data: 'Test'));
       expect(
-        Loon.inspect()['store'],
-        {
-          "root": {
-            "__values": {
-              "1": DocumentSnapshot(
-                doc: rootDoc,
-                data: data,
-              ),
-            }
-          }
-        },
+        rootSubcollectionDoc.get(),
+        DocumentSnapshot(doc: rootSubcollectionDoc, data: 'Test 2'),
       );
     });
 
-    test('Can be deleted successfully', () {
+    test('Deletes documents', () {
       final data = {"test": true};
       final rootDoc = Loon.doc('1');
 

@@ -43,7 +43,7 @@ class Document<T> implements StoreReference {
   }
 
   static Document<T> fromPath<T>(String path) {
-    return Document._fromPath<T>(Document.root, path.split('__'), 0);
+    return Document._fromPath<T>(Document('', ''), path.split('__'), 0);
   }
 
   @override
@@ -70,8 +70,6 @@ class Document<T> implements StoreReference {
 
     return "${parent}__$id";
   }
-
-  static final root = Document(_rootKey, '');
 
   Collection<S> subcollection<S>(
     String name, {

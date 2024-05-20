@@ -68,6 +68,8 @@ class Loon {
   }) {
     if (snap is DocumentSnapshot<Json> && T != Json && T != dynamic) {
       _validateTypeSerialization<T>(
+        persistenceEnabled: persistorSettings?.enabled ??
+            Loon._instance._isGlobalPersistenceEnabled,
         fromJson: fromJson,
         toJson: toJson,
       );
@@ -134,6 +136,8 @@ class Loon {
     bool persist = true,
   }) {
     _validateDataSerialization(
+      persistenceEnabled: doc.persistorSettings?.enabled ??
+          Loon._instance._isGlobalPersistenceEnabled,
       data: data,
       fromJson: doc.fromJson,
       toJson: doc.toJson,
@@ -323,7 +327,8 @@ class Loon {
     PersistorSettings<T>? persistorSettings,
     DependenciesBuilder<T>? dependenciesBuilder,
   }) {
-    return Document.root.subcollection<T>(
+    return Collection<T>(
+      '',
       name,
       fromJson: fromJson,
       toJson: toJson,

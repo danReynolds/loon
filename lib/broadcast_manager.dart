@@ -46,7 +46,7 @@ class BroadcastManager {
   void _broadcast() {
     _depObservers.clear();
 
-    for (final observer in _observers) {
+    for (final observer in _observers.toList()) {
       observer._onBroadcast();
 
       // Recalculate the set of observers with dependencies after they process the broadcast

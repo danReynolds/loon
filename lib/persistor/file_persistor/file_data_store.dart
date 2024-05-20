@@ -7,7 +7,7 @@ import 'package:loon/persistor/file_persistor/file_persistor_worker.dart';
 import 'package:path/path.dart' as path;
 
 final fileRegex = RegExp(
-  r'^(?!__resolver__)(?:__)?(\w+?)(?<!__)(?:__)?(?:.encrypted)?\.json$',
+  r'^(?!__resolver__)(\w+?)(?:.encrypted)?\.json$',
 );
 
 class DualFileDataStore {
@@ -169,14 +169,16 @@ class FileDataStore {
 
   late final Logger _logger;
 
+  /// The name of the default data store key.
+  static const defaultKey = '__store__';
+
   FileDataStore({
     required this.name,
     required Directory directory,
     this.isHydrated = false,
     this.suffix = '',
   }) {
-    final fileName =
-        "${name == Collection.root.name ? '__root__' : name}$suffix";
+    final fileName = "$name$suffix";
 
     _logger = Logger(
       'FileDataStore:$name',

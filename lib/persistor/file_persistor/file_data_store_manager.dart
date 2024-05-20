@@ -25,12 +25,12 @@ class FileDataStoreManager {
   });
 
   /// Resolves the data store name for the given path as the nearest value found working up from
-  /// the full path, defaulting to the root collection.
+  /// the full path, falling back to the default store key if none is found.
   String _resolveStoreName(String path) {
-    return _resolver.store.getNearest(path) ?? Collection.root.name;
+    return _resolver.store.getNearest(path) ?? FileDataStore.defaultKey;
   }
 
-  /// Resolves the set of [FileDataStore] that exist under and at the given path.
+  /// Resolves the set of [FileDataStore] that exist at the given path and under it.
   Set<DualFileDataStore> _resolveStores(String path) {
     // Resolve the store for the document path itself separately.
     final store = _index[_resolveStoreName(path)];

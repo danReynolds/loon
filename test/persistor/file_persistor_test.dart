@@ -79,7 +79,7 @@ void main() {
 
           await completer.onPersist;
 
-          final file = File('${testDirectory.path}/loon/__root__.json');
+          final file = File('${testDirectory.path}/loon/__store__.json');
           final json = jsonDecode(file.readAsStringSync());
 
           expect(
@@ -126,7 +126,7 @@ void main() {
 
           await completer.onPersist;
 
-          final file = File('${testDirectory.path}/loon/__root__.json');
+          final file = File('${testDirectory.path}/loon/__store__.json');
           final json = jsonDecode(file.readAsStringSync());
 
           expect(
@@ -161,7 +161,7 @@ void main() {
 
           await completer.onPersist;
 
-          final file = File('${testDirectory.path}/loon/__root__.json');
+          final file = File('${testDirectory.path}/loon/__store__.json');
           final json = jsonDecode(file.readAsStringSync());
 
           expect(
@@ -189,7 +189,7 @@ void main() {
           userCollection.doc('1').create(TestUserModel('User 1'));
           userCollection.doc('2').create(TestUserModel('User 2'));
 
-          final file = File('${testDirectory.path}/loon/__root__.json');
+          final file = File('${testDirectory.path}/loon/__store__.json');
 
           await completer.onPersist;
 
@@ -308,7 +308,7 @@ void main() {
 
           await completer.onPersist;
 
-          final rootFile = File('${testDirectory.path}/loon/__root__.json');
+          final rootFile = File('${testDirectory.path}/loon/__store__.json');
           final friendsFile = File('${testDirectory.path}/loon/friends.json');
           final rootJson = jsonDecode(rootFile.readAsStringSync());
           final friendsJson = jsonDecode(friendsFile.readAsStringSync());
@@ -410,7 +410,7 @@ void main() {
                   await completer.onPersist;
 
                   final rootFile =
-                      File('${testDirectory.path}/loon/__root__.json');
+                      File('${testDirectory.path}/loon/__store__.json');
                   var rootJson = jsonDecode(rootFile.readAsStringSync());
 
                   expect(
@@ -532,7 +532,7 @@ void main() {
                   await completer.onPersist;
 
                   final rootFile =
-                      File('${testDirectory.path}/loon/__root__.json');
+                      File('${testDirectory.path}/loon/__store__.json');
                   var rootJson = jsonDecode(rootFile.readAsStringSync());
 
                   expect(
@@ -712,7 +712,7 @@ void main() {
                   await completer.onPersist;
 
                   final rootFile =
-                      File('${testDirectory.path}/loon/__root__.json');
+                      File('${testDirectory.path}/loon/__store__.json');
                   var rootJson = jsonDecode(rootFile.readAsStringSync());
 
                   expect(
@@ -948,7 +948,7 @@ void main() {
                   await completer.onPersist;
 
                   final rootFile =
-                      File('${testDirectory.path}/loon/__root__.json');
+                      File('${testDirectory.path}/loon/__store__.json');
                   var rootJson = jsonDecode(rootFile.readAsStringSync());
 
                   expect(rootJson, {
@@ -1200,7 +1200,7 @@ void main() {
 
           await completer.onPersist;
 
-          final file = File('${testDirectory.path}/loon/__root__.json');
+          final file = File('${testDirectory.path}/loon/__store__.json');
           final json = jsonDecode(file.readAsStringSync());
 
           expect(
@@ -1237,7 +1237,7 @@ void main() {
 
           await completer.onPersist;
 
-          final file = File('${testDirectory.path}/loon/__root__.json');
+          final file = File('${testDirectory.path}/loon/__store__.json');
           final json = jsonDecode(file.readAsStringSync());
 
           expect(
@@ -1287,7 +1287,7 @@ void main() {
 
       await completer.onPersist;
 
-      final rootFile = File('${testDirectory.path}/loon/__root__.json');
+      final rootFile = File('${testDirectory.path}/loon/__store__.json');
       final rootJson = jsonDecode(rootFile.readAsStringSync());
 
       expect(rootJson, {
@@ -1418,7 +1418,7 @@ void main() {
 
         await completer.onPersist;
 
-        final rootFile = File('${testDirectory.path}/loon/__root__.json');
+        final rootFile = File('${testDirectory.path}/loon/__store__.json');
         final rootJson = jsonDecode(rootFile.readAsStringSync());
 
         expect(rootJson, {
@@ -1485,7 +1485,7 @@ void main() {
         // The `friends` collection should remain empty, while `users` and `users__1__friends`
         // should have been hydrated from persistence.
         //
-        // Note that while the `__root__` data store contains the data for both the `users` collection
+        // Note that while the `__store__` data store contains the data for both the `users` collection
         // as well as the `friends` data, only the data in the store under the `users` path should
         // be extracted from the data store and delivered in the hydration response.
 
@@ -1582,7 +1582,7 @@ void main() {
 
         await completer.onPersist;
 
-        final file = File('${testDirectory.path}/loon/__root__.json');
+        final file = File('${testDirectory.path}/loon/__store__.json');
         final json = jsonDecode(file.readAsStringSync());
 
         expect(
@@ -1633,7 +1633,7 @@ void main() {
 
         await completer.onPersist;
 
-        final file = File('${testDirectory.path}/loon/__root__.json');
+        final file = File('${testDirectory.path}/loon/__store__.json');
         final json = jsonDecode(file.readAsStringSync());
 
         expect(
@@ -1691,7 +1691,7 @@ void main() {
 
         await completer.onPersist;
 
-        final file = File('${testDirectory.path}/loon/__root__.json');
+        final file = File('${testDirectory.path}/loon/__store__.json');
         final json = jsonDecode(file.readAsStringSync());
 
         expect(
@@ -1716,7 +1716,7 @@ void main() {
 
         Loon.configure(persistor: TestFilePersistor());
 
-        await Loon.hydrate([Document.root]);
+        await Loon.hydrate([Collection.root]);
 
         expect(
           currentUserDoc.get(),
@@ -1746,7 +1746,7 @@ void main() {
           userCollection.doc('1').create(TestUserModel('User 1'));
           userCollection.doc('2').create(TestUserModel('User 2'));
 
-          final file = File('${testDirectory.path}/loon/__root__.json');
+          final file = File('${testDirectory.path}/loon/__store__.json');
 
           await completer.onPersist;
 
@@ -1819,7 +1819,7 @@ void main() {
           userCollection.doc('2').create(TestUserModel('User 2'));
           friendsCollection.doc('1').create(TestUserModel('Friend 1'));
 
-          final rootFile = File('${testDirectory.path}/loon/__root__.json');
+          final rootFile = File('${testDirectory.path}/loon/__store__.json');
           final friendsFile = File('${testDirectory.path}/loon/friends.json');
 
           await completer.onPersist;
@@ -1857,7 +1857,7 @@ void main() {
           friendsCollection.doc('1').create(TestUserModel('Friend 1'));
           friendsCollection.doc('2').create(TestUserModel('Friend 2'));
 
-          final file = File('${testDirectory.path}/loon/__root__.json');
+          final file = File('${testDirectory.path}/loon/__store__.json');
 
           await completer.onPersist;
 
