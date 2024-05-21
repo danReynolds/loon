@@ -4,7 +4,7 @@ import 'package:loon/loon.dart';
 void main() {
   group('write', () {
     test('Writes the value to the given path', () {
-      final store = IndexedValueStore<String>();
+      final store = ValueStore<String>();
 
       store.write('users', 'Collection value');
       store.write('users__1', 'Dan');
@@ -34,7 +34,7 @@ void main() {
 
   group('get', () {
     test('Retrieves the value at the given path', () {
-      final store = IndexedValueStore<String>();
+      final store = ValueStore<String>();
 
       store.write('users__1', 'Dan');
       store.write('users__2', 'Sonja');
@@ -48,7 +48,7 @@ void main() {
 
   group('getChildValues', () {
     test('Retrieves all of the values of the children of the given path', () {
-      final store = IndexedValueStore<String>();
+      final store = ValueStore<String>();
 
       store.write('users__1', 'Dan');
       store.write('users__2', 'Sonja');
@@ -68,7 +68,7 @@ void main() {
 
   group('hasValue', () {
     test('Returns whether a value exists at the given path', () {
-      final store = IndexedValueStore<String>();
+      final store = ValueStore<String>();
       store.write('users__1', 'Test');
 
       expect(store.hasValue('users__1'), true);
@@ -81,7 +81,7 @@ void main() {
     test(
       "Returns the first subpath along the given path with the provided value",
       () {
-        final store = IndexedValueStore<String>();
+        final store = ValueStore<String>();
         store.write('users__1', 'Dan');
         store.write('users__1__messages__1', 'Dan');
         store.write('users__1__messages__2', 'Sonja');
@@ -102,7 +102,7 @@ void main() {
       () {
         test('Removes the value at the given path recursively from the store.',
             () {
-          final store = IndexedValueStore<String>();
+          final store = ValueStore<String>();
 
           store.write('users__1', 'Dan');
           store.write('users__2', 'Sonja');
@@ -159,7 +159,7 @@ void main() {
 
     group('when not recursive', () {
       test("Should delete the value at the path and retain subpaths", () {
-        final store = IndexedValueStore<String>();
+        final store = ValueStore<String>();
 
         store.write('users__1', 'Dan');
         store.write('users__2', 'Chris');
@@ -207,7 +207,7 @@ void main() {
       test(
         'Moves the data from the other store to this store',
         () {
-          final store = IndexedValueStore<String>();
+          final store = ValueStore<String>();
           store.write('users__1', 'Dan');
           store.write('users__2', 'Sonja');
           store.write('users__1__messages__1', 'Hello');
@@ -240,7 +240,7 @@ void main() {
             },
           });
 
-          final store2 = IndexedValueStore<String>();
+          final store2 = ValueStore<String>();
           store2.write('users__3', 'Chris');
           store2.write('users__4', 'Nik');
           store2.write('users__3__messages__1', 'Greetings');
@@ -324,7 +324,7 @@ void main() {
       test(
         'Moves the data under the given path from the other store to this store.',
         () {
-          final store = IndexedValueStore<String>();
+          final store = ValueStore<String>();
           store.write('users__1', 'Dan');
           store.write('users__2', 'Sonja');
           store.write('users__1__messages__1', 'Hello');
@@ -357,7 +357,7 @@ void main() {
             },
           });
 
-          final store2 = IndexedValueStore<String>();
+          final store2 = ValueStore<String>();
           store2.write('users__1', 'Chris');
           store2.write('users__2', 'Nik');
           store2.write('users__3__messages__1', 'Greetings');
@@ -452,10 +452,10 @@ void main() {
       test(
         "Deletes the source store's path if now empty",
         () {
-          final store = IndexedValueStore<String>();
+          final store = ValueStore<String>();
           store.write('users__1', 'Dan');
 
-          final store2 = IndexedValueStore<String>();
+          final store2 = ValueStore<String>();
           store2.write('users__2', 'Chris');
           store2.write('users__3', 'Sonja');
 
@@ -520,7 +520,7 @@ void main() {
 
   group('touch', () {
     test("Creates an empty node if necessary", () {
-      final store = IndexedValueStore<String>();
+      final store = ValueStore<String>();
 
       store.write('users__1__messages__1', 'Hey');
       store.touch('users__1');
@@ -545,7 +545,7 @@ void main() {
     test(
       'Returns the nearest value of a node in the path moving from the bottom up.',
       () {
-        final store = IndexedValueStore<String>();
+        final store = ValueStore<String>();
 
         store.write('users__1', 'Dan');
         store.write('users__1__posts__2', "You all mean so much to me");
@@ -573,7 +573,7 @@ void main() {
 
   group('extractValues', () {
     test('Extracts all values in the store to a path/value map', () {
-      final store = IndexedValueStore<String>();
+      final store = ValueStore<String>();
       store.write('users__1', 'Dan');
       store.write('users__2', 'Sonja');
       store.write('users__1__messages__1', 'Hello');
@@ -594,7 +594,7 @@ void main() {
     test(
         'Extracts all values under the given path in the store to a path/value map',
         () {
-      final store = IndexedValueStore<String>();
+      final store = ValueStore<String>();
       store.write('users__1', 'Dan');
       store.write('users__2', 'Sonja');
       store.write('users__1__messages__1', 'Hello');

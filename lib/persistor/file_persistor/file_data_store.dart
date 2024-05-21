@@ -153,7 +153,7 @@ class FileDataStore {
   late final File _file;
 
   /// The data contained within the file data store.
-  IndexedValueStore<Json> _store = IndexedValueStore<Json>();
+  ValueStore<Json> _store = ValueStore<Json>();
 
   /// The name of the file data store.
   final String name;
@@ -247,7 +247,7 @@ class FileDataStore {
         () async {
           final encodedStore = await _readFile();
           if (encodedStore != null) {
-            _store = IndexedValueStore.fromJson(jsonDecode(encodedStore));
+            _store = ValueStore.fromJson(jsonDecode(encodedStore));
           }
         },
       );
@@ -370,7 +370,7 @@ class EncryptedFileDataStore extends FileDataStore {
 class FileDataStoreResolver {
   late final File _file;
 
-  var store = IndexedRefValueStore<String>();
+  var store = RefValueStore<String>();
 
   static const name = '__resolver__';
 
@@ -392,7 +392,7 @@ class FileDataStoreResolver {
         'Hydrate',
         () async {
           final fileStr = await _file.readAsString();
-          store = IndexedRefValueStore(jsonDecode(fileStr));
+          store = RefValueStore(jsonDecode(fileStr));
         },
       );
     } catch (e) {

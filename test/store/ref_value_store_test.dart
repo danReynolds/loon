@@ -6,7 +6,7 @@ void main() {
     'write',
     () {
       test('Writes the value to the given path and updates the ref count', () {
-        final store = IndexedRefValueStore<String>();
+        final store = RefValueStore<String>();
 
         store.write('users', 'Collection value');
         store.write('users__1', 'Dan');
@@ -76,7 +76,7 @@ void main() {
       test(
         'Should not increment the ref count when writing the same value multiple times',
         () {
-          final store = IndexedRefValueStore<String>();
+          final store = RefValueStore<String>();
 
           store.write('users', 'Collection value');
           store.write('users__1', 'Dan');
@@ -131,7 +131,7 @@ void main() {
     test(
         'Removes the value at the given path from the store and decrements the ref count.',
         () {
-      final store = IndexedRefValueStore<String>();
+      final store = RefValueStore<String>();
 
       store.write('users__1', 'Dan');
       store.write('users__2', 'Sonja');
@@ -203,7 +203,7 @@ void main() {
     test(
       "Extracts the total ref count of all values in the store under the provided path",
       () {
-        final store = IndexedRefValueStore<String>();
+        final store = RefValueStore<String>();
 
         store.write('users__1', 'Dan');
         store.write('users__2', 'Sonja');
@@ -250,12 +250,12 @@ void main() {
     test(
       "Merges the ref count from the source store into the destination store",
       () {
-        final store = IndexedRefValueStore<String>();
+        final store = RefValueStore<String>();
         store.write('users__1', 'Dan');
         store.write('users__2', 'Chris');
         store.write('users__1__messages__1', 'Hello');
 
-        final store2 = IndexedRefValueStore<String>();
+        final store2 = RefValueStore<String>();
         store2.write('users__3', 'Sonja');
         store2.write('users__1__messages__2', 'How are you');
         store2.write('users__3__messages__1', 'Hey there');

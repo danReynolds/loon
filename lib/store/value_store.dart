@@ -6,7 +6,7 @@ part of loon;
 /// Ex. In this example, the parent path `users__2__messages` indexes the value 'Test' by its key `1`.
 ///
 /// ```dart
-/// final store = IndexedValueStore<String>();
+/// final store = ValueStore<String>();
 /// store.write('users__2__messages__1', 'Test');
 /// store.write('users__2__messages__2', 'Test again');
 ///
@@ -36,14 +36,14 @@ part of loon;
 ///   2: 'Test again',
 /// }
 /// ```
-/// The [IndexedValueStore] is used as the data structure used throughout the library for storing collections of documents.
-class IndexedValueStore<T> {
+/// The [ValueStore] is the data structure used throughout the library for storing collections of documents.
+class ValueStore<T> {
   Map _store = {};
 
   static const _delimiter = '__';
   static const _values = '__values';
 
-  IndexedValueStore({
+  ValueStore({
     Map? store,
   }) {
     if (store != null) {
@@ -51,8 +51,8 @@ class IndexedValueStore<T> {
     }
   }
 
-  static IndexedValueStore<Json> fromJson(Json json) {
-    return IndexedValueStore<Json>(store: json);
+  static ValueStore<Json> fromJson(Json json) {
+    return ValueStore<Json>(store: json);
   }
 
   /// Returns the node at the given path.
@@ -353,10 +353,10 @@ class IndexedValueStore<T> {
     return otherNode.isEmpty;
   }
 
-  /// Removes the subtree at the given [path] of the other provided [IndexedValueStore] and recursively
+  /// Removes the subtree at the given [path] of the other provided [ValueStore] and recursively
   /// merges it onto this store at the given path.
   void graft(
-    IndexedValueStore<T> other, [
+    ValueStore<T> other, [
     String path = '',
   ]) {
     if (path.isEmpty) {
@@ -418,12 +418,12 @@ class IndexedValueStore<T> {
   }
 }
 
-/// An extension of the [IndexedValueStore] that additionally keeps a ref count of each distinct
+/// An extension of the [ValueStore] that additionally keeps a ref count of each distinct
 /// value indexed under a path.
 ///
 /// Ex.
 /// ```dart
-/// final store = IndexedRefValueStore<String>();
+/// final store = RefValueStore<String>();
 /// store.write('users__2__messages__1', 'Test');
 /// store.write('users__2__messages__2', 'Test again');
 /// store.write('users__2__messages__3', 'Test again');
@@ -447,10 +447,10 @@ class IndexedValueStore<T> {
 ///   }
 /// }
 /// ```
-class IndexedRefValueStore<T> extends IndexedValueStore<T> {
+class RefValueStore<T> extends ValueStore<T> {
   static const _refs = '__refs';
 
-  IndexedRefValueStore([Map? store]) {
+  RefValueStore([Map? store]) {
     if (store != null) {
       _store = store;
     }
@@ -460,7 +460,7 @@ class IndexedRefValueStore<T> extends IndexedValueStore<T> {
   Map _mergeNode(Map node, Map otherNode) {
     final result = super._mergeNode(node, otherNode);
 
-    final otherValues = otherNode[IndexedValueStore._values];
+    final otherValues = otherNode[ValueStore._values];
     if (otherValues != null) {
       node[_refs] ??= <T, int>{};
 
@@ -477,9 +477,9 @@ class IndexedRefValueStore<T> extends IndexedValueStore<T> {
   bool _graft(node, otherNode, segments, index) {
     if (index == segments.length - 1) {
       final segment = segments[index];
-      final otherValues = otherNode?[IndexedValueStore._values];
+      final otherValues = otherNode?[ValueStore._values];
 
-      // An [IndexedRefValueStore] must additionally update the ref count on the
+      // An [RefValueStore] must additionally update the ref count on the
       // source and destination store's parent node's value.
       if (otherValues != null && otherValues.containsKey(segment)) {
         final otherValue = otherValues[segment];
@@ -495,8 +495,8 @@ class IndexedRefValueStore<T> extends IndexedValueStore<T> {
           otherNode.remove(_refs);
         }
 
-        if (node[IndexedValueStore._values].containsKey(segment)) {
-          final value = node[IndexedValueStore._values][segment];
+        if (node[ValueStore._values].containsKey(segment)) {
+          final value = node[ValueStore._values][segment];
           if (node[_refs][value] == 1) {
             node[_refs].remove(value);
           } else {
@@ -526,14 +526,14 @@ class IndexedRefValueStore<T> extends IndexedValueStore<T> {
       return super.graft(other, path);
     }
 
-    _graft(_store, other._store, path.split(IndexedValueStore._delimiter), 0);
+    _graft(_store, other._store, path.split(ValueStore._delimiter), 0);
   }
 
   @override
   void _write(Map node, List<String> segments, int index, T value) {
     if (index == segments.length - 1) {
       final segment = segments[index];
-      final values = node[IndexedValueStore._values];
+      final values = node[ValueStore._values];
       final refs = node[_refs] ??= <T, int>{};
 
       // Check if there was a previous value for this path.
@@ -575,8 +575,8 @@ class IndexedRefValueStore<T> extends IndexedValueStore<T> {
         return super._delete(node, segments, index, recursive);
       }
 
-      if (node[IndexedValueStore._values].containsKey(segment)) {
-        final value = node[IndexedValueStore._values][segment];
+      if (node[ValueStore._values].containsKey(segment)) {
+        final value = node[ValueStore._values][segment];
 
         if (node[_refs][value] > 1) {
           node[_refs][value]--;
@@ -607,7 +607,7 @@ class IndexedRefValueStore<T> extends IndexedValueStore<T> {
     }
 
     for (final key in node.keys) {
-      if (key != _refs && key != IndexedValueStore._values) {
+      if (key != _refs && key != ValueStore._values) {
         _extractRefs(node[key], index);
       }
     }
@@ -621,14 +621,14 @@ class IndexedRefValueStore<T> extends IndexedValueStore<T> {
 
     if (path.isEmpty) {
       for (final key in _store.keys) {
-        if (key != _refs && key != IndexedValueStore._values) {
+        if (key != _refs && key != ValueStore._values) {
           _extractRefs(_store[key], index);
         }
       }
       return index;
     }
 
-    final segments = path.split(IndexedValueStore._delimiter);
+    final segments = path.split(ValueStore._delimiter);
     final parent =
         _getNode(_store, segments.sublist(0, segments.length - 1), 0);
     if (parent == null) {
@@ -637,10 +637,10 @@ class IndexedRefValueStore<T> extends IndexedValueStore<T> {
 
     // If the parent node has the final path segment as a value, then the ref count must include
     // a count for the final node's value.
-    if (parent.containsKey(IndexedValueStore._values)) {
+    if (parent.containsKey(ValueStore._values)) {
       final segment = segments.last;
-      if (parent[IndexedValueStore._values].containsKey(segment)) {
-        final value = parent[IndexedValueStore._values][segment];
+      if (parent[ValueStore._values].containsKey(segment)) {
+        final value = parent[ValueStore._values][segment];
         index[value] = 1;
       }
     }

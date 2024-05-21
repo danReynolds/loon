@@ -1528,7 +1528,7 @@ void main() {
     test('Hydrates large persistence files', () async {
       int size = 20000;
 
-      final store = IndexedValueStore<Json>();
+      final store = ValueStore<Json>();
       List<TestLargeModel> models =
           List.generate(size, (_) => generateRandomModel());
 

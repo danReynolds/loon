@@ -19,7 +19,7 @@ enum BroadcastEvents {
 
 class BroadcastManager {
   /// The store of documents/collections scheduled for broadcast.
-  final store = IndexedValueStore<BroadcastEvents>();
+  final store = ValueStore<BroadcastEvents>();
 
   /// The store of broadcast observers that should be notified on broadcast.
   final Set<BroadcastObserver> _observers = {};

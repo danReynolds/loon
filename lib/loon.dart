@@ -8,7 +8,7 @@ export 'widgets/document_stream_builder.dart';
 export 'persistor/file_persistor/file_persistor.dart';
 
 part 'store/path_ref_store.dart';
-part 'store/indexed_value_store.dart';
+part 'store/value_store.dart';
 part 'broadcast_observer.dart';
 part 'query.dart';
 part 'observable_query.dart';
@@ -39,10 +39,10 @@ class Loon {
   }
 
   /// The store of document snapshots indexed by document path.
-  final documentStore = IndexedValueStore<DocumentSnapshot>();
+  final documentStore = ValueStore<DocumentSnapshot>();
 
   /// The store of dependencies of documents indexed by document path.
-  final dependenciesStore = IndexedValueStore<Set<Document>>();
+  final dependenciesStore = ValueStore<Set<Document>>();
 
   /// The store of dependents of documents.
   final Map<Document, Set<Document>> dependentsStore = {};
