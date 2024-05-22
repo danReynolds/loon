@@ -19,16 +19,15 @@ mixin BroadcastObserver<T, S> {
     /// The term *multicast* is used to refer to a a multi-subscription observable since it is common observable terminology and
     /// the term broadcast is to mean something different in the library compared to its usage in the underlying Dart [Stream] implementation.
     required bool multicast,
-    required bool sync,
   }) {
     this.multicast = multicast;
 
     if (multicast) {
-      _controller = StreamController<T>.broadcast(sync: sync);
-      _changeController = StreamController<S>.broadcast(sync: sync);
+      _controller = StreamController<T>.broadcast();
+      _changeController = StreamController<S>.broadcast();
     } else {
-      _controller = StreamController<T>(onCancel: dispose, sync: sync);
-      _changeController = StreamController<S>(onCancel: dispose, sync: sync);
+      _controller = StreamController<T>(onCancel: dispose);
+      _changeController = StreamController<S>(onCancel: dispose);
     }
 
     _value = initialValue;

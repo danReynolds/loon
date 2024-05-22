@@ -15,14 +15,13 @@ class ObservableQuery<T> extends Query<T>
     required super.filters,
     required super.sort,
     required bool multicast,
-    required bool sync,
   }) {
     final snaps = super.get();
     for (final snap in snaps) {
       _updateIndex(snap);
     }
 
-    init(snaps, multicast: multicast, sync: sync);
+    init(snaps, multicast: multicast);
   }
 
   /// Update the doc in the snapshot and dependency indices.
@@ -64,8 +63,8 @@ class ObservableQuery<T> extends Query<T>
     _snapIndex.remove(doc);
   }
 
-  /// On broadcast, the [ObservableQuery] examines the broadcast events that have occurred
-  /// since the last broadcast and determines if the query needs to rebroadcast to its listeners.
+  /// On broadcast, the [ObservableQuery] examines the events that have occurred
+  /// since the last broadcast and determines if the query needs to be rebroadcast.
   ///
   /// The scenarios for rebroadcasting the updated query are as follows:
   ///
@@ -264,14 +263,16 @@ class ObservableQuery<T> extends Query<T>
   }
 
   @override
-  ObservableQuery<T> observe({bool multicast = false, bool sync = false,}) {
+  ObservableQuery<T> observe({
+    bool multicast = false,
+  }) {
     return this;
   }
 
   @override
   get() {
-    // If the query is pending a broadcast when its data is accessed, we must immediately
-    // run the broadcast instead of waiting until the next micro-task in order to return the latest value.
+    // If the query is pending a broadcast when its data is accessed, then it must not use
+    // the cached value as that value is stale until the query has processed the broadcast.
     if (isScheduledForBroadcast()) {
       return super.get();
     }
