@@ -271,9 +271,9 @@ class ObservableQuery<T> extends Query<T>
 
   @override
   get() {
-    // If the query is pending a broadcast when its data is accessed, then it must not use
-    // the cached value as that value is stale until the query has processed the broadcast.
-    if (isScheduledForBroadcast()) {
+    // If the query is pending broadcast when its data is accessed, then it must not use
+    // its cached value as that value is stale until the query has processed the broadcast.
+    if (isPendingBroadcast()) {
       return super.get();
     }
     return _value;

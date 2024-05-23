@@ -63,4 +63,6 @@ mixin BroadcastObserver<T, S> {
   }
 
   void _onBroadcast();
+
+  bool isPendingBroadcast();
 }

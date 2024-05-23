@@ -59,7 +59,7 @@ class Query<T> extends Queryable<T> {
     return _filterQuery(collection.get()).isNotEmpty;
   }
 
-  bool isScheduledForBroadcast() {
+  bool isPendingBroadcast() {
     return collection.isPendingBroadcast();
   }
 
