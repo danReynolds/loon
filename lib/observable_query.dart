@@ -4,11 +4,11 @@ class ObservableQuery<T> extends Query<T>
     with
         BroadcastObserver<List<DocumentSnapshot<T>>,
             List<DocumentChangeSnapshot<T>>> {
-  /// A query maintains an index of snapshots of the documents in its current result set.
-  final Map<Document<T>, DocumentSnapshot<T>> _snapIndex = {};
+  /// A query maintains a cache of snapshots of the documents in its current result set.
+  final Map<Document<T>, DocumentSnapshot<T>> _snapCache = {};
 
-  /// A query maintains an index of the dependencies of documents in its current result set.
-  final Map<Document<T>, Set<Document>> _dependencyIndex = {};
+  /// A query maintains a cache of the dependencies of documents in its current result set.
+  final Map<Document<T>, Set<Document>> _depCache = {};
 
   ObservableQuery(
     super.collection, {
@@ -18,29 +18,29 @@ class ObservableQuery<T> extends Query<T>
   }) {
     final snaps = super.get();
     for (final snap in snaps) {
-      _updateIndex(snap);
+      _cacheDoc(snap);
     }
 
     init(snaps, multicast: multicast);
   }
 
   /// Update the doc in the snapshot and dependency indices.
-  void _updateIndex(DocumentSnapshot<T> snap) {
+  void _cacheDoc(DocumentSnapshot<T> snap) {
     final doc = snap.doc;
-    final prevDeps = _dependencyIndex[doc];
+    final prevDeps = _depCache[doc];
     final deps = doc.dependencies();
 
-    _snapIndex[doc] = snap;
+    _snapCache[doc] = snap;
 
     if (deps != prevDeps) {
       if (deps != null) {
-        _dependencyIndex[doc] = deps;
+        _depCache[doc] = deps;
 
         for (final dep in deps) {
           _deps.inc(dep.path);
         }
       } else if (prevDeps != null) {
-        _dependencyIndex.remove(doc);
+        _depCache.remove(doc);
 
         for (final dep in prevDeps) {
           _deps.dec(dep.path);
@@ -50,8 +50,8 @@ class ObservableQuery<T> extends Query<T>
   }
 
   /// Removes the doc from the index, clearing it in both the snapshot and dependency indices.
-  void _removeIndex(Document<T> doc) {
-    final deps = _dependencyIndex[doc];
+  void _evictDoc(Document<T> doc) {
+    final deps = _depCache[doc];
 
     if (deps != null) {
       for (final dep in deps) {
@@ -59,8 +59,8 @@ class ObservableQuery<T> extends Query<T>
       }
     }
 
-    _dependencyIndex.remove(doc);
-    _snapIndex.remove(doc);
+    _depCache.remove(doc);
+    _snapCache.remove(doc);
   }
 
   /// On broadcast, the [ObservableQuery] examines the events that have occurred
@@ -112,7 +112,7 @@ class ObservableQuery<T> extends Query<T>
           ),
         );
 
-        _snapIndex.clear();
+        _snapCache.clear();
         _deps.clear();
       }
     }
@@ -125,7 +125,7 @@ class ObservableQuery<T> extends Query<T>
         final event = entry.value;
 
         final doc = collection.doc(docId);
-        final prevSnap = _snapIndex[doc];
+        final prevSnap = _snapCache[doc];
         final snap = doc.get();
 
         switch (event) {
@@ -133,7 +133,7 @@ class ObservableQuery<T> extends Query<T>
           case BroadcastEvents.hydrated:
             // 2.a Add new documents that satisfy the query filter.
             if (_filter(snap!)) {
-              _updateIndex(snap);
+              _cacheDoc(snap);
 
               shouldUpdate = true;
 
@@ -151,8 +151,8 @@ class ObservableQuery<T> extends Query<T>
             break;
           case BroadcastEvents.removed:
             // 2.b Remove old documents that previously satisfied the query filter and have been removed.
-            if (_snapIndex.containsKey(doc)) {
-              _removeIndex(doc);
+            if (_snapCache.containsKey(doc)) {
+              _evictDoc(doc);
 
               shouldUpdate = true;
 
@@ -171,12 +171,12 @@ class ObservableQuery<T> extends Query<T>
 
           // 2.c Add / remove modified documents.
           case BroadcastEvents.modified:
-            if (_snapIndex.containsKey(doc)) {
+            if (_snapCache.containsKey(doc)) {
               shouldUpdate = true;
 
               // 2.c.i Previously satisfied the query filter and still does (updated value must still be rebroadcast on the query).
               if (_filter(snap!)) {
-                _updateIndex(snap);
+                _cacheDoc(snap);
 
                 if (hasChangeListener) {
                   changeSnaps.add(
@@ -190,7 +190,7 @@ class ObservableQuery<T> extends Query<T>
                 }
               } else {
                 /// 2.c.ii Previously satisfied the query filter and now does not.
-                _removeIndex(doc);
+                _evictDoc(doc);
 
                 if (hasChangeListener) {
                   changeSnaps.add(
@@ -206,7 +206,7 @@ class ObservableQuery<T> extends Query<T>
             } else {
               // 2.c.iii Previously did not satisfy the query filter and now does.
               if (_filter(snap!)) {
-                _updateIndex(snap);
+                _cacheDoc(snap);
 
                 shouldUpdate = true;
 
@@ -226,7 +226,7 @@ class ObservableQuery<T> extends Query<T>
           // 2.d If the broadcast documents include any documents that were manually touched for rebroadcast and are part of this query's
           // result set, then the query should be rebroadcasted.
           case BroadcastEvents.touched:
-            if (_snapIndex.containsKey(doc)) {
+            if (_snapCache.containsKey(doc)) {
               shouldRebroadcast = true;
 
               if (hasChangeListener) {
@@ -256,7 +256,7 @@ class ObservableQuery<T> extends Query<T>
     }
 
     if (shouldUpdate) {
-      add(_sortQuery(_snapIndex.values.toList()));
+      add(_sortQuery(_snapCache.values.toList()));
     } else if (shouldRebroadcast) {
       add(_value);
     }
@@ -274,7 +274,7 @@ class ObservableQuery<T> extends Query<T>
     // If the query is pending a broadcast when its data is accessed, then it must not use
     // the cached value as that value is stale until the query has processed the broadcast.
     if (isScheduledForBroadcast()) {
-      _onBroadcast();
+      return super.get();
     }
     return _value;
   }
