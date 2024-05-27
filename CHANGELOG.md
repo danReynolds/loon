@@ -2,6 +2,12 @@
 
 * Rearchitecture of core implementation.
 
+* [Breaking] Default behavior of deleting a document/collection is to recursively delete all nested data.
+* `FilePersistor` changes:
+    * [Breaking] Change from `getPersistenceKey` to `FilePersistor.key` and `FilePersistor.keyBuilder`.
+    * [Breaking] Changed the default data store location from `loon.json` to `__store__.json`.
+    * [Feature] Added ability to specify the collections/documents to hydrate when calling `Loon.hydrate()`.
+
 ## 1.2.0
 
 * Fixed a bug where `clearAll` wasn't broadcasting to observers.
