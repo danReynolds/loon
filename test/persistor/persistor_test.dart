@@ -1,9 +1,9 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:loon/loon.dart';
 
-import 'models/test_persistor.dart';
-import 'models/test_user_model.dart';
-import 'utils.dart';
+import '../models/test_persistor.dart';
+import '../models/test_user_model.dart';
+import '../utils.dart';
 
 void main() {
   final completer = PersistorCompleter();
@@ -14,14 +14,13 @@ void main() {
 
   group('Persistor', () {
     test(
-      'Persistence batches using the throttle',
+      'Persists batches using the throttle',
       () async {
         List<List<Document>> batches = [];
 
         Loon.configure(
           persistor: TestPersistor(
             seedData: [],
-            persistenceThrottle: const Duration(milliseconds: 1),
             onPersist: (docs) {
               batches.add(docs);
               completer.persistComplete();
@@ -38,11 +37,11 @@ void main() {
         userCollection.doc('1').create(TestUserModel('User 1'));
         userCollection.doc('2').create(TestUserModel('User 2'));
 
-        await completer.onPersistComplete;
+        await completer.onPersist;
 
         userCollection.doc('3').create(TestUserModel('User 3'));
 
-        await completer.onPersistComplete;
+        await completer.onPersist;
 
         // There should be two calls to the persistor:
         // 1. The first two writes should be grouped together into a single batch in the first 1ms throttle.
@@ -67,7 +66,6 @@ void main() {
         Loon.configure(
           persistor: TestPersistor(
             seedData: [],
-            persistenceThrottle: const Duration(milliseconds: 1),
             onPersist: (docs) {
               batches.add(docs);
               completer.persistComplete();
@@ -84,11 +82,11 @@ void main() {
         userCollection.doc('1').create(TestUserModel('User 1'));
         userCollection.doc('1').update(TestUserModel('User 1 updated'));
 
-        await completer.onPersistComplete;
+        await completer.onPersist;
 
         userCollection.doc('2').create(TestUserModel('User 2'));
 
-        await completer.onPersistComplete;
+        await completer.onPersist;
 
         expect(batches.length, 2);
 

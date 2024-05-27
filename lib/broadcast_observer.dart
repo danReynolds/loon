@@ -7,6 +7,10 @@ mixin BroadcastObserver<T, S> {
   late T _value;
   late final bool multicast;
 
+  String get path;
+
+  final _deps = PathRefStore();
+
   void init(
     T initialValue, {
     /// Whether the [Observable] can have more than one observable subscription. A single-subscription
@@ -29,13 +33,13 @@ mixin BroadcastObserver<T, S> {
     _value = initialValue;
     _controller.add(_value);
 
-    Loon._instance._addBroadcastObserver(this);
+    Loon._instance.broadcastManager.addObserver(this);
   }
 
   void dispose() {
     _controller.close();
     _changeController.close();
-    Loon._instance._removeBroadcastObserver(this);
+    Loon._instance.broadcastManager.removeObserver(this);
   }
 
   T add(T updatedValue) {
@@ -43,6 +47,8 @@ mixin BroadcastObserver<T, S> {
     _controller.add(_value);
     return _value;
   }
+
+  bool exists();
 
   /// [get] is left unimplemented since it has variable logic based on the type of observer like an [ObservableDocument]
   /// and [ObservableQuery].
@@ -56,8 +62,7 @@ mixin BroadcastObserver<T, S> {
     return _changeController.stream;
   }
 
-  String get key;
-
   void _onBroadcast();
-  void _onClear();
+
+  bool isPendingBroadcast();
 }

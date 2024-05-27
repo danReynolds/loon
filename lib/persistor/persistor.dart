@@ -1,27 +1,34 @@
 part of loon;
 
-typedef SerializedCollectionStore = Map<String, Map<String, Json>>;
+/// The data returned on hydration from the hydration layer as a map of document
+/// paths to document data.
+typedef HydrationData = Map<String, Json>;
 
 class PersistorSettings<T> {
-  final bool persistenceEnabled;
+  final bool enabled;
 
   const PersistorSettings({
-    this.persistenceEnabled = true,
+    this.enabled = true,
   });
 }
 
 /// Abstract persistor that implements the base persistence batching, de-duping and locking of
-/// persistence operations and exposes the public persistence APIs for persistence implementations to implement.
+/// persistence operations. Exposes the public persistence APIs for persistence implementations to implement.
 /// See [FilePersistor] as an example implementation.
 abstract class Persistor {
-  final Duration persistenceThrottle;
   final PersistorSettings settings;
   final void Function(List<Document> batch)? onPersist;
-  final void Function(String collection)? onClear;
+  final void Function(Collection collection)? onClear;
   final void Function()? onClearAll;
-  final void Function(SerializedCollectionStore data)? onHydrate;
+  final void Function(HydrationData data)? onHydrate;
+
+  /// The throttle for batching persisted documents. All documents updated within the throttle
+  /// duration are batched together into a single persist operation.
+  final Duration persistenceThrottle;
 
   final Set<Document> _batch = {};
+
+  late final Logger _logger;
 
   /// The operation queue ensures that operations (init, hydrate, persist, clear) are blocking and
   /// that only one is ever running at a time, not concurrently.
@@ -40,6 +47,8 @@ abstract class Persistor {
     this.onClearAll,
     this.onHydrate,
   }) {
+    _logger = Logger('Persistor', output: Loon.logger.log);
+
     _runOperation(() {
       return init();
     });
@@ -71,10 +80,10 @@ abstract class Persistor {
     }
   }
 
-  Future<void> _clear(String key) {
+  Future<void> _clear(Collection collection) {
     return _runOperation(() async {
-      await clear(key);
-      onClear?.call(key);
+      await clear(collection);
+      onClear?.call(collection);
     });
   }
 
@@ -85,9 +94,9 @@ abstract class Persistor {
     });
   }
 
-  Future<SerializedCollectionStore> _hydrate() {
+  Future<HydrationData> _hydrate([List<StoreReference>? refs]) {
     return _runOperation(() async {
-      final result = await hydrate();
+      final result = await hydrate(refs);
       onHydrate?.call(result);
       return result;
     });
@@ -96,6 +105,7 @@ abstract class Persistor {
   Future<void> _persist() async {
     try {
       await _runOperation(() async {
+        _logger.log('Persist batch size: ${_batch.length}');
         final batchDocs = _batch.toList();
 
         // The current batch is eagerly cleared so that after persistence completes, it can be re-checked to see if there
@@ -125,7 +135,7 @@ abstract class Persistor {
 
   void _persistDoc(Document doc) {
     if (!doc.isPersistenceEnabled()) {
-      printDebug('Persistence not enabled for document: ${doc.id}');
+      _logger.log('Persistence not enabled for document: ${doc.id}');
       return;
     }
 
@@ -137,15 +147,25 @@ abstract class Persistor {
     _schedulePersist();
   }
 
+  ///
   /// Public APIs to be implemented by any [Persistor] extension like [FilePersistor].
+  ///
 
+  /// Initialization function called when the persistor is instantiated to execute and setup work.
   Future<void> init();
 
+  /// Persist function called with the bath of documents that have changed (including been deleted) within the last throttle window
+  /// specified by the [Persistor.persistenceThrottle] duration.
   Future<void> persist(List<Document> docs);
 
-  Future<SerializedCollectionStore> hydrate();
+  /// Hydration function called to read data from persistence. If no entities are specified,
+  /// then it hydrations all persisted data. if entities are specified, it hydrates only the data from
+  /// the paths under those entities.
+  Future<HydrationData> hydrate([List<StoreReference>? refs]);
 
-  Future<void> clear(String collection);
+  /// Clear function used to clear all documents in a collection.
+  Future<void> clear(Collection collection);
 
+  /// Clears all documents and removes all persisted data.
   Future<void> clearAll();
 }

@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:loon/loon.dart';
 import 'test_user_model.dart';
 
@@ -9,21 +7,21 @@ class TestPersistor extends Persistor {
   final List<DocumentSnapshot<TestUserModel>> seedData;
 
   TestPersistor({
-    super.persistenceThrottle,
     super.onPersist,
     required this.seedData,
-  });
+  }) : super(
+          persistenceThrottle: const Duration(milliseconds: 1),
+          settings: const PersistorSettings(),
+        );
 
   @override
-  Future<SerializedCollectionStore> hydrate() async {
-    return {
-      "users": seedData.fold({}, (acc, doc) {
-        return {
-          ...acc,
-          doc.id: doc.data.toJson(),
-        };
-      }),
-    };
+  hydrate([collections]) async {
+    return seedData.fold<HydrationData>({}, (acc, doc) {
+      return {
+        ...acc,
+        doc.path: doc.data.toJson(),
+      };
+    });
   }
 
   @override

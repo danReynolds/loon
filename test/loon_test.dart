@@ -1,63 +1,12 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:loon/loon.dart';
 
+import 'matchers/document_snapshot.dart';
 import 'models/test_persistor.dart';
 import 'models/test_user_model.dart';
 
 Future<void> asyncEvent() {
   return Future.delayed(const Duration(milliseconds: 1), () => null);
-}
-
-class DocumentSnapshotMatcher<T> extends Matcher {
-  DocumentSnapshot<T?>? expected;
-  late DocumentSnapshot<T?>? actual;
-  DocumentSnapshotMatcher(this.expected);
-
-  @override
-  Description describe(Description description) {
-    return description.add(
-      "has expected document ID: ${expected?.id}, data: ${expected?.data}",
-    );
-  }
-
-  @override
-  Description describeMismatch(
-    dynamic item,
-    Description mismatchDescription,
-    Map<dynamic, dynamic> matchState,
-    bool verbose,
-  ) {
-    return mismatchDescription.add(
-      "Expected: $item, Actual: ${matchState['actual']}",
-    );
-  }
-
-  @override
-  bool matches(actual, Map matchState) {
-    this.actual = actual;
-
-    final actualData = actual?.data;
-    final expectedData = expected?.data;
-
-    if (actual.doc.key != expected?.doc.key) {
-      return false;
-    }
-
-    if (expectedData == null) {
-      return actualData == null;
-    }
-
-    if (expectedData is Json) {
-      return actualData is Json && mapEquals(actualData, expectedData);
-    }
-
-    if (expectedData is TestUserModel) {
-      return actualData is TestUserModel && expectedData == actualData;
-    }
-
-    return false;
-  }
 }
 
 void main() {
@@ -67,7 +16,28 @@ void main() {
     });
 
     test(
-      'User document created successfully',
+      'Creates primitive documents',
+      () {
+        final usersCollection = Loon.collection('users');
+        final userDoc = usersCollection.doc('1');
+
+        userDoc.create('Test');
+
+        expect(
+          Loon.inspect()['store'],
+          {
+            "users": {
+              "__values": {
+                "1": DocumentSnapshot(doc: userDoc, data: 'Test'),
+              }
+            }
+          },
+        );
+      },
+    );
+
+    test(
+      'Creates serializable documents',
       () {
         final user = TestUserModel('User 1');
         final userDoc = TestUserModel.store.doc('1');
@@ -75,22 +45,22 @@ void main() {
         userDoc.create(user);
 
         expect(
-          Loon.extract()['collectionStore'],
+          Loon.inspect()['store'],
           {
             "users": {
-              "1": DocumentSnapshotMatcher(
-                DocumentSnapshot(
+              "__values": {
+                "1": DocumentSnapshot(
                   doc: userDoc,
                   data: user,
                 ),
-              ),
+              }
             }
           },
         );
       },
     );
 
-    test('JSON user document created successfully', () {
+    test('Creates JSON documents successfully', () {
       final userCollection = Loon.collection('users');
       final userDoc = userCollection.doc('2');
       final userJson = {
@@ -100,21 +70,21 @@ void main() {
       userDoc.create(userJson);
 
       expect(
-        Loon.extract()['collectionStore'],
+        Loon.inspect()['store'],
         {
           "users": {
-            "2": DocumentSnapshotMatcher(
-              DocumentSnapshot(
+            "__values": {
+              "2": DocumentSnapshot(
                 doc: userDoc,
                 data: userJson,
               ),
-            ),
+            },
           }
         },
       );
     });
 
-    test('Persisted instance document added without serializer throws error',
+    test('Creating persisted documents without a serializer throws an error',
         () {
       expect(
         () => Loon.collection(
@@ -125,7 +95,7 @@ void main() {
       );
     });
 
-    test('Duplicate user document created fails', () {
+    test('Creating duplicate documents throws an error', () {
       final user = TestUserModel('User 1');
       final userDoc = TestUserModel.store.doc('1');
 
@@ -151,11 +121,9 @@ void main() {
 
       expect(
         userDoc.get(),
-        DocumentSnapshotMatcher(
-          DocumentSnapshot(
-            doc: userDoc,
-            data: user,
-          ),
+        DocumentSnapshot(
+          doc: userDoc,
+          data: user,
         ),
       );
     });
@@ -171,11 +139,9 @@ void main() {
 
       expect(
         userDoc.get(),
-        DocumentSnapshotMatcher(
-          DocumentSnapshot(
-            doc: userDoc,
-            data: userJson,
-          ),
+        DocumentSnapshot(
+          doc: userDoc,
+          data: userJson,
         ),
       );
     });
@@ -186,7 +152,29 @@ void main() {
       Loon.clearAll();
     });
 
-    test('Deserialized document updated successfully', () {
+    test(
+      'Updates primitive documents',
+      () {
+        final usersCollection = Loon.collection('users');
+        final userDoc = usersCollection.doc('1');
+
+        userDoc.create('Test');
+        userDoc.update('Test updated');
+
+        expect(
+          Loon.inspect()['store'],
+          {
+            "users": {
+              "__values": {
+                "1": DocumentSnapshot(doc: userDoc, data: 'Test updated'),
+              }
+            }
+          },
+        );
+      },
+    );
+
+    test('Creates serializable documents', () {
       final updatedUser = TestUserModel('User 1 updated');
       final userDoc = TestUserModel.store.doc('1');
 
@@ -195,16 +183,14 @@ void main() {
 
       expect(
         userDoc.get(),
-        DocumentSnapshotMatcher(
-          DocumentSnapshot(
-            doc: userDoc,
-            data: updatedUser,
-          ),
+        DocumentSnapshot(
+          doc: userDoc,
+          data: updatedUser,
         ),
       );
     });
 
-    test('JSON document updated successfully', () {
+    test('Creates JSON documents', () {
       final userCollection = Loon.collection('users');
       final userDoc = userCollection.doc('2');
       final userJson = {
@@ -219,11 +205,9 @@ void main() {
 
       expect(
         userDoc.get(),
-        DocumentSnapshotMatcher(
-          DocumentSnapshot(
-            doc: userDoc,
-            data: updatedUserJson,
-          ),
+        DocumentSnapshot(
+          doc: userDoc,
+          data: updatedUserJson,
         ),
       );
     });
@@ -238,8 +222,7 @@ void main() {
       );
     });
 
-    test('Persisted instance document updated without serializer throws error',
-        () {
+    test('Updating a persisted document without a serializer throws error', () {
       expect(
         () => Loon.collection(
           'users',
@@ -264,11 +247,9 @@ void main() {
 
       expect(
         userDoc.get(),
-        DocumentSnapshotMatcher(
-          DocumentSnapshot(
-            doc: userDoc,
-            data: updatedUser,
-          ),
+        DocumentSnapshot(
+          doc: userDoc,
+          data: updatedUser,
         ),
       );
     });
@@ -281,10 +262,10 @@ void main() {
 
         expect(
           userDoc.modify((_) => newUser),
-          DocumentSnapshotMatcher(DocumentSnapshot(
+          DocumentSnapshot(
             doc: userDoc,
             data: newUser,
-          )),
+          ),
         );
       },
     );
@@ -304,11 +285,9 @@ void main() {
 
       expect(
         userDoc.get(),
-        DocumentSnapshotMatcher(
-          DocumentSnapshot(
-            doc: userDoc,
-            data: updatedUserJson,
-          ),
+        DocumentSnapshot(
+          doc: userDoc,
+          data: updatedUserJson,
         ),
       );
     });
@@ -330,7 +309,23 @@ void main() {
       Loon.clearAll();
     });
 
-    test('Document deleted successfully', () {
+    test(
+      'Deletes primitive documents',
+      () {
+        final usersCollection = Loon.collection('users');
+        final userDoc = usersCollection.doc('1');
+
+        userDoc.create('Test');
+        userDoc.delete();
+
+        expect(
+          Loon.inspect()['store'],
+          {},
+        );
+      },
+    );
+
+    test('Deletes serializable documents', () {
       final user = TestUserModel('User 1');
       final userDoc = TestUserModel.store.doc('1');
 
@@ -340,8 +335,8 @@ void main() {
       expect(userDoc.exists(), false);
 
       expect(
-        Loon.extract()['collectionStore'],
-        {"users": {}},
+        Loon.inspect()["store"],
+        {},
       );
     });
   });
@@ -362,11 +357,9 @@ void main() {
       expectLater(
         userStream,
         emits(
-          DocumentSnapshotMatcher(
-            DocumentSnapshot(
-              doc: userDoc,
-              data: user,
-            ),
+          DocumentSnapshot(
+            doc: userDoc,
+            data: user,
           ),
         ),
       );
@@ -395,17 +388,13 @@ void main() {
         userObs.stream(),
         emitsInOrder([
           null,
-          DocumentSnapshotMatcher(
-            DocumentSnapshot(
-              doc: userDoc,
-              data: user,
-            ),
+          DocumentSnapshot(
+            doc: userDoc,
+            data: user,
           ),
-          DocumentSnapshotMatcher(
-            DocumentSnapshot(
-              doc: userDoc,
-              data: updatedUser,
-            ),
+          DocumentSnapshot(
+            doc: userDoc,
+            data: updatedUser,
           ),
           null,
           emitsDone,
@@ -436,8 +425,8 @@ void main() {
 
       // Add document
       expect(
-        snaps[0].type,
-        BroadcastEventTypes.added,
+        snaps[0].event,
+        BroadcastEvents.added,
       );
       expect(
         snaps[0].prevData,
@@ -450,8 +439,8 @@ void main() {
 
       // Update document
       expect(
-        snaps[1].type,
-        BroadcastEventTypes.modified,
+        snaps[1].event,
+        BroadcastEvents.modified,
       );
       expect(
         snaps[1].prevData,
@@ -484,46 +473,48 @@ void main() {
       expect(querySnap.length, 1);
       expect(
         querySnap.first,
-        DocumentSnapshotMatcher(
-          DocumentSnapshot(
-            doc: userDoc,
-            data: user,
-          ),
+        DocumentSnapshot(
+          doc: userDoc,
+          data: user,
         ),
       );
     });
   });
 
-  group('Stream documents', () {
+  group('Stream queries', () {
     tearDown(() {
       Loon.clearAll();
     });
 
-    test('Returns a stream of documents that satisfy the query', () async {
-      final user = TestUserModel('User 1');
-      final user2 = TestUserModel('User 2');
-      final userDoc = TestUserModel.store.doc('1');
-      final userDoc2 = TestUserModel.store.doc('2');
+    test(
+      'Returns a stream of documents that satisfy the query',
+      () async {
+        final user = TestUserModel('User 1');
+        final user2 = TestUserModel('User 2');
+        final userDoc = TestUserModel.store.doc('1');
+        final userDoc2 = TestUserModel.store.doc('2');
 
-      userDoc.create(user);
-      userDoc2.create(user2);
+        userDoc.create(user);
+        userDoc2.create(user2);
 
-      final queryStream =
-          TestUserModel.store.where((snap) => snap.id == '1').stream();
+        final queryStream =
+            TestUserModel.store.where((snap) => snap.id == '1').stream();
 
-      final querySnap = await queryStream.first;
+        final querySnaps = await queryStream.take(1).toList();
 
-      expect(querySnap.length, 1);
-      expect(
-        querySnap.first,
-        DocumentSnapshotMatcher(
-          DocumentSnapshot(
-            doc: userDoc,
-            data: user,
-          ),
-        ),
-      );
-    });
+        expect(
+          querySnaps,
+          [
+            [
+              DocumentSnapshot(
+                doc: userDoc,
+                data: user,
+              ),
+            ]
+          ],
+        );
+      },
+    );
 
     test('Updates the stream of documents when they change', () async {
       final user = TestUserModel('User 1');
@@ -546,21 +537,63 @@ void main() {
       userDoc.update(user2);
 
       final querySnaps = await queryStream.toList();
-      final firstSnap = querySnaps.first;
-      final lastSnap = querySnaps.last;
-
-      expect(firstSnap.length, 1);
       expect(
-        firstSnap[0],
-        DocumentSnapshotMatcher(
-          DocumentSnapshot(
-            doc: userDoc,
-            data: user,
-          ),
-        ),
+        querySnaps,
+        [
+          [
+            DocumentSnapshot(
+              doc: userDoc,
+              data: user,
+            ),
+          ],
+          [],
+        ],
       );
+    });
 
-      expect(lastSnap.isEmpty, true);
+    test(
+        'Correctly handles the scenario where a collection is removed and written to in the same task',
+        () async {
+      final user = TestUserModel('User 1');
+      final user2 = TestUserModel('User 2');
+      final userDoc = TestUserModel.store.doc('1');
+      final userDoc2 = TestUserModel.store.doc('2');
+
+      userDoc.create(user);
+      userDoc2.create(user2);
+
+      await asyncEvent();
+
+      final queryStream = TestUserModel.store.stream().take(2);
+
+      await asyncEvent();
+
+      TestUserModel.store.delete();
+      userDoc.create(user);
+
+      final querySnaps = await queryStream.toList();
+
+      expect(
+        querySnaps,
+        [
+          [
+            DocumentSnapshot(
+              doc: userDoc,
+              data: user,
+            ),
+            DocumentSnapshot(
+              doc: userDoc2,
+              data: user2,
+            ),
+          ],
+          [
+            DocumentSnapshot(
+              doc: userDoc,
+              data: user,
+            ),
+          ],
+        ],
+      );
     });
   });
 
@@ -576,7 +609,7 @@ void main() {
       final userDoc2 = TestUserModel.store.doc('2');
       final updatedUser = TestUserModel('User 1 updated');
 
-      final queryFuture = TestUserModel.store.streamChanges().take(2).toList();
+      final changeSnaps = TestUserModel.store.streamChanges().take(2).toList();
 
       userDoc.create(user);
       userDoc2.create(user2);
@@ -585,41 +618,32 @@ void main() {
 
       userDoc.update(updatedUser);
 
-      final snaps = await queryFuture;
-
-      expect(snaps[0].length, 2);
-
       expect(
-        snaps[0].first.type,
-        BroadcastEventTypes.added,
-      );
-      expect(
-        snaps[0].first.data,
-        user,
-      );
-
-      expect(
-        snaps[0].last.type,
-        BroadcastEventTypes.added,
-      );
-      expect(
-        snaps[0].last.data,
-        user2,
-      );
-
-      expect(snaps[1].length, 1);
-
-      expect(
-        snaps[1].first.type,
-        BroadcastEventTypes.modified,
-      );
-      expect(
-        snaps[1].first.prevData,
-        user,
-      );
-      expect(
-        snaps[1].first.data,
-        updatedUser,
+        await changeSnaps,
+        [
+          [
+            DocumentChangeSnapshot(
+              doc: userDoc,
+              data: user,
+              event: BroadcastEvents.added,
+              prevData: null,
+            ),
+            DocumentChangeSnapshot(
+              doc: userDoc2,
+              data: user2,
+              event: BroadcastEvents.added,
+              prevData: null,
+            ),
+          ],
+          [
+            DocumentChangeSnapshot(
+              doc: userDoc,
+              data: updatedUser,
+              event: BroadcastEvents.modified,
+              prevData: user,
+            ),
+          ]
+        ],
       );
     });
 
@@ -627,7 +651,7 @@ void main() {
       final user = TestUserModel('User 1');
       final userDoc = TestUserModel.store.doc('1');
 
-      final queryFuture = TestUserModel.store
+      final changeSnaps = TestUserModel.store
           .where((snap) => snap.data.name == 'User 1 updated')
           .streamChanges()
           .take(1)
@@ -635,17 +659,136 @@ void main() {
 
       userDoc.create(user);
       await asyncEvent();
-      userDoc.update(TestUserModel('User 1 updated'));
+      final updatedUser = TestUserModel('User 1 updated');
+      userDoc.update(updatedUser);
 
-      final snaps = await queryFuture;
-
-      expect(snaps[0].length, 1);
       expect(
-        snaps[0].first.type,
-        // The global event is a [BroadcastEventTypes.modified] when the user is updated,
-        // but to this query, it should be a [BroadcastEventTypes.added] event since previously
-        // it was not included and now it is.
-        BroadcastEventTypes.added,
+        await changeSnaps,
+        [
+          [
+            DocumentChangeSnapshot(
+              doc: userDoc,
+              data: updatedUser,
+              // The global event is a [BroadcastBroadcastEvents.modified] when the user is updated,
+              // but to this query, it should be a [BroadcastBroadcastEvents.added] event since previously
+              // it was not included and now it is.
+              event: BroadcastEvents.added,
+              prevData: null,
+            ),
+          ],
+        ],
+      );
+    });
+
+    test(
+        'Correctly handles the scenario where a collection is removed and written to in the same task',
+        () async {
+      final user = TestUserModel('User 1');
+      final user2 = TestUserModel('User 2');
+      final userDoc = TestUserModel.store.doc('1');
+      final userDoc2 = TestUserModel.store.doc('2');
+
+      final changeSnaps = TestUserModel.store.streamChanges().take(2).toList();
+
+      userDoc.create(user);
+      userDoc2.create(user2);
+
+      await asyncEvent();
+
+      TestUserModel.store.delete();
+      userDoc.create(user);
+
+      expect(
+        await changeSnaps,
+        [
+          [
+            DocumentChangeSnapshot(
+              doc: userDoc,
+              data: user,
+              prevData: null,
+              event: BroadcastEvents.added,
+            ),
+            DocumentChangeSnapshot(
+              doc: userDoc2,
+              data: user2,
+              prevData: null,
+              event: BroadcastEvents.added,
+            )
+          ],
+          [
+            DocumentChangeSnapshot(
+              doc: userDoc,
+              data: null,
+              prevData: user,
+              event: BroadcastEvents.removed,
+            ),
+            DocumentChangeSnapshot(
+              doc: userDoc2,
+              data: null,
+              prevData: user2,
+              event: BroadcastEvents.removed,
+            ),
+            DocumentChangeSnapshot(
+              doc: userDoc,
+              data: user,
+              prevData: null,
+              event: BroadcastEvents.added,
+            ),
+          ],
+        ],
+      );
+    });
+
+    test(
+        'Discards changes that occur to a collection in the same task as a subsequent deletion of that collection',
+        () async {
+      final user = TestUserModel('User 1');
+      final user2 = TestUserModel('User 2');
+      final userDoc = TestUserModel.store.doc('1');
+      final userDoc2 = TestUserModel.store.doc('2');
+
+      final changeSnaps = TestUserModel.store.streamChanges().take(2).toList();
+
+      userDoc.create(user);
+      userDoc2.create(user2);
+
+      await asyncEvent();
+
+      userDoc.update(TestUserModel('User 1 updated'));
+      TestUserModel.store.delete();
+
+      expect(
+        await changeSnaps,
+        [
+          [
+            DocumentChangeSnapshot(
+              doc: userDoc,
+              data: user,
+              prevData: null,
+              event: BroadcastEvents.added,
+            ),
+            DocumentChangeSnapshot(
+              doc: userDoc2,
+              data: user2,
+              prevData: null,
+              event: BroadcastEvents.added,
+            )
+          ],
+          [
+            DocumentChangeSnapshot(
+              doc: userDoc,
+              data: null,
+              prevData: user,
+              event: BroadcastEvents.removed,
+            ),
+            DocumentChangeSnapshot(
+              doc: userDoc2,
+              data: null,
+              prevData: user2,
+              event: BroadcastEvents.removed,
+            ),
+          ],
+        ],
       );
     });
   });
@@ -668,21 +811,19 @@ void main() {
         userDoc2.create(userData2);
 
         expect(
-          Loon.extract()['collectionStore'],
+          Loon.inspect()['store'],
           {
             "users": {
-              "1": DocumentSnapshotMatcher(
-                DocumentSnapshot(
+              "__values": {
+                "1": DocumentSnapshot(
                   doc: userDoc,
                   data: userData,
                 ),
-              ),
-              "2": DocumentSnapshotMatcher(
-                DocumentSnapshot(
+                "2": DocumentSnapshot(
                   doc: userDoc2,
                   data: userData2,
                 ),
-              ),
+              }
             }
           },
         );
@@ -690,7 +831,7 @@ void main() {
         TestUserModel.store.delete();
 
         expect(
-          Loon.extract()['collectionStore'],
+          Loon.inspect()['store'],
           {},
         );
       });
@@ -702,45 +843,50 @@ void main() {
         final userData = TestUserModel('User 1');
         final userData2 = TestUserModel('User 2');
 
-        final friendDoc =
-            userDoc.subcollection<TestUserModel>('friends').doc('2');
+        final friendDoc = userDoc
+            .subcollection<TestUserModel>(
+              'friends',
+              fromJson: TestUserModel.fromJson,
+              toJson: (snap) => snap.toJson(),
+            )
+            .doc('2');
 
         userDoc.create(userData);
         friendDoc.create(userData2);
         userDoc2.create(userData2);
 
         expect(
-          Loon.extract()['collectionStore'],
+          Loon.inspect()['store'],
           {
             "users": {
-              "1": DocumentSnapshotMatcher(
-                DocumentSnapshot(
+              "__values": {
+                "1": DocumentSnapshot(
                   doc: userDoc,
                   data: userData,
                 ),
-              ),
-              "2": DocumentSnapshotMatcher(
-                DocumentSnapshot(
+                "2": DocumentSnapshot(
                   doc: userDoc2,
                   data: userData2,
                 ),
-              ),
+              },
+              "1": {
+                "friends": {
+                  "__values": {
+                    "2": DocumentSnapshot(
+                      doc: friendDoc,
+                      data: userData2,
+                    ),
+                  }
+                }
+              }
             },
-            "users__1__friends": {
-              "2": DocumentSnapshotMatcher(
-                DocumentSnapshot(
-                  doc: friendDoc,
-                  data: userData2,
-                ),
-              ),
-            }
           },
         );
 
         TestUserModel.store.delete();
 
         expect(
-          Loon.extract()['collectionStore'],
+          Loon.inspect()['store'],
           {},
         );
       });
@@ -754,8 +900,13 @@ void main() {
           final userData = TestUserModel('User 1');
           final userData2 = TestUserModel('User 2');
 
-          final friendDoc =
-              userDoc.subcollection<TestUserModel>('friends').doc('2');
+          final friendDoc = userDoc
+              .subcollection<TestUserModel>(
+                'friends',
+                fromJson: TestUserModel.fromJson,
+                toJson: (snap) => snap.toJson(),
+              )
+              .doc('2');
 
           userDoc.create(userData);
           friendDoc.create(userData2);
@@ -779,11 +930,9 @@ void main() {
           expect(
             userDocData,
             [
-              DocumentSnapshotMatcher(
-                DocumentSnapshot(
-                  doc: userDoc,
-                  data: userData,
-                ),
+              DocumentSnapshot(
+                doc: userDoc,
+                data: userData,
               ),
               null,
             ],
@@ -793,18 +942,14 @@ void main() {
             userCollectionData,
             [
               [
-                DocumentSnapshotMatcher(
-                  DocumentSnapshot(
-                    doc: userDoc,
-                    data: userData,
-                  ),
+                DocumentSnapshot(
+                  doc: userDoc,
+                  data: userData,
                 ),
-                DocumentSnapshotMatcher(
-                  DocumentSnapshot(
-                    doc: userDoc2,
-                    data: userData2,
-                  ),
-                )
+                DocumentSnapshot(
+                  doc: userDoc2,
+                  data: userData2,
+                ),
               ],
               [],
             ],
@@ -813,11 +958,9 @@ void main() {
           expect(
             friendDocData,
             [
-              DocumentSnapshotMatcher(
-                DocumentSnapshot(
-                  doc: friendDoc,
-                  data: userData2,
-                ),
+              DocumentSnapshot(
+                doc: friendDoc,
+                data: userData2,
               ),
               null,
             ],
@@ -827,18 +970,14 @@ void main() {
             userCollectionData,
             [
               [
-                DocumentSnapshotMatcher(
-                  DocumentSnapshot(
-                    doc: userDoc,
-                    data: userData,
-                  ),
+                DocumentSnapshot(
+                  doc: userDoc,
+                  data: userData,
                 ),
-                DocumentSnapshotMatcher(
-                  DocumentSnapshot(
-                    doc: userDoc2,
-                    data: userData2,
-                  ),
-                )
+                DocumentSnapshot(
+                  doc: userDoc2,
+                  data: userData2,
+                ),
               ],
               [],
             ],
@@ -848,11 +987,9 @@ void main() {
             friendCollectionData,
             [
               [
-                DocumentSnapshotMatcher(
-                  DocumentSnapshot(
-                    doc: friendDoc,
-                    data: userData2,
-                  ),
+                DocumentSnapshot(
+                  doc: friendDoc,
+                  data: userData2,
                 ),
               ],
               [],
@@ -863,77 +1000,156 @@ void main() {
     },
   );
 
-  group('Replace collection', () {
-    tearDown(() {
-      Loon.clearAll();
-    });
+  group(
+    'Replace collection',
+    () {
+      tearDown(() {
+        Loon.clearAll();
+      });
 
-    test('Replaces all documents in the collection', () {
-      final userDoc = TestUserModel.store.doc('1');
-      final userDoc2 = TestUserModel.store.doc('2');
+      test('Replaces all documents in the collection', () {
+        final userDoc = TestUserModel.store.doc('1');
+        final userDoc2 = TestUserModel.store.doc('2');
 
-      final userData = TestUserModel('User 1');
-      final userData2 = TestUserModel('User 2');
+        final userData = TestUserModel('User 1');
+        final userData2 = TestUserModel('User 2');
 
-      userDoc.create(userData);
-      userDoc2.create(userData2);
+        userDoc.create(userData);
+        userDoc2.create(userData2);
 
-      expect(
-        Loon.extract()['collectionStore'],
-        {
-          "users": {
-            "1": DocumentSnapshotMatcher(
-              DocumentSnapshot(
-                doc: userDoc,
-                data: userData,
-              ),
+        expect(
+          Loon.inspect()['store'],
+          {
+            "users": {
+              "__values": {
+                "1": DocumentSnapshot(
+                  doc: userDoc,
+                  data: userData,
+                ),
+                "2": DocumentSnapshot(
+                  doc: userDoc2,
+                  data: userData2,
+                ),
+              }
+            }
+          },
+        );
+
+        final updatedUser2 = TestUserModel('User 2 updated');
+        final userDoc3 = TestUserModel.store.doc('3');
+        final userData3 = TestUserModel('User 3');
+
+        TestUserModel.store.replace([
+          DocumentSnapshot(
+            doc: userDoc2,
+            data: updatedUser2,
+          ),
+          DocumentSnapshot(
+            doc: userDoc3,
+            data: userData3,
+          ),
+        ]);
+
+        expect(
+          Loon.inspect()['store'],
+          {
+            "users": {
+              "__values": {
+                "2": DocumentSnapshot(
+                  doc: userDoc2,
+                  data: updatedUser2,
+                ),
+                "3": DocumentSnapshot(
+                  doc: userDoc3,
+                  data: userData3,
+                ),
+              },
+            }
+          },
+        );
+      });
+
+      test(
+        "Broadcasts the expected change events",
+        () async {
+          final userDoc = TestUserModel.store.doc('1');
+          final userDoc2 = TestUserModel.store.doc('2');
+
+          final userData = TestUserModel('User 1');
+          final userData2 = TestUserModel('User 2');
+
+          final querySnaps =
+              TestUserModel.store.streamChanges().take(2).toList();
+
+          userDoc.create(userData);
+          userDoc2.create(userData2);
+
+          await asyncEvent();
+
+          final updatedUser2 = TestUserModel('User 2 updated');
+          final userDoc3 = TestUserModel.store.doc('3');
+          final userData3 = TestUserModel('User 3');
+
+          TestUserModel.store.replace([
+            DocumentSnapshot(
+              doc: userDoc2,
+              data: updatedUser2,
             ),
-            "2": DocumentSnapshotMatcher(
-              DocumentSnapshot(
-                doc: userDoc2,
-                data: userData2,
-              ),
+            DocumentSnapshot(
+              doc: userDoc3,
+              data: userData3,
             ),
-          }
+          ]);
+
+          expect(
+            await querySnaps,
+            [
+              [
+                DocumentChangeSnapshot(
+                  doc: userDoc,
+                  data: userData,
+                  event: BroadcastEvents.added,
+                  prevData: null,
+                ),
+                DocumentChangeSnapshot(
+                  doc: userDoc2,
+                  data: userData2,
+                  event: BroadcastEvents.added,
+                  prevData: null,
+                ),
+              ],
+              [
+                DocumentChangeSnapshot(
+                  doc: userDoc,
+                  data: null,
+                  event: BroadcastEvents.removed,
+                  prevData: userData,
+                ),
+                DocumentChangeSnapshot(
+                  doc: userDoc2,
+                  data: null,
+                  event: BroadcastEvents.removed,
+                  prevData: userData2,
+                ),
+                DocumentChangeSnapshot(
+                  doc: userDoc2,
+                  data: updatedUser2,
+                  event: BroadcastEvents.added,
+                  prevData: null,
+                ),
+                DocumentChangeSnapshot(
+                  doc: userDoc3,
+                  data: userData3,
+                  event: BroadcastEvents.added,
+                  prevData: null,
+                ),
+              ]
+            ],
+          );
         },
       );
-
-      final updatedUser2 = TestUserModel('User 2 updated');
-      final userDoc3 = TestUserModel.store.doc('3');
-      final userData3 = TestUserModel('User 3');
-
-      TestUserModel.store.replace([
-        DocumentSnapshot(
-          doc: userDoc2,
-          data: updatedUser2,
-        ),
-        DocumentSnapshot(
-          doc: userDoc3,
-          data: userData3,
-        ),
-      ]);
-
-      expect(
-        Loon.extract()['collectionStore'],
-        {
-          "users": {
-            "2": DocumentSnapshotMatcher(
-              DocumentSnapshot(
-                doc: userDoc2,
-                data: updatedUser2,
-              ),
-            ),
-            "3": DocumentSnapshotMatcher(
-              DocumentSnapshot(
-                doc: userDoc3,
-                data: userData3,
-              ),
-            ),
-          }
-        },
-      );
-    });
-  });
+    },
+  );
 
   group(
     'clearAll',
@@ -953,21 +1169,19 @@ void main() {
         userDoc2.create(userData2);
 
         expect(
-          Loon.extract()['collectionStore'],
+          Loon.inspect()['store'],
           {
             "users": {
-              "1": DocumentSnapshotMatcher(
-                DocumentSnapshot(
+              "__values": {
+                "1": DocumentSnapshot(
                   doc: userDoc,
                   data: userData,
                 ),
-              ),
-              "2": DocumentSnapshotMatcher(
-                DocumentSnapshot(
+                "2": DocumentSnapshot(
                   doc: userDoc2,
                   data: userData2,
                 ),
-              ),
+              }
             }
           },
         );
@@ -975,15 +1189,8 @@ void main() {
         Loon.clearAll();
 
         expect(
-          Loon.extract()['collectionStore'],
+          Loon.inspect()['store'],
           {},
-        );
-        expect(
-          Loon.extract()['dependencyStore'],
-          {
-            'dependencies': {},
-            'dependents': {},
-          },
         );
       });
 
@@ -1009,11 +1216,9 @@ void main() {
             userDocStreamData,
             [
               null,
-              DocumentSnapshotMatcher(
-                DocumentSnapshot(
-                  doc: userDoc,
-                  data: userData,
-                ),
+              DocumentSnapshot(
+                doc: userDoc,
+                data: userData,
               ),
               null,
             ],
@@ -1024,11 +1229,9 @@ void main() {
             [
               [],
               [
-                DocumentSnapshotMatcher(
-                  DocumentSnapshot(
-                    doc: userDoc,
-                    data: userData,
-                  ),
+                DocumentSnapshot(
+                  doc: userDoc,
+                  data: userData,
                 ),
               ],
               [],
@@ -1044,24 +1247,50 @@ void main() {
       Loon.clearAll();
     });
 
-    test('Writes documents successfully', () {
+    test('Writes documents', () {
+      final rootDoc1 = Loon.doc('1');
+      final rootSubcollection = rootDoc1.subcollection('friends');
+      final rootSubcollectionDoc = rootSubcollection.doc('1');
+
+      expect(rootDoc1.path, 'root__1');
+      expect(rootSubcollection.path, 'root__1__friends');
+      expect(rootSubcollectionDoc.path, 'root__1__friends__1');
+
+      rootDoc1.create('Test');
+      rootSubcollectionDoc.create('Test 2');
+
+      expect(rootDoc1.get(), DocumentSnapshot(doc: rootDoc1, data: 'Test'));
+      expect(
+        rootSubcollectionDoc.get(),
+        DocumentSnapshot(doc: rootSubcollectionDoc, data: 'Test 2'),
+      );
+    });
+
+    test('Deletes documents', () {
       final data = {"test": true};
       final rootDoc = Loon.doc('1');
 
       rootDoc.create(data);
 
       expect(
-        Loon.extract()['collectionStore'],
+        Loon.inspect()['store'],
         {
-          "__ROOT__": {
-            "1": DocumentSnapshotMatcher(
-              DocumentSnapshot(
+          "root": {
+            "__values": {
+              "1": DocumentSnapshot(
                 doc: rootDoc,
                 data: data,
               ),
-            ),
+            }
           }
         },
+      );
+
+      rootDoc.delete();
+
+      expect(
+        Loon.inspect()['store'],
+        {},
       );
     });
   });
@@ -1075,21 +1304,29 @@ void main() {
       final friendData = TestUserModel('Friend 1');
       final friendDoc = Loon.collection('users')
           .doc('1')
-          .subcollection<TestUserModel>('friends')
+          .subcollection<TestUserModel>(
+            'friends',
+            fromJson: TestUserModel.fromJson,
+            toJson: (snap) => snap.toJson(),
+          )
           .doc('1');
 
       friendDoc.create(friendData);
 
       expect(
-        Loon.extract()['collectionStore'],
+        Loon.inspect()['store'],
         {
-          "users__1__friends": {
-            "1": DocumentSnapshotMatcher(
-              DocumentSnapshot(
-                doc: friendDoc,
-                data: friendData,
-              ),
-            ),
+          "users": {
+            "1": {
+              "friends": {
+                "__values": {
+                  "1": DocumentSnapshot(
+                    doc: friendDoc,
+                    data: friendData,
+                  ),
+                },
+              },
+            }
           }
         },
       );
@@ -1111,73 +1348,85 @@ void main() {
       final userDoc = userCollection.doc('1');
       final userData = TestUserModel('User 1');
 
-      expectLater(
-        userDoc.stream(),
-        emitsInOrder(
-          [
-            null,
-            DocumentSnapshotMatcher(
-              DocumentSnapshot(
-                doc: userDoc,
-                data: userData,
-              ),
-            ),
-          ],
+      Loon.configure(
+        persistor: TestPersistor(
+          seedData: [DocumentSnapshot(doc: userDoc, data: userData)],
         ),
       );
+
+      await Loon.hydrate();
+
+      expect(
+        Loon.inspect()['store'],
+        {
+          "users": {
+            "__values": {
+              "1": DocumentSnapshotMatcher(
+                DocumentSnapshot(doc: userDoc, data: userData.toJson()),
+              ),
+            }
+          }
+        },
+      );
+
+      // It is then de-serialized when it is first accessed.
+      expect(userDoc.get(), DocumentSnapshot(doc: userDoc, data: userData));
+
+      // After the document is read, it is lazily de-serialized.
+      expect(
+        Loon.inspect()['store'],
+        {
+          "users": {
+            "__values": {
+              "1": DocumentSnapshot(doc: userDoc, data: userData),
+            }
+          }
+        },
+      );
+    });
+
+    test('Does not overwrite existing documents', () async {
+      final userCollection = Loon.collection<TestUserModel>(
+        'users',
+        fromJson: TestUserModel.fromJson,
+        toJson: (user) => user.toJson(),
+      );
+      final userDoc = userCollection.doc('1');
+      final userDoc2 = userCollection.doc('2');
+
+      userDoc.create(TestUserModel('User 1'));
 
       Loon.configure(
         persistor: TestPersistor(
           seedData: [
             DocumentSnapshot(
               doc: userDoc,
-              data: userData,
-            )
+              data: TestUserModel('User 1 cached'),
+            ),
+            DocumentSnapshot(
+              doc: userDoc2,
+              data: TestUserModel('User 2 cached'),
+            ),
           ],
         ),
       );
 
       await Loon.hydrate();
 
-      // The data is hydrated as Json
       expect(
-        Loon.extract()['collectionStore'],
-        {
-          "users": {
-            "1": DocumentSnapshotMatcher(
-              DocumentSnapshot(
-                doc: userDoc,
-                data: userData.toJson(),
-              ),
-            ),
-          }
-        },
-      );
-
-      // It is then de-serialized when it is first accessed.
-      expect(
-        userDoc.get(),
-        DocumentSnapshotMatcher(
+        userCollection.get(),
+        [
+          // User 1 should not have been overwritten by the data hydrated from persistence,
+          // since that data is stale and User 1 already exists in memory.
           DocumentSnapshot(
             doc: userDoc,
-            data: userData,
+            data: TestUserModel('User 1'),
           ),
-        ),
-      );
-
-      // Afterwards first read, it is stored de-serialized.
-      expect(
-        Loon.extract()['collectionStore'],
-        {
-          "users": {
-            "1": DocumentSnapshotMatcher(
-              DocumentSnapshot(
-                doc: userDoc,
-                data: userData,
-              ),
-            ),
-          }
-        },
+          DocumentSnapshot(
+            doc: userDoc2,
+            data: TestUserModel('User 2 cached'),
+          ),
+        ],
       );
     });
   });
@@ -1187,7 +1436,7 @@ void main() {
       Loon.clearAll();
     });
 
-    test("Dependent changes should broadcast dependencies", () async {
+    test("Changes to dependents should broadcast dependencies", () async {
       final usersCollection = Loon.collection('users');
       final postsCollection = Loon.collection<Json>(
         'posts',
@@ -1213,21 +1462,22 @@ void main() {
       await asyncEvent();
 
       expect(
-        Loon.extract()['dependencyStore'],
+        Loon.inspect()['dependencyStore'],
         {
-          "dependencies": {
-            "posts": {
+          "posts": {
+            "__values": {
               "1": {
                 userDoc,
-              },
-            },
-          },
-          "dependents": {
-            "users": {
-              "1": {
-                postDoc,
               }
             }
+          }
+        },
+      );
+      expect(
+        Loon.inspect()['dependentsStore'],
+        {
+          userDoc: {
+            postDoc,
           },
         },
       );
@@ -1251,21 +1501,22 @@ void main() {
       // Deleting the user doc should not alter the dependencies, as the post doc remains
       // dependent on the user doc, even when it is no longer in the store, since it could be added back later.
       expect(
-        Loon.extract()['dependencyStore'],
+        Loon.inspect()['dependencyStore'],
         {
-          "dependencies": {
-            "posts": {
+          "posts": {
+            "__values": {
               "1": {
                 userDoc,
-              },
-            },
+              }
+            }
           },
-          "dependents": {
-            "users": {
-              "1": {
-                postDoc,
-              },
-            },
+        },
+      );
+      expect(
+        Loon.inspect()['dependentsStore'],
+        {
+          userDoc: {
+            postDoc,
           },
         },
       );
@@ -1283,23 +1534,17 @@ void main() {
 
       // Now the post doc has been updated and is no longer dependent on the user doc.
       expect(
-        Loon.extract()['dependencyStore'],
-        {
-          "dependencies": {
-            "posts": {
-              "1": <dynamic>{},
-            },
-          },
-          "dependents": {
-            "users": {
-              "1": <dynamic>{},
-            }
-          },
-        },
+        Loon.inspect()['dependencyStore'],
+        {},
+      );
+      expect(
+        Loon.inspect()['dependentsStore'],
+        {},
       );
 
       await asyncEvent();
 
+      // Skips this update to user doc, since the last update caused the user doc to be removed as a dependency.
       userDoc.update({
         "id": 1,
         "name": "User 1 updated",
@@ -1311,22 +1556,24 @@ void main() {
 
       final snaps = await postsStream.take(8).toList();
 
-      // No post yet
-      expect(snaps[0], null);
-      // Post created
-      expect(snaps[1]!.data, postData);
-      // Rebroadcast post when user created
-      expect(snaps[2]!.data, postData);
-      // Rebroadcast post when user updated
-      expect(snaps[3]!.data, postData);
-      // Rebroadcast post when user deleted
-      expect(snaps[4]!.data, postData);
-      // Rebroadcast post when user re-added (ensures dependencies remain across deletion/re-creation)
-      expect(snaps[5]!.data, postData);
-      // Rebroadcast when post data is updated
-      expect(snaps[6]!.data, updatedPostData1);
-      // Skips the update to user doc, since the last update caused the user doc to be removed as a dependency.
-      expect(snaps[7]!.data, updatedPostData2);
+      expect(snaps, [
+        // No post yet
+        null,
+        // Post created
+        DocumentSnapshot(doc: postDoc, data: postData),
+        // Rebroadcast post when user created
+        DocumentSnapshot(doc: postDoc, data: postData),
+        // Rebroadcast post when user updated
+        DocumentSnapshot(doc: postDoc, data: postData),
+        // Rebroadcast post when user deleted
+        DocumentSnapshot(doc: postDoc, data: postData),
+        // Rebroadcast post when user re-added (ensures dependencies remain across deletion/re-creation)
+        DocumentSnapshot(doc: postDoc, data: postData),
+        // Rebroadcast when post data is updated
+        DocumentSnapshot(doc: postDoc, data: updatedPostData1),
+        // Rebroadcast when post data is updated again
+        DocumentSnapshot(doc: postDoc, data: updatedPostData2),
+      ]);
     });
 
     test("Cyclical dependencies do not cause infinite rebroadcasts", () async {
@@ -1361,18 +1608,23 @@ void main() {
       await asyncEvent();
 
       expect(
-        Loon.extract()['dependencyStore'],
+        Loon.inspect()['dependencyStore'],
         {
-          "dependencies": {
-            "users": {
-              "1": {postDoc},
-            },
-          },
-          "dependents": {
-            "posts": {
-              "1": {userDoc},
+          "users": {
+            "__values": {
+              "1": {
+                postDoc,
+              },
             }
           },
+        },
+      );
+      expect(
+        Loon.inspect()['dependentsStore'],
+        {
+          postDoc: {
+            userDoc,
+          }
         },
       );
 
@@ -1382,32 +1634,33 @@ void main() {
       });
 
       expect(
-        Loon.extract()['dependencyStore'],
+        Loon.inspect()['dependencyStore'],
         {
-          "dependencies": {
-            "users": {
+          "users": {
+            "__values": {
               "1": {
                 postDoc,
-              }
+              },
             },
-            "posts": {
+          },
+          "posts": {
+            "__values": {
               "1": {
                 userDoc,
-              }
-            }
-          },
-          "dependents": {
-            "posts": {
-              "1": {
-                userDoc,
-              }
+              },
             },
-            "users": {
-              "1": {
-                postDoc,
-              }
-            }
           },
+        },
+      );
+      expect(
+        Loon.inspect()['dependentsStore'],
+        {
+          postDoc: {
+            userDoc,
+          },
+          userDoc: {
+            postDoc,
+          }
         },
       );
 
@@ -1425,37 +1678,28 @@ void main() {
           // First emits null when no user has been written.
           null,
           // Emits the initially created user.
-          DocumentSnapshotMatcher(
-            DocumentSnapshot(
-              doc: userDoc,
-              data: userData,
-            ),
-          ),
+          DocumentSnapshot(doc: userDoc, data: userData),
           // Emits the same user again when the post is updated. Infinite rebroadcasting
           // does not occur despite a cyclical dependency between the user and the post since
           // attempts to rebroadcast documents that are already pending broadcast are ignored.
-          DocumentSnapshotMatcher(
-            DocumentSnapshot(
-              doc: userDoc,
-              data: userData,
-            ),
-          ),
+          DocumentSnapshot(doc: userDoc, data: userData),
           // Emits the updated user.
-          DocumentSnapshotMatcher(
-            DocumentSnapshot(
-              doc: userDoc,
-              data: updatedUserData,
-            ),
-          ),
+          DocumentSnapshot(doc: userDoc, data: updatedUserData),
           emitsDone,
         ]),
       );
     });
 
     test("Deleting a collection clears its dependencies", () async {
-      final usersCollection = Loon.collection('users');
-      final friendsCollection = Loon.collection<TestUserModel>(
+      final usersCollection = Loon.collection(
+        'users',
+        fromJson: TestUserModel.fromJson,
+        toJson: (snap) => snap.toJson(),
+      );
+      final friendsCollection = Loon.collection(
         'friends',
+        fromJson: TestUserModel.fromJson,
+        toJson: (snap) => snap.toJson(),
         dependenciesBuilder: (snap) {
           return {
             usersCollection.doc(snap.doc.id),
@@ -1471,22 +1715,23 @@ void main() {
       await asyncEvent();
 
       expect(
-        Loon.extract()['dependencyStore'],
+        Loon.inspect()['dependencyStore'],
         {
-          "dependencies": {
-            "friends": {
+          "friends": {
+            "__values": {
               "1": {
                 userDoc,
               }
             }
-          },
-          "dependents": {
-            "users": {
-              "1": {
-                friendDoc,
-              }
-            }
-          },
+          }
+        },
+      );
+      expect(
+        Loon.inspect()['dependentsStore'],
+        {
+          userDoc: {
+            friendDoc,
+          }
         },
       );
 
@@ -1495,34 +1740,27 @@ void main() {
       await asyncEvent();
 
       expect(
-        Loon.extract()['dependencyStore'],
+        Loon.inspect()['dependencyStore'],
+        {},
+      );
+      expect(
+        Loon.inspect()['dependentsStore'],
         {
-          "dependencies": {},
           // The dependents are not cleared when a collection is cleared, instead
           // the dependents are lazily cleared when the dependent is updated.
-          "dependents": {
-            "users": {
-              "1": {
-                friendDoc,
-              }
-            }
+          userDoc: {
+            friendDoc,
           },
         },
       );
 
+      // Now that the user has been updated, it has cleared its friend dependent.
       userDoc.update(TestUserModel('User 1 updated'));
 
       await asyncEvent();
 
-      expect(
-        Loon.extract()['dependencyStore'],
-        {
-          "dependencies": {},
-          "dependents": {
-            "users": {"1": <dynamic>{}}
-          },
-        },
-      );
+      expect(Loon.inspect()['dependencyStore'], {});
+      expect(Loon.inspect()['dependentsStore'], {});
     });
   });
 }

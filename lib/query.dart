@@ -1,26 +1,23 @@
 part of loon;
 
-class Query<T> {
-  final String key;
+abstract class Queryable<T> {
+  Query<T> toQuery();
+}
+
+class Query<T> extends Queryable<T> {
+  final Collection<T> collection;
   final List<FilterFn<T>> filters;
   final SortFn<T>? sort;
-  final FromJson<T>? fromJson;
-  final ToJson<T>? toJson;
-  final PersistorSettings? persistorSettings;
-
-  /// Returns the set of documents that the document associated with the given
-  /// [DocumentSnapshot] is dependent on.
-  final DependenciesBuilder<T>? dependenciesBuilder;
 
   Query(
-    this.key, {
-    required this.filters,
-    required this.sort,
-    required this.fromJson,
-    required this.toJson,
-    required this.persistorSettings,
-    required this.dependenciesBuilder,
+    this.collection, {
+    this.filters = const [],
+    this.sort,
   });
+
+  String get path {
+    return collection.path;
+  }
 
   bool _filter(DocumentSnapshot<T> snap) {
     for (final filter in filters) {
@@ -44,32 +41,26 @@ class Query<T> {
   }
 
   List<DocumentSnapshot<T>> get() {
-    return _sortQuery(
-      _filterQuery(
-        Loon._instance._getSnapshots(
-          key,
-          fromJson: fromJson,
-          toJson: toJson,
-          persistorSettings: persistorSettings,
-          dependenciesBuilder: dependenciesBuilder,
-        ),
-      ),
-    );
+    return _sortQuery(_filterQuery(collection.get()));
   }
 
   ObservableQuery<T> observe({
     bool multicast = false,
   }) {
     return ObservableQuery<T>(
-      key,
+      collection,
       filters: filters,
       sort: sort,
-      fromJson: fromJson,
-      toJson: toJson,
-      persistorSettings: persistorSettings,
-      dependenciesBuilder: dependenciesBuilder,
       multicast: multicast,
     );
+  }
+
+  bool exists() {
+    return _filterQuery(collection.get()).isNotEmpty;
+  }
+
+  bool isPendingBroadcast() {
+    return collection.isPendingBroadcast();
   }
 
   Stream<List<DocumentSnapshot<T>>> stream() {
@@ -82,25 +73,22 @@ class Query<T> {
 
   Query<T> sortBy(SortFn<T> sort) {
     return Query<T>(
-      key,
+      this.collection,
       filters: filters,
       sort: sort,
-      fromJson: fromJson,
-      toJson: toJson,
-      persistorSettings: persistorSettings,
-      dependenciesBuilder: dependenciesBuilder,
     );
   }
 
   Query<T> where(FilterFn<T> filter) {
     return Query<T>(
-      key,
+      this.collection,
       filters: [...filters, filter],
       sort: sort,
-      fromJson: fromJson,
-      toJson: toJson,
-      persistorSettings: persistorSettings,
-      dependenciesBuilder: dependenciesBuilder,
     );
+  }
+
+  @override
+  toQuery() {
+    return this;
   }
 }

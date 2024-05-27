@@ -1,21 +1,39 @@
 part of loon;
 
-class Document<T> {
-  final String collection;
+class Document<T> implements StoreReference {
   final String id;
+  final String parent;
   final FromJson<T>? fromJson;
   final ToJson<T>? toJson;
-  final PersistorSettings? _persistorSettings;
+  final PersistorSettings<T>? persistorSettings;
   final DependenciesBuilder<T>? dependenciesBuilder;
 
-  Document({
-    required this.collection,
-    required this.id,
+  Document(
+    this.parent,
+    this.id, {
     this.fromJson,
     this.toJson,
-    PersistorSettings? persistorSettings,
+    this.persistorSettings,
     this.dependenciesBuilder,
-  }) : _persistorSettings = persistorSettings;
+  });
+
+  static Document<S> fromPath<S>(
+    String path, {
+    FromJson<S>? fromJson,
+    ToJson<S>? toJson,
+    PersistorSettings<S>? persistorSettings,
+    DependenciesBuilder<S>? dependenciesBuilder,
+  }) {
+    final [...pathSegments, id] = path.split(ValueStore.delimiter);
+    return Document<S>(
+      pathSegments.join(ValueStore.delimiter),
+      id,
+      fromJson: fromJson,
+      toJson: toJson,
+      persistorSettings: persistorSettings,
+      dependenciesBuilder: dependenciesBuilder,
+    );
+  }
 
   @override
   bool operator ==(Object other) {
@@ -25,55 +43,37 @@ class Document<T> {
     // Documents are equivalent based on their ID and collection, however, observable documents
     // are not, since they have additional properties unique to their instance.
     if (other is Document && this is! ObservableDocument) {
-      return id == other.id && collection == other.collection;
+      return other.path == path;
     }
     return false;
   }
 
   @override
-  int get hashCode => Object.hashAll([id, collection]);
+  int get hashCode => Object.hashAll([parent, id]);
 
-  String get key {
-    return "$collection:$id";
+  @override
+  String get path {
+    if (id.isEmpty) {
+      return parent;
+    }
+
+    return "${parent}__$id";
   }
 
   Collection<S> subcollection<S>(
-    String subcollection, {
+    String name, {
     FromJson<S>? fromJson,
     ToJson<S>? toJson,
-    PersistorSettings? persistorSettings,
+    PersistorSettings<S>? persistorSettings,
     DependenciesBuilder<S>? dependenciesBuilder,
   }) {
     return Collection<S>(
-      "${collection}__${id}__$subcollection",
+      path,
+      name,
       fromJson: fromJson,
       toJson: toJson,
       persistorSettings: persistorSettings,
       dependenciesBuilder: dependenciesBuilder,
-    );
-  }
-
-  void delete({
-    bool broadcast = true,
-  }) {
-    Loon._instance._deleteDocument<T>(this, broadcast: broadcast);
-  }
-
-  DocumentSnapshot<T> update(
-    T data, {
-    bool broadcast = true,
-  }) {
-    return Loon._instance._updateDocument<T>(this, data, broadcast: broadcast);
-  }
-
-  DocumentSnapshot<T> modify(
-    ModifyFn<T> modifyFn, {
-    bool broadcast = true,
-  }) {
-    return Loon._instance._modifyDocument(
-      this,
-      modifyFn,
-      broadcast: broadcast,
     );
   }
 
@@ -81,37 +81,67 @@ class Document<T> {
     T data, {
     bool broadcast = true,
   }) {
-    return Loon._instance._createDocument<T>(this, data, broadcast: broadcast);
+    if (exists()) {
+      throw Exception('Cannot create duplicate document');
+    }
+
+    return Loon._instance.writeDocument<T>(
+      this,
+      data,
+      broadcast: broadcast,
+      event: BroadcastEvents.added,
+    );
+  }
+
+  DocumentSnapshot<T> update(
+    T data, {
+    bool broadcast = true,
+  }) {
+    if (!exists()) {
+      throw Exception('Missing document $path');
+    }
+
+    return Loon._instance.writeDocument<T>(
+      this,
+      data,
+      // As an optimization, broadcasting is skipped when updating a document if the document
+      // data is unchanged.
+      broadcast: data != get()!.data,
+      event: BroadcastEvents.modified,
+    );
   }
 
   DocumentSnapshot<T> createOrUpdate(
     T data, {
     bool broadcast = true,
   }) {
-    return Loon._instance._createOrUpdateDocument<T>(
-      this,
-      data,
-      broadcast: broadcast,
-    );
+    if (exists()) {
+      return update(data, broadcast: broadcast);
+    }
+    return create(data, broadcast: broadcast);
+  }
+
+  DocumentSnapshot<T> modify(
+    ModifyFn<T> modifyFn, {
+    bool broadcast = true,
+  }) {
+    return createOrUpdate(modifyFn(get()), broadcast: broadcast);
+  }
+
+  void delete() {
+    Loon._instance.deleteDocument<T>(this);
   }
 
   DocumentSnapshot<T>? get() {
-    return Loon._instance._getSnapshot<T>(
-      id: id,
-      collection: collection,
-      fromJson: fromJson,
-      toJson: toJson,
-      persistorSettings: persistorSettings,
-      dependenciesBuilder: dependenciesBuilder,
-    );
+    return Loon._instance.getSnapshot(this);
   }
 
   ObservableDocument<T> observe({
     bool multicast = false,
   }) {
     return ObservableDocument<T>(
-      id: id,
-      collection: collection,
+      parent,
+      id,
       fromJson: fromJson,
       toJson: toJson,
       persistorSettings: persistorSettings,
@@ -139,35 +169,23 @@ class Document<T> {
   }
 
   bool exists() {
-    return Loon._instance._hasDocument(this);
+    return get() != null;
+  }
+
+  Set<Document>? dependencies() {
+    return Loon._instance.dependenciesStore.get(path);
+  }
+
+  Set<Document>? dependents() {
+    return Loon._instance.dependentsStore[this];
   }
 
   bool isPersistenceEnabled() {
-    return persistorSettings?.persistenceEnabled ?? false;
+    return persistorSettings?.enabled ??
+        Loon._instance._isGlobalPersistenceEnabled;
   }
 
   bool isPendingBroadcast() {
-    return Loon._instance._isDocumentPendingBroadcast(this);
+    return Loon._instance.broadcastManager.store.hasValue(path);
   }
-
-  PersistorSettings? get persistorSettings {
-    return _persistorSettings ?? Loon._instance.persistor?.settings;
-  }
-}
-
-enum BroadcastEventTypes {
-  /// The document has been modified.
-  modified,
-
-  /// The document has been added.
-  added,
-
-  /// The document has been removed.
-  removed,
-
-  /// The document has been manually touched for rebroadcast.
-  touched,
-
-  /// The document has been hydrated from persisted storage.
-  hydrated,
 }

@@ -28,7 +28,7 @@ abstract class MessageResponse {
 class InitMessageRequest extends MessageRequest<InitMessageResponse> {
   final SendPort sendPort;
   final Directory directory;
-  final Encrypter? encrypter;
+  final Encrypter encrypter;
 
   InitMessageRequest({
     required this.sendPort,
@@ -51,7 +51,11 @@ class InitMessageResponse extends MessageResponse {
 }
 
 class HydrateMessageRequest extends MessageRequest<HydrateMessageResponse> {
-  HydrateMessageResponse success(SerializedCollectionStore data) {
+  final List<String>? paths;
+
+  HydrateMessageRequest([this.paths]);
+
+  HydrateMessageResponse success(Map<String, Json> data) {
     return HydrateMessageResponse(
       id: id,
       data: data,
@@ -60,7 +64,8 @@ class HydrateMessageRequest extends MessageRequest<HydrateMessageResponse> {
 }
 
 class HydrateMessageResponse extends MessageResponse {
-  final SerializedCollectionStore data;
+  /// A map of document paths to the document's hydrated data.
+  final Map<String, Json> data;
 
   HydrateMessageResponse({
     required super.id,
@@ -87,10 +92,10 @@ class PersistMessageResponse extends MessageResponse {
 }
 
 class ClearMessageRequest extends MessageRequest<ClearMessageResponse> {
-  final String collection;
+  final String path;
 
   ClearMessageRequest({
-    required this.collection,
+    required this.path,
   });
 
   ClearMessageResponse success() {
@@ -125,10 +130,10 @@ class ErrorMessageResponse extends MessageResponse {
   });
 }
 
-class DebugMessageResponse extends MessageResponse {
+class LogMessageResponse extends MessageResponse {
   final String text;
 
-  DebugMessageResponse({
+  LogMessageResponse({
     required this.text,
   }) : super(id: '');
 }

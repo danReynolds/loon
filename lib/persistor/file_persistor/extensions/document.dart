@@ -1,39 +1,42 @@
 import 'package:loon/loon.dart';
 import 'package:loon/persistor/file_persistor/file_persist_document.dart';
+import 'package:loon/persistor/file_persistor/file_persistor_settings.dart';
 
 extension DocumentExtensions<T> on Document<T> {
-  /// Returns the name of a file data store name for a given document and its persistor settings.
-  /// Uses the custom persistence key of the document if specified in its persistor settings,
-  /// otherwise it defaults to the document's collection name.
-  String getDatastoreName() {
-    String dataStoreName;
+  FilePersistorKey? getPersistenceKey() {
     final documentSettings = persistorSettings;
+    if (documentSettings is FilePersistorSettings<T>) {
+      final keyBuilder = documentSettings.key;
 
-    if (documentSettings is FilePersistorSettings) {
-      dataStoreName =
-          documentSettings.getPersistenceKey?.call(this) ?? collection;
-
-      if (isEncryptionEnabled()) {
-        dataStoreName += '.encrypted';
+      if (keyBuilder is FilePersistorDocumentKeyBuilder<T>) {
+        return (keyBuilder as FilePersistorDocumentKeyBuilder).build(get()!);
       }
-    } else {
-      dataStoreName = collection;
+
+      if (keyBuilder is FilePersistorCollectionKeyBuilder<T>) {
+        return keyBuilder.build();
+      }
     }
 
-    return dataStoreName;
+    return null;
   }
 
   /// Returns whether encryption is enabled for this document.
-  bool isEncryptionEnabled() {
-    return persistorSettings is FilePersistorSettings &&
-        (persistorSettings as FilePersistorSettings).encryptionEnabled;
+  bool isEncrypted() {
+    final settings = persistorSettings ?? Loon.persistorSettings;
+
+    if (settings is FilePersistorSettings) {
+      return settings.encrypted;
+    }
+
+    return false;
   }
 
-  FilePersistDocument toPersistenceDoc() {
-    return FilePersistDocument(
-      key: key,
-      encryptionEnabled: isEncryptionEnabled(),
-      dataStoreName: getDatastoreName(),
+  FilePersistDocument<T> toPersistenceDoc() {
+    return FilePersistDocument<T>(
+      id: id,
+      parent: parent,
+      encrypted: isEncrypted(),
+      key: getPersistenceKey(),
       data: getJson(),
     );
   }

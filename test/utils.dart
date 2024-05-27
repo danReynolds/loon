@@ -49,19 +49,19 @@ class PersistorCompleter {
     _onHydrateCompleter.complete();
   }
 
-  Future<void> get onPersistComplete {
+  Future<void> get onPersist {
     return _onPersistCompleter.future;
   }
 
-  Future<void> get onClearComplete {
+  Future<void> get onClear {
     return _onClearCompleter.future;
   }
 
-  Future<void> get onClearAllComplete {
+  Future<void> get onClearAll {
     return _onClearAllCompleter.future;
   }
 
-  Future<void> get onHydrateComplete {
+  Future<void> get onHydrate {
     return _onHydrateCompleter.future;
   }
 }

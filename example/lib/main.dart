@@ -10,7 +10,10 @@ const uuid = Uuid();
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  Loon.configure(persistor: FilePersistor());
+  Loon.configure(
+    persistor: FilePersistor(),
+    enableLogging: true,
+  );
 
   await Loon.hydrate();
 

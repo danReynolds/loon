@@ -1,3 +1,7 @@
+## 2.0.0
+
+* Rearchitecture of core implementation.
+
 ## 1.2.0
 
 * Fixed a bug where `clearAll` wasn't broadcasting to observers.
