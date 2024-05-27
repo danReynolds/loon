@@ -190,7 +190,13 @@ class FileDataStore {
   Future<String?> _readFile() {
     return _logger.measure(
       "Read file",
-      () => _file.readAsString().catchType<PathNotFoundException>(),
+      () async {
+        if (await _file.exists()) {
+          return _file.readAsString();
+        }
+
+        return null;
+      },
     );
   }
 

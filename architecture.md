@@ -57,13 +57,16 @@ as part of the next micro-task. The handing off of the batched change events to 
 
 On broadcast, each broadcast observer checks if it is affected by any of the changes in the current broadcast.
 
-* For an [ObservableDocument], this involves checking if the broadcast tree contains an event at its current path.
-* For an [ObservableQuery], this involves iterating through the changes at its path in the broadcast tree for each of the documents in its collection
-  and recalculating whether it needs to inform listeners of any additions, removals or updates to its documents.
+* For an [ObservableDocument], this involves checking if the broadcast tree contains an event at its document path.
+* For an [ObservableQuery], this involves iterating through the changes at collection its path in the broadcast tree
+  for each of the documents in its collection and recalculating whether it needs to inform listeners of any additions,
+  removals or updates to its documents.
 
-### Dependency Layer
+If the broadcast observer has changes, then it emits its updated data to its listeners.
 
-Loon has support for creating relationships between documents:
+### Dependencies
+
+Documents can specify that they depend on other documents and that they should react to changes to those documents.
 
 ```dart
 Loon.collection(
@@ -76,13 +79,219 @@ Loon.collection(
 );
 ```
 
-In this example, each post specifies that it has a dependency on its associated user. This means that when a post's associated user changes,
-any observers of the post, meaning an [ObservableDocument] for that specific post or an [ObservableQuery] that currently includes that post in its list of documents, must also be rebroadcast to listeners.
+In this example, each post specifies that it has a dependency on its associated user. This means that when a post's user changes,
+any observers of the post, meaning an [ObservableDocument] for that specific post or an [ObservableQuery] that currently includes
+that post in its list of documents, should also notify its listeners.
 
-This is an important feature, since otherwise if a client was observing changes to a post, it would need to wire up multiple streams for both the post, its user,
-maybe some messages, and any other related data to the post. Dependencies make this much simpler, since now only the post can be observed and it will be rebroadcast
-when its dependencies change.
+In this example, if a post was to be displayed along with its user's profile picture, then without dependencies it would need to observe
+both the post and user document for changes. With dependencies, it only needs to observe the post and the post will react to any changes to the user automatically.
 
-Supporting this feature requires an additional dependency layer. 
+Document dependencies are modeled using a [ValueStore] for indexing a document's dependencies by path, and a flat map of documents to their set of dependents.
 
-The dependencies of documents are stored in a map on the [BroadcastManager] along with 
+```dart
+final dependenciesStore = ValueStore<Set<Document>>();
+final Map<Document, Set<Document>> dependentsStore = {};
+```
+
+When a document is updated, it iterates through its set of dependents and marks each of them for broadcast with a [BroadcastEvent.touched] event.
+
+When a document or collection is deleted, each broadcast observer checks to see if the deleted path is present in its dependency tree and if it is, then the broadcast observer notifies its listeners.
+
+Each broadcast observer has its own dependency tree called a [PathRefStore] which maintains a ref count of the number of times a path exists in the tree. When a path's ref count goes to 0, it is removed from the tree. This store is used to determine if a deleted path exists in an observer's dependencies.
+
+## Persistence Layer
+
+Loon comes with a default [FilePersistor] implementation. To enable persistence, clients can make a call to `configure()` with the persistor as shown below:
+
+```dart
+Loon.configure(
+  persistor: FilePersistor(),
+);
+```
+
+By default, the [FilePersistor] serializes and persists all documents in a single `__store__.json` file.
+
+In order to support persistence, collections must specify a fromJson/toJson serialization implementation:
+
+```dart
+class UserModel {
+  final String name;
+
+  UserModel({
+    required this.name,
+  });
+
+  factory UserModel.fromJson(Json json) {
+    return UserModel(name: json['name']);
+  }
+
+  static Collection<UserModel> get store {
+    return Loon.collection<UserModel>(
+      'users',
+      fromJson: UserModel.fromJson,
+      toJson: (user) => user.toJson(),
+    );
+  }
+}
+```
+
+The [FilePersistor] extends a base [Persistor] class that automatically handles throttling and synchronization of the four types of persistence operations:
+
+```dart
+/// Persist function called with the bath of documents that have changed (including been deleted) within the last throttle window
+/// specified by the [Persistor.persistenceThrottle] duration.
+Future<void> persist(List<Document> docs);
+
+/// Hydration function called to read data from persistence. If no entities are specified,
+/// then it hydrations all persisted data. if entities are specified, it hydrates only the data from
+/// the paths under those entities.
+Future<HydrationData> hydrate([List<StoreReference>? refs]);
+
+/// Clear function used to clear all documents in a collection.
+Future<void> clear(Collection collection);
+
+/// Clears all documents and removes all persisted data.
+Future<void> clearAll();
+```
+
+Any custom persistor can be implemented using just these four operations. In the case of the [FilePersistor], it packages each of these operations
+into messages that it sends to the [FilePersistorWorker], which runs on a separate isolate.
+
+The worker receives persistence operation messages from the main isolate and passes them off to the [FileDataStoreManager] for processing. The [FileDataStoreManager]
+maintains a set of hydrated [FileDataStore] objects, which map 1:1 with a persistence file and are responsible for hydrating and persisting documents to and from their associated files.
+
+Each [FileDataStore] stores the document data it contains in memory using a variant of a [ValueStore] called a [RefValueStore]. The [RefValueStore] stores data in the same format as the [ValueStore], with the addition of a ref count for each unique value stored in a given collection.
+
+Based on our original [ValueStore] example, its [RefValueStore] representation is shown below:
+
+```dart
+final messageDoc = Loon.collection('users').doc('1').subcollection('messages').doc('1');
+messageDoc.create('Hello');
+```
+
+```dart
+{
+  "users": {
+    "1": {
+      "messages": {
+        "__refs": {
+          "Hello" 1,
+        },
+        "__values": {
+          "1": "Hello"
+        }
+      }
+    }
+  }
+}
+```
+
+Each [FileDataStore] can contain any arbitrary subset of document data from across various collections. By default, all document data is stored in a single [FileDataStore] that writes documents to a `__store__.json` file.
+
+Individual collections can customize their persistence file by specifying a persistor key:
+
+```dart
+class UserModel {
+  final String name;
+
+  UserModel({
+    required this.name,
+  });
+
+  factory UserModel.fromJson(Json json) {
+    return UserModel(name: json['name']);
+  }
+
+  static Collection<UserModel> get store {
+    return Loon.collection<UserModel>(
+      'users',
+      fromJson: UserModel.fromJson,
+      toJson: (user) => user.toJson(),
+      settings: FilePersistorSettings(
+        key: FilePersistor.key('users'),
+      ),
+    );
+  }
+}
+```
+
+In the above example, the users collection has specified that all user documents should be stored in a separate [FileDataStore] and persisted
+to a file named after its key called `users.json`. 
+
+File persistence can be specified even more granularly at the individual document-level using a `FilePersistor.keyBuilder`:
+
+```dart
+class UserModel {
+  final String name;
+
+  UserModel({
+    required this.name,
+  });
+
+  factory UserModel.fromJson(Json json) {
+    return UserModel(name: json['name']);
+  }
+
+  static Collection<UserModel> get store {
+    return Loon.collection<TestUserModel>(
+      'users',
+      fromJson: TestUserModel.fromJson,
+      toJson: (user) => user.toJson(),
+      persistorSettings: FilePersistorSettings(
+        key: FilePersistor.keyBuilder(
+          (snap) => 'users_${snap.id}',
+        ),
+      ),
+    );
+  }
+}
+```
+
+Whenever a document is updated, it will evaluate the `keyBuilder` function with its latest data in order to determine the file in which it should be stored. If the resolved persistence key of an existing document changes, then the document and its subcollections will be moved from the previous file to the one specified by its updated key.
+
+This level of persistence granularity is done to support features like sharding of large collections across multiple files (like breaking one big messages collection into `messages_shard_1`, `messages_shard_2`, etc) and grouping of small subcollections into the same file (like grouping subcollections of posts with document paths `posts__1__reactions__2`, `posts__2__reactions__1`, etc into one large reactions file).
+
+Since any given collection can be spread across multiple [FileDataStore] objects, a [FileDataStoreResolver] is used to lookup the set of files that contain data for a given store path. The `FileDataStoreResolver` maintains a [RefValueStore] that maps documents to file persistence keys.
+
+To illustrate how this works, consider the case of hydrating a users collection that is spread across multiple files in the format `users_1`, `users_2`, etc. using a `FilePersistor.keyBuilder`.
+
+The resolver mapping for this collection could look like the following:
+
+```dart
+{
+  "users": {
+    "__refs": {
+      "users_1": 3,
+      "users_2": 4,
+    },
+    "__values": {
+      "1": "users_1",
+      "2": "users_1",
+      "3": "users_1",
+      "4": "users_2",
+    }
+  }
+}
+```
+
+The resolver persists this mapping to a `__resolver__.json` file that is hydrated automatically when the [FilePersistor] is initialized.
+
+Here's a full example of how it all comes together. In this scenario, the client has specified to hydrate **just** the `users` collection by calling `hydrate()` with a collection path.
+
+```dart
+Future<void> main() async {
+  await Loon.hydrate([Loon.collection('users')]);
+  ...
+  runApp(...);
+}
+```
+
+When the hydration operation for the users collection is executed, the [FilePersistor] sends a [hydrate] message for the given collection to the [FilePersistorWorker] on the background isolate.
+
+The worker parses the message and tells the [FileDataStoreManager] to hydrate the appropriate [FileDataStore] objects containing data for the given collection. The manager uses the [FileDataStoreResolver] to look up all of the file key refs for the `users` collection and immediately finds two values: `users_1` and `users_2`. The ref counting feature of the [RefValueStore] allows for this to be done without checking each individual document in the collection.
+
+The [FileDataStoreManager] then iterates over each resolved [FileDataStore] and hydrates its file from disk. The manager returns only the requested collection data hydrated from the file to the [FileDataStoreWorker], which packages it and sends its response back to the [FilePersistor] on the main isolate.
+
+The documents are then written into the Loon document store on the main isolate and are now available to the client.
+
+

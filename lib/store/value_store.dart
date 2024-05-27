@@ -40,8 +40,8 @@ part of loon;
 class ValueStore<T> {
   Map _store = {};
 
-  static const _delimiter = '__';
   static const _values = '__values';
+  static const delimiter = '__';
 
   ValueStore({
     Map? store,
@@ -109,7 +109,7 @@ class ValueStore<T> {
   }
 
   Map touch(String path) {
-    return _touch(_store, path.split(_delimiter), 0);
+    return _touch(_store, path.split(delimiter), 0);
   }
 
   /// Returns the value for the given path.
@@ -118,7 +118,7 @@ class ValueStore<T> {
       return null;
     }
 
-    final segments = path.split(_delimiter);
+    final segments = path.split(delimiter);
     return _getNode(
       _store,
       segments.isEmpty ? segments : segments.sublist(0, segments.length - 1),
@@ -148,12 +148,12 @@ class ValueStore<T> {
   /// Returns the nearest value along the given path, beginning at the full path
   /// and then attempting to find a non-null value for any parent node moving up the tree.
   T? getNearest(String path) {
-    return _getNearest(_store, path.split(_delimiter), 0);
+    return _getNearest(_store, path.split(delimiter), 0);
   }
 
   /// Returns a map of all values that are immediate children of the given path.
   Map<String, T>? getChildValues(String path) {
-    return _getNode(_store, path.split(_delimiter), 0)?[_values];
+    return _getNode(_store, path.split(delimiter), 0)?[_values];
   }
 
   void _write(Map node, List<String> segments, int index, T value) {
@@ -168,7 +168,7 @@ class ValueStore<T> {
 
   /// Writes the value at the given path.
   T write(String path, T value) {
-    _write(_store, path.split(_delimiter), 0, value);
+    _write(_store, path.split(delimiter), 0, value);
     return value;
   }
 
@@ -229,7 +229,7 @@ class ValueStore<T> {
       return;
     }
 
-    _delete(_store, path.split(_delimiter), 0, recursive);
+    _delete(_store, path.split(delimiter), 0, recursive);
   }
 
   /// Returns whether the store has a value for the given path.
@@ -249,8 +249,7 @@ class ValueStore<T> {
       return true;
     }
 
-    return hasValue(path) ||
-        _getNode(_store, path.split(_delimiter), 0) != null;
+    return hasValue(path) || _getNode(_store, path.split(delimiter), 0) != null;
   }
 
   String? _findValue(
@@ -265,7 +264,7 @@ class ValueStore<T> {
 
     final segment = segments[index];
     if (node[_values]?[segment] == value) {
-      return segments.take(index + 1).join(_delimiter);
+      return segments.take(index + 1).join(delimiter);
     }
 
     if (index < segments.length - 1) {
@@ -278,7 +277,7 @@ class ValueStore<T> {
   /// Returns the first subpath along the given path that has a value equal to the
   /// provided value (if any).
   String? findValue(String path, dynamic value) {
-    return _findValue(_store, path.split(_delimiter), 0, value);
+    return _findValue(_store, path.split(delimiter), 0, value);
   }
 
   void clear() {
@@ -364,7 +363,7 @@ class ValueStore<T> {
       other.clear();
       _mergeNode(_store, otherNode);
     } else {
-      _graft(_store, other._store, path.split(_delimiter), 0);
+      _graft(_store, other._store, path.split(delimiter), 0);
     }
   }
 
@@ -379,14 +378,14 @@ class ValueStore<T> {
 
     if (node.containsKey(_values)) {
       for (final entry in node[_values].entries) {
-        final key = path.isEmpty ? entry.key : "$path$_delimiter${entry.key}";
+        final key = path.isEmpty ? entry.key : "$path$delimiter${entry.key}";
         values[key] = entry.value;
       }
     }
 
     for (final key in node.keys) {
       if (key != _values) {
-        final childPath = path.isEmpty ? key : "$path$_delimiter$key";
+        final childPath = path.isEmpty ? key : "$path$delimiter$key";
         _extractValues(node[key], values, childPath);
       }
     }
@@ -401,7 +400,7 @@ class ValueStore<T> {
     }
 
     final Map<String, T> values = {};
-    final segments = path.split(_delimiter);
+    final segments = path.split(delimiter);
     final lastSegment = segments.removeLast();
 
     final parentNode = _getNode(_store, segments, 0);
@@ -526,7 +525,7 @@ class RefValueStore<T> extends ValueStore<T> {
       return super.graft(other, path);
     }
 
-    _graft(_store, other._store, path.split(ValueStore._delimiter), 0);
+    _graft(_store, other._store, path.split(ValueStore.delimiter), 0);
   }
 
   @override
@@ -628,7 +627,7 @@ class RefValueStore<T> extends ValueStore<T> {
       return index;
     }
 
-    final segments = path.split(ValueStore._delimiter);
+    final segments = path.split(ValueStore.delimiter);
     final parent =
         _getNode(_store, segments.sublist(0, segments.length - 1), 0);
     if (parent == null) {

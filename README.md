@@ -16,7 +16,7 @@ You can get started by looking at the [example](./example/lib/main.dart).
 
 ## ➕ Creating documents
 
-Loon is based around collections of documents.
+Loon makes it easy to work with collections of documents.
 
 ```dart
 import 'package:loon/loon.dart';
@@ -46,7 +46,7 @@ Loon.collection<BirdModel>(
 );
 ```
 
-If persistence is enabled, then a typed data model will need a `fromJson/toJson` serialization pair. In order to avoid having to specify types or serializers whenever a collection is accessed, it can be helpful to store the collection in a variable or as an index on the data model:
+If persistence is enabled, then a typed collection needs to specify a `fromJson/toJson` serialization pair. In order to avoid having to specify types or serializers whenever a collection is accessed, it can be helpful to store the collection in a variable or as an index on the data model:
 
 ```dart
 class BirdModel {
@@ -99,7 +99,7 @@ print(snap.id) // loon
 print(snap.data) // BirdModel(...)
 ```
 
-To watch for changes to a document, you can read it as a stream:
+To watch for changes to a document, you can listen to its stream:
 
 ```dart
 BirdModel.store.doc('loon').stream().listen((snap) {});
@@ -134,7 +134,7 @@ class MyWidget extends StatelessWidget {
 
 ## 𖢞 Subcollections
 
-Documents can be nested under subcollections. Documents in subcollections are uniquely identified by their collection and
+Documents can be nested under subcollections. Documents in subcollections are uniquely identified by the path to their collection and
 document ID.
 
 ```dart
@@ -150,7 +150,7 @@ for (final snap in snaps) {
 
 ## 🔎 Queries
 
-Documents can be read and filtered with queries:
+Documents can be filtered using queries:
 
 ```dart
 final snapshots = BirdModel.store.where((snap) => snap.data.family == 'Gaviidae').get();
@@ -294,8 +294,14 @@ void main() {
 }
 ```
 
-The call to `hydrate` returns a `Future` that resolves when the data has been hydrated from the persistence layer. It can be awaited to ensure that
-data is available before proceeding, otherwise hydrated data will be merged on top of any data already in the store.
+The call to `hydrate` returns a `Future` that resolves when the data has been hydrated from the persistence layer. By default, calling `hydrate()` will hydrate all persisted data. If only certain data should be hydrated, then it can be called with a list of documents and collections to hydrate. All subcollections of the specified paths are also hydrated.
+
+```dart
+Loon.hydrate([
+  Loon.doc('selected_bird_id'),
+  Loon.collection('birds'),
+]);
+```
 
 ## ⚙️ Persistence options
 
@@ -330,9 +336,7 @@ class BirdModel {
       'birds',
       fromJson: BirdModel.fromJson,
       toJson: (bird) => bird.toJson(),
-      settings: FilePersistorSettings(
-        encrypted: false,
-      ),
+      settings: FilePersistorSettings(encrypted: false),
     )
   }
 }
@@ -341,15 +345,15 @@ class BirdModel {
 In this example, file encryption is enabled globally for all collections, but disabled
 specifically for the bird collection.
 
-By default, file persistence stores data in files on a per collection basis. The above `birds` collection is stored as:
+By default, the `FilePersistor` stores all data in a single  `__store__.json` persistence file.
 
 ```
 loon >
-  birds.json
+  __store__.json
 ```
 
 If data needs to be persisted differently, either by merging data across collections into a single file or by breaking down a collection
-into multiple files, then a custom persistence key can be specified on the collection.
+into multiple files, then a custom persistence key can be specified on the collection:
 
 ```dart
 class BirdModel {
@@ -369,22 +373,52 @@ class BirdModel {
       fromJson: BirdModel.fromJson,
       toJson: (bird) => bird.toJson(),
       settings: FilePersistorSettings(
-        getPersistenceKey: (snap) {
-          return 'birds_${snap.data.family};
-        }
+        key: FilePersistor.key('birds'),
       ),
     )
   }
 }
 ```
 
-In the updated example, data from the collection is now broken down into multiple files based on the document data:
+In the updated example, data from the birds collection is now stored separately from the rest:
 
 ```dart
 loon >
-  birds_phalacrocoracidae.json
-  birds_gaviidae.json
+  __store__.json
+  birds.json
 ```
+
+If documents need to be stored in different files based on their data, then a `FilePersistor.keyBuilder` can be used:
+
+```dart
+class BirdModel {
+  final String name;
+  final String description;
+  final String species;
+
+  BirdModel({
+    required this.name,
+    required this.description,
+    required this.species,
+  });
+
+  static Collection<BirdModel> get store {
+    return Loon.collection<BirdModel>(
+      'birds',
+      fromJson: BirdModel.fromJson,
+      toJson: (bird) => bird.toJson(),
+      settings: FilePersistorSettings(
+        key: FilePersistor.keyBuilder((snap) {
+          return snap.data.family;
+        }),
+      ),
+    )
+  }
+}
+```
+
+Now instead of storing all birds in the `birds.json` file, they will be distributed across multiple files based on the value of `bird.family`. The key is recalculated
+whenever a document's data changes and if its associated key is updated, then the document is moved from its previous file to the new one.
 
 ## 🎨 Custom persistence
 
@@ -394,17 +428,28 @@ If you would prefer to persist data using an alternative implementation than the
 import 'package:loon/loon.dart';
 
 class MyPersistor extends Persistor {
+  /// Initialization function called when the persistor is instantiated to execute and setup work.
   Future<void> init();
 
+  /// Persist function called with the bath of documents that have changed (including been deleted) within the last throttle window
+  /// specified by the [Persistor.persistenceThrottle] duration.
   Future<void> persist(List<Document> docs);
 
-  Future<SerializedCollectionStore> hydrate();
+  /// Hydration function called to read data from persistence. If no entities are specified,
+  /// then it hydrations all persisted data. if entities are specified, it hydrates only the data from
+  /// the paths under those entities.
+  Future<HydrationData> hydrate([List<StoreReference>? refs]);
 
-  Future<void> clear(String collection);
+  /// Clear function used to clear all documents in a collection.
+  Future<void> clear(Collection collection);
 
+  /// Clears all documents and removes all persisted data.
   Future<void> clearAll();
 }
 ```
 
-The base `Persistor` class implements batching and throttling, so you can just choose your storage mechanism and format.
+The base `Persistor` class implements synchronization and throttling of persistence operations by default, so you can just choose your storage mechanism and format.
 
+## Happy coding
+
+Feel free to open an issue to discuss any new features or bugs.

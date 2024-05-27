@@ -154,7 +154,8 @@ abstract class Persistor {
   /// Initialization function called when the persistor is instantiated to execute and setup work.
   Future<void> init();
 
-  /// Persist function called with the list of documents that have changed (including been deleted).
+  /// Persist function called with the bath of documents that have changed (including been deleted) within the last throttle window
+  /// specified by the [Persistor.persistenceThrottle] duration.
   Future<void> persist(List<Document> docs);
 
   /// Hydration function called to read data from persistence. If no entities are specified,

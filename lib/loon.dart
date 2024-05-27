@@ -293,7 +293,7 @@ class Loon {
 
         if (!_instance.documentStore.hasValue(docPath)) {
           _instance.writeDocument<Json>(
-            Document.fromPath<Json>(docPath),
+            Document.fromPath(docPath),
             data,
             event: BroadcastEvents.hydrated,
             persist: false,

@@ -17,33 +17,22 @@ class Document<T> implements StoreReference {
     this.dependenciesBuilder,
   });
 
-  static Document<T> _fromPath<T>(
-    StoreReference ref,
-    List<String> segments,
-    int index,
-  ) {
-    if (index == segments.length) {
-      if (ref is Document<T>) {
-        return ref;
-      }
-    } else {
-      final segment = segments[index];
-      if (ref is Document) {
-        return Document._fromPath(
-          ref.subcollection<T>(segment),
-          segments,
-          index + 1,
-        );
-      } else if (ref is Collection) {
-        return Document._fromPath(ref.doc(segment), segments, index + 1);
-      }
-    }
-
-    throw 'Invalid path';
-  }
-
-  static Document<T> fromPath<T>(String path) {
-    return Document._fromPath<T>(Document('', ''), path.split('__'), 0);
+  static Document<S> fromPath<S>(
+    String path, {
+    FromJson<S>? fromJson,
+    ToJson<S>? toJson,
+    PersistorSettings<S>? persistorSettings,
+    DependenciesBuilder<S>? dependenciesBuilder,
+  }) {
+    final [...pathSegments, id] = path.split(ValueStore.delimiter);
+    return Document<S>(
+      pathSegments.join(ValueStore.delimiter),
+      id,
+      fromJson: fromJson,
+      toJson: toJson,
+      persistorSettings: persistorSettings,
+      dependenciesBuilder: dependenciesBuilder,
+    );
   }
 
   @override
