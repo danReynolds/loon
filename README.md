@@ -448,8 +448,6 @@ class MyPersistor extends Persistor {
 }
 ```
 
-The base `Persistor` class implements synchronization and throttling of persistence operations by default, so you can just choose your storage mechanism and format.
+The base `Persistor` class implements synchronization and throttling of persistence operations by default, so you can just choose your storage mechanism.
 
 ## Happy coding
-
-Feel free to open an issue to discuss any new features or bugs.
