@@ -278,6 +278,92 @@ void main() {
       );
 
       test(
+        'Removes documents with a document-level key',
+        () async {
+          final userCollection = Loon.collection<TestUserModel>(
+            'users',
+            fromJson: TestUserModel.fromJson,
+            toJson: (user) => user.toJson(),
+            persistorSettings: FilePersistorSettings(
+              key: FilePersistor.keyBuilder((snap) {
+                return 'users';
+              }),
+            ),
+          );
+
+          userCollection.doc('1').create(TestUserModel('User 1'));
+          userCollection.doc('2').create(TestUserModel('User 2'));
+
+          await completer.onPersist;
+
+          final usersFile = File('${testDirectory.path}/loon/users.json');
+          var usersJson = jsonDecode(usersFile.readAsStringSync());
+
+          expect(
+            usersJson,
+            {
+              "users": {
+                "__values": {
+                  "1": {'name': 'User 1'},
+                  "2": {'name': 'User 2'},
+                },
+              }
+            },
+          );
+
+          final resolverFile =
+              File('${testDirectory.path}/loon/__resolver__.json');
+          var resolverJson = jsonDecode(resolverFile.readAsStringSync());
+
+          expect(
+            resolverJson,
+            {
+              "users": {
+                "__refs": {
+                  "users": 2,
+                },
+                "__values": {
+                  "1": "users",
+                  "2": "users",
+                }
+              }
+            },
+          );
+
+          userCollection.doc('1').delete();
+
+          await completer.onPersist;
+
+          usersJson = jsonDecode(usersFile.readAsStringSync());
+          expect(
+            usersJson,
+            {
+              "users": {
+                "__values": {
+                  "2": {'name': 'User 2'},
+                },
+              }
+            },
+          );
+
+          resolverJson = jsonDecode(resolverFile.readAsStringSync());
+          expect(
+            resolverJson,
+            {
+              "users": {
+                "__refs": {
+                  "users": 1,
+                },
+                "__values": {
+                  "2": "users",
+                }
+              }
+            },
+          );
+        },
+      );
+
+      test(
         'Persists documents using a collection-level key',
         () async {
           final userCollection = Loon.collection<TestUserModel>(
@@ -308,13 +394,13 @@ void main() {
 
           await completer.onPersist;
 
-          final rootFile = File('${testDirectory.path}/loon/__store__.json');
+          final storeFile = File('${testDirectory.path}/loon/__store__.json');
           final friendsFile = File('${testDirectory.path}/loon/friends.json');
-          final rootJson = jsonDecode(rootFile.readAsStringSync());
+          final storeJson = jsonDecode(storeFile.readAsStringSync());
           final friendsJson = jsonDecode(friendsFile.readAsStringSync());
 
           expect(
-            rootJson,
+            storeJson,
             {
               "users": {
                 "__values": {
@@ -409,12 +495,12 @@ void main() {
 
                   await completer.onPersist;
 
-                  final rootFile =
+                  final storeFile =
                       File('${testDirectory.path}/loon/__store__.json');
-                  var rootJson = jsonDecode(rootFile.readAsStringSync());
+                  var storeJson = jsonDecode(storeFile.readAsStringSync());
 
                   expect(
-                    rootJson,
+                    storeJson,
                     {
                       "users": {
                         "__values": {
@@ -442,9 +528,9 @@ void main() {
 
                   await completer.onPersist;
 
-                  rootJson = jsonDecode(rootFile.readAsStringSync());
+                  storeJson = jsonDecode(storeFile.readAsStringSync());
                   expect(
-                    rootJson,
+                    storeJson,
                     {
                       "users": {
                         "__values": {
@@ -531,12 +617,12 @@ void main() {
 
                   await completer.onPersist;
 
-                  final rootFile =
+                  final storeFile =
                       File('${testDirectory.path}/loon/__store__.json');
-                  var rootJson = jsonDecode(rootFile.readAsStringSync());
+                  var storeJson = jsonDecode(storeFile.readAsStringSync());
 
                   expect(
-                    rootJson,
+                    storeJson,
                     {
                       "users": {
                         "__values": {
@@ -711,12 +797,12 @@ void main() {
 
                   await completer.onPersist;
 
-                  final rootFile =
+                  final storeFile =
                       File('${testDirectory.path}/loon/__store__.json');
-                  var rootJson = jsonDecode(rootFile.readAsStringSync());
+                  var storeJson = jsonDecode(storeFile.readAsStringSync());
 
                   expect(
-                    rootJson,
+                    storeJson,
                     {
                       "users": {
                         "__values": {
@@ -947,11 +1033,11 @@ void main() {
 
                   await completer.onPersist;
 
-                  final rootFile =
+                  final storeFile =
                       File('${testDirectory.path}/loon/__store__.json');
-                  var rootJson = jsonDecode(rootFile.readAsStringSync());
+                  var storeJson = jsonDecode(storeFile.readAsStringSync());
 
-                  expect(rootJson, {
+                  expect(storeJson, {
                     "users": {
                       "__values": {
                         "3": {"name": "User 3"},
@@ -1047,7 +1133,7 @@ void main() {
                     },
                   );
 
-                  expect(rootFile.existsSync(), false);
+                  expect(storeFile.existsSync(), false);
                   expect(users1File.existsSync(), false);
 
                   users2Json = jsonDecode(users2File.readAsStringSync());
@@ -1287,10 +1373,10 @@ void main() {
 
       await completer.onPersist;
 
-      final rootFile = File('${testDirectory.path}/loon/__store__.json');
-      final rootJson = jsonDecode(rootFile.readAsStringSync());
+      final storeFile = File('${testDirectory.path}/loon/__store__.json');
+      final storeJson = jsonDecode(storeFile.readAsStringSync());
 
-      expect(rootJson, {
+      expect(storeJson, {
         "users": {
           "__values": {
             "1": {"name": "User 1"},
@@ -1338,11 +1424,11 @@ void main() {
 
       await Loon.clearAll();
 
-      expect(rootFile.existsSync(), false);
+      expect(storeFile.existsSync(), false);
       expect(myFriendsFile.existsSync(), false);
       expect(resolverFile.existsSync(), false);
 
-      rootFile.writeAsStringSync(jsonEncode(rootJson));
+      storeFile.writeAsStringSync(jsonEncode(storeJson));
       myFriendsFile.writeAsStringSync(jsonEncode(myFriendsJson));
 
       // After clearing the data and reinitializing it from disk to verify with hydration,
@@ -1418,10 +1504,10 @@ void main() {
 
         await completer.onPersist;
 
-        final rootFile = File('${testDirectory.path}/loon/__store__.json');
-        final rootJson = jsonDecode(rootFile.readAsStringSync());
+        final storeFile = File('${testDirectory.path}/loon/__store__.json');
+        final storeJson = jsonDecode(storeFile.readAsStringSync());
 
-        expect(rootJson, {
+        expect(storeJson, {
           "users": {
             "__values": {
               "1": {"name": "User 1"},
@@ -1471,7 +1557,7 @@ void main() {
 
         await Loon.clearAll();
 
-        rootFile.writeAsStringSync(jsonEncode(rootJson));
+        storeFile.writeAsStringSync(jsonEncode(storeJson));
         userFriendsFile.writeAsStringSync(jsonEncode(userFriendsJson));
         resolverFile.writeAsStringSync(jsonEncode(resolverJson));
 
@@ -1819,19 +1905,19 @@ void main() {
           userCollection.doc('2').create(TestUserModel('User 2'));
           friendsCollection.doc('1').create(TestUserModel('Friend 1'));
 
-          final rootFile = File('${testDirectory.path}/loon/__store__.json');
+          final storeFile = File('${testDirectory.path}/loon/__store__.json');
           final friendsFile = File('${testDirectory.path}/loon/friends.json');
 
           await completer.onPersist;
 
-          expect(rootFile.existsSync(), true);
+          expect(storeFile.existsSync(), true);
           expect(friendsFile.existsSync(), true);
 
           userCollection.delete();
 
           await completer.onClear;
 
-          expect(rootFile.existsSync(), false);
+          expect(storeFile.existsSync(), false);
           expect(friendsFile.existsSync(), false);
         },
       );

@@ -7,9 +7,10 @@ extension DocumentExtensions<T> on Document<T> {
     final documentSettings = persistorSettings;
     if (documentSettings is FilePersistorSettings<T>) {
       final keyBuilder = documentSettings.key;
+      final snap = get();
 
-      if (keyBuilder is FilePersistorDocumentKeyBuilder<T>) {
-        return (keyBuilder as FilePersistorDocumentKeyBuilder).build(get()!);
+      if (keyBuilder is FilePersistorDocumentKeyBuilder<T> && snap != null) {
+        return (keyBuilder as FilePersistorDocumentKeyBuilder).build(snap);
       }
 
       if (keyBuilder is FilePersistorCollectionKeyBuilder<T>) {

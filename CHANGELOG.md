@@ -1,3 +1,7 @@
+## 2.0.1
+
+* Fix bug for deletion of documents with a document-level persistence key. 
+
 ## 2.0.0
 
 * Rearchitecture of core implementation.
