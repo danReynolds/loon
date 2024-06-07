@@ -58,8 +58,8 @@ as part of the next micro-task. The handing off of the batched change events to 
 On broadcast, each broadcast observer checks if it is affected by any of the changes in the current broadcast.
 
 * For an [ObservableDocument], this involves checking if the broadcast tree contains an event at its document path.
-* For an [ObservableQuery], this involves iterating through the changes at collection its path in the broadcast tree
-  for each of the documents in its collection and recalculating whether it needs to inform listeners of any additions,
+* For an [ObservableQuery], this involves iterating through the changes at its collection path in the broadcast tree
+  for each dirty document and determining whether it needs to inform listeners of any additions,
   removals or updates to its documents.
 
 If the broadcast observer has changes, then it emits its updated data to its listeners.
