@@ -8,18 +8,17 @@ class DependencyManager {
   final _dependents = <Document, Set<Document>?>{};
 
   /// The cache of documents referenced as dependencies. A cache is used so that multiple documents
-  /// that share a dependency reference the same document instance.
-  final _cache = <Document>{};
+  /// that share the same document dependency reference the same object.
+  final _depCache = <Document>{};
 
   /// Updates the dependencies/dependents store for the given [DocumentSnapshot]
   /// with the document's recalculated dependencies.
   void updateDependencies<T>(DocumentSnapshot<T> snap) {
     final doc = snap.doc;
     final deps = doc.dependenciesBuilder?.call(snap)?.map((dep) {
-      // Maps the given dependenc to its cached dependency document, creating it if it does not exist yet.
-      final cacheDoc = _cache.lookup(dep);
+      final cacheDoc = _depCache.lookup(dep);
       if (cacheDoc == null) {
-        _cache.add(dep);
+        _depCache.add(dep);
       }
       return cacheDoc ?? dep;
     }).toSet();
@@ -39,7 +38,7 @@ class DependencyManager {
       for (final dep in removedDeps) {
         if (_dependents[dep]!.length == 1) {
           _dependents.remove(dep);
-          _cache.remove(dep);
+          _depCache.remove(dep);
         } else {
           _dependents[dep]!.remove(doc);
         }
@@ -108,13 +107,14 @@ class DependencyManager {
   void clear() {
     _dependencies.clear();
     _dependents.clear();
+    _depCache.clear();
   }
 
   Map inspect() {
     return {
       "dependencyStore": _dependencies.inspect(),
       "dependentsStore": _dependents,
-      "documentCache": _cache,
+      "dependencyCache": _depCache,
     };
   }
 }

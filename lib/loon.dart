@@ -204,6 +204,8 @@ class Loon {
     // Clear any documents scheduled for broadcast, as whatever events happened prior to the clear are now irrelevant.
     broadcastManager.clear();
 
+    dependencyManager.clear();
+
     await persistor?._clearAll();
   }
 

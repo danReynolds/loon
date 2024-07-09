@@ -29,6 +29,24 @@ class Collection<T> implements Queryable<T>, StoreReference {
     this.dependenciesBuilder,
   });
 
+  static Collection<S> fromPath<S>(
+    String path, {
+    FromJson<S>? fromJson,
+    ToJson<S>? toJson,
+    PersistorSettings<S>? persistorSettings,
+    DependenciesBuilder<S>? dependenciesBuilder,
+  }) {
+    final [...pathSegments, id] = path.split(ValueStore.delimiter);
+    return Collection<S>(
+      pathSegments.join(ValueStore.delimiter),
+      id,
+      fromJson: fromJson,
+      toJson: toJson,
+      persistorSettings: persistorSettings,
+      dependenciesBuilder: dependenciesBuilder,
+    );
+  }
+
   @override
   String get path {
     if (parent.isEmpty || parent == _rootKey) {

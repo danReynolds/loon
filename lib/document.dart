@@ -98,6 +98,7 @@ class Document<T> implements StoreReference {
   DocumentSnapshot<T> update(
     T data, {
     bool broadcast = true,
+    bool persist = true,
   }) {
     if (!exists()) {
       throw Exception('Missing document $path');
@@ -109,6 +110,7 @@ class Document<T> implements StoreReference {
       // As an optimization, broadcasting is skipped when updating a document if the document
       // data is unchanged.
       broadcast: data != get()!.data,
+      persist: persist,
       event: BroadcastEvents.modified,
     );
   }
@@ -116,11 +118,16 @@ class Document<T> implements StoreReference {
   DocumentSnapshot<T> createOrUpdate(
     T data, {
     bool broadcast = true,
+    bool persist = true,
   }) {
     if (exists()) {
-      return update(data, broadcast: broadcast);
+      return update(
+        data,
+        broadcast: broadcast,
+        persist: persist,
+      );
     }
-    return create(data, broadcast: broadcast);
+    return create(data, broadcast: broadcast, persist: persist);
   }
 
   DocumentSnapshot<T> modify(

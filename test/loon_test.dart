@@ -1456,10 +1456,10 @@ void main() {
         },
       );
 
-      // After writing the post, both the post and its user dependency should exist in
-      // the document cache.
+      // After writing the post, its user doc dependency should exist in the dependency
+      // doc cache.
       expect(
-        Loon.inspect()['documentCache'],
+        Loon.inspect()['dependencyCache'],
         {
           userDoc,
         },
@@ -1496,7 +1496,7 @@ void main() {
       // Updating the post should not create a duplicate user dependency, it should re-use
       // the existing cached user document.
       expect(
-        Loon.inspect()['documentCache'],
+        Loon.inspect()['dependencyCache'],
         {
           userDoc,
         },
@@ -1517,7 +1517,7 @@ void main() {
       // Since the user doc no longer has any dependencies, it should be removed from the dependency
       // document cache.
       expect(
-        Loon.inspect()['documentCache'],
+        Loon.inspect()['dependencyCache'],
         [],
       );
     });
@@ -1587,7 +1587,7 @@ void main() {
     test(
       "Rebroadcasts an observable query on dependency changes",
       () async {
-        final usersCollection = Loon.collection('users');
+        final usersCollection = Loon.collection<Json>('users');
         final postsCollection = Loon.collection<Json>(
           'posts',
           dependenciesBuilder: (snap) {
@@ -1755,7 +1755,7 @@ void main() {
           };
         },
       );
-      final postsCollection = Loon.collection(
+      final postsCollection = Loon.collection<Json>(
         'posts',
         dependenciesBuilder: (snap) {
           return {
