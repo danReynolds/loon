@@ -346,59 +346,30 @@ void main() {
       return Loon.clearAll();
     });
 
-    test('Emits the current document', () async {
+    test('Streams the document correctly', () async {
       final user = TestUserModel('User 1');
+      final userUpdated = TestUserModel('User 1 updated');
       final userDoc = TestUserModel.store.doc('1');
-
-      userDoc.create(user);
-
-      final userStream = userDoc.stream();
-
-      expectLater(
-        userStream,
-        emits(
-          DocumentSnapshot(
-            doc: userDoc,
-            data: user,
-          ),
-        ),
-      );
-    });
-
-    test('Emits updates to the document', () async {
-      final user = TestUserModel('User 1');
-      final updatedUser = TestUserModel('Updated User 1');
-      final userDoc = TestUserModel.store.doc('1');
-
-      final userObs = userDoc.observe();
-
-      userDoc.create(user);
+      final stream = userDoc.stream();
 
       await asyncEvent();
-      userDoc.update(updatedUser);
-
+      userDoc.create(user);
+      await asyncEvent();
+      userDoc.update(userUpdated);
       await asyncEvent();
       userDoc.delete();
-
       await asyncEvent();
 
-      userObs.dispose();
+      final events = await stream.take(4).toList();
 
-      expectLater(
-        userObs.stream(),
-        emitsInOrder([
+      expect(
+        events,
+        [
           null,
-          DocumentSnapshot(
-            doc: userDoc,
-            data: user,
-          ),
-          DocumentSnapshot(
-            doc: userDoc,
-            data: updatedUser,
-          ),
+          DocumentSnapshot(doc: userDoc, data: user),
+          DocumentSnapshot(doc: userDoc, data: userUpdated),
           null,
-          emitsDone,
-        ]),
+        ],
       );
     });
   });
@@ -408,47 +379,37 @@ void main() {
       Loon.clearAll();
     });
 
-    test('Returns a stream of changes to the document', () async {
+    test('Streams changes correctly', () async {
       final userDoc = TestUserModel.store.doc('1');
-      final user = TestUserModel('User 1');
-      final userUpdated = TestUserModel('User 1 updated');
-
-      final queryFuture = userDoc.streamChanges().take(2).toList();
-
-      userDoc.create(user);
+      final userData = TestUserModel('User 1');
+      final userDataUpdated = TestUserModel('User 1 updated');
+      final userObs = userDoc.observe();
+      final future = userObs.streamChanges().take(2).toList();
 
       await asyncEvent();
+      userDoc.create(userData);
+      await asyncEvent();
+      userDoc.update(userDataUpdated);
+      await asyncEvent();
 
-      userDoc.update(userUpdated);
+      final events = await future;
 
-      final snaps = await queryFuture;
-
-      // Add document
       expect(
-        snaps[0].event,
-        BroadcastEvents.added,
-      );
-      expect(
-        snaps[0].prevData,
-        null,
-      );
-      expect(
-        snaps[0].data,
-        user,
-      );
-
-      // Update document
-      expect(
-        snaps[1].event,
-        BroadcastEvents.modified,
-      );
-      expect(
-        snaps[1].prevData,
-        user,
-      );
-      expect(
-        snaps[1].data,
-        userUpdated,
+        events,
+        [
+          DocumentChangeSnapshot(
+            doc: userObs,
+            data: userData,
+            prevData: null,
+            event: BroadcastEvents.added,
+          ),
+          DocumentChangeSnapshot(
+            doc: userObs,
+            data: userDataUpdated,
+            prevData: userData,
+            event: BroadcastEvents.modified,
+          ),
+        ],
       );
     });
   });
@@ -481,75 +442,64 @@ void main() {
     });
   });
 
-  group('Stream queries', () {
+  group('Stream query', () {
     tearDown(() {
       Loon.clearAll();
     });
 
     test(
-      'Returns a stream of documents that satisfy the query',
+      'Streams correctly',
       () async {
         final user = TestUserModel('User 1');
+        final userUpdated = TestUserModel('User 1 updated');
         final user2 = TestUserModel('User 2');
         final userDoc = TestUserModel.store.doc('1');
         final userDoc2 = TestUserModel.store.doc('2');
 
-        userDoc.create(user);
-        userDoc2.create(user2);
-
         final queryStream =
             TestUserModel.store.where((snap) => snap.id == '1').stream();
 
-        final querySnaps = await queryStream.take(1).toList();
+        await asyncEvent();
+        userDoc.create(user);
+        userDoc2.create(user2);
+
+        await asyncEvent();
+        userDoc.update(userUpdated);
+        await asyncEvent();
+        userDoc.delete();
+        await asyncEvent();
+        userDoc.create(user);
+        await asyncEvent();
+        TestUserModel.store.delete();
+        await asyncEvent();
+
+        final querySnaps = await queryStream.take(6).toList();
 
         expect(
           querySnaps,
           [
+            // No data
+            [],
+            // User 1 created
             [
-              DocumentSnapshot(
-                doc: userDoc,
-                data: user,
-              ),
-            ]
+              DocumentSnapshot(doc: userDoc, data: user),
+            ],
+            // User 1 updated
+            [
+              DocumentSnapshot(doc: userDoc, data: userUpdated),
+            ],
+            // User 1 deleted
+            [],
+            // User 1 recreated
+            [
+              DocumentSnapshot(doc: userDoc, data: user),
+            ],
+            // User collection deleted
+            [],
           ],
         );
       },
     );
-
-    test('Updates the stream of documents when they change', () async {
-      final user = TestUserModel('User 1');
-      final user2 = TestUserModel('User 2');
-      final userDoc = TestUserModel.store.doc('1');
-
-      userDoc.create(user);
-
-      await asyncEvent();
-
-      final queryStream = TestUserModel.store
-          .where((snap) {
-            return snap.data.name == 'User 1';
-          })
-          .stream()
-          .take(2);
-
-      await asyncEvent();
-
-      userDoc.update(user2);
-
-      final querySnaps = await queryStream.toList();
-      expect(
-        querySnaps,
-        [
-          [
-            DocumentSnapshot(
-              doc: userDoc,
-              data: user,
-            ),
-          ],
-          [],
-        ],
-      );
-    });
 
     test(
         'Correctly handles the scenario where a collection is removed and written to in the same task',
@@ -602,25 +552,30 @@ void main() {
       Loon.clearAll();
     });
 
-    test('Returns a stream of changes to documents', () async {
+    test('Streams changes correctly', () async {
       final user = TestUserModel('User 1');
       final user2 = TestUserModel('User 2');
       final userDoc = TestUserModel.store.doc('1');
       final userDoc2 = TestUserModel.store.doc('2');
       final updatedUser = TestUserModel('User 1 updated');
 
-      final changeSnaps = TestUserModel.store.streamChanges().take(2).toList();
-
-      userDoc.create(user);
-      userDoc2.create(user2);
+      final events = TestUserModel.store.streamChanges().take(4).toList();
 
       await asyncEvent();
-
+      userDoc.create(user);
+      userDoc2.create(user2);
+      await asyncEvent();
       userDoc.update(updatedUser);
+      await asyncEvent();
+      userDoc.delete();
+      await asyncEvent();
+      TestUserModel.store.delete();
+      await asyncEvent();
 
       expect(
-        await changeSnaps,
+        await events,
         [
+          // Create documents
           [
             DocumentChangeSnapshot(
               doc: userDoc,
@@ -635,12 +590,31 @@ void main() {
               prevData: null,
             ),
           ],
+          // Update document
           [
             DocumentChangeSnapshot(
               doc: userDoc,
               data: updatedUser,
               event: BroadcastEvents.modified,
               prevData: user,
+            ),
+          ],
+          // Remove document
+          [
+            DocumentChangeSnapshot(
+              doc: userDoc,
+              data: null,
+              event: BroadcastEvents.removed,
+              prevData: updatedUser,
+            ),
+          ],
+          // Delete user collection
+          [
+            DocumentChangeSnapshot(
+              doc: userDoc2,
+              data: null,
+              event: BroadcastEvents.removed,
+              prevData: user2,
             ),
           ]
         ],
@@ -1436,7 +1410,7 @@ void main() {
       Loon.clearAll();
     });
 
-    test("Changes to dependents should broadcast dependencies", () async {
+    test("Updates the dependencies/dependents stores correctly", () async {
       final usersCollection = Loon.collection('users');
       final postsCollection = Loon.collection<Json>(
         'posts',
@@ -1453,13 +1427,13 @@ void main() {
       final postDoc = postsCollection.doc('1');
       final postData = {"id": 1, "text": "Post 1"};
       final updatedPostData1 = {"text": "Post 1 updated"};
-      final updatedPostData2 = {"text": "Post 1 updated again"};
       final userDoc = usersCollection.doc('1');
-      final postsStream = postDoc.stream();
+      final userData = {
+        "id": 1,
+        "name": "User 1",
+      };
 
       postDoc.create(postData);
-
-      await asyncEvent();
 
       expect(
         Loon.inspect()['dependencyStore'],
@@ -1482,23 +1456,19 @@ void main() {
         },
       );
 
-      usersCollection.doc('1').create({
-        "id": 1,
-        "name": "User 1",
-      });
+      // After writing the post, both the post and its user dependency should exist in
+      // the document cache.
+      expect(
+        Loon.inspect()['documentCache'],
+        {
+          userDoc,
+        },
+      );
 
-      await asyncEvent();
-
-      userDoc.update({
-        "id": 1,
-        "name": "User 1",
-      });
-
-      await asyncEvent();
-
+      userDoc.create(userData);
       userDoc.delete();
 
-      // Deleting the user doc should not alter the dependencies, as the post doc remains
+      // Deleting the user doc should not alter the post's dependencies, as the post doc remains
       // dependent on the user doc, even when it is no longer in the store, since it could be added back later.
       expect(
         Loon.inspect()['dependencyStore'],
@@ -1521,14 +1491,16 @@ void main() {
         },
       );
 
-      await asyncEvent();
+      postDoc.update(postData);
 
-      usersCollection.doc('1').create({
-        "id": 1,
-        "name": "User 1",
-      });
-
-      await asyncEvent();
+      // Updating the post should not create a duplicate user dependency, it should re-use
+      // the existing cached user document.
+      expect(
+        Loon.inspect()['documentCache'],
+        {
+          userDoc,
+        },
+      );
 
       postDoc.update(updatedPostData1);
 
@@ -1542,19 +1514,55 @@ void main() {
         {},
       );
 
+      // Since the user doc no longer has any dependencies, it should be removed from the dependency
+      // document cache.
+      expect(
+        Loon.inspect()['documentCache'],
+        [],
+      );
+    });
+
+    test("Rebroadcasts an observable document on dependency changes", () async {
+      final usersCollection = Loon.collection('users');
+      final postsCollection = Loon.collection<Json>(
+        'posts',
+        dependenciesBuilder: (snap) {
+          if (snap.data['text'] == 'Post 1') {
+            return {
+              usersCollection.doc('1'),
+            };
+          }
+          return {};
+        },
+      );
+
+      final postDoc = postsCollection.doc('1');
+      final postData = {"id": 1, "text": "Post 1"};
+      final updatedPostData1 = {"text": "Post 1 updated"};
+      final userDoc = usersCollection.doc('1');
+      final userData = {"id": 1, "name": "User 1"};
+      final updatedUserData = {"id": 1, "name": "User 1 updated"};
+      final postStream = postDoc.stream();
+
+      postDoc.create(postData);
       await asyncEvent();
-
-      // Skips this update to user doc, since the last update caused the user doc to be removed as a dependency.
-      userDoc.update({
-        "id": 1,
-        "name": "User 1 updated",
-      });
-
+      usersCollection.doc('1').create(userData);
       await asyncEvent();
+      userDoc.update(updatedUserData);
+      await asyncEvent();
+      userDoc.delete();
+      await asyncEvent();
+      usersCollection.doc('1').create(userData);
+      await asyncEvent();
+      postDoc.update(updatedPostData1);
+      await asyncEvent();
+      // Skips this update to user doc, since the last update to the post
+      // caused the user doc to be removed as a dependency.
+      userDoc.update(updatedUserData);
+      await asyncEvent();
+      postDoc.delete();
 
-      postDoc.update(updatedPostData2);
-
-      final snaps = await postsStream.take(8).toList();
+      final snaps = await postStream.take(8).toList();
 
       expect(snaps, [
         // No post yet
@@ -1571,10 +1579,170 @@ void main() {
         DocumentSnapshot(doc: postDoc, data: postData),
         // Rebroadcast when post data is updated
         DocumentSnapshot(doc: postDoc, data: updatedPostData1),
-        // Rebroadcast when post data is updated again
-        DocumentSnapshot(doc: postDoc, data: updatedPostData2),
+        // Rebroadcast when post deleted
+        null,
       ]);
     });
+
+    test(
+      "Rebroadcasts an observable query on dependency changes",
+      () async {
+        final usersCollection = Loon.collection('users');
+        final postsCollection = Loon.collection<Json>(
+          'posts',
+          dependenciesBuilder: (snap) {
+            if (snap.data['text'] == 'Post 1') {
+              return {
+                usersCollection.doc('1'),
+              };
+            }
+            return {};
+          },
+        );
+
+        final postDoc = postsCollection.doc('1');
+        final postData = {"id": 1, "text": "Post 1"};
+        final updatedPostData1 = {"text": "Post 1 updated"};
+        final userDoc = usersCollection.doc('1');
+        final userData = {"id": 1, "name": "User 1"};
+        final updatedUserData = {"id": 1, "name": "User 1 updated"};
+        final postsStream = postsCollection.stream();
+
+        postDoc.create(postData);
+        await asyncEvent();
+        userDoc.create(userData);
+        await asyncEvent();
+        userDoc.update(updatedUserData);
+        await asyncEvent();
+        userDoc.delete();
+        await asyncEvent();
+        userDoc.create(userData);
+        await asyncEvent();
+        usersCollection.delete();
+        await asyncEvent();
+        userDoc.create(userData);
+        await asyncEvent();
+        postDoc.update(updatedPostData1);
+        await asyncEvent();
+        // Skips this update to user doc, since the last update to the post
+        // caused the user doc to be removed as a dependency.
+        userDoc.update(updatedUserData);
+        await asyncEvent();
+        postsCollection.delete();
+        await asyncEvent();
+
+        final snaps = await postsStream.take(10).toList();
+
+        expect(snaps, [
+          // No post yet
+          [],
+          // Post created
+          [DocumentSnapshot(doc: postDoc, data: postData)],
+          // Rebroadcast posts when user created
+          [DocumentSnapshot(doc: postDoc, data: postData)],
+          // Rebroadcast posts when user updated
+          [DocumentSnapshot(doc: postDoc, data: postData)],
+          // Rebroadcast posts when user deleted
+          [DocumentSnapshot(doc: postDoc, data: postData)],
+          // Rebroadcast posts when user recreated (ensures dependencies remain across deletion/re-creation)
+          [DocumentSnapshot(doc: postDoc, data: postData)],
+          // Rebroadcast posts when user collection deleted
+          [DocumentSnapshot(doc: postDoc, data: postData)],
+          // Rebroadcast posts when user recreated
+          [DocumentSnapshot(doc: postDoc, data: postData)],
+          // Rebroadcast posts when post updated
+          [DocumentSnapshot(doc: postDoc, data: updatedPostData1)],
+          // Rebroadcast posts when posts collection deleted
+          [],
+        ]);
+      },
+    );
+
+    test(
+      "Records an observable query's dependencies correctly",
+      () async {
+        final usersCollection = Loon.collection('users');
+        final postsCollection = Loon.collection<Json>(
+          'posts',
+          dependenciesBuilder: (snap) {
+            if (!snap.data['text'].contains('updated')) {
+              return {
+                usersCollection.doc(snap.doc.id),
+              };
+            }
+            return null;
+          },
+        );
+
+        final postDoc = postsCollection.doc('1');
+        final postData = {"id": 1, "text": "Post 1"};
+        final updatedPostData1 = {"text": "Post 1 updated"};
+        final postDoc2 = postsCollection.doc('2');
+        final postData2 = {"id": 2, "text": "Post 2"};
+        final userDoc = usersCollection.doc('1');
+        final userDoc2 = usersCollection.doc('2');
+        final postsObs = postsCollection.toQuery().observe();
+
+        postDoc.create(postData);
+        await asyncEvent();
+
+        // After creating the post document, the query should have a global and document level
+        // dependency.
+        expect(postsObs.inspect(), {
+          "deps": {
+            "__ref": 1,
+            "users": {
+              "__ref": 1,
+              "1": 1,
+            },
+          },
+          "docDeps": {
+            postDoc: {
+              userDoc,
+            },
+          }
+        });
+
+        postDoc.update(updatedPostData1);
+        await asyncEvent();
+
+        // After updating the document, it should have removed the user dependency from the global
+        // and document level dependency.
+        expect(postsObs.inspect(), {"deps": {}, "docDeps": {}});
+
+        postDoc.update(postData);
+        postDoc2.create(postData2);
+        await asyncEvent();
+
+        // After updating the first post to have a user dependency again, and creating a second
+        // post with another user dependency, the query's dependencies should have two entries.
+        expect(postsObs.inspect(), {
+          "deps": {
+            "__ref": 2,
+            "users": {
+              "__ref": 2,
+              "1": 1,
+              "2": 1,
+            },
+          },
+          "docDeps": {
+            postDoc: {
+              userDoc,
+            },
+            postDoc2: {
+              userDoc2,
+            },
+          }
+        });
+
+        postsCollection.delete();
+        await asyncEvent();
+
+        // After deleting the posts collection, the query should have cleared its global
+        // and document level dependencies.
+        expect(postsObs.inspect(), {"deps": {}, "docDeps": {}});
+      },
+    );
 
     test("Cyclical dependencies do not cause infinite rebroadcasts", () async {
       final usersCollection = Loon.collection<TestUserModel>(

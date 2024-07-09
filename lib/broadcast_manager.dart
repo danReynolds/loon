@@ -62,20 +62,12 @@ class BroadcastManager {
 
   /// Schedules all dependents of the given document for broadcast.
   void _broadcastDependents(Document doc) {
-    final dependents = Loon._instance.dependentsStore[doc];
-
+    final dependents = Loon._instance.dependencyManager.getDependents(doc);
     if (dependents != null) {
-      for (final doc in dependents.toList()) {
-        // If a dependent document does not exist in the store, then it is lazily removed.
-        if (!doc.exists()) {
-          dependents.remove(doc);
-        } else if (!store.hasValue(doc.path)) {
+      for (final doc in dependents) {
+        if (!store.hasValue(doc.path)) {
           writeDocument(doc, BroadcastEvents.touched);
         }
-      }
-
-      if (dependents.isEmpty) {
-        Loon._instance.dependentsStore.remove(doc);
       }
     }
   }

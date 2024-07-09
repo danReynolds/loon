@@ -80,6 +80,7 @@ class Document<T> implements StoreReference {
   DocumentSnapshot<T> create(
     T data, {
     bool broadcast = true,
+    bool persist = true,
   }) {
     if (exists()) {
       throw Exception('Cannot create duplicate document');
@@ -89,6 +90,7 @@ class Document<T> implements StoreReference {
       this,
       data,
       broadcast: broadcast,
+      persist: persist,
       event: BroadcastEvents.added,
     );
   }
@@ -173,11 +175,11 @@ class Document<T> implements StoreReference {
   }
 
   Set<Document>? dependencies() {
-    return Loon._instance.dependenciesStore.get(path);
+    return Loon._instance.dependencyManager.getDependencies(this);
   }
 
   Set<Document>? dependents() {
-    return Loon._instance.dependentsStore[this];
+    return Loon._instance.dependencyManager.getDependents(this);
   }
 
   bool isPersistenceEnabled() {

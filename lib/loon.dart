@@ -20,7 +20,8 @@ part 'document_snapshot.dart';
 part 'persistor/persistor.dart';
 part 'document_change_snapshot.dart';
 part 'broadcast_manager.dart';
-part 'utils.dart';
+part 'dependency_manager.dart';
+part 'utils/validation.dart';
 part 'logger.dart';
 part 'store_reference.dart';
 
@@ -41,13 +42,9 @@ class Loon {
   /// The store of document snapshots indexed by document path.
   final documentStore = ValueStore<DocumentSnapshot>();
 
-  /// The store of dependencies of documents indexed by document path.
-  final dependenciesStore = ValueStore<Set<Document>>();
-
-  /// The store of dependents of documents.
-  final Map<Document, Set<Document>> dependentsStore = {};
-
   final broadcastManager = BroadcastManager();
+
+  final dependencyManager = DependencyManager();
 
   late final Logger _logger;
 
@@ -147,11 +144,8 @@ class Loon {
       broadcastManager.writeDocument(doc, event);
     }
 
-    final snap = DocumentSnapshot(
-      doc: doc,
-      data: data,
-    );
-    updateDependencies(snap);
+    final snap = DocumentSnapshot(doc: doc, data: data);
+    dependencyManager.updateDependencies(snap);
 
     documentStore.write(doc.path, snap);
 
@@ -195,59 +189,9 @@ class Loon {
   void deleteCollection(Collection collection) {
     final path = collection.path;
     broadcastManager.deleteCollection(collection);
+    dependencyManager.deleteCollection(collection);
     documentStore.delete(path);
-    dependenciesStore.delete(path);
     persistor?._clear(collection);
-  }
-
-  /// When a snapshot is written, its dependencies and dependents are recalculated
-  /// based on its updated data.
-  void updateDependencies<T>(DocumentSnapshot<T> snap) {
-    final doc = snap.doc;
-    final prevDeps = dependenciesStore.get(doc.path);
-    final deps = doc.dependenciesBuilder?.call(snap);
-
-    if (setEquals(deps, prevDeps)) {
-      return;
-    }
-
-    if (deps != null && prevDeps != null) {
-      final addedDeps = deps.difference(prevDeps);
-      final removedDeps = prevDeps.difference(deps);
-
-      for (final dep in addedDeps) {
-        (dependentsStore[dep] ??= {}).add(doc);
-      }
-      for (final dep in removedDeps) {
-        if (dependentsStore[dep]!.length == 1) {
-          dependentsStore.remove(dep);
-        } else {
-          dependentsStore[dep]!.remove(doc);
-        }
-      }
-
-      if (deps.isEmpty) {
-        dependenciesStore.delete(doc.path);
-      } else {
-        dependenciesStore.write(doc.path, deps);
-      }
-    } else if (deps != null) {
-      for (final dep in deps) {
-        (dependentsStore[dep] ??= {}).add(doc);
-      }
-
-      dependenciesStore.write(doc.path, deps);
-    } else if (prevDeps != null) {
-      for (final dep in prevDeps) {
-        if (dependentsStore[dep]!.length == 1) {
-          dependentsStore.remove(dep);
-        } else {
-          dependentsStore[dep]!.remove(doc);
-        }
-      }
-
-      dependenciesStore.delete(doc.path);
-    }
   }
 
   /// Clears all data from the store.
@@ -259,10 +203,6 @@ class Loon {
 
     // Clear any documents scheduled for broadcast, as whatever events happened prior to the clear are now irrelevant.
     broadcastManager.clear();
-
-    // Clear all dependencies and dependents of documents.
-    dependenciesStore.clear();
-    dependentsStore.clear();
 
     await persistor?._clearAll();
   }
@@ -353,8 +293,7 @@ class Loon {
     return {
       "store": _instance.documentStore.inspect(),
       "broadcastStore": _instance.broadcastManager.inspect(),
-      "dependencyStore": _instance.dependenciesStore.inspect(),
-      "dependentsStore": _instance.dependentsStore,
+      ..._instance.dependencyManager.inspect(),
     };
   }
 

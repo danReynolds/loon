@@ -4,11 +4,11 @@ class ObservableQuery<T> extends Query<T>
     with
         BroadcastObserver<List<DocumentSnapshot<T>>,
             List<DocumentChangeSnapshot<T>>> {
-  /// A query maintains a cache of snapshots of the documents in its current result set.
+  /// An observable query maintains a cache of snapshots of the documents in its current result set.
   final Map<Document<T>, DocumentSnapshot<T>> _snapCache = {};
 
-  /// A query maintains a cache of the dependencies of documents in its current result set.
-  final Map<Document<T>, Set<Document>> _depCache = {};
+  /// An observable query maintains a cache of the dependencies of documents in its current result set.
+  final Map<Document<T>, Set<Document>> _docDepCache = {};
 
   ObservableQuery(
     super.collection, {
@@ -24,23 +24,23 @@ class ObservableQuery<T> extends Query<T>
     init(snaps, multicast: multicast);
   }
 
-  /// Update the doc in the snapshot and dependency indices.
+  /// Update the doc in the snapshot and dependency caches.
   void _cacheDoc(DocumentSnapshot<T> snap) {
     final doc = snap.doc;
-    final prevDeps = _depCache[doc];
+    final prevDeps = _docDepCache[doc];
     final deps = doc.dependencies();
 
     _snapCache[doc] = snap;
 
     if (deps != prevDeps) {
       if (deps != null) {
-        _depCache[doc] = deps;
+        _docDepCache[doc] = deps;
 
         for (final dep in deps) {
           _deps.inc(dep.path);
         }
       } else if (prevDeps != null) {
-        _depCache.remove(doc);
+        _docDepCache.remove(doc);
 
         for (final dep in prevDeps) {
           _deps.dec(dep.path);
@@ -49,9 +49,9 @@ class ObservableQuery<T> extends Query<T>
     }
   }
 
-  /// Removes the doc from the index, clearing it in both the snapshot and dependency indices.
+  /// Removes the doc from the index, clearing it in both the snapshot and dependency caches.
   void _evictDoc(Document<T> doc) {
-    final deps = _depCache[doc];
+    final deps = _docDepCache[doc];
 
     if (deps != null) {
       for (final dep in deps) {
@@ -59,7 +59,7 @@ class ObservableQuery<T> extends Query<T>
       }
     }
 
-    _depCache.remove(doc);
+    _docDepCache.remove(doc);
     _snapCache.remove(doc);
   }
 
@@ -113,6 +113,7 @@ class ObservableQuery<T> extends Query<T>
         );
 
         _snapCache.clear();
+        _docDepCache.clear();
         _deps.clear();
       }
     }
@@ -277,5 +278,12 @@ class ObservableQuery<T> extends Query<T>
       return super.get();
     }
     return _value;
+  }
+
+  Map inspect() {
+    return {
+      "deps": _deps.inspect(),
+      "docDeps": _docDepCache,
+    };
   }
 }

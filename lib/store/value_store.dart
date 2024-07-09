@@ -1,6 +1,6 @@
 part of loon;
 
-/// An indexed value store is a tree structure that takes a path and indexes its value into the tree as a
+/// A value store is a tree structure that takes a path and indexes its value into the tree as a
 /// key of its parent path, enabling efficient access to all values of the parent path.
 ///
 /// Ex. In this example, the parent path `users__2__messages` indexes the value 'Test' by its key `1`.
