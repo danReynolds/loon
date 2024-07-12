@@ -97,7 +97,7 @@ class Document<T> implements StoreReference {
 
   DocumentSnapshot<T> update(
     T data, {
-    bool broadcast = true,
+    bool? broadcast,
     bool persist = true,
   }) {
     if (!exists()) {
@@ -107,9 +107,13 @@ class Document<T> implements StoreReference {
     return Loon._instance.writeDocument<T>(
       this,
       data,
-      // As an optimization, broadcasting is skipped when updating a document if the document
+      // As an optimization, broadcasting is skipped when updating a document if its
       // data is unchanged.
-      broadcast: data != get()!.data,
+      //
+      // The document store is accessed directly here instead of going through the public [Document.get]
+      // API since [get] checks for type compatibility of the existing value with the current document
+      // and the update may be altering the type of the document.
+      broadcast: broadcast ?? Loon._instance.documentStore.get(path) != data,
       persist: persist,
       event: BroadcastEvents.modified,
     );
@@ -178,7 +182,7 @@ class Document<T> implements StoreReference {
   }
 
   bool exists() {
-    return get() != null;
+    return Loon._instance.existsSnap(this);
   }
 
   Set<Document>? dependencies() {

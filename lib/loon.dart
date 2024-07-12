@@ -24,6 +24,7 @@ part 'dependency_manager.dart';
 part 'utils/validation.dart';
 part 'logger.dart';
 part 'store_reference.dart';
+part 'exceptions/document_type_mismatch.dart';
 
 class Loon {
   Persistor? persistor;
@@ -88,7 +89,15 @@ class Loon {
       );
     }
 
-    return snap as DocumentSnapshot<T>;
+    if (snap is DocumentSnapshot<T>) {
+      return snap;
+    }
+
+    throw DocumentTypeMismatchException<T>(snap);
+  }
+
+  bool existsSnap<T>(Document<T> doc) {
+    return documentStore.hasValue(doc.path);
   }
 
   DocumentSnapshot<T>? getSnapshot<T>(Document<T> doc) {

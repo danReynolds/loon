@@ -145,6 +145,31 @@ void main() {
         ),
       );
     });
+
+    test(
+      'Throws an exception if accessed through a document of an incompatible type',
+      () {
+        final usersCollection = Loon.collection<TestUserModel>(
+          'users',
+          fromJson: TestUserModel.fromJson,
+          toJson: (snap) => snap.toJson(),
+        );
+
+        final userDoc = usersCollection.doc('1');
+
+        userDoc.create(TestUserModel('1'));
+
+        expect(
+          () => Loon.collection<int>('users').doc('1').get(),
+          throwsA(
+            (e) =>
+                e is DocumentTypeMismatchException &&
+                e.toString() ==
+                    'Document type mismatch: Requested type int does not match existing type TestUserModel',
+          ),
+        );
+      },
+    );
   });
 
   group('Update document', () {
@@ -229,6 +254,32 @@ void main() {
           persistorSettings: const PersistorSettings(),
         ).doc('1').update(TestUserModel('1')),
         throwsException,
+      );
+    });
+
+    test('Documents can be updated to a new data type', () {
+      final usersCollection = Loon.collection<TestUserModel>(
+        'users',
+        fromJson: TestUserModel.fromJson,
+        toJson: (snap) => snap.toJson(),
+      );
+      final numericUsersCollection = Loon.collection<int>('users');
+      final userData = TestUserModel('User 1');
+
+      usersCollection.doc('1').create(userData);
+
+      // It is a valid case to update a document from one data type (in this case TestUserModel)
+      // to another type (int).
+      numericUsersCollection.doc('1').update(10);
+
+      expect(
+        numericUsersCollection.doc('1').get(),
+        DocumentSnapshotMatcher(
+          DocumentSnapshot(
+            doc: numericUsersCollection.doc('1'),
+            data: 10,
+          ),
+        ),
       );
     });
   });

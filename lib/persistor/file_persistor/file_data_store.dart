@@ -397,19 +397,17 @@ class FileDataStoreResolver {
       await _logger.measure(
         'Hydrate',
         () async {
-          final fileStr = await _file.readAsString();
-          store = RefValueStore(jsonDecode(fileStr));
+          if (await (_file.exists())) {
+            final fileStr = await _file.readAsString();
+            store = RefValueStore(jsonDecode(fileStr));
+          }
         },
       );
     } catch (e) {
-      if (e is PathNotFoundException) {
-        _logger.log('Missing file.');
-      } else {
-        // If hydration fails for an existing file, then this file data store is corrupt
-        // and should be removed from the file data store index.
-        _logger.log('Corrupt file.');
-        rethrow;
-      }
+      // If hydration fails for an existing file, then this file data store is corrupt
+      // and should be removed from the file data store index.
+      _logger.log('Corrupt file.');
+      rethrow;
     }
   }
 

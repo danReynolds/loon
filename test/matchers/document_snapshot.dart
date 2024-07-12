@@ -47,10 +47,6 @@ class DocumentSnapshotMatcher<T> extends Matcher {
       return actualData is Json && mapEquals(actualData, expectedData);
     }
 
-    if (expectedData is TestUserModel) {
-      return actualData is TestUserModel && expectedData == actualData;
-    }
-
-    return false;
+    return expectedData == actualData;
   }
 }
