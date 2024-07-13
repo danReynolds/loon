@@ -2,8 +2,6 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:loon/loon.dart';
 
-import '../models/test_user_model.dart';
-
 class DocumentSnapshotMatcher<T> extends Matcher {
   DocumentSnapshot<T?>? expected;
   late DocumentSnapshot<T?>? actual;

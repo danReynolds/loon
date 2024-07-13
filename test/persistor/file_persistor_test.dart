@@ -1565,7 +1565,7 @@ void main() {
         // the persistor needs to be recreated so that it re-reads all data stores from disk.
         Loon.configure(persistor: TestFilePersistor());
 
-        await Loon.hydrate([userCollection]);
+        await Loon.hydrate({userCollection});
 
         // Only the user collection and its subcollections should have been hydrated.
         // The `friends` collection should remain empty, while `users` and `users__1__friends`
@@ -1600,7 +1600,7 @@ void main() {
 
         // If a subsequent request is made to hydrate a particular document from the `friends` data store,
         // then the already hydrated data can extract that additional data and deliver it in the hydration response.
-        await Loon.hydrate([friendsCollection.doc('1')]);
+        await Loon.hydrate({friendsCollection.doc('1')});
 
         expect(friendsCollection.get(), [
           DocumentSnapshot(
@@ -1744,7 +1744,7 @@ void main() {
 
         Loon.configure(persistor: TestFilePersistor());
 
-        await Loon.hydrate([currentUserDoc]);
+        await Loon.hydrate({currentUserDoc});
 
         expect(
           currentUserDoc.get(),
@@ -1802,7 +1802,7 @@ void main() {
 
         Loon.configure(persistor: TestFilePersistor());
 
-        await Loon.hydrate([Collection.root]);
+        await Loon.hydrate({Collection.root});
 
         expect(
           currentUserDoc.get(),

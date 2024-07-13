@@ -92,10 +92,10 @@ class PersistMessageResponse extends MessageResponse {
 }
 
 class ClearMessageRequest extends MessageRequest<ClearMessageResponse> {
-  final String path;
+  final List<String> paths;
 
   ClearMessageRequest({
-    required this.path,
+    required this.paths,
   });
 
   ClearMessageResponse success() {

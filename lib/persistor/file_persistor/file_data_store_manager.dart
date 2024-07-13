@@ -231,8 +231,8 @@ class FileDataStoreManager {
     await _sync();
   }
 
-  Future<void> clear(String path) async {
-    await _clear(path);
+  Future<void> clear(List<String> paths) async {
+    await Future.wait(paths.map(_clear).toList());
     await _sync();
   }
 

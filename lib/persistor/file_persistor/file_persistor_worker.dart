@@ -103,7 +103,7 @@ class FilePersistorWorker {
   void _clear(ClearMessageRequest request) {
     logger.measure('Clear operation', () async {
       try {
-        await manager.clear(request.path);
+        await manager.clear(request.paths);
         _sendResponse(request.success());
       } catch (e) {
         _sendResponse(request.error('Clear error'));
