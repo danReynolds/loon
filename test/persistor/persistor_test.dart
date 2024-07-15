@@ -83,8 +83,7 @@ void main() {
         await TestPersistor.completer.onPersist;
 
         // There should be a separate persistence call for each document in this scenario since the operation
-        // order must be persist->clear->persist and grouping together the persistence operations
-        // would lead to both occur either before or after the clear operation would lead to an incorrect state.
+        // order must be persist->clear->persist in order to ensure the correct sequencing of events.
         expect(batches.length, 2);
         expect(
           batches.first,
@@ -134,7 +133,7 @@ void main() {
   });
 
   test(
-    'Batches clearing collections',
+    'Batches clearing of collections',
     () async {
       List<Set<Collection>> batches = [];
 

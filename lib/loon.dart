@@ -26,7 +26,7 @@ part 'store_reference.dart';
 part 'exceptions/document_type_mismatch.dart';
 part 'persistor/persistor.dart';
 part 'persistor/operations.dart';
-part 'persistor/scheduler.dart';
+part 'persistor/persist_manager.dart';
 part 'extensions/iterable.dart';
 
 class Loon {
@@ -41,8 +41,6 @@ class Loon {
     });
   }
 
-  PersistenceScheduler? persistenceScheduler;
-
   /// The store of document snapshots indexed by document path.
   final documentStore = ValueStore<DocumentSnapshot>();
 
@@ -50,12 +48,14 @@ class Loon {
 
   final dependencyManager = DependencyManager();
 
+  PersistManager? persistManager;
+
   late final Logger _logger;
 
   bool _isLoggingEnabled = false;
 
   bool get _isGlobalPersistenceEnabled {
-    return persistenceScheduler?.settings.enabled ?? false;
+    return persistManager?.settings.enabled ?? false;
   }
 
   // When a document is read, if it is still in JSON format from hydration and is now being accessed
@@ -162,7 +162,7 @@ class Loon {
     documentStore.write(doc.path, snap);
 
     if (persist && doc.isPersistenceEnabled()) {
-      persistenceScheduler?.persist(doc);
+      persistManager?.persist(doc);
     }
 
     return snap;
@@ -194,7 +194,7 @@ class Loon {
     documentStore.delete(doc.path);
 
     if (doc.isPersistenceEnabled()) {
-      persistenceScheduler?.persist(doc);
+      persistManager?.persist(doc);
     }
   }
 
@@ -203,7 +203,7 @@ class Loon {
     broadcastManager.deleteCollection(collection);
     dependencyManager.deleteCollection(collection);
     documentStore.delete(path);
-    persistenceScheduler?.clear(collection);
+    persistManager?.clear(collection);
   }
 
   /// Clears all data from the store.
@@ -218,7 +218,7 @@ class Loon {
 
     dependencyManager.clear();
 
-    await persistenceScheduler?.clearAll();
+    await persistManager?.clearAll();
   }
 
   static void configure({
@@ -228,8 +228,7 @@ class Loon {
     _instance._isLoggingEnabled = enableLogging;
 
     if (persistor != null) {
-      _instance.persistenceScheduler =
-          PersistenceScheduler(persistor: persistor);
+      _instance.persistManager = PersistManager(persistor: persistor);
     }
   }
 
@@ -238,12 +237,12 @@ class Loon {
   /// [StoreReference] documents and collections are provided, then only data in the store under those
   /// entities is hydrated.
   static Future<void> hydrate([Set<StoreReference>? refs]) async {
-    if (_instance.persistenceScheduler == null) {
+    if (_instance.persistManager == null) {
       logger.log('Hydration skipped - persistence not enabled');
       return;
     }
     try {
-      final data = await _instance.persistenceScheduler!.hydrate(refs);
+      final data = await _instance.persistManager!.hydrate(refs);
 
       for (final entry in data.entries) {
         final docPath = entry.key;
@@ -320,6 +319,6 @@ class Loon {
   }
 
   static PersistorSettings? get persistorSettings {
-    return _instance.persistenceScheduler?.settings;
+    return _instance.persistManager?.settings;
   }
 }

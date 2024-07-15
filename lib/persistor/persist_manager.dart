@@ -1,6 +1,6 @@
 part of loon;
 
-class PersistenceScheduler {
+class PersistManager {
   /// The operation queue is used to sequence persistor operations (init, hydrate, persist, clear, clearAll)
   /// in order to prevent race conditions and ensure operations are executed in the correct order.
   final List<PersistorOperation> _operationQueue = [];
@@ -11,10 +11,10 @@ class PersistenceScheduler {
 
   bool _isBusy = false;
 
-  PersistenceScheduler({
+  PersistManager({
     required Persistor persistor,
   })  : _persistor = persistor,
-        _logger = Logger('Persistor', output: Loon.logger.log);
+        _logger = Logger('PersistManager', output: Loon.logger.log);
 
   Future<void> _next<T>() async {
     if (_operationQueue.isEmpty || _isBusy) {
@@ -24,14 +24,10 @@ class PersistenceScheduler {
     _isBusy = true;
     final current = _operationQueue.first;
 
-    // An operation delays execution until its execution window is expired so that it
-    // can de-dupe redundant operations.
-    //
-    // For example, if many documents are written in succession within a persistence throttle window,
-    // they are de-duped into a single persistence operation. The default throttle for this is 100ms.
-    if (!current.isExpired) {
-      await current.onExpire;
-    }
+    // The operation is delayed a moment so that consecutive operations of the same type
+    // (multiple persist, clear, hydrate operations) can be batched together into a single
+    // operation.
+    await Future.delayed(const Duration(milliseconds: 1));
     _operationQueue.removeAt(0);
 
     try {
@@ -71,7 +67,7 @@ class PersistenceScheduler {
     }
   }
 
-  Future<T> _schedule<T>(PersistorOperation<T> operation) {
+  Future<T> _enqueue<T>(PersistorOperation<T> operation) {
     _operationQueue.add(operation);
     _next();
     return operation.onComplete;
@@ -88,19 +84,12 @@ class PersistenceScheduler {
     }
 
     final lastOperation = _operationQueue.tryLast;
-    if (lastOperation is PersistOperation && !lastOperation.isExpired) {
+    if (lastOperation is PersistOperation) {
       lastOperation.batch.add(doc);
       return lastOperation.onComplete;
     }
 
-    return _schedule(
-      PersistOperation(
-        batch: {doc},
-        // Persistence batches changes together using an extended window specified
-        // by the client. By default it is set to 100ms.
-        expiration: _persistor.persistenceThrottle,
-      ),
-    );
+    return _enqueue(PersistOperation({doc}));
   }
 
   Future<void> clear(Collection collection) {
@@ -112,7 +101,7 @@ class PersistenceScheduler {
       return lastOperation.onComplete;
     }
 
-    return _schedule(ClearOperation(batch: {collection}));
+    return _enqueue(ClearOperation({collection}));
   }
 
   Future<void> clearAll() {
@@ -121,7 +110,7 @@ class PersistenceScheduler {
       return lastOperation.onComplete;
     }
 
-    return _schedule(ClearAllOperation());
+    return _enqueue(ClearAllOperation());
   }
 
   Future<HydrationData> hydrate([Set<StoreReference>? refs]) {
@@ -131,7 +120,7 @@ class PersistenceScheduler {
       if (lastOperation is HydrateAllOperation) {
         return lastOperation.onComplete;
       }
-      return _schedule(HydrateAllOperation());
+      return _enqueue(HydrateAllOperation());
     }
 
     if (lastOperation is HydrateOperation) {
@@ -139,6 +128,6 @@ class PersistenceScheduler {
       return lastOperation.onComplete;
     }
 
-    return _schedule(HydrateOperation(batch: refs));
+    return _enqueue(HydrateOperation(refs));
   }
 }

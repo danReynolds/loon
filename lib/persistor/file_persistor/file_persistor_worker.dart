@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:isolate';
 import 'package:encrypt/encrypt.dart';
@@ -22,12 +23,14 @@ class FilePersistorWorker {
     required this.sendPort,
     required Directory directory,
     required Encrypter encrypter,
+    required Duration persistenceThrottle,
   }) {
     logger = Logger('Worker', output: _sendLog);
 
     manager = FileDataStoreManager(
       directory: directory,
       encrypter: encrypter,
+      persistenceThrottle: persistenceThrottle,
     );
   }
 
@@ -36,6 +39,7 @@ class FilePersistorWorker {
       sendPort: request.sendPort,
       directory: request.directory,
       encrypter: request.encrypter,
+      persistenceThrottle: request.persistenceThrottle,
     )._onMessage(request);
   }
 

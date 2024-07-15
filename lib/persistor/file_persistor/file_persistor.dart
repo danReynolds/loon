@@ -119,6 +119,7 @@ class FilePersistor extends Persistor {
       sendPort: _receivePort.sendPort,
       directory: directory as Directory,
       encrypter: encrypter as Encrypter,
+      persistenceThrottle: persistenceThrottle,
     );
 
     final completer =
