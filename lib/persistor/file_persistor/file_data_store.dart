@@ -3,7 +3,6 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:encrypt/encrypt.dart';
 import 'package:loon/loon.dart';
-import 'package:loon/persistor/file_persistor/extensions/future.dart';
 import 'package:loon/persistor/file_persistor/file_persistor_worker.dart';
 import 'package:path/path.dart' as path;
 
@@ -265,6 +264,7 @@ class FileDataStore {
             _store = ValueStore.fromJson(jsonDecode(encodedStore));
           }
           _hydrationCompleter!.complete();
+          isHydrated = true;
         },
       );
     } catch (e) {
@@ -434,7 +434,9 @@ class FileDataStoreResolver {
     await _logger.measure(
       'Delete',
       () async {
-        await _file.delete().catchType<PathNotFoundException>();
+        if (await _file.exists()) {
+          await _file.delete();
+        }
         store.clear();
       },
     );

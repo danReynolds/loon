@@ -14,7 +14,9 @@ class PersistManager {
   PersistManager({
     required Persistor persistor,
   })  : _persistor = persistor,
-        _logger = Logger('PersistManager', output: Loon.logger.log);
+        _logger = Logger('PersistManager', output: Loon.logger.log) {
+    _enqueue(InitOperation());
+  }
 
   Future<void> _next<T>() async {
     if (_operationQueue.isEmpty || _isBusy) {
@@ -48,6 +50,11 @@ class PersistManager {
           break;
         case HydrateOperation(batch: final refs):
           final data = await _persistor.hydrate(refs);
+          current.complete(data);
+          _persistor.onHydrate?.call(data);
+          break;
+        case HydrateAllOperation():
+          final data = await _persistor.hydrate();
           current.complete(data);
           _persistor.onHydrate?.call(data);
           break;

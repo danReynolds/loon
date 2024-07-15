@@ -37,6 +37,7 @@ void main() {
   setUp(() {
     completer = TestFilePersistor.completer = PersistorCompleter();
     testDirectory = Directory.systemTemp.createTempSync('test_dir');
+    Directory("${testDirectory.path}/loon").createSync();
     final mockPathProvider = MockPathProvider();
     PathProviderPlatform.instance = mockPathProvider;
 
