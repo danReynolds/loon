@@ -22,13 +22,8 @@ abstract class Persistor {
   final void Function()? onClearAll;
   final void Function(HydrationData data)? onHydrate;
 
-  /// The throttle for batching persisted documents. All documents updated within the throttle
-  /// duration are batched together into a single persist operation.
-  final Duration persistenceThrottle;
-
   Persistor({
     this.settings = const PersistorSettings(),
-    this.persistenceThrottle = const Duration(milliseconds: 100),
     this.onPersist,
     this.onClear,
     this.onClearAll,

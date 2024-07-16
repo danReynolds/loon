@@ -21,6 +21,10 @@ class FilePersistor extends Persistor {
   /// An index of task IDs to the task completer that is resolved when they are completed on the worker.
   final Map<String, Completer> _messageRequestIndex = {};
 
+  /// The throttle for batching persisted documents. All documents updated within the throttle
+  /// duration are batched together into a single persist operation.
+  final Duration persistenceThrottle;
+
   final _secureStorageKey = 'loon_encrypted_file_persistor_key';
 
   late final Logger _logger;
@@ -31,7 +35,7 @@ class FilePersistor extends Persistor {
     super.onClear,
     super.onClearAll,
     super.onHydrate,
-    super.persistenceThrottle,
+    this.persistenceThrottle = const Duration(milliseconds: 100),
   }) : super(settings: settings ?? const FilePersistorSettings()) {
     _logger = Logger('FilePersistor', output: Loon.logger.log);
   }

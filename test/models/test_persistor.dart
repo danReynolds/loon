@@ -16,7 +16,6 @@ class TestPersistor extends Persistor {
     void Function(HydrationData data)? onHydrate,
     required this.seedData,
   }) : super(
-          persistenceThrottle: const Duration(milliseconds: 1),
           settings: const PersistorSettings(),
           onPersist: (docs) {
             completer.persistComplete();

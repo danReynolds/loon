@@ -1,6 +1,6 @@
 part of loon;
 
-extension IterableExtensions<T> on Iterable<T> {
+extension LoonIterableExtensions<T> on Iterable<T> {
   T? get tryLast {
     if (isEmpty) {
       return null;

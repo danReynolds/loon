@@ -236,13 +236,13 @@ class Loon {
   /// If no arguments are provided, then the entire store is hydrated by default. If specific
   /// [StoreReference] documents and collections are provided, then only data in the store under those
   /// entities is hydrated.
-  static Future<void> hydrate([Set<StoreReference>? refs]) async {
+  static Future<void> hydrate([List<StoreReference>? refs]) async {
     if (_instance.persistManager == null) {
       logger.log('Hydration skipped - persistence not enabled');
       return;
     }
     try {
-      final data = await _instance.persistManager!.hydrate(refs);
+      final data = await _instance.persistManager!.hydrate(refs?.toSet());
 
       for (final entry in data.entries) {
         final docPath = entry.key;
@@ -320,5 +320,9 @@ class Loon {
 
   static PersistorSettings? get persistorSettings {
     return _instance.persistManager?.settings;
+  }
+
+  static Persistor? get persistor {
+    return _instance.persistManager?.persistor;
   }
 }

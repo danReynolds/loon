@@ -5,16 +5,15 @@ class PersistManager {
   /// in order to prevent race conditions and ensure operations are executed in the correct order.
   final List<PersistorOperation> _operationQueue = [];
 
-  final Persistor _persistor;
+  final Persistor persistor;
 
   late final Logger _logger;
 
   bool _isBusy = false;
 
   PersistManager({
-    required Persistor persistor,
-  })  : _persistor = persistor,
-        _logger = Logger('PersistManager', output: Loon.logger.log) {
+    required this.persistor,
+  }) : _logger = Logger('PersistManager', output: Loon.logger.log) {
     _enqueue(InitOperation());
   }
 
@@ -35,33 +34,33 @@ class PersistManager {
     try {
       switch (current) {
         case InitOperation():
-          await _persistor.init();
+          await persistor.init();
           current.complete(null);
           break;
         case PersistOperation(batch: final docs):
-          await _persistor.persist(docs);
+          await persistor.persist(docs);
           current.complete(docs);
-          _persistor.onPersist?.call(docs);
+          persistor.onPersist?.call(docs);
           break;
         case ClearOperation(batch: final collections):
-          await _persistor.clear(collections);
+          await persistor.clear(collections);
           current.complete(collections);
-          _persistor.onClear?.call(collections);
+          persistor.onClear?.call(collections);
           break;
         case HydrateOperation(batch: final refs):
-          final data = await _persistor.hydrate(refs);
+          final data = await persistor.hydrate(refs);
           current.complete(data);
-          _persistor.onHydrate?.call(data);
+          persistor.onHydrate?.call(data);
           break;
         case HydrateAllOperation():
-          final data = await _persistor.hydrate();
+          final data = await persistor.hydrate();
           current.complete(data);
-          _persistor.onHydrate?.call(data);
+          persistor.onHydrate?.call(data);
           break;
         case ClearAllOperation():
-          await _persistor.clearAll();
+          await persistor.clearAll();
           current.complete(null);
-          _persistor.onClearAll?.call();
+          persistor.onClearAll?.call();
           break;
       }
     } catch (e) {
@@ -81,7 +80,7 @@ class PersistManager {
   }
 
   PersistorSettings get settings {
-    return _persistor.settings;
+    return persistor.settings;
   }
 
   Future<Set<Document>> persist(Document doc) async {
@@ -92,7 +91,15 @@ class PersistManager {
 
     final lastOperation = _operationQueue.tryLast;
     if (lastOperation is PersistOperation) {
-      lastOperation.batch.add(doc);
+      final batch = lastOperation.batch;
+
+      // The batch could already contain this document with a different configuration
+      // (fromJson, toJson, etc). In this case, the old document should be removed and replaced
+      // with the updated one.
+      if (batch.contains(doc)) {
+        batch.remove(doc);
+      }
+      batch.add(doc);
       return lastOperation.onComplete;
     }
 
