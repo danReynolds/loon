@@ -2023,4 +2023,56 @@ void main() {
       );
     },
   );
+
+  test('Sequences operations correctly', () async {
+    final List<String> operations = [];
+    Loon.configure(
+      persistor: TestFilePersistor(
+        onClear: (_) {
+          operations.add('clear');
+        },
+        onClearAll: () {
+          operations.add('clearAll');
+        },
+        onHydrate: (_) {
+          operations.add('hydrate');
+        },
+        onPersist: (_) {
+          operations.add('persist');
+        },
+      ),
+    );
+
+    final userCollection = Loon.collection(
+      'users',
+      fromJson: TestUserModel.fromJson,
+      toJson: (user) => user.toJson(),
+    );
+
+    userCollection.doc('1').create(TestUserModel('User 1'));
+    userCollection.doc('2').create(TestUserModel('User 2'));
+    Loon.hydrate();
+    userCollection.delete();
+    userCollection.doc('3').create(TestUserModel('User 3'));
+
+    await Loon.hydrate();
+
+    expect(operations, [
+      'persist',
+      'hydrate',
+      'clear',
+      'persist',
+      'hydrate',
+    ]);
+
+    expect(
+      userCollection.get(),
+      [
+        DocumentSnapshot(
+          doc: userCollection.doc('3'),
+          data: TestUserModel('User 3'),
+        ),
+      ],
+    );
+  });
 }

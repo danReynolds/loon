@@ -1,4 +1,5 @@
 import 'package:encrypt/encrypt.dart';
+import 'package:loon/loon.dart';
 import 'package:loon/persistor/file_persistor/file_persistor.dart';
 import 'package:loon/persistor/file_persistor/file_persistor_settings.dart';
 
@@ -11,15 +12,31 @@ class TestFilePersistor extends FilePersistor {
 
   TestFilePersistor({
     FilePersistorSettings? settings,
+    void Function(Set<Document> batch)? onPersist,
+    void Function(Set<Collection> collections)? onClear,
+    void Function()? onClearAll,
+    void Function(HydrationData data)? onHydrate,
   }) : super(
           // To make tests run faster, in the test environment the persistence throttle
           // is decreased to 1 millisecond.
           persistenceThrottle: const Duration(milliseconds: 1),
           settings: settings ?? const FilePersistorSettings(),
-          onPersist: (_) => completer.persistComplete(),
-          onHydrate: (_) => completer.hydrateComplete(),
-          onClear: (_) => completer.clearComplete(),
-          onClearAll: () => completer.clearAllComplete(),
+          onPersist: (docs) {
+            onPersist?.call(docs);
+            completer.persistComplete();
+          },
+          onHydrate: (refs) {
+            onHydrate?.call(refs);
+            completer.hydrateComplete();
+          },
+          onClear: (collections) {
+            onClear?.call(collections);
+            completer.clearComplete();
+          },
+          onClearAll: () {
+            onClearAll?.call();
+            completer.clearAllComplete();
+          },
         );
 
   @override
