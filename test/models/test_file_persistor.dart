@@ -1,6 +1,5 @@
 import 'package:encrypt/encrypt.dart';
 import 'package:loon/loon.dart';
-import 'package:loon/persistor/file_persistor/file_persistor.dart';
 import 'package:loon/persistor/file_persistor/file_persistor_settings.dart';
 
 import '../utils.dart';

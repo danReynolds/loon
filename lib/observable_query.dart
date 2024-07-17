@@ -32,16 +32,31 @@ class ObservableQuery<T> extends Query<T>
 
     _snapCache[doc] = snap;
 
+    // If the dependencies of the document have not changed, then the set is guaranteed
+    // to be referentially equal.
     if (deps != prevDeps) {
+      // The old document should be unconditionally removed and then optionally re-added
+      // with the updated document reference if the document still has dependencies.
+      _docDepCache.remove(doc);
       if (deps != null) {
         _docDepCache[doc] = deps;
+      }
 
+      if (deps != null && prevDeps != null) {
+        final addedDeps = deps.difference(prevDeps);
+        final removedDeps = prevDeps.difference(deps);
+
+        for (final dep in addedDeps) {
+          _deps.inc(dep.path);
+        }
+        for (final dep in removedDeps) {
+          _deps.dec(dep.path);
+        }
+      } else if (deps != null) {
         for (final dep in deps) {
           _deps.inc(dep.path);
         }
       } else if (prevDeps != null) {
-        _docDepCache.remove(doc);
-
         for (final dep in prevDeps) {
           _deps.dec(dep.path);
         }
@@ -284,6 +299,7 @@ class ObservableQuery<T> extends Query<T>
     return {
       "deps": _deps.inspect(),
       "docDeps": _docDepCache,
+      "docSnaps": _snapCache,
     };
   }
 }

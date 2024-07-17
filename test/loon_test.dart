@@ -4,10 +4,7 @@ import 'package:loon/loon.dart';
 import 'matchers/document_snapshot.dart';
 import 'models/test_persistor.dart';
 import 'models/test_user_model.dart';
-
-Future<void> asyncEvent() {
-  return Future.delayed(const Duration(milliseconds: 1), () => null);
-}
+import 'utils.dart';
 
 void main() {
   group('Create document', () {
@@ -1456,7 +1453,7 @@ void main() {
     });
   });
 
-  group('dependencies', () {
+  group('Dependencies', () {
     tearDown(() {
       Loon.clearAll();
     });
@@ -1515,7 +1512,6 @@ void main() {
           userDoc,
         },
       );
-
       userDoc.create(userData);
       userDoc.delete();
 
@@ -1709,92 +1705,6 @@ void main() {
       },
     );
 
-    test(
-      "Records an observable query's dependencies correctly",
-      () async {
-        final usersCollection = Loon.collection('users');
-        final postsCollection = Loon.collection<Json>(
-          'posts',
-          dependenciesBuilder: (snap) {
-            if (!snap.data['text'].contains('updated')) {
-              return {
-                usersCollection.doc(snap.doc.id),
-              };
-            }
-            return null;
-          },
-        );
-
-        final postDoc = postsCollection.doc('1');
-        final postData = {"id": 1, "text": "Post 1"};
-        final updatedPostData1 = {"text": "Post 1 updated"};
-        final postDoc2 = postsCollection.doc('2');
-        final postData2 = {"id": 2, "text": "Post 2"};
-        final userDoc = usersCollection.doc('1');
-        final userDoc2 = usersCollection.doc('2');
-        final postsObs = postsCollection.toQuery().observe();
-
-        postDoc.create(postData);
-        await asyncEvent();
-
-        // After creating the post document, the query should have a global and document level
-        // dependency.
-        expect(postsObs.inspect(), {
-          "deps": {
-            "__ref": 1,
-            "users": {
-              "__ref": 1,
-              "1": 1,
-            },
-          },
-          "docDeps": {
-            postDoc: {
-              userDoc,
-            },
-          }
-        });
-
-        postDoc.update(updatedPostData1);
-        await asyncEvent();
-
-        // After updating the document, it should have removed the user dependency from the global
-        // and document level dependency.
-        expect(postsObs.inspect(), {"deps": {}, "docDeps": {}});
-
-        postDoc.update(postData);
-        postDoc2.create(postData2);
-        await asyncEvent();
-
-        // After updating the first post to have a user dependency again, and creating a second
-        // post with another user dependency, the query's dependencies should have two entries.
-        expect(postsObs.inspect(), {
-          "deps": {
-            "__ref": 2,
-            "users": {
-              "__ref": 2,
-              "1": 1,
-              "2": 1,
-            },
-          },
-          "docDeps": {
-            postDoc: {
-              userDoc,
-            },
-            postDoc2: {
-              userDoc2,
-            },
-          }
-        });
-
-        postsCollection.delete();
-        await asyncEvent();
-
-        // After deleting the posts collection, the query should have cleared its global
-        // and document level dependencies.
-        expect(postsObs.inspect(), {"deps": {}, "docDeps": {}});
-      },
-    );
-
     test("Cyclical dependencies do not cause infinite rebroadcasts", () async {
       final usersCollection = Loon.collection<TestUserModel>(
         'users',
@@ -1982,4 +1892,142 @@ void main() {
       expect(Loon.inspect()['dependentsStore'], {});
     });
   });
+
+  group(
+    'ObservableQuery',
+    () {
+      test(
+        "Maintains its dependencies correctly",
+        () async {
+          final usersCollection = Loon.collection('users');
+          final postsCollection = Loon.collection<Json>(
+            'posts',
+            dependenciesBuilder: (snap) {
+              if (snap.data['userId'] != null) {
+                return {
+                  usersCollection.doc(snap.data['userId'].toString()),
+                };
+              }
+              return null;
+            },
+          );
+
+          final postDoc = postsCollection.doc('1');
+          final post1Data = {"id": 1, "text": "Post 1", "userId": 1};
+          final post1Data2 = {"id": 1, "text": "Post 1 updated"};
+          final post1Data3 = {"id": 1, "text": "Post 1 updated", "userId": 3};
+          final postDoc2 = postsCollection.doc('2');
+          final post2Data = {"id": 2, "text": "Post 2", "userId": 2};
+          final userDoc = usersCollection.doc('1');
+          final userDoc2 = usersCollection.doc('2');
+          final userDoc3 = usersCollection.doc('3');
+          final postsObs = postsCollection.toQuery().observe();
+
+          postDoc.create(post1Data);
+          await asyncEvent();
+
+          // After creating the post document, the query should have a global and document level
+          // dependency.
+          expect(postsObs.inspect(), {
+            "deps": {
+              "__ref": 1,
+              "users": {
+                "__ref": 1,
+                "1": 1,
+              },
+            },
+            "docDeps": {
+              postDoc: {
+                userDoc,
+              },
+            },
+            "docSnaps": {
+              postDoc: DocumentSnapshot(doc: postDoc, data: post1Data),
+            }
+          });
+
+          postDoc.update(post1Data2);
+          await asyncEvent();
+
+          // After updating the document, it should have removed the user dependency from the observable's
+          // dep tree and document level dependency cache.
+          expect(postsObs.inspect(), {
+            "deps": {},
+            "docDeps": {},
+            "docSnaps": {
+              postDoc: DocumentSnapshot(doc: postDoc, data: post1Data2),
+            }
+          });
+
+          postDoc.update(post1Data);
+          postDoc2.create(post2Data);
+          await asyncEvent();
+
+          // After updating the first post to have a user dependency again, and creating a second
+          // post with another user dependency, the query's dependencies should have two entries.
+          expect(postsObs.inspect(), {
+            "deps": {
+              "__ref": 2,
+              "users": {
+                "__ref": 2,
+                "1": 1,
+                "2": 1,
+              },
+            },
+            "docDeps": {
+              postDoc: {
+                userDoc,
+              },
+              postDoc2: {
+                userDoc2,
+              },
+            },
+            "docSnaps": {
+              postDoc: DocumentSnapshot(doc: postDoc, data: post1Data),
+              postDoc2: DocumentSnapshot(doc: postDoc2, data: post2Data),
+            }
+          });
+
+          postDoc.update(post1Data3);
+          await asyncEvent();
+
+          // After updated the post to be dependent on a different user, the observable query
+          // should have removed the reference to the previous user (user 1) and replaced it with the
+          // dependency on user 3.
+          expect(postsObs.inspect(), {
+            "deps": {
+              "__ref": 2,
+              "users": {
+                "__ref": 2,
+                "2": 1,
+                "3": 1,
+              },
+            },
+            "docDeps": {
+              postDoc: {
+                userDoc3,
+              },
+              postDoc2: {
+                userDoc2,
+              },
+            },
+            "docSnaps": {
+              postDoc: DocumentSnapshot(doc: postDoc, data: post1Data3),
+              postDoc2: DocumentSnapshot(doc: postDoc2, data: post2Data),
+            }
+          });
+
+          postsCollection.delete();
+          await asyncEvent();
+
+          // After deleting the posts collection, the query should have cleared its global
+          // and document level dependencies.
+          expect(
+            postsObs.inspect(),
+            {"deps": {}, "docDeps": {}, "docSnaps": {}},
+          );
+        },
+      );
+    },
+  );
 }

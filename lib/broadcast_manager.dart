@@ -34,12 +34,9 @@ class BroadcastManager {
     if (!_pendingBroadcast) {
       _pendingBroadcast = true;
 
-      // Schedule a broadcast event to be run on the microtask queue. The broadcast is run
-      // async so that multiple broadcast events can be batched together into one update
-      // across all changes that occur in the current task of the event loop.
-      scheduleMicrotask(() {
-        _broadcast();
-      });
+      // The broadcast is run async so that multiple broadcast events can be batched
+      // together into one update across all changes that occur in the current task of the event loop.
+      Future.delayed(Duration.zero, () => _broadcast());
     }
   }
 
