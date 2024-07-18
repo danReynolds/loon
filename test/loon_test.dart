@@ -1897,7 +1897,7 @@ void main() {
     'ObservableQuery',
     () {
       test(
-        "Maintains its dependencies correctly",
+        "Maintains its dependency/snapshot caches correctly",
         () async {
           final usersCollection = Loon.collection('users');
           final postsCollection = Loon.collection<Json>(
@@ -1991,7 +1991,7 @@ void main() {
           postDoc.update(post1Data3);
           await asyncEvent();
 
-          // After updated the post to be dependent on a different user, the observable query
+          // After updating the post to be dependent on a different user, the observable query
           // should have removed the reference to the previous user (user 1) and replaced it with the
           // dependency on user 3.
           expect(postsObs.inspect(), {
