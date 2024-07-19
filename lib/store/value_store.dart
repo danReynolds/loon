@@ -203,6 +203,15 @@ class ValueStore<T> {
     final segment = segments.last;
     if (recursive) {
       node.remove(segment);
+    } else {
+      final Map? child = node[segment];
+      if (child != null) {
+        if (child.keys.length == 1 && child.containsKey(_values)) {
+          node.remove(segment);
+        } else {
+          child.remove(_values);
+        }
+      }
     }
 
     if (node.containsKey(_values)) {
@@ -217,11 +226,11 @@ class ValueStore<T> {
     return node.isEmpty;
   }
 
-  /// Deletes the value at the given path and optionally its subtree from the store.
+  /// Deletes the values at the given path and optionally its subtree from the store.
   void delete(
     String path, {
     /// Whether the data in the subtree under the given path should also be deleted.
-    /// If false, only the value at the given path is deleted and the subtree is maintained.
+    /// If false, only the values at the given path are deleted and the subtree is maintained.
     bool recursive = true,
   }) {
     if (path.isEmpty) {

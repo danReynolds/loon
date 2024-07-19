@@ -1,15 +1,24 @@
 part of loon;
 
+const uuid = Uuid();
+
 /// A mixin that provides an observable interface for the access and streaming of data broadcasted from the store.
 mixin BroadcastObserver<T, S> {
   late final StreamController<T> _controller;
   late final StreamController<S> _changeController;
-  late T _value;
   late final bool multicast;
+
+  /// The latest value emitted on the observer's stream controller. This value can be different
+  /// from the *current* value of the observer, which may not have been broadcast on its stream yet
+  /// and is cached in the [BroadcastManager].
+  late T _controllerValue;
 
   String get path;
 
   final _deps = PathRefStore();
+
+  /// The path of the broadcast observer in the observer value store.
+  late String _storePath;
 
   void init(
     T initialValue, {
@@ -30,10 +39,12 @@ mixin BroadcastObserver<T, S> {
       _changeController = StreamController<S>(onCancel: dispose);
     }
 
-    _value = initialValue;
-    _controller.add(_value);
+    _controllerValue = initialValue;
+    _controller.add(initialValue);
 
-    Loon._instance.broadcastManager.addObserver(this);
+    _storePath = "${path}__${uuid.v4()}";
+
+    Loon._instance.broadcastManager.addObserver(this, initialValue);
   }
 
   void dispose() {
@@ -43,16 +54,11 @@ mixin BroadcastObserver<T, S> {
   }
 
   T add(T updatedValue) {
-    _value = updatedValue;
-    _controller.add(_value);
-    return _value;
+    Loon._instance.broadcastManager.observerValueStore
+        .write(this._storePath, updatedValue);
+    _controller.add(updatedValue);
+    return _controllerValue = updatedValue;
   }
-
-  bool exists();
-
-  /// [get] is left unimplemented since it has variable logic based on the type of observer like an [ObservableDocument]
-  /// and [ObservableQuery].
-  T get();
 
   Stream<T> stream() {
     return _controller.stream;
@@ -62,7 +68,18 @@ mixin BroadcastObserver<T, S> {
     return _changeController.stream;
   }
 
-  void _onBroadcast();
+  T? get value {
+    return Loon._instance.broadcastManager.observerValueStore.get(this);
+  }
 
-  bool isPendingBroadcast();
+  set value(T? value) {
+    Loon._instance.broadcastManager.observerValueStore.write(this, value);
+  }
+
+  /// Returns whether the observer has a cached value in the [ObserverValueStore].
+  bool get hasValue {
+    return Loon._instance.broadcastManager.observerValueStore.hasValue(this);
+  }
+
+  void _onBroadcast();
 }

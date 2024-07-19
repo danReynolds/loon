@@ -2,6 +2,7 @@ library loon;
 
 import 'dart:async';
 import 'package:flutter/foundation.dart';
+import 'package:uuid/uuid.dart';
 
 export 'widgets/query_stream_builder.dart';
 export 'widgets/document_stream_builder.dart';
@@ -28,6 +29,7 @@ part 'persistor/persistor.dart';
 part 'persistor/operations.dart';
 part 'persistor/persist_manager.dart';
 part 'extensions/iterable.dart';
+part 'store/observer_value_store.dart';
 
 class Loon {
   static final Loon _instance = Loon._();

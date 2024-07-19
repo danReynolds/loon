@@ -96,7 +96,6 @@ class ObservableQuery<T> extends Query<T>
   @override
   void _onBroadcast() {
     bool shouldRebroadcast = false;
-    bool shouldUpdate = false;
 
     // The list of changes to the query. Note that the [BroadcastEvents] of the document
     // local to the query are different from the global broadcast events. For example, if a document
@@ -108,14 +107,12 @@ class ObservableQuery<T> extends Query<T>
 
     // 1.  Any path above or equal to the query's collection has been removed. This is determined by finding
     //     a [BroadcastEvents.removed] event anywhere above or at the query's collection path.
-    if (Loon._instance.broadcastManager.store
+    if (Loon._instance.broadcastManager.eventStore
             .findValue(path, BroadcastEvents.removed) !=
         null) {
-      if (_value.isNotEmpty) {
-        shouldUpdate = true;
-
+      if (_controllerValue.isNotEmpty) {
         changeSnaps.addAll(
-          _value.map(
+          _controllerValue.map(
             (snap) {
               return DocumentChangeSnapshot<T>(
                 doc: snap.doc,
@@ -133,8 +130,8 @@ class ObservableQuery<T> extends Query<T>
       }
     }
 
-    final events =
-        Loon._instance.broadcastManager.store.getChildValues(collection.path);
+    final events = Loon._instance.broadcastManager.eventStore
+        .getChildValues(collection.path);
     if (events != null) {
       for (final entry in events.entries) {
         final docId = entry.key;
@@ -150,8 +147,6 @@ class ObservableQuery<T> extends Query<T>
             // 2.a Add new documents that satisfy the query filter.
             if (_filter(snap!)) {
               _cacheDoc(snap);
-
-              shouldUpdate = true;
 
               if (hasChangeListener) {
                 changeSnaps.add(
@@ -170,8 +165,6 @@ class ObservableQuery<T> extends Query<T>
             if (_snapCache.containsKey(doc)) {
               _evictDoc(doc);
 
-              shouldUpdate = true;
-
               if (hasChangeListener) {
                 changeSnaps.add(
                   DocumentChangeSnapshot(
@@ -188,8 +181,6 @@ class ObservableQuery<T> extends Query<T>
           // 2.c Add / remove modified documents.
           case BroadcastEvents.modified:
             if (_snapCache.containsKey(doc)) {
-              shouldUpdate = true;
-
               // 2.c.i Previously satisfied the query filter and still does (updated value must still be rebroadcast on the query).
               if (_filter(snap!)) {
                 _cacheDoc(snap);
@@ -223,8 +214,6 @@ class ObservableQuery<T> extends Query<T>
               // 2.c.iii Previously did not satisfy the query filter and now does.
               if (_filter(snap!)) {
                 _cacheDoc(snap);
-
-                shouldUpdate = true;
 
                 if (hasChangeListener) {
                   changeSnaps.add(
@@ -262,7 +251,7 @@ class ObservableQuery<T> extends Query<T>
     }
 
     // 3. The query itself has been touched for rebroadcast.
-    if (Loon._instance.broadcastManager.store.get(path) ==
+    if (Loon._instance.broadcastManager.eventStore.get(path) ==
         BroadcastEvents.touched) {
       shouldRebroadcast = true;
     }
@@ -271,10 +260,13 @@ class ObservableQuery<T> extends Query<T>
       _changeController.add(changeSnaps);
     }
 
-    if (shouldUpdate) {
-      add(_sortQuery(_snapCache.values.toList()));
-    } else if (shouldRebroadcast) {
-      add(_value);
+    if (shouldRebroadcast) {
+      // If the query should be rebroadcast, then it checks if it has a cached computed value,
+      // emitting either that value or if there's a cache miss, recomputing it, caching it
+      // and then emitting it on the stream.
+      final updatedValue =
+          value ?? (value = _sortQuery(_snapCache.values.toList()));
+      add(updatedValue);
     }
   }
 
@@ -287,12 +279,10 @@ class ObservableQuery<T> extends Query<T>
 
   @override
   get() {
-    // If the query is pending broadcast when its data is accessed, then it must not use
-    // its cached value as that value is stale until the query has processed the broadcast.
-    if (isPendingBroadcast()) {
-      return super.get();
+    if (!hasValue) {
+      return value = super.get();
     }
-    return _value;
+    return value!;
   }
 
   Map inspect() {

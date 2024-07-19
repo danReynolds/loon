@@ -197,8 +197,4 @@ class Document<T> implements StoreReference {
     return persistorSettings?.enabled ??
         Loon._instance._isGlobalPersistenceEnabled;
   }
-
-  bool isPendingBroadcast() {
-    return Loon._instance.broadcastManager.store.hasValue(path);
-  }
 }

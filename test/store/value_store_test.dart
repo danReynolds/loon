@@ -197,6 +197,35 @@ void main() {
             }
           },
         });
+
+        store.delete('users', recursive: false);
+
+        expect(store.inspect(), {
+          "users": {
+            "1": {
+              "posts": {
+                "__values": {
+                  "1": "Hello",
+                }
+              }
+            }
+          },
+        });
+
+        // This is a no-op as the delete is not recursive and users__1 does not exist anymore.
+        store.delete('users__1', recursive: false);
+
+        expect(store.inspect(), {
+          "users": {
+            "1": {
+              "posts": {
+                "__values": {
+                  "1": "Hello",
+                }
+              }
+            }
+          },
+        });
       });
     });
   });

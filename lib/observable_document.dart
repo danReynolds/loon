@@ -23,10 +23,10 @@ class ObservableDocument<T> extends Document<T>
   @override
   void _onBroadcast() {
     // 1.
-    final docEvent = Loon._instance.broadcastManager.store.get(path);
+    final docEvent = Loon._instance.broadcastManager.eventStore.get(path);
 
     // 2.
-    final isRemoved = Loon._instance.broadcastManager.store
+    final isRemoved = Loon._instance.broadcastManager.eventStore
             .findValue(path, BroadcastEvents.removed) !=
         null;
 
@@ -39,7 +39,7 @@ class ObservableDocument<T> extends Document<T>
             doc: this,
             event: docEvent ?? BroadcastEvents.removed,
             data: snap?.data,
-            prevData: _value?.data,
+            prevData: _controllerValue?.data,
           ),
         );
       }
@@ -53,5 +53,13 @@ class ObservableDocument<T> extends Document<T>
     bool multicast = false,
   }) {
     return this;
+  }
+
+  @override
+  get() {
+    if (!hasValue) {
+      return value = super.get();
+    }
+    return value!;
   }
 }

@@ -104,18 +104,6 @@ class Collection<T> implements Queryable<T>, StoreReference {
     return Loon._instance.documentStore.hasChildValues(path);
   }
 
-  /// A collection is pending broadcast based on 3 conditions:
-  /// 1. If the collection itself has any pending broadcast events.
-  /// 2. If any of the collection's documents have pending broadcast events.
-  /// 3. If a parent path of the collection has a removal event.
-  bool isPendingBroadcast() {
-    return Loon._instance.broadcastManager.store.hasValue(path) ||
-        Loon._instance.broadcastManager.store.hasChildValues(path) ||
-        Loon._instance.broadcastManager.store
-                .findValue(path, BroadcastEvents.removed) !=
-            null;
-  }
-
   Stream<List<DocumentSnapshot<T>>> stream() {
     return Query<T>(this).observe().stream();
   }
