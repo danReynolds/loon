@@ -116,8 +116,8 @@ class BroadcastManager {
       eventStore.write(path, event);
     }
 
-    _scheduleBroadcast();
     _broadcastDependents(doc);
+    _scheduleBroadcast();
   }
 
   void deleteCollection(Collection collection) {
@@ -141,6 +141,8 @@ class BroadcastManager {
     for (final observer in _observers) {
       eventStore.write(observer.path, BroadcastEvents.removed);
     }
+
+    _scheduleBroadcast();
   }
 
   void addObserver<T, S>(BroadcastObserver<T, S> observer, T initialValue) {

@@ -23,7 +23,7 @@ mixin BroadcastObserver<T, S> {
   late String _observerId;
 
   /// The path being observed in the store.
-  late String path;
+  String get path;
 
   /// The dependencies of the observer in the store.
   final _deps = PathRefStore();
