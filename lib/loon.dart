@@ -29,7 +29,6 @@ part 'persistor/persistor.dart';
 part 'persistor/operations.dart';
 part 'persistor/persist_manager.dart';
 part 'extensions/iterable.dart';
-part 'store/observer_value_store.dart';
 
 class Loon {
   static final Loon _instance = Loon._();

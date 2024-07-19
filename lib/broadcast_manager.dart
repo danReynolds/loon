@@ -45,7 +45,7 @@ class BroadcastManager {
 
       // The broadcast is run async so that multiple broadcast events can be batched
       // together into one update across all changes that occur in the current task of the event loop.
-      Future.delayed(Duration.zero, () => _broadcast());
+      Future.delayed(Duration.zero, _broadcast);
     }
   }
 
@@ -85,7 +85,7 @@ class BroadcastManager {
     eventStore.delete(path);
     eventStore.write(path, BroadcastEvents.removed);
 
-    // Deleting a path also invalidates all cached values under that path in the observer value store.
+    // Deleting a path also invalidates all cached values at that path in the observer value store.
     observerValueStore.delete(path);
 
     /// Deleting a path is relatively infrequent, so iterating over the subset of active observers with dependencies
@@ -110,7 +110,7 @@ class BroadcastManager {
     }
 
     final pendingEvent = eventStore.get(path);
-    // Ignore writing a duplicate event type or overwriting a pending mutative event type with a touched event.
+    // Ignore writing a duplicate events or overwriting a pending mutative event type with a touched event.
     if (pendingEvent == null ||
         (event != pendingEvent && event != BroadcastEvents.touched)) {
       eventStore.write(path, event);
@@ -127,8 +127,8 @@ class BroadcastManager {
   void deleteDocument(Document doc) {
     _deletePath(doc.path);
 
-    // All cached observer values for the document's collection
-    // are also invalidated after the document is deleted.
+    // All cached observer values for the document's collection are also invalidated after
+    // the document is deleted.
     observerValueStore.delete(doc.parent, recursive: false);
 
     _broadcastDependents(doc);
@@ -150,14 +150,14 @@ class BroadcastManager {
       _depObservers.add(observer);
     }
 
-    observerValueStore.write(observer._observerPath, initialValue);
+    observerValueStore.write(observer._observerId, initialValue);
   }
 
   void removeObserver(BroadcastObserver observer) {
     _observers.remove(observer);
     _depObservers.remove(observer);
 
-    observerValueStore.delete(observer._observerPath);
+    observerValueStore.delete(observer._observerId);
   }
 
   Map inspect() {
