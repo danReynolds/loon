@@ -4,7 +4,7 @@
 <br />
 <br />
 
-Loon is a reactive collection data store for Flutter.
+Loon is a reactive document data store for Flutter.
 
 ## Features
 
@@ -21,27 +21,26 @@ Loon makes it easy to work with collections of documents.
 ```dart
 import 'package:loon/loon.dart';
 
-Loon.collection('birds').doc('loon').create({
-  'name': 'Loon',
-  'description': 'The loon is an aquatic bird native to North America and parts of Northern Eurasia.',
+Loon.collection('users').doc('1').create({
+  'name': 'John',
+  'age': 28,
 });
 ```
 
-Documents are stored under collections in a map structure. They can contain any type of data, like a `Map` or a typed data model:
+Documents are stored under collections in a map structure. They can contain any type of data, like a `String`, `Map` or typed data model:
 
 ```dart
 import 'package:loon/loon.dart';
-import './models/bird.dart';
+import './models/user.dart';
 
-Loon.collection<BirdModel>(
-  'birds',
-  fromJson: BirdModel.fromJson,
+Loon.collection<UserModel>(
+  'users',
+  fromJson: UserModel.fromJson,
   toJson: (user) => user.toJson(),
-).doc('loon').create(
-  BirdModel(
-    name: 'Loon',
-    description: 'The loon is known for its distinctive black-and-white plumage, haunting calls, and remarkable diving ability.',
-    family: 'Gaviidae',
+).doc('1').create(
+  UserModel(
+    name: 'John',
+    age: 28,
   )
 );
 ```
@@ -49,22 +48,20 @@ Loon.collection<BirdModel>(
 If persistence is enabled, then a typed collection needs to specify a `fromJson/toJson` serialization pair. In order to avoid having to specify types or serializers whenever a collection is accessed, it can be helpful to store the collection in a variable or as an index on the data model:
 
 ```dart
-class BirdModel {
+class UserModel {
   final String name;
-  final String description;
-  final String species;
+  final int age;
 
-  BirdModel({
+  UserModel({
     required this.name,
-    required this.description,
-    required this.species,
+    required this.age,
   });
 
-  static Collection<BirdModel> get store {
-    return Loon.collection<BirdModel>(
-      'birds',
-      fromJson: BirdModel.fromJson,
-      toJson: (bird) => bird.toJson(),
+  static Collection<UserModel> get store {
+    return Loon.collection(
+      'users',
+      fromJson: UserModel.fromJson,
+      toJson: (user) => user.toJson(),
     )
   }
 }
@@ -73,11 +70,10 @@ class BirdModel {
 Documents can then be read/written using the index:
 
 ```dart
-BirdModel.store.doc('cormorant').create(
-  BirdModel(
-    name: 'Cormorant',
-    description: 'Cormorants are generally darker than loons, with an almost black plumage, and have a more hook-tipped beak',
-    family: 'Phalacrocoracidae',
+UserModel.store.doc('1').create(
+  UserModel(
+    name: 'John',
+    age: 28,
   ),
 );
 ```
@@ -85,24 +81,24 @@ BirdModel.store.doc('cormorant').create(
 ## 📚 Reading documents
 
 ```dart
-final snap = BirdModel.store.doc('loon').get();
+final snap = UserModel.store.doc('1').get();
 
-if (snap != null && snap.id == 'loon') {
-  print('Loons are excellent swimmers, using their feet to propel themselves above and under water.');
+if (snap != null && snap.name == 'John') {
+  print('Hi John!');
 }
 ```
 
-Reading a document returns a `DocumentSnapshot?` which exposes your document's data and ID:
+Reading a document returns a `DocumentSnapshot?` which exposes a document's data and ID:
 
 ```dart
-print(snap.id) // loon
-print(snap.data) // BirdModel(...)
+print(snap.id) // 1
+print(snap.data) // UserModel(...)
 ```
 
 To watch for changes to a document, you can listen to its stream:
 
 ```dart
-BirdModel.store.doc('loon').stream().listen((snap) {});
+UserModel.store.doc('1').stream().listen((snap) {});
 ```
 
 You can then use Flutter's built-in `StreamBuilder` or the library's `DocumentStreamBuilder` widget to access data from widgets:
@@ -112,20 +108,15 @@ class MyWidget extends StatelessWidget {
   @override
   build(context) {
     return DocumentStreamBuilder(
-      doc: BirdModel.store.doc('loon'),
+      doc: UserModel.store.doc('1'),
       builder: (context, snap) {
-        final bird = snap?.data;
+        final user = snap?.data;
 
-        if (bird == null) {
-          return Text('Missing bird');
+        if (user == null) {
+          return Text('Missing user');
         }
 
-        return Text(
-          '''
-          The common loon is the provincial bird of Ontario and is depicted on the Canadian one-dollar coin,
-          which has come to be known affectionately as the "loonie".
-          '''
-        );
+        return Text('Found user ${user.name}');
       }
     )
   }
@@ -138,13 +129,24 @@ Documents can be nested under subcollections. Documents in subcollections are un
 document ID.
 
 ```dart
-final snaps = BirdModel.store.doc('hawk').subcollection('prey').get();
+final userDoc =  UserModel.store.doc('1');
+final friendsCollection = userDoc.subcollection(
+  'friends',
+  fromJson: UserModel.fromJson,
+  toJson: (user) => user.toJson(),
+);
+
+friendsCollection.doc('2').create(UserModel(name: 'Jack', age: 26));
+friendsCollection.doc('3').create(UserModel(name: 'Brenda', age: 40));
+friendsCollection.doc('4').create(UserModel(name: 'Bill', age: 70));
+
+final snaps = friendsCollection.get();
 
 for (final snap in snaps) {
-  print("${snap.id}: ${snap.collection}");
-  // crayfish: birds__hawk__prey__mice
-  // frogs: birds__hawk__prey__rabbits
-  // snails: birds__hawk__prey__squirrels
+  print("${snap.data.name}: ${snap.path}");
+  // Jack: users__1__friends__2
+  // Brenda: users__1__friends__3
+  // Bill: users__1__friends__4
 }
 ```
 
@@ -153,13 +155,12 @@ for (final snap in snaps) {
 Documents can be filtered using queries:
 
 ```dart
-final snapshots = BirdModel.store.where((snap) => snap.data.family == 'Gaviidae').get();
+final snapshots = friendsCollection.where((snap) => snap.data.name.startsWith('B')).get();
 
 for (final snap in snapshots) {
   print(snap.data.name);
-  // Red-throated Loon
-  // Pacific Loon
-  // Common Loon
+  // Brenda
+  // Bill
 }
 ```
 
@@ -170,12 +171,12 @@ class MyWidget extends StatelessWidget {
   @override
   build(context) {
     return QueryStreamBuilder(
-      query: BirdModel.store.where((snap) => snap.data.family == 'Phalacrocoracidae'),
+      query: UserModel.store.where((snap) => snap.data.age > 65),
       builder: (context, snaps) {
         return ListView.builder(
           itemCount: snaps.length,
           builder: (context, snap) {
-            return Text('Phalacrocoracidae is a family of approximately 40 species of aquatic birds including the ${snap.data.name}');
+            return Text('John has a retired friend named ${snap.data.name}');
           }
         )
       }
@@ -189,12 +190,12 @@ class MyWidget extends StatelessWidget {
 Assuming a model has a `copyWith` function, documents can be updated as shown below:
 
 ```dart
-final doc = BirdModel.doc('loon');
+final doc = UserModel.doc('1');
 final snap = doc.get();
 
 doc.update(
   snap.data.copyWith(
-    description: 'Loons are monogamous, a single female and male often together defend a territory and may breed together for a decade or more',
+    name: 'John Smith',
   ),
 );
 ```
@@ -202,12 +203,12 @@ doc.update(
 The reading and writing of a document can be combined using the `modify` API. If the document does not yet exist, then its snapshot is `null`.
 
 ```dart
-BirdModel.doc('loon').modify((snap) {
+UserModel.doc('1').modify((snap) {
   if (snap == null) {
     return null;
   }
   return snap.data.copyWith(
-    description: 'Loons nest during the summer on freshwater lakes and/or large ponds.',
+    name: 'John Smitherson',
   );
 });
 ```
@@ -217,7 +218,7 @@ BirdModel.doc('loon').modify((snap) {
 Deleting a document removes it and all of its subcollections from the store.
 
 ```dart
-BirdModel.doc('cormorant').delete();
+UserModel.doc('1').delete();
 ```
 
 ## 🌊 Streaming changes
@@ -225,7 +226,7 @@ BirdModel.doc('cormorant').delete();
 Documents and queries can be streamed for changes which provides the previous and current document data as well as the event type of the change:
 
 ```dart
-BirdModel.store.streamChanges().listen((changes) {
+UserModel.store.streamChanges().listen((changes) {
   for (final changeSnap in changes) {
      switch(changeSnap.type) {
       case BroadcastEventTypes.added:
@@ -250,19 +251,29 @@ BirdModel.store.streamChanges().listen((changes) {
 Data relationships in the store can be established using the data dependencies builder.
 
 ```dart
-final families = Loon.collection('families');
+class PostModel {
+  final String message;
+  final String userId;
 
-final birds = Loon.collection<BirdModel>(
-  'birds',
+  PostModel({
+    required this.message,
+    required this.userId,
+  })
+}
+
+final posts = Loon.collection<PostModel>(
+  'posts',
+  fromJson: PostModel.fromJson,
+  toJson: (post) => post.toJson(),
   dependenciesBuilder: (snap) {
     return {
-      famililes.doc(snap.data.family),
+      UserModel.store.doc(snap.data.userId),
     };
   },
 );
 ```
 
-In this example, whenever a bird's given family is updated, the bird will also be rebroadcast to any of its listeners.
+In this example, whenever a post's associated user is updated, the post will also be rebroadcast to any of its listeners.
 
 Additionally, whenever a document is updated, it will rebuild its set of dependencies, allowing documents to support dynamic dependencies
 that can change in response to updated document data.
@@ -273,7 +284,7 @@ Not all documents necessarily make sense to be grouped together under any partic
 on the root collection:
 
 ```dart
-Loon.doc('selected_bird_id').create('hawk');
+Loon.doc('current_user').create('1');
 ```
 
 ## 🗄️ Data Persistence
@@ -298,8 +309,8 @@ The call to `hydrate` returns a `Future` that resolves when the data has been hy
 
 ```dart
 Loon.hydrate([
-  Loon.doc('selected_bird_id'),
-  Loon.collection('birds'),
+  Loon.doc('current_user'),
+  Loon.collection('users'),
 ]);
 ```
 
@@ -319,23 +330,21 @@ void main() {
   });
 }
 
-// models/birds.dart
-class BirdModel {
+// models/user.dart
+class UserModel {
   final String name;
-  final String description;
-  final String species;
+  final int age;
 
-  BirdModel({
+  UserModel({
     required this.name,
-    required this.description,
-    required this.species,
+    required this.age,
   });
 
-  static Collection<BirdModel> get store {
-    return Loon.collection<BirdModel>(
-      'birds',
-      fromJson: BirdModel.fromJson,
-      toJson: (bird) => bird.toJson(),
+  static Collection<UserModel> get store {
+    return Loon.collection(
+      'users',
+      fromJson: UserModel.fromJson,
+      toJson: (user) => user.toJson(),
       settings: FilePersistorSettings(encrypted: false),
     )
   }
@@ -343,7 +352,7 @@ class BirdModel {
 ```
 
 In this example, file encryption is enabled globally for all collections, but disabled
-specifically for the bird collection.
+specifically for the users collection.
 
 By default, the `FilePersistor` stores all data in a single  `__store__.json` persistence file.
 
@@ -356,60 +365,59 @@ If data needs to be persisted differently, either by merging data across collect
 into multiple files, then a custom persistence key can be specified on the collection:
 
 ```dart
-class BirdModel {
+class UserModel {
   final String name;
-  final String description;
-  final String species;
+  final int age;
 
-  BirdModel({
+  UserModel({
     required this.name,
-    required this.description,
-    required this.species,
+    required this.age,
   });
 
-  static Collection<BirdModel> get store {
-    return Loon.collection<BirdModel>(
-      'birds',
-      fromJson: BirdModel.fromJson,
-      toJson: (bird) => bird.toJson(),
+  static Collection<UserModel> get store {
+    return Loon.collection(
+      'users',
+      fromJson: UserModel.fromJson,
+      toJson: (user) => user.toJson(),
       settings: FilePersistorSettings(
-        key: FilePersistor.key('birds'),
+        key: FilePersistor.key('users'),
       ),
     )
   }
 }
 ```
 
-In the updated example, data from the birds collection is now stored separately from the rest:
+In the updated example, data from the users collection is now stored in a separate file:
 
 ```dart
 loon >
   __store__.json
-  birds.json
+  users.json
 ```
 
 If documents need to be stored in different files based on their data, then a `FilePersistor.keyBuilder` can be used:
 
 ```dart
-class BirdModel {
+class UserModel {
   final String name;
-  final String description;
-  final String species;
+  final int age;
 
-  BirdModel({
+  UserModel({
     required this.name,
-    required this.description,
-    required this.species,
+    required this.age,
   });
 
-  static Collection<BirdModel> get store {
-    return Loon.collection<BirdModel>(
-      'birds',
-      fromJson: BirdModel.fromJson,
-      toJson: (bird) => bird.toJson(),
+  static Collection<UserModel> get store {
+    return Loon.collection(
+      'users',
+      fromJson: UserModel.fromJson,
+      toJson: (user) => user.toJson(),
       settings: FilePersistorSettings(
         key: FilePersistor.keyBuilder((snap) {
-          return snap.data.family;
+          if (snap.data.age > 65) {
+            return 'retired_users';
+          }
+          return 'users';
         }),
       ),
     )
@@ -417,8 +425,8 @@ class BirdModel {
 }
 ```
 
-Now instead of storing all birds in the `birds.json` file, they will be distributed across multiple files based on the value of `bird.family`. The key is recalculated
-whenever a document's data changes and if its associated key is updated, then the document is moved from its previous file to the new one.
+Now instead of storing all users in the `users.json` file, they will be distributed across multiple files based on the user's age. The key is recalculated
+whenever a document's data changes and if its associated key is updated, then the document is moved from its previous file to its updated location.
 
 ## 🎨 Custom persistence
 
@@ -433,21 +441,19 @@ class MyPersistor extends Persistor {
 
   /// Persist function called with the bath of documents that have changed (including been deleted) within the last throttle window
   /// specified by the [Persistor.persistenceThrottle] duration.
-  Future<void> persist(List<Document> docs);
+  Future<void> persist(Set<Document> docs);
 
   /// Hydration function called to read data from persistence. If no entities are specified,
   /// then it hydrations all persisted data. if entities are specified, it hydrates only the data from
   /// the paths under those entities.
-  Future<HydrationData> hydrate([List<StoreReference>? refs]);
+  Future<HydrationData> hydrate([Set<StoreReference>? refs]);
 
-  /// Clear function used to clear all documents in a collection.
-  Future<void> clear(Collection collection);
+  /// Clear function used to clear all documents under the given collections.
+  Future<void> clear(Set<Collection> collections);
 
   /// Clears all documents and removes all persisted data.
   Future<void> clearAll();
 }
 ```
-
-The base `Persistor` class implements synchronization and throttling of persistence operations by default, so you can just choose your storage mechanism.
 
 ## Happy coding

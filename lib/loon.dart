@@ -2,7 +2,6 @@ library loon;
 
 import 'dart:async';
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
 
 export 'widgets/query_stream_builder.dart';
