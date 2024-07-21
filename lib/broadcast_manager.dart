@@ -85,7 +85,8 @@ class BroadcastManager {
     eventStore.delete(path);
     eventStore.write(path, BroadcastEvents.removed);
 
-    // Deleting a path also invalidates all cached values at that path in the observer value store.
+    // Deleting a path also invalidates all cached values under that path in the observer
+    // value store recursively.
     observerValueStore.delete(path);
 
     /// Deleting a path is relatively infrequent, so iterating over the subset of active observers with dependencies

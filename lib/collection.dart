@@ -120,6 +120,12 @@ class Collection<T> implements Queryable<T>, StoreReference {
     return Query<T>(this, sort: sort);
   }
 
+  ObservableQuery<T> observe({
+    bool multicast = false,
+  }) {
+    return toQuery().observe(multicast: multicast);
+  }
+
   @override
   Query<T> toQuery() {
     return Query(this);
