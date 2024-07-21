@@ -2,6 +2,7 @@ library loon;
 
 import 'dart:async';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
 
 export 'widgets/query_stream_builder.dart';
@@ -313,6 +314,11 @@ class Loon {
       "broadcastStore": _instance.broadcastManager.inspect(),
       ..._instance.dependencyManager.inspect(),
     };
+  }
+
+  /// Unsubscribes all active observers of the store, disposing their stream resources.
+  static void unsubscribe() {
+    _instance.broadcastManager.unsubscribe();
   }
 
   static Logger get logger {

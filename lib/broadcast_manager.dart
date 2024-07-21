@@ -163,7 +163,19 @@ class BroadcastManager {
     observerValueStore.delete(observer._observerId);
   }
 
+  void unsubscribe() {
+    for (final observer in _observers.toList()) {
+      observer.dispose();
+    }
+    _observers.clear();
+    _depObservers.clear();
+    observerValueStore.clear();
+  }
+
   Map inspect() {
-    return eventStore.inspect();
+    return {
+      "events": eventStore.inspect(),
+      "observerValues": observerValueStore.inspect(),
+    };
   }
 }
