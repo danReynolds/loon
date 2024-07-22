@@ -27,7 +27,7 @@ Loon.collection('users').doc('1').create({
 });
 ```
 
-Documents are stored under collections in a map structure. They can contain any type of data, like a `String`, `Map` or typed data model:
+Documents are stored under collections in a tree structure. They can contain any type of data, like a `String`, `Map` or typed data model:
 
 ```dart
 import 'package:loon/loon.dart';
@@ -126,7 +126,7 @@ class MyWidget extends StatelessWidget {
 ## 𖢞 Subcollections
 
 Documents can be nested under subcollections. Documents in subcollections are uniquely identified by the path to their collection and
-document ID.
+their document ID.
 
 ```dart
 final userDoc =  UserModel.store.doc('1');
@@ -136,7 +136,7 @@ final friendsCollection = userDoc.subcollection(
   toJson: (user) => user.toJson(),
 );
 
-friendsCollection.doc('2').create(UserModel(name: 'Jack', age: 26));
+friendsCollection.doc('2').create(UserModel(name: 'Jack', age: 17));
 friendsCollection.doc('3').create(UserModel(name: 'Brenda', age: 40));
 friendsCollection.doc('4').create(UserModel(name: 'Bill', age: 70));
 
@@ -156,7 +156,6 @@ Documents can be filtered using queries:
 
 ```dart
 final snapshots = friendsCollection.where((snap) => snap.data.name.startsWith('B')).get();
-
 for (final snap in snapshots) {
   print(snap.data.name);
   // Brenda
@@ -171,12 +170,12 @@ class MyWidget extends StatelessWidget {
   @override
   build(context) {
     return QueryStreamBuilder(
-      query: UserModel.store.where((snap) => snap.data.age > 65),
+      query: UserModel.store.where((snap) => snap.data.age >= 18),
       builder: (context, snaps) {
         return ListView.builder(
           itemCount: snaps.length,
           builder: (context, snap) {
-            return Text('John has a retired friend named ${snap.data.name}');
+            return Text('${snap.data.name} is old enough to vote!');
           }
         )
       }
@@ -193,11 +192,7 @@ Assuming a model has a `copyWith` function, documents can be updated as shown be
 final doc = UserModel.doc('1');
 final snap = doc.get();
 
-doc.update(
-  snap.data.copyWith(
-    name: 'John Smith',
-  ),
-);
+doc.update(snap.data.copyWith(name: 'John Smith'));
 ```
 
 The reading and writing of a document can be combined using the `modify` API. If the document does not yet exist, then its snapshot is `null`.
@@ -233,13 +228,13 @@ UserModel.store.streamChanges().listen((changes) {
         print('New document ${changeSnap.id} was added to the collection.');
         break;
       case BroadcastEventTypes.modified:
-        print('The document ${changeSnap.id} was modified from ${changeSnap.prevData} to ${changeSnap.data}');
+        print('The document ${changeSnap.id} was modified from ${changeSnap.prevData} to ${changeSnap.data}.');
         break;
       case BroadcastEventTypes.removed:
         print('${changeSnap.id} was removed from the collection.');
         break;
       case BroadcastEventTypes.hydrated:
-        print('${changeSnap.id} was hydrated from the persisted data');
+        print('${changeSnap.id} was hydrated from the persisted data.');
         break;
     }
   }
@@ -273,7 +268,7 @@ final posts = Loon.collection<PostModel>(
 );
 ```
 
-In this example, whenever a post's associated user is updated, the post will also be rebroadcast to any of its listeners.
+In this example, whenever a post's associated user is updated, the post will also be rebroadcast to its active listeners.
 
 Additionally, whenever a document is updated, it will rebuild its set of dependencies, allowing documents to support dynamic dependencies
 that can change in response to updated document data.
@@ -323,6 +318,7 @@ Persistence options can be specified globally or on a per-collection basis.
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
 
+  // Globally enable encryption.
   Loon.configure(persistor: FilePersistor(encrypted: true));
 
   Loon.hydrate().then(() {
@@ -345,6 +341,7 @@ class UserModel {
       'users',
       fromJson: UserModel.fromJson,
       toJson: (user) => user.toJson(),
+      // Disable encryption specifically for this collection.
       settings: FilePersistorSettings(encrypted: false),
     )
   }
@@ -414,8 +411,8 @@ class UserModel {
       toJson: (user) => user.toJson(),
       settings: FilePersistorSettings(
         key: FilePersistor.keyBuilder((snap) {
-          if (snap.data.age > 65) {
-            return 'retired_users';
+          if (snap.data.age >= 18) {
+            return 'voting_users';
           }
           return 'users';
         }),
@@ -423,6 +420,13 @@ class UserModel {
     )
   }
 }
+```
+
+```dart
+loon >
+  __store__.json
+  users.json
+  voting_users.json
 ```
 
 Now instead of storing all users in the `users.json` file, they will be distributed across multiple files based on the user's age. The key is recalculated
@@ -457,3 +461,5 @@ class MyPersistor extends Persistor {
 ```
 
 ## Happy coding
+
+That's all for now! Let us know of any issues you come across and features that you would like to see added.

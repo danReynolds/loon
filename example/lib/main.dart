@@ -23,11 +23,10 @@ void main() async {
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
-  // This widget is the root of your application.
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Flutter Demo',
+      title: 'Loon Demo',
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.blueAccent),
         useMaterial3: true,
@@ -78,7 +77,7 @@ class _MyHomePageState extends State<MyHomePage> {
                   );
                 },
               ),
-              actions: <Widget>[
+              actions: [
                 TextButton(
                   child: const Text('Cancel'),
                   onPressed: () {
@@ -180,7 +179,7 @@ class _MyHomePageState extends State<MyHomePage> {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.end,
           mainAxisSize: MainAxisSize.min,
-          children: <Widget>[
+          children: [
             FloatingActionButton(
               onPressed: () {
                 final id = uuid.v4();
