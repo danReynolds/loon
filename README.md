@@ -14,6 +14,12 @@ Loon is a reactive document data store for Flutter.
 
 You can get started by looking at the [example](./example/lib/main.dart).
 
+## Install
+
+```dart
+pub add loon
+```
+
 ## ➕ Creating documents
 
 Loon makes it easy to work with collections of documents.
@@ -459,6 +465,11 @@ class MyPersistor extends Persistor {
   Future<void> clearAll();
 }
 ```
+
+## Extensions
+
+* [Firestore]: The [loon_extension_firestore](https://github.com/danReynolds/loon_extension_firestore) package is used to easily sync documents fetched from Firestore into Loon.
+
 
 ## Happy coding
 
