@@ -17,7 +17,7 @@ You can get started by looking at the [example](./example/lib/main.dart).
 ## Install
 
 ```dart
-pub add loon
+dart pub add loon
 ```
 
 ## ➕ Creating documents

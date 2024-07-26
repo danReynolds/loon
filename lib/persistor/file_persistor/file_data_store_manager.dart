@@ -25,12 +25,16 @@ class FileDataStoreManager {
   /// changes to the file system.
   late final Throttler _syncThrottle;
 
+  late final Logger _logger;
+
   FileDataStoreManager({
     required this.directory,
     required this.encrypter,
     required Duration persistenceThrottle,
+    required void Function(String message) sendLog,
   }) {
-    _syncThrottle = Throttler(persistenceThrottle, _sync);
+    _syncThrottle = Throttler(const Duration(milliseconds: 3000), _sync);
+    _logger = Logger('FileDataStoreManager', output: sendLog);
   }
 
   /// Resolves the data store name for the given path as the nearest value found working up from
@@ -62,23 +66,25 @@ class FileDataStoreManager {
   /// Syncs all file data stores to the file system, persisting dirty ones and deleting
   /// ones that can now be removed.
   Future<void> _sync() async {
-    final dirtyStores =
-        _index.values.where((dataStore) => dataStore.isDirty).toList();
+    return _logger.measure('File Sync', () async {
+      final dirtyStores =
+          _index.values.where((dataStore) => dataStore.isDirty).toList();
 
-    if (dirtyStores.isEmpty) {
-      return;
-    }
-
-    await Future.wait([
-      ...dirtyStores.map((store) => store.sync()),
-      _resolver.persist(),
-    ]);
-
-    for (final store in dirtyStores) {
-      if (store.isEmpty) {
-        _index.remove(store.name);
+      if (dirtyStores.isEmpty) {
+        return;
       }
-    }
+
+      await Future.wait([
+        ...dirtyStores.map((store) => store.sync()),
+        _resolver.persist(),
+      ]);
+
+      for (final store in dirtyStores) {
+        if (store.isEmpty) {
+          _index.remove(store.name);
+        }
+      }
+    });
   }
 
   /// Clears the provided path and all of its subpaths from each data store that contains

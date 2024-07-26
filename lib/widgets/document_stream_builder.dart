@@ -17,13 +17,7 @@ class DocumentStreamBuilder<T> extends StatefulWidget {
 }
 
 class DocumentStreamBuilderState<T> extends State<DocumentStreamBuilder<T>> {
-  late ObservableDocument<T> _observable;
-
-  @override
-  initState() {
-    super.initState();
-    _observable = widget.doc.observe();
-  }
+  late ObservableDocument<T> _observable = widget.doc.observe();
 
   @override
   void didUpdateWidget(covariant DocumentStreamBuilder<T> oldWidget) {

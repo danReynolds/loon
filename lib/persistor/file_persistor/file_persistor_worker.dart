@@ -31,6 +31,7 @@ class FilePersistorWorker {
       directory: directory,
       encrypter: encrypter,
       persistenceThrottle: persistenceThrottle,
+      sendLog: _sendLog,
     );
   }
 
@@ -43,11 +44,11 @@ class FilePersistorWorker {
     )._onMessage(request);
   }
 
-  _sendResponse(MessageResponse response) {
+  void _sendResponse(MessageResponse response) {
     sendPort.send(response);
   }
 
-  _sendLog(String text) {
+  void _sendLog(String text) {
     _sendResponse(LogMessageResponse(text: text));
   }
 
@@ -96,6 +97,7 @@ class FilePersistorWorker {
   void _persist(PersistMessageRequest request) {
     logger.measure('Persist operation', () async {
       try {
+        logger.log('Persist operation batch size: ${request.data.length}');
         await manager.persist(request.data);
         _sendResponse(request.success());
       } catch (e) {

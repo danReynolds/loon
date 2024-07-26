@@ -101,7 +101,11 @@ class FilePersistor extends Persistor {
   Future<Directory> initDirectory() async {
     final applicationDirectory = await getApplicationDocumentsDirectory();
     final fileDirectory = Directory('${applicationDirectory.path}/loon');
-    return fileDirectory.create();
+    final directory = await fileDirectory.create();
+
+    _logger.log('Directory: ${directory.path}');
+
+    return directory;
   }
 
   @override

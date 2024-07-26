@@ -16,13 +16,7 @@ class QueryStreamBuilder<T> extends StatefulWidget {
 }
 
 class QueryStreamBuilderState<T> extends State<QueryStreamBuilder<T>> {
-  late final ObservableQuery<T> _observable;
-
-  @override
-  initState() {
-    super.initState();
-    _observable = widget.query.observe();
-  }
+  late ObservableQuery<T> _observable = widget.query.observe();
 
   @override
   void didUpdateWidget(covariant QueryStreamBuilder<T> oldWidget) {

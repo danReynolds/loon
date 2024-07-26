@@ -16,6 +16,7 @@ class Throttler {
   /// it creates a new timer and awaits the full throttle duration.
   Future<void> run() async {
     if (_timer == null) {
+      print('here');
       final completer = _completer = Completer();
       _timer = Timer(duration, _complete);
       return completer.future;
