@@ -28,13 +28,14 @@ class FileDataStoreManager {
   /// The index of [FileDataStore] objects by name.
   final Map<String, DualFileDataStore> _index = {};
 
-  /// The sync mutex is used to isolate file system changes, blocking operations
-  /// from reading/writing data while there is an ongoing sync operation and conversely
-  /// blocking a sync from starting until the ongoing operation holding the sync mutex has finished.
+  /// The sync mutex is used to block operations from accessing the file system while there is an ongoing sync
+  /// operation and conversely blocks a sync from starting until the ongoing operation holding the sync mutex has finished.
   final _syncMutex = Mutex();
 
   /// The sync timer is used to throttle syncing changes to the file system using
-  /// the given [persistenceThrottle].
+  /// the given [persistenceThrottle]. After an that mutates the file system operation runs, it schedules
+  /// a sync to run on a timer. When the sync runs, it acquires the [_syncMutex], blocking any operations
+  /// from being processed until the sync completes.
   Timer? _syncTimer;
 
   late final _logger = Logger('FileDataStoreManager', output: onLog);
