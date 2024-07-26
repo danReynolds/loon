@@ -25,13 +25,13 @@ class FilePersistorWorker {
     required Encrypter encrypter,
     required Duration persistenceThrottle,
   }) {
-    logger = Logger('Worker', output: _sendLog);
-
+    logger = Logger('Worker', output: _sendLogMessage);
     manager = FileDataStoreManager(
       directory: directory,
       encrypter: encrypter,
       persistenceThrottle: persistenceThrottle,
-      sendLog: _sendLog,
+      onSync: _sendSyncMessage,
+      onLog: _sendLogMessage,
     );
   }
 
@@ -44,12 +44,16 @@ class FilePersistorWorker {
     )._onMessage(request);
   }
 
-  void _sendResponse(MessageResponse response) {
-    sendPort.send(response);
+  void _sendLogMessage(String text) {
+    _sendMessage(LogMessage(text: text));
   }
 
-  void _sendLog(String text) {
-    _sendResponse(LogMessageResponse(text: text));
+  void _sendSyncMessage() {
+    _sendMessage(SyncCompleteMessage());
+  }
+
+  void _sendMessage(Message message) {
+    sendPort.send(message);
   }
 
   void _onMessage(dynamic message) {
@@ -80,16 +84,16 @@ class FilePersistorWorker {
     receivePort.listen(_onMessage);
 
     // Send a successful message response containing the worker's send port.
-    _sendResponse(request.success(receivePort.sendPort));
+    _sendMessage(request.success(receivePort.sendPort));
   }
 
   void _hydrate(HydrateMessageRequest request) {
     logger.measure('Hydration operation', () async {
       try {
         final data = await manager.hydrate(request.paths);
-        _sendResponse(request.success(data));
+        _sendMessage(request.success(data));
       } catch (e) {
-        _sendResponse(request.error('Hydration error'));
+        _sendMessage(request.error('Hydration error'));
       }
     });
   }
@@ -99,9 +103,9 @@ class FilePersistorWorker {
       try {
         logger.log('Persist operation batch size: ${request.data.length}');
         await manager.persist(request.data);
-        _sendResponse(request.success());
+        _sendMessage(request.success());
       } catch (e) {
-        _sendResponse(request.error('Persist error'));
+        _sendMessage(request.error('Persist error'));
       }
     });
   }
@@ -110,9 +114,9 @@ class FilePersistorWorker {
     logger.measure('Clear operation', () async {
       try {
         await manager.clear(request.paths);
-        _sendResponse(request.success());
+        _sendMessage(request.success());
       } catch (e) {
-        _sendResponse(request.error('Clear error'));
+        _sendMessage(request.error('Clear error'));
       }
     });
   }
@@ -121,9 +125,9 @@ class FilePersistorWorker {
     logger.measure('ClearAll operation', () async {
       try {
         await manager.clearAll();
-        _sendResponse(request.success());
+        _sendMessage(request.success());
       } catch (e) {
-        _sendResponse(request.error('ClearAll failed'));
+        _sendMessage(request.error('ClearAll failed'));
       }
     });
   }

@@ -32,10 +32,10 @@ class MockPathProvider extends Fake
 }
 
 void main() {
-  var completer = TestFilePersistor.completer = PersistorCompleter();
+  late FilePersistorCompleter completer;
 
   setUp(() {
-    completer = TestFilePersistor.completer = PersistorCompleter();
+    completer = TestFilePersistor.completer = FilePersistorCompleter();
     testDirectory = Directory.systemTemp.createTempSync('test_dir');
     Directory("${testDirectory.path}/loon").createSync();
     final mockPathProvider = MockPathProvider();
@@ -78,7 +78,7 @@ void main() {
               .doc('1')
               .create(user);
 
-          await completer.onPersist;
+          await completer.onSync;
 
           final file = File('${testDirectory.path}/loon/__store__.json');
           final json = jsonDecode(file.readAsStringSync());
@@ -121,11 +121,11 @@ void main() {
           userCollection.doc('1').create(TestUserModel('User 1'));
           userCollection.doc('2').create(TestUserModel('User 2'));
 
-          await completer.onPersist;
+          await completer.onSync;
 
           userCollection.doc('2').update(TestUserModel('User 2 updated'));
 
-          await completer.onPersist;
+          await completer.onSync;
 
           final file = File('${testDirectory.path}/loon/__store__.json');
           final json = jsonDecode(file.readAsStringSync());
@@ -156,14 +156,29 @@ void main() {
           userCollection.doc('1').create(TestUserModel('User 1'));
           userCollection.doc('2').create(TestUserModel('User 2'));
 
-          await completer.onPersist;
+          await completer.onSync;
+
+          var file = File('${testDirectory.path}/loon/__store__.json');
+          var json = jsonDecode(file.readAsStringSync());
+
+          expect(
+            json,
+            {
+              "users": {
+                "__values": {
+                  "1": {"name": "User 1"},
+                  "2": {"name": "User 2"}
+                },
+              }
+            },
+          );
 
           userCollection.doc('2').delete();
 
-          await completer.onPersist;
+          await completer.onSync;
 
-          final file = File('${testDirectory.path}/loon/__store__.json');
-          final json = jsonDecode(file.readAsStringSync());
+          file = File('${testDirectory.path}/loon/__store__.json');
+          json = jsonDecode(file.readAsStringSync());
 
           expect(
             json,
@@ -192,7 +207,7 @@ void main() {
 
           final file = File('${testDirectory.path}/loon/__store__.json');
 
-          await completer.onPersist;
+          await completer.onSync;
 
           expect(file.existsSync(), true);
 
@@ -200,7 +215,7 @@ void main() {
           userCollection.doc('1').delete();
           userCollection.doc('2').delete();
 
-          await completer.onPersist;
+          await completer.onSync;
 
           expect(file.existsSync(), false);
         },
@@ -226,7 +241,7 @@ void main() {
           userCollection.doc('1').create(TestUserModel('User 1'));
           userCollection.doc('2').create(TestUserModel('User 2'));
 
-          await completer.onPersist;
+          await completer.onSync;
 
           final usersFile = File('${testDirectory.path}/loon/users.json');
           final otherUsersFile =
@@ -295,7 +310,7 @@ void main() {
           userCollection.doc('1').create(TestUserModel('User 1'));
           userCollection.doc('2').create(TestUserModel('User 2'));
 
-          await completer.onPersist;
+          await completer.onSync;
 
           final usersFile = File('${testDirectory.path}/loon/users.json');
           var usersJson = jsonDecode(usersFile.readAsStringSync());
@@ -333,7 +348,7 @@ void main() {
 
           userCollection.doc('1').delete();
 
-          await completer.onPersist;
+          await completer.onSync;
 
           usersJson = jsonDecode(usersFile.readAsStringSync());
           expect(
@@ -393,7 +408,7 @@ void main() {
               .doc('1')
               .create(user);
 
-          await completer.onPersist;
+          await completer.onSync;
 
           final storeFile = File('${testDirectory.path}/loon/__store__.json');
           final friendsFile = File('${testDirectory.path}/loon/friends.json');
@@ -494,7 +509,7 @@ void main() {
                       .doc('1')
                       .create(TestUserModel('Friend 1'));
 
-                  await completer.onPersist;
+                  await completer.onSync;
 
                   final storeFile =
                       File('${testDirectory.path}/loon/__store__.json');
@@ -527,7 +542,7 @@ void main() {
                       .doc('1')
                       .update(TestUserModel('User 1 updated'));
 
-                  await completer.onPersist;
+                  await completer.onSync;
 
                   storeJson = jsonDecode(storeFile.readAsStringSync());
                   expect(
@@ -616,7 +631,7 @@ void main() {
                       .doc('1')
                       .create(TestUserModel('Friend 1'));
 
-                  await completer.onPersist;
+                  await completer.onSync;
 
                   final storeFile =
                       File('${testDirectory.path}/loon/__store__.json');
@@ -649,7 +664,7 @@ void main() {
                       .doc('1')
                       .update(TestUserModel('User 1 updated'));
 
-                  await completer.onPersist;
+                  await completer.onSync;
 
                   final otherUsersFile =
                       File('${testDirectory.path}/loon/other_users.json');
@@ -732,7 +747,7 @@ void main() {
                       .doc('1')
                       .create(TestUserModel('Friend 1'));
 
-                  await completer.onPersist;
+                  await completer.onSync;
 
                   final users1File =
                       File('${testDirectory.path}/loon/users_1.json');
@@ -796,7 +811,7 @@ void main() {
                       .doc('1')
                       .update(TestUserModel('User 1 updated'));
 
-                  await completer.onPersist;
+                  await completer.onSync;
 
                   final storeFile =
                       File('${testDirectory.path}/loon/__store__.json');
@@ -890,7 +905,7 @@ void main() {
                       .doc('1')
                       .create(TestUserModel('Friend 1'));
 
-                  await completer.onPersist;
+                  await completer.onSync;
 
                   final usersFile =
                       File('${testDirectory.path}/loon/users.json');
@@ -919,7 +934,7 @@ void main() {
                       .doc('2')
                       .update(TestUserModel('User 2 updated'));
 
-                  await completer.onPersist;
+                  await completer.onSync;
 
                   usersJson = jsonDecode(usersFile.readAsStringSync());
                   expect(
@@ -1032,7 +1047,7 @@ void main() {
                       .create(TestUserModel('Friend 1'));
                   usersCollection.doc('3').create(TestUserModel('User 3'));
 
-                  await completer.onPersist;
+                  await completer.onSync;
 
                   final storeFile =
                       File('${testDirectory.path}/loon/__store__.json');
@@ -1108,7 +1123,7 @@ void main() {
                       .doc('1')
                       .update(TestUserModel('User 1 updated'));
 
-                  await completer.onPersist;
+                  await completer.onSync;
 
                   final otherUsersFile =
                       File('${testDirectory.path}/loon/other_users.json');
@@ -1202,7 +1217,7 @@ void main() {
                   otherUsersCollection.doc('1').create(TestUserModel('User 1'));
                   otherUsersCollection.doc('2').create(TestUserModel('User 2'));
 
-                  await completer.onPersist;
+                  await completer.onSync;
 
                   final otherUsersFile =
                       File('${testDirectory.path}/loon/other_users.json');
@@ -1239,7 +1254,7 @@ void main() {
                       .doc('1')
                       .update(TestUserModel('Updated user 1'));
 
-                  await completer.onPersist;
+                  await completer.onSync;
 
                   final otherUsersUpdatedFile = File(
                       '${testDirectory.path}/loon/other_users_updated.json');
@@ -1285,7 +1300,7 @@ void main() {
             toJson: (user) => user.toJson(),
           ).create(TestUserModel('Dan'));
 
-          await completer.onPersist;
+          await completer.onSync;
 
           final file = File('${testDirectory.path}/loon/__store__.json');
           final json = jsonDecode(file.readAsStringSync());
@@ -1322,7 +1337,7 @@ void main() {
           usersCollection.doc('1').create(TestUserModel('User 1'));
           friendsCollection.doc('1').create(TestUserModel('Friend 1'));
 
-          await completer.onPersist;
+          await completer.onSync;
 
           final file = File('${testDirectory.path}/loon/__store__.json');
           final json = jsonDecode(file.readAsStringSync());
@@ -1372,7 +1387,7 @@ void main() {
 
       userFriendsCollection.doc('3').create(TestUserModel('Friend 3'));
 
-      await completer.onPersist;
+      await completer.onSync;
 
       final storeFile = File('${testDirectory.path}/loon/__store__.json');
       final storeJson = jsonDecode(storeFile.readAsStringSync());
@@ -1503,7 +1518,7 @@ void main() {
 
         userFriendsCollection.doc('3').create(TestUserModel('Friend 3'));
 
-        await completer.onPersist;
+        await completer.onSync;
 
         final storeFile = File('${testDirectory.path}/loon/__store__.json');
         final storeJson = jsonDecode(storeFile.readAsStringSync());
@@ -1667,7 +1682,7 @@ void main() {
 
         currentUserDoc.create(TestUserModel('Dan'));
 
-        await completer.onPersist;
+        await completer.onSync;
 
         final file = File('${testDirectory.path}/loon/__store__.json');
         final json = jsonDecode(file.readAsStringSync());
@@ -1718,7 +1733,7 @@ void main() {
         userCollection.doc('1').create(TestUserModel('User 1'));
         currentUserDoc.create(TestUserModel('Dan'));
 
-        await completer.onPersist;
+        await completer.onSync;
 
         final file = File('${testDirectory.path}/loon/__store__.json');
         final json = jsonDecode(file.readAsStringSync());
@@ -1776,7 +1791,7 @@ void main() {
         userCollection.doc('1').create(TestUserModel('User 1'));
         currentUserDoc.create(TestUserModel('Dan'));
 
-        await completer.onPersist;
+        await completer.onSync;
 
         final file = File('${testDirectory.path}/loon/__store__.json');
         final json = jsonDecode(file.readAsStringSync());
@@ -1835,13 +1850,13 @@ void main() {
 
           final file = File('${testDirectory.path}/loon/__store__.json');
 
-          await completer.onPersist;
+          await completer.onSync;
 
           expect(file.existsSync(), true);
 
           userCollection.delete();
 
-          await completer.onClear;
+          await completer.onSync;
 
           expect(file.existsSync(), false);
         },
@@ -1869,7 +1884,7 @@ void main() {
           final file2 = File('${testDirectory.path}/loon/users2.json');
           final file3 = File('${testDirectory.path}/loon/users3.json');
 
-          await completer.onPersist;
+          await completer.onSync;
 
           expect(file1.existsSync(), true);
           expect(file2.existsSync(), true);
@@ -1877,7 +1892,7 @@ void main() {
 
           userCollection.delete();
 
-          await completer.onClear;
+          await completer.onSync;
 
           expect(file1.existsSync(), false);
           expect(file2.existsSync(), false);
@@ -1909,14 +1924,14 @@ void main() {
           final storeFile = File('${testDirectory.path}/loon/__store__.json');
           final friendsFile = File('${testDirectory.path}/loon/friends.json');
 
-          await completer.onPersist;
+          await completer.onSync;
 
           expect(storeFile.existsSync(), true);
           expect(friendsFile.existsSync(), true);
 
           userCollection.delete();
 
-          await completer.onClear;
+          await completer.onSync;
 
           expect(storeFile.existsSync(), false);
           expect(friendsFile.existsSync(), false);
@@ -1946,7 +1961,7 @@ void main() {
 
           final file = File('${testDirectory.path}/loon/__store__.json');
 
-          await completer.onPersist;
+          await completer.onSync;
 
           Json json = jsonDecode(file.readAsStringSync());
           expect(
@@ -1969,7 +1984,7 @@ void main() {
 
           userCollection.delete();
 
-          await completer.onClear;
+          await completer.onSync;
 
           json = jsonDecode(file.readAsStringSync());
           expect(
@@ -2010,7 +2025,7 @@ void main() {
           final resolverFile =
               File('${testDirectory.path}/loon/__resolver__.json');
 
-          await completer.onPersist;
+          await completer.onSync;
 
           expect(file.existsSync(), true);
           expect(resolverFile.existsSync(), true);

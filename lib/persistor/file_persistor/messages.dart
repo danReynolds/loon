@@ -7,7 +7,9 @@ import 'package:uuid/uuid.dart';
 
 const uuid = Uuid();
 
-abstract class MessageRequest<T extends MessageResponse> {
+abstract class Message {}
+
+abstract class MessageRequest<T extends MessageResponse> extends Message {
   final id = uuid.v4();
 
   MessageRequest();
@@ -17,7 +19,7 @@ abstract class MessageRequest<T extends MessageResponse> {
   }
 }
 
-abstract class MessageResponse {
+abstract class MessageResponse extends Message {
   final String id;
 
   MessageResponse({
@@ -132,10 +134,12 @@ class ErrorMessageResponse extends MessageResponse {
   });
 }
 
-class LogMessageResponse extends MessageResponse {
+class LogMessage extends Message {
   final String text;
 
-  LogMessageResponse({
+  LogMessage({
     required this.text,
-  }) : super(id: '');
+  });
 }
+
+class SyncCompleteMessage extends Message {}

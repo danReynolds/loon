@@ -66,6 +66,18 @@ class PersistorCompleter {
   }
 }
 
+class FilePersistorCompleter extends PersistorCompleter {
+  final _onSyncCompleter = ResetCompleter();
+
+  void syncComplete() {
+    _onSyncCompleter.complete();
+  }
+
+  Future<void> get onSync {
+    return _onSyncCompleter.future;
+  }
+}
+
 TestLargeModel generateRandomModel() {
   var random = Random();
   return TestLargeModel(

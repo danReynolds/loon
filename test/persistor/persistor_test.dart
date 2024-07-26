@@ -130,36 +130,36 @@ void main() {
         expect(batches.last, [userCollection.doc('2')]);
       },
     );
+
+    test(
+      'Batches clearing of collections',
+      () async {
+        List<Set<Collection>> batches = [];
+
+        Loon.configure(
+          persistor: TestPersistor(
+            seedData: [],
+            onClear: (collections) {
+              batches.add(collections);
+            },
+          ),
+        );
+
+        Loon.collection('users').delete();
+        Loon.collection('posts').delete();
+
+        await TestPersistor.completer.onClear;
+
+        Loon.collection('messages').delete();
+
+        await TestPersistor.completer.onClear;
+
+        expect(batches.length, 2);
+
+        expect(batches.first,
+            [Loon.collection('users'), Loon.collection('posts')]);
+        expect(batches.last, [Loon.collection('messages')]);
+      },
+    );
   });
-
-  test(
-    'Batches clearing of collections',
-    () async {
-      List<Set<Collection>> batches = [];
-
-      Loon.configure(
-        persistor: TestPersistor(
-          seedData: [],
-          onClear: (collections) {
-            batches.add(collections);
-          },
-        ),
-      );
-
-      Loon.collection('users').delete();
-      Loon.collection('posts').delete();
-
-      await TestPersistor.completer.onClear;
-
-      Loon.collection('messages').delete();
-
-      await TestPersistor.completer.onClear;
-
-      expect(batches.length, 2);
-
-      expect(
-          batches.first, [Loon.collection('users'), Loon.collection('posts')]);
-      expect(batches.last, [Loon.collection('messages')]);
-    },
-  );
 }

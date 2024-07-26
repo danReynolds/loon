@@ -5,7 +5,7 @@ import 'package:loon/persistor/file_persistor/file_persistor_settings.dart';
 import '../utils.dart';
 
 class TestFilePersistor extends FilePersistor {
-  static PersistorCompleter completer = PersistorCompleter();
+  static FilePersistorCompleter completer = FilePersistorCompleter();
 
   final encrypter = Encrypter(AES(testEncryptionKey, mode: AESMode.cbc));
 
@@ -15,6 +15,7 @@ class TestFilePersistor extends FilePersistor {
     void Function(Set<Collection> collections)? onClear,
     void Function()? onClearAll,
     void Function(HydrationData data)? onHydrate,
+    void Function()? onSync,
   }) : super(
           // To make tests run faster, in the test environment the persistence throttle
           // is decreased to 1 millisecond.
@@ -35,6 +36,10 @@ class TestFilePersistor extends FilePersistor {
           onClearAll: () {
             onClearAll?.call();
             completer.clearAllComplete();
+          },
+          onSync: () {
+            onSync?.call();
+            completer.syncComplete();
           },
         );
 
