@@ -63,13 +63,11 @@ class UserModel {
     required this.age,
   });
 
-  static Collection<UserModel> get store {
-    return Loon.collection(
-      'users',
-      fromJson: UserModel.fromJson,
-      toJson: (user) => user.toJson(),
-    )
-  }
+  static final Collection<UserModel> store = Loon.collection(
+    'users',
+    fromJson: UserModel.fromJson,
+    toJson: (user) => user.toJson(),
+  );
 }
 ```
 
@@ -208,9 +206,7 @@ UserModel.store.doc('1').modify((snap) {
   if (snap == null) {
     return null;
   }
-  return snap.data.copyWith(
-    name: 'John Smitherson',
-  );
+  return snap.data.copyWith(name: 'John Smitherson');
 });
 ```
 
@@ -229,17 +225,17 @@ Documents and queries can be streamed for changes which provides the previous an
 ```dart
 UserModel.store.streamChanges().listen((changes) {
   for (final changeSnap in changes) {
-     switch(changeSnap.type) {
-      case BroadcastEventTypes.added:
+     switch(changeSnap.event) {
+      case BroadcastEvents.added:
         print('New document ${changeSnap.id} was added to the collection.');
         break;
-      case BroadcastEventTypes.modified:
+      case BroadcastEvents.modified:
         print('The document ${changeSnap.id} was modified from ${changeSnap.prevData} to ${changeSnap.data}.');
         break;
-      case BroadcastEventTypes.removed:
+      case BroadcastEvents.removed:
         print('${changeSnap.id} was removed from the collection.');
         break;
-      case BroadcastEventTypes.hydrated:
+      case BroadcastEvents.hydrated:
         print('${changeSnap.id} was hydrated from the persisted data.');
         break;
     }
@@ -285,7 +281,7 @@ Not all documents necessarily make sense to be grouped together under any partic
 on the root collection:
 
 ```dart
-Loon.doc('current_user').create('1');
+Loon.doc('current_user_id').create('1');
 ```
 
 ## 🗄️ Data Persistence
@@ -310,7 +306,7 @@ The call to `hydrate` returns a `Future` that resolves when the data has been hy
 
 ```dart
 Loon.hydrate([
-  Loon.doc('current_user'),
+  Loon.doc('current_user_id'),
   Loon.collection('users'),
 ]);
 ```
@@ -468,7 +464,7 @@ class MyPersistor extends Persistor {
 
 ## Extensions
 
-* [Firestore]: The [loon_extension_firestore](https://github.com/danReynolds/loon_extension_firestore) package is used to easily sync documents fetched from Firestore into Loon.
+* [Firestore](https://pub.dev/packages/cloud_firestore): The [loon_extension_firestore](https://github.com/danReynolds/loon_extension_firestore) package is used to sync documents fetched from Firestore into Loon.
 
 ## Happy coding
 
