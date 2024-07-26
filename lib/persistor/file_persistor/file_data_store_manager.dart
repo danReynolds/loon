@@ -79,13 +79,7 @@ class FileDataStoreManager {
   }
 
   void _scheduleSync() {
-    _syncTimer ??= Timer(persistenceThrottle, () async {
-      try {
-        await _sync();
-      } finally {
-        _syncTimer = null;
-      }
-    });
+    _syncTimer ??= Timer(persistenceThrottle, _sync);
   }
 
   /// Syncs all file data stores to the file system, persisting dirty ones and deleting
@@ -112,6 +106,7 @@ class FileDataStoreManager {
         }
 
         onSync();
+        _syncTimer = null;
       });
     });
   }
