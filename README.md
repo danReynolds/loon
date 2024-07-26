@@ -195,7 +195,7 @@ class MyWidget extends StatelessWidget {
 Assuming a model has a `copyWith` function, documents can be updated as shown below:
 
 ```dart
-final doc = UserModel.doc('1');
+final doc = UserModel.store.doc('1');
 final snap = doc.get();
 
 doc.update(snap.data.copyWith(name: 'John Smith'));
@@ -204,7 +204,7 @@ doc.update(snap.data.copyWith(name: 'John Smith'));
 The reading and writing of a document can be combined using the `modify` API. If the document does not yet exist, then its snapshot is `null`.
 
 ```dart
-UserModel.doc('1').modify((snap) {
+UserModel.store.doc('1').modify((snap) {
   if (snap == null) {
     return null;
   }
@@ -219,7 +219,7 @@ UserModel.doc('1').modify((snap) {
 Deleting a document removes it and all of its subcollections from the store.
 
 ```dart
-UserModel.doc('1').delete();
+UserModel.store.doc('1').delete();
 ```
 
 ## 🌊 Streaming changes
