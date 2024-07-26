@@ -1,3 +1,9 @@
+## 3.0.0
+
+* Refactors dependency behavior into the dependency manager and de-dupes dependency references to improve performance.
+* Moves base persistor batch/throttle behavior to the persist manager and updates persistence delays to be done at the task duration level in the manager and at the throttle duration in the file persistor implementation.
+* Adds a caching layer to accessing observable values via get() ahead of a broadcast.
+
 ## 2.0.1
 
 * Fix bug for deletion of documents with a document-level persistence key. 

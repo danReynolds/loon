@@ -29,6 +29,24 @@ class Collection<T> implements Queryable<T>, StoreReference {
     this.dependenciesBuilder,
   });
 
+  static Collection<S> fromPath<S>(
+    String path, {
+    FromJson<S>? fromJson,
+    ToJson<S>? toJson,
+    PersistorSettings<S>? persistorSettings,
+    DependenciesBuilder<S>? dependenciesBuilder,
+  }) {
+    final [...pathSegments, id] = path.split(ValueStore.delimiter);
+    return Collection<S>(
+      pathSegments.join(ValueStore.delimiter),
+      id,
+      fromJson: fromJson,
+      toJson: toJson,
+      persistorSettings: persistorSettings,
+      dependenciesBuilder: dependenciesBuilder,
+    );
+  }
+
   @override
   String get path {
     if (parent.isEmpty || parent == _rootKey) {
@@ -86,18 +104,6 @@ class Collection<T> implements Queryable<T>, StoreReference {
     return Loon._instance.documentStore.hasChildValues(path);
   }
 
-  /// A collection is pending broadcast based on 3 conditions:
-  /// 1. If the collection itself has any pending broadcast events.
-  /// 2. If any of the collection's documents have pending broadcast events.
-  /// 3. If a parent path of the collection has a removal event.
-  bool isPendingBroadcast() {
-    return Loon._instance.broadcastManager.store.hasValue(path) ||
-        Loon._instance.broadcastManager.store.hasChildValues(path) ||
-        Loon._instance.broadcastManager.store
-                .findValue(path, BroadcastEvents.removed) !=
-            null;
-  }
-
   Stream<List<DocumentSnapshot<T>>> stream() {
     return Query<T>(this).observe().stream();
   }
@@ -112,6 +118,12 @@ class Collection<T> implements Queryable<T>, StoreReference {
 
   Query<T> sortBy(SortFn<T> sort) {
     return Query<T>(this, sort: sort);
+  }
+
+  ObservableQuery<T> observe({
+    bool multicast = false,
+  }) {
+    return toQuery().observe(multicast: multicast);
   }
 
   @override

@@ -2,8 +2,6 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:loon/loon.dart';
 
-import '../models/test_user_model.dart';
-
 class DocumentSnapshotMatcher<T> extends Matcher {
   DocumentSnapshot<T?>? expected;
   late DocumentSnapshot<T?>? actual;
@@ -47,10 +45,6 @@ class DocumentSnapshotMatcher<T> extends Matcher {
       return actualData is Json && mapEquals(actualData, expectedData);
     }
 
-    if (expectedData is TestUserModel) {
-      return actualData is TestUserModel && expectedData == actualData;
-    }
-
-    return false;
+    return expectedData == actualData;
   }
 }

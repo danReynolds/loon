@@ -4,11 +4,11 @@ class ObservableQuery<T> extends Query<T>
     with
         BroadcastObserver<List<DocumentSnapshot<T>>,
             List<DocumentChangeSnapshot<T>>> {
-  /// A query maintains a cache of snapshots of the documents in its current result set.
+  /// An observable query maintains a cache of snapshots of the documents in its current result set.
   final Map<Document<T>, DocumentSnapshot<T>> _snapCache = {};
 
-  /// A query maintains a cache of the dependencies of documents in its current result set.
-  final Map<Document<T>, Set<Document>> _depCache = {};
+  /// An observable query maintains a cache of the dependencies of documents in its current result set.
+  final Map<Document<T>, Set<Document>> _docDepCache = {};
 
   ObservableQuery(
     super.collection, {
@@ -24,24 +24,39 @@ class ObservableQuery<T> extends Query<T>
     init(snaps, multicast: multicast);
   }
 
-  /// Update the doc in the snapshot and dependency indices.
+  /// Update the doc in the snapshot and dependency caches.
   void _cacheDoc(DocumentSnapshot<T> snap) {
     final doc = snap.doc;
-    final prevDeps = _depCache[doc];
+    final prevDeps = _docDepCache[doc];
     final deps = doc.dependencies();
 
     _snapCache[doc] = snap;
 
+    // If the dependencies of the document have not changed, then the set is guaranteed
+    // to be referentially equal.
     if (deps != prevDeps) {
+      // The old document should be unconditionally removed and then optionally re-added
+      // with the updated document reference if the document still has dependencies.
+      _docDepCache.remove(doc);
       if (deps != null) {
-        _depCache[doc] = deps;
+        _docDepCache[doc] = deps;
+      }
 
+      if (deps != null && prevDeps != null) {
+        final addedDeps = deps.difference(prevDeps);
+        final removedDeps = prevDeps.difference(deps);
+
+        for (final dep in addedDeps) {
+          _deps.inc(dep.path);
+        }
+        for (final dep in removedDeps) {
+          _deps.dec(dep.path);
+        }
+      } else if (deps != null) {
         for (final dep in deps) {
           _deps.inc(dep.path);
         }
       } else if (prevDeps != null) {
-        _depCache.remove(doc);
-
         for (final dep in prevDeps) {
           _deps.dec(dep.path);
         }
@@ -49,9 +64,9 @@ class ObservableQuery<T> extends Query<T>
     }
   }
 
-  /// Removes the doc from the index, clearing it in both the snapshot and dependency indices.
+  /// Removes the doc from the index, clearing it in both the snapshot and dependency caches.
   void _evictDoc(Document<T> doc) {
-    final deps = _depCache[doc];
+    final deps = _docDepCache[doc];
 
     if (deps != null) {
       for (final dep in deps) {
@@ -59,7 +74,7 @@ class ObservableQuery<T> extends Query<T>
       }
     }
 
-    _depCache.remove(doc);
+    _docDepCache.remove(doc);
     _snapCache.remove(doc);
   }
 
@@ -81,7 +96,6 @@ class ObservableQuery<T> extends Query<T>
   @override
   void _onBroadcast() {
     bool shouldRebroadcast = false;
-    bool shouldUpdate = false;
 
     // The list of changes to the query. Note that the [BroadcastEvents] of the document
     // local to the query are different from the global broadcast events. For example, if a document
@@ -93,14 +107,14 @@ class ObservableQuery<T> extends Query<T>
 
     // 1.  Any path above or equal to the query's collection has been removed. This is determined by finding
     //     a [BroadcastEvents.removed] event anywhere above or at the query's collection path.
-    if (Loon._instance.broadcastManager.store
+    if (Loon._instance.broadcastManager.eventStore
             .findValue(path, BroadcastEvents.removed) !=
         null) {
-      if (_value.isNotEmpty) {
-        shouldUpdate = true;
+      if (_controllerValue.isNotEmpty) {
+        shouldRebroadcast = true;
 
         changeSnaps.addAll(
-          _value.map(
+          _controllerValue.map(
             (snap) {
               return DocumentChangeSnapshot<T>(
                 doc: snap.doc,
@@ -113,12 +127,13 @@ class ObservableQuery<T> extends Query<T>
         );
 
         _snapCache.clear();
+        _docDepCache.clear();
         _deps.clear();
       }
     }
 
-    final events =
-        Loon._instance.broadcastManager.store.getChildValues(collection.path);
+    final events = Loon._instance.broadcastManager.eventStore
+        .getChildValues(collection.path);
     if (events != null) {
       for (final entry in events.entries) {
         final docId = entry.key;
@@ -135,7 +150,7 @@ class ObservableQuery<T> extends Query<T>
             if (_filter(snap!)) {
               _cacheDoc(snap);
 
-              shouldUpdate = true;
+              shouldRebroadcast = true;
 
               if (hasChangeListener) {
                 changeSnaps.add(
@@ -154,7 +169,7 @@ class ObservableQuery<T> extends Query<T>
             if (_snapCache.containsKey(doc)) {
               _evictDoc(doc);
 
-              shouldUpdate = true;
+              shouldRebroadcast = true;
 
               if (hasChangeListener) {
                 changeSnaps.add(
@@ -172,7 +187,7 @@ class ObservableQuery<T> extends Query<T>
           // 2.c Add / remove modified documents.
           case BroadcastEvents.modified:
             if (_snapCache.containsKey(doc)) {
-              shouldUpdate = true;
+              shouldRebroadcast = true;
 
               // 2.c.i Previously satisfied the query filter and still does (updated value must still be rebroadcast on the query).
               if (_filter(snap!)) {
@@ -208,7 +223,7 @@ class ObservableQuery<T> extends Query<T>
               if (_filter(snap!)) {
                 _cacheDoc(snap);
 
-                shouldUpdate = true;
+                shouldRebroadcast = true;
 
                 if (hasChangeListener) {
                   changeSnaps.add(
@@ -246,7 +261,7 @@ class ObservableQuery<T> extends Query<T>
     }
 
     // 3. The query itself has been touched for rebroadcast.
-    if (Loon._instance.broadcastManager.store.get(path) ==
+    if (Loon._instance.broadcastManager.eventStore.get(path) ==
         BroadcastEvents.touched) {
       shouldRebroadcast = true;
     }
@@ -255,10 +270,13 @@ class ObservableQuery<T> extends Query<T>
       _changeController.add(changeSnaps);
     }
 
-    if (shouldUpdate) {
-      add(_sortQuery(_snapCache.values.toList()));
-    } else if (shouldRebroadcast) {
-      add(_value);
+    // If the query should be rebroadcast, then it checks if it has a cached computed value,
+    // emitting either that value or if there's a cache miss, recomputing it, caching it
+    // and then emitting it on the stream.
+    if (shouldRebroadcast) {
+      final updatedValue =
+          value ?? (value = _sortQuery(_snapCache.values.toList()));
+      add(updatedValue);
     }
   }
 
@@ -271,11 +289,19 @@ class ObservableQuery<T> extends Query<T>
 
   @override
   get() {
-    // If the query is pending broadcast when its data is accessed, then it must not use
-    // its cached value as that value is stale until the query has processed the broadcast.
-    if (isPendingBroadcast()) {
-      return super.get();
+    // If the query does not have an up to date cached value, then it recomputes its value
+    // and records it in the cache.
+    if (!hasValue) {
+      return value = super.get();
     }
-    return _value;
+    return value!;
+  }
+
+  Map inspect() {
+    return {
+      "deps": _deps.inspect(),
+      "docDeps": _docDepCache,
+      "docSnaps": _snapCache,
+    };
   }
 }

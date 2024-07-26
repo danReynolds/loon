@@ -59,10 +59,6 @@ class Query<T> extends Queryable<T> {
     return _filterQuery(collection.get()).isNotEmpty;
   }
 
-  bool isPendingBroadcast() {
-    return collection.isPendingBroadcast();
-  }
-
   Stream<List<DocumentSnapshot<T>>> stream() {
     return observe().stream();
   }

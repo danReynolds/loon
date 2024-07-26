@@ -1,9 +1,11 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:encrypt/encrypt.dart';
 import 'package:loon/loon.dart';
 import 'package:loon/persistor/file_persistor/file_data_store.dart';
 import 'package:loon/persistor/file_persistor/file_persist_document.dart';
 import 'package:loon/persistor/file_persistor/file_persistor_settings.dart';
+import 'package:loon/persistor/file_persistor/throttler.dart';
 import 'package:path/path.dart' as path;
 
 class FileDataStoreManager {
@@ -19,10 +21,17 @@ class FileDataStoreManager {
   /// The index of [FileDataStore] objects by name.
   final Map<String, DualFileDataStore> _index = {};
 
+  /// A global persistence sync throttle used to throttle syncing of file data store
+  /// changes to the file system.
+  late final Throttler _syncThrottle;
+
   FileDataStoreManager({
     required this.directory,
     required this.encrypter,
-  });
+    required Duration persistenceThrottle,
+  }) {
+    _syncThrottle = Throttler(persistenceThrottle, _sync);
+  }
 
   /// Resolves the data store name for the given path as the nearest value found working up from
   /// the full path, falling back to the default store key if none is found.
@@ -50,7 +59,8 @@ class FileDataStoreManager {
     };
   }
 
-  /// Syncs all file data stores, persisting dirty ones and deleting ones that can now be removed.
+  /// Syncs all file data stores to the file system, persisting dirty ones and deleting
+  /// ones that can now be removed.
   Future<void> _sync() async {
     final dirtyStores =
         _index.values.where((dataStore) => dataStore.isDirty).toList();
@@ -109,6 +119,10 @@ class FileDataStoreManager {
 
   /// Hydrates the given paths and returns a map of document paths to their serialized data.
   Future<Map<String, Json>> hydrate(List<String>? paths) async {
+    // Immediately complete any pending sync before initiating the hydration, since the sync
+    // may effect the hydration response.
+    await _syncThrottle.complete();
+
     final Map<String, Set<DualFileDataStore>> pathDataStores = {};
     final Set<DualFileDataStore> dataStores = {};
 
@@ -228,15 +242,18 @@ class FileDataStoreManager {
       await dataStore.writePath(docPath, docData, encrypted);
     }
 
-    await _sync();
+    await _syncThrottle.run();
   }
 
-  Future<void> clear(String path) async {
-    await _clear(path);
-    await _sync();
+  Future<void> clear(List<String> paths) async {
+    await Future.wait(paths.map(_clear).toList());
+    await _syncThrottle.run();
   }
 
   Future<void> clearAll() async {
+    // Cancel any pending sync, since all data stores are being cleared immediately.
+    _syncThrottle.cancel();
+
     await Future.wait([
       ..._index.values.map((dataStore) => dataStore.delete()),
       _resolver.delete(),

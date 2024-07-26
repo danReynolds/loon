@@ -29,11 +29,13 @@ class InitMessageRequest extends MessageRequest<InitMessageResponse> {
   final SendPort sendPort;
   final Directory directory;
   final Encrypter encrypter;
+  final Duration persistenceThrottle;
 
   InitMessageRequest({
     required this.sendPort,
     required this.directory,
     required this.encrypter,
+    required this.persistenceThrottle,
   });
 
   InitMessageResponse success(SendPort sendPort) {
@@ -92,10 +94,10 @@ class PersistMessageResponse extends MessageResponse {
 }
 
 class ClearMessageRequest extends MessageRequest<ClearMessageResponse> {
-  final String path;
+  final List<String> paths;
 
   ClearMessageRequest({
-    required this.path,
+    required this.paths,
   });
 
   ClearMessageResponse success() {

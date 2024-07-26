@@ -109,3 +109,7 @@ Json decryptData(String encrypted) {
     ),
   );
 }
+
+Future<void> asyncEvent() {
+  return Future.delayed(const Duration(milliseconds: 1), () => null);
+}

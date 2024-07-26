@@ -80,6 +80,7 @@ class Document<T> implements StoreReference {
   DocumentSnapshot<T> create(
     T data, {
     bool broadcast = true,
+    bool persist = true,
   }) {
     if (exists()) {
       throw Exception('Cannot create duplicate document');
@@ -89,13 +90,15 @@ class Document<T> implements StoreReference {
       this,
       data,
       broadcast: broadcast,
+      persist: persist,
       event: BroadcastEvents.added,
     );
   }
 
   DocumentSnapshot<T> update(
     T data, {
-    bool broadcast = true,
+    bool? broadcast,
+    bool persist = true,
   }) {
     if (!exists()) {
       throw Exception('Missing document $path');
@@ -104,9 +107,14 @@ class Document<T> implements StoreReference {
     return Loon._instance.writeDocument<T>(
       this,
       data,
-      // As an optimization, broadcasting is skipped when updating a document if the document
+      // As an optimization, broadcasting is skipped when updating a document if its
       // data is unchanged.
-      broadcast: data != get()!.data,
+      //
+      // The document store is accessed directly here instead of going through the public [Document.get]
+      // API since [get] checks for type compatibility of the existing value with the current document
+      // and the update may be altering the type of the document.
+      broadcast: broadcast ?? Loon._instance.documentStore.get(path) != data,
+      persist: persist,
       event: BroadcastEvents.modified,
     );
   }
@@ -114,11 +122,16 @@ class Document<T> implements StoreReference {
   DocumentSnapshot<T> createOrUpdate(
     T data, {
     bool broadcast = true,
+    bool persist = true,
   }) {
     if (exists()) {
-      return update(data, broadcast: broadcast);
+      return update(
+        data,
+        broadcast: broadcast,
+        persist: persist,
+      );
     }
-    return create(data, broadcast: broadcast);
+    return create(data, broadcast: broadcast, persist: persist);
   }
 
   DocumentSnapshot<T> modify(
@@ -169,23 +182,19 @@ class Document<T> implements StoreReference {
   }
 
   bool exists() {
-    return get() != null;
+    return Loon._instance.existsSnap(this);
   }
 
   Set<Document>? dependencies() {
-    return Loon._instance.dependenciesStore.get(path);
+    return Loon._instance.dependencyManager.getDependencies(this);
   }
 
   Set<Document>? dependents() {
-    return Loon._instance.dependentsStore[this];
+    return Loon._instance.dependencyManager.getDependents(this);
   }
 
   bool isPersistenceEnabled() {
     return persistorSettings?.enabled ??
         Loon._instance._isGlobalPersistenceEnabled;
-  }
-
-  bool isPendingBroadcast() {
-    return Loon._instance.broadcastManager.store.hasValue(path);
   }
 }

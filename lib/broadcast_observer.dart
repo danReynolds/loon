@@ -1,23 +1,35 @@
 part of loon;
 
+const uuid = Uuid();
+
 /// A mixin that provides an observable interface for the access and streaming of data broadcasted from the store.
 mixin BroadcastObserver<T, S> {
   late final StreamController<T> _controller;
   late final StreamController<S> _changeController;
-  late T _value;
+
+  /// Whether the [Observable] can have more than one observable subscription. A single-subscription
+  /// observable will allow one listener and release its resources automatically when its listener cancels its subscription.
+  /// A multicast observable must have its resources released manually by calling [dispose].
+  /// The term *multicast* is used to refer to a a multi-subscription observable since it is common observable terminology and
+  /// the term broadcast is to mean something different in the library compared to its usage in the underlying Dart [Stream] implementation.
   late final bool multicast;
 
+  /// The latest value emitted on the observer's stream controller. This value can be different
+  /// from the *current* value of the observer, which may not have been broadcast on its stream yet
+  /// and is cached in the [BroadcastManager].
+  late T _controllerValue;
+
+  /// The unique ID of the observer instance.
+  late String _observerId;
+
+  /// The path being observed in the store.
   String get path;
 
+  /// The dependencies of the observer in the store.
   final _deps = PathRefStore();
 
   void init(
     T initialValue, {
-    /// Whether the [Observable] can have more than one observable subscription. A single-subscription
-    /// observable will allow one listener and release its resources automatically when its listener cancels its subscription.
-    /// A multicast observable must have its resources released manually by calling [dispose].
-    /// The term *multicast* is used to refer to a a multi-subscription observable since it is common observable terminology and
-    /// the term broadcast is to mean something different in the library compared to its usage in the underlying Dart [Stream] implementation.
     required bool multicast,
   }) {
     this.multicast = multicast;
@@ -30,10 +42,12 @@ mixin BroadcastObserver<T, S> {
       _changeController = StreamController<S>(onCancel: dispose);
     }
 
-    _value = initialValue;
-    _controller.add(_value);
+    _controllerValue = initialValue;
+    _controller.add(initialValue);
 
-    Loon._instance.broadcastManager.addObserver(this);
+    _observerId = "${path}__${uuid.v4()}";
+
+    Loon._instance.broadcastManager.addObserver(this, initialValue);
   }
 
   void dispose() {
@@ -42,17 +56,14 @@ mixin BroadcastObserver<T, S> {
     Loon._instance.broadcastManager.removeObserver(this);
   }
 
-  T add(T updatedValue) {
-    _value = updatedValue;
-    _controller.add(_value);
-    return _value;
-  }
-
-  bool exists();
-
-  /// [get] is left unimplemented since it has variable logic based on the type of observer like an [ObservableDocument]
-  /// and [ObservableQuery].
   T get();
+
+  T add(T updatedValue) {
+    Loon._instance.broadcastManager.observerValueStore
+        .write(_observerId, updatedValue);
+    _controller.add(updatedValue);
+    return _controllerValue = updatedValue;
+  }
 
   Stream<T> stream() {
     return _controller.stream;
@@ -62,7 +73,20 @@ mixin BroadcastObserver<T, S> {
     return _changeController.stream;
   }
 
-  void _onBroadcast();
+  T? get value {
+    return Loon._instance.broadcastManager.observerValueStore.get(_observerId);
+  }
 
-  bool isPendingBroadcast();
+  set value(T? value) {
+    Loon._instance.broadcastManager.observerValueStore
+        .write(_observerId, value);
+  }
+
+  /// Returns whether the observer has a cached value in the [ObserverValueStore].
+  bool get hasValue {
+    return Loon._instance.broadcastManager.observerValueStore
+        .hasValue(_observerId);
+  }
+
+  void _onBroadcast();
 }

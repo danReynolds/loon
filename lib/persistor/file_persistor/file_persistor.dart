@@ -21,6 +21,10 @@ class FilePersistor extends Persistor {
   /// An index of task IDs to the task completer that is resolved when they are completed on the worker.
   final Map<String, Completer> _messageRequestIndex = {};
 
+  /// The throttle for batching persisted documents. All documents updated within the throttle
+  /// duration are batched together into a single persist operation.
+  final Duration persistenceThrottle;
+
   final _secureStorageKey = 'loon_encrypted_file_persistor_key';
 
   late final Logger _logger;
@@ -31,7 +35,7 @@ class FilePersistor extends Persistor {
     super.onClear,
     super.onClearAll,
     super.onHydrate,
-    super.persistenceThrottle,
+    this.persistenceThrottle = const Duration(milliseconds: 100),
   }) : super(settings: settings ?? const FilePersistorSettings()) {
     _logger = Logger('FilePersistor', output: Loon.logger.log);
   }
@@ -119,6 +123,7 @@ class FilePersistor extends Persistor {
       sendPort: _receivePort.sendPort,
       directory: directory as Directory,
       encrypter: encrypter as Encrypter,
+      persistenceThrottle: persistenceThrottle,
     );
 
     final completer =
@@ -143,7 +148,7 @@ class FilePersistor extends Persistor {
   }
 
   @override
-  hydrate([List<StoreReference>? refs]) async {
+  hydrate([refs]) async {
     final response = await _sendMessage(
       HydrateMessageRequest(refs?.map((entity) => entity.path).toList()),
     );
@@ -151,15 +156,19 @@ class FilePersistor extends Persistor {
   }
 
   @override
-  persist(List<Document> docs) async {
+  persist(docs) async {
     // Marshall file persist documents to be sent to and persisted by the worker isolate.
     final data = docs.map((doc) => doc.toPersistenceDoc()).toList();
     await _sendMessage(PersistMessageRequest(data: data));
   }
 
   @override
-  clear(collection) async {
-    await _sendMessage(ClearMessageRequest(path: collection.path));
+  clear(collections) async {
+    await _sendMessage(
+      ClearMessageRequest(
+        paths: collections.map((collection) => collection.path).toList(),
+      ),
+    );
   }
 
   @override

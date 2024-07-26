@@ -1,8 +1,8 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:encrypt/encrypt.dart';
 import 'package:loon/loon.dart';
-import 'package:loon/persistor/file_persistor/extensions/future.dart';
 import 'package:loon/persistor/file_persistor/file_persistor_worker.dart';
 import 'package:path/path.dart' as path;
 
@@ -167,6 +167,9 @@ class FileDataStore {
   /// Whether the file data store has been hydrated yet from its persisted file.
   bool isHydrated;
 
+  // Completer used to await hydration of the data store.
+  Completer<void>? _hydrationCompleter;
+
   late final Logger _logger;
 
   /// The name of the default data store key.
@@ -242,6 +245,10 @@ class FileDataStore {
       return;
     }
 
+    if (_hydrationCompleter != null) {
+      return _hydrationCompleter!.future;
+    }
+
     if (!(await _file.exists())) {
       isHydrated = true;
       return;
@@ -251,17 +258,17 @@ class FileDataStore {
       await _logger.measure(
         'Hydrate',
         () async {
+          _hydrationCompleter = Completer();
           final encodedStore = await _readFile();
           if (encodedStore != null) {
             _store = ValueStore.fromJson(jsonDecode(encodedStore));
           }
+          _hydrationCompleter!.complete();
+          isHydrated = true;
         },
       );
-
-      isHydrated = true;
     } catch (e) {
-      // If hydration fails for an existing file, then this file data store is corrupt
-      // and should be removed from the file data store index.
+      _hydrationCompleter!.completeError(e);
       _logger.log('Corrupt file data store $name');
       rethrow;
     }
@@ -397,19 +404,17 @@ class FileDataStoreResolver {
       await _logger.measure(
         'Hydrate',
         () async {
-          final fileStr = await _file.readAsString();
-          store = RefValueStore(jsonDecode(fileStr));
+          if (await (_file.exists())) {
+            final fileStr = await _file.readAsString();
+            store = RefValueStore(jsonDecode(fileStr));
+          }
         },
       );
     } catch (e) {
-      if (e is PathNotFoundException) {
-        _logger.log('Missing file.');
-      } else {
-        // If hydration fails for an existing file, then this file data store is corrupt
-        // and should be removed from the file data store index.
-        _logger.log('Corrupt file.');
-        rethrow;
-      }
+      // If hydration fails for an existing file, then this file data store is corrupt
+      // and should be removed from the file data store index.
+      _logger.log('Corrupt file.');
+      rethrow;
     }
   }
 
@@ -429,7 +434,9 @@ class FileDataStoreResolver {
     await _logger.measure(
       'Delete',
       () async {
-        await _file.delete().catchType<PathNotFoundException>();
+        if (await _file.exists()) {
+          await _file.delete();
+        }
         store.clear();
       },
     );
