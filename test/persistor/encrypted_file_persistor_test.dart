@@ -28,7 +28,7 @@ class MockPathProvider extends Fake
 }
 
 void main() {
-  late PersistorCompleter completer;
+  late FilePersistorCompleter completer;
   late TestFilePersistor persistor;
 
   setUp(() {
@@ -36,7 +36,7 @@ void main() {
     final mockPathProvider = MockPathProvider();
     PathProviderPlatform.instance = mockPathProvider;
 
-    completer = TestFilePersistor.completer = PersistorCompleter();
+    completer = TestFilePersistor.completer = FilePersistorCompleter();
     persistor = TestFilePersistor(
       settings: const FilePersistorSettings(encrypted: true),
     );
@@ -71,7 +71,7 @@ void main() {
       userCollection.doc('1').create(TestUserModel('User 1'));
       encryptedUsersCollection.doc('2').create(TestUserModel('User 2'));
 
-      await completer.onPersist;
+      await completer.onSync;
 
       final rootFile = File('${testDirectory.path}/loon/__store__.json');
       final rootJson = jsonDecode(rootFile.readAsStringSync());
@@ -145,7 +145,7 @@ void main() {
       userDoc1.create(user1);
       userDoc2.create(user2);
 
-      await completer.onPersist;
+      await completer.onSync;
 
       final file = File('${testDirectory.path}/loon/__store__.encrypted.json');
       final json = decryptData(file.readAsStringSync());
@@ -187,7 +187,7 @@ void main() {
       usersCollection.doc('1').create(TestUserModel('User 1'));
       usersCollection.doc('2').create(TestUserModel('User 2'));
 
-      await completer.onPersist;
+      await completer.onSync;
 
       final rootFile = File('${testDirectory.path}/loon/__store__.json');
       final rootJson = jsonDecode(rootFile.readAsStringSync());
@@ -239,7 +239,7 @@ void main() {
     usersCollection.doc('1').create(TestUserModel('User 1'));
     usersCollection.doc('2').create(TestUserModel('User 2'));
 
-    await completer.onPersist;
+    await completer.onSync;
 
     final file = File('${testDirectory.path}/loon/__store__.json');
     final json = jsonDecode(file.readAsStringSync());
@@ -278,7 +278,7 @@ void main() {
     usersCollection.doc('1').create(TestUserModel('User 1'));
     usersCollection.doc('2').create(TestUserModel('User 2'));
 
-    await completer.onPersist;
+    await completer.onSync;
 
     final rootFile = File('${testDirectory.path}/loon/__store__.json');
     var rootJson = jsonDecode(rootFile.readAsStringSync());
@@ -319,7 +319,7 @@ void main() {
 
     usersCollection.doc('3').create(TestUserModel('User 3'));
 
-    await completer.onPersist;
+    await completer.onSync;
 
     final encryptedRootFile =
         File('${testDirectory.path}/loon/__store__.encrypted.json');
@@ -355,7 +355,7 @@ void main() {
     usersCollection.doc('1').update(TestUserModel('User 1 updated'));
     usersCollection.doc('2').update(TestUserModel('User 2 updated'));
 
-    await completer.onPersist;
+    await completer.onSync;
 
     // The documents should now have been updated to exist in the encrypted root file.
     encryptedRootJson = decryptData(encryptedRootFile.readAsStringSync());

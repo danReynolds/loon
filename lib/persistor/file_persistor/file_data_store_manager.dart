@@ -5,7 +5,7 @@ import 'package:loon/loon.dart';
 import 'package:loon/persistor/file_persistor/file_data_store.dart';
 import 'package:loon/persistor/file_persistor/file_persist_document.dart';
 import 'package:loon/persistor/file_persistor/file_persistor_settings.dart';
-import 'package:loon/persistor/file_persistor/throttler.dart';
+import 'package:loon/persistor/file_persistor/lock.dart';
 import 'package:path/path.dart' as path;
 
 class FileDataStoreManager {
@@ -14,6 +14,13 @@ class FileDataStoreManager {
   /// The directory in which a file data store is persisted.
   final Directory directory;
 
+  /// The duration by which to throttle persistence changes to the file system.
+  final Duration persistenceThrottle;
+
+  final void Function() onSync;
+
+  final void Function(String text) onLog;
+
   /// The resolver that contains a mapping of documents to the file data store in which
   /// the document is currently stored.
   late final FileDataStoreResolver _resolver;
@@ -21,17 +28,25 @@ class FileDataStoreManager {
   /// The index of [FileDataStore] objects by name.
   final Map<String, DualFileDataStore> _index = {};
 
-  /// A global persistence sync throttle used to throttle syncing of file data store
-  /// changes to the file system.
-  late final Throttler _syncThrottle;
+  /// The sync lock is used to block operations from accessing the file system while there is an ongoing sync
+  /// operation and conversely blocks a sync from starting until the ongoing operation holding the lock has finished.
+  final _syncLock = Lock();
+
+  /// The sync timer is used to throttle syncing changes to the file system using
+  /// the given [persistenceThrottle]. After an that mutates the file system operation runs, it schedules
+  /// a sync to run on a timer. When the sync runs, it acquires the [_syncLock], blocking any operations
+  /// from being processed until the sync completes.
+  Timer? _syncTimer;
+
+  late final _logger = Logger('FileDataStoreManager', output: onLog);
 
   FileDataStoreManager({
     required this.directory,
     required this.encrypter,
-    required Duration persistenceThrottle,
-  }) {
-    _syncThrottle = Throttler(persistenceThrottle, _sync);
-  }
+    required this.persistenceThrottle,
+    required this.onSync,
+    required this.onLog,
+  });
 
   /// Resolves the data store name for the given path as the nearest value found working up from
   /// the full path, falling back to the default store key if none is found.
@@ -59,35 +74,49 @@ class FileDataStoreManager {
     };
   }
 
+  void _cancelSync() {
+    _syncTimer?.cancel();
+    _syncTimer = null;
+  }
+
+  void _scheduleSync() {
+    _syncTimer ??= Timer(persistenceThrottle, _sync);
+  }
+
   /// Syncs all file data stores to the file system, persisting dirty ones and deleting
   /// ones that can now be removed.
-  Future<void> _sync() async {
-    final dirtyStores =
-        _index.values.where((dataStore) => dataStore.isDirty).toList();
+  Future<void> _sync() {
+    return _syncLock.run(() {
+      return _logger.measure('File Sync', () async {
+        final dirtyStores =
+            _index.values.where((dataStore) => dataStore.isDirty).toList();
 
-    if (dirtyStores.isEmpty) {
-      return;
-    }
+        if (dirtyStores.isEmpty) {
+          return;
+        }
 
-    await Future.wait([
-      ...dirtyStores.map((store) => store.sync()),
-      _resolver.persist(),
-    ]);
+        await Future.wait([
+          ...dirtyStores.map((store) => store.sync()),
+          _resolver.persist(),
+        ]);
 
-    for (final store in dirtyStores) {
-      if (store.isEmpty) {
-        _index.remove(store.name);
-      }
-    }
+        for (final store in dirtyStores) {
+          if (store.isEmpty) {
+            _index.remove(store.name);
+          }
+        }
+
+        onSync();
+        _syncTimer = null;
+      });
+    });
   }
 
   /// Clears the provided path and all of its subpaths from each data store that contains
   /// data under that path.
   Future<void> _clear(String path) async {
     final stores = _resolveStores(path);
-
     await Future.wait(stores.map((store) => store.deletePath(path)));
-
     _resolver.store.delete(path);
   }
 
@@ -118,147 +147,156 @@ class FileDataStoreManager {
   }
 
   /// Hydrates the given paths and returns a map of document paths to their serialized data.
-  Future<Map<String, Json>> hydrate(List<String>? paths) async {
-    // Immediately complete any pending sync before initiating the hydration, since the sync
-    // may effect the hydration response.
-    await _syncThrottle.complete();
+  Future<Map<String, Json>> hydrate(List<String>? paths) {
+    return _syncLock.run(
+      () async {
+        final Map<String, Set<DualFileDataStore>> pathDataStores = {};
+        final Set<DualFileDataStore> dataStores = {};
 
-    final Map<String, Set<DualFileDataStore>> pathDataStores = {};
-    final Set<DualFileDataStore> dataStores = {};
-
-    // If the hydration operation is only for certain paths, then resolve all of the file data stores
-    // relevant to the given paths and their subpaths and hydrate those data stores.
-    if (paths != null) {
-      for (final path in paths) {
-        final stores = _resolveStores(path);
-        pathDataStores[path] = stores;
-        dataStores.addAll(stores);
-      }
-    } else {
-      // If no specific collections have been specified, then hydrate all file data stores.
-      dataStores.addAll(_index.values);
-    }
-
-    await Future.wait(dataStores.map((store) => store.hydrate()));
-
-    final Map<String, Json> data = {};
-    if (paths != null) {
-      for (final path in paths) {
-        for (final dataStore in pathDataStores[path]!) {
-          // Since many different paths can be contained within the same file data store,
-          // we only extract the data in the hydrated store that falls under the requested path.
-          //
-          // Doing this ensures that the client's contract to only hydrate the data that the requested
-          // is fulfilled and it also offers a performance benefit since no unnecessary data is copied
-          // back from the worker to the main isolate.
-          //
-          // If later on the client requests to hydrate a path for a data store that has already been
-          // hydrated but has not yet delivered the data under that path to the client, then this still
-          // works as expected, as the hydration operation will just extract that data from the already hydrated
-          // data store and deliver it to the client as expected.
-          final (plaintextData, encryptedData) = dataStore.extractValues(path);
-          data.addAll(plaintextData);
-          data.addAll(encryptedData);
+        // If the hydration operation is only for certain paths, then resolve all of the file data stores
+        // relevant to the given paths and their subpaths and hydrate those data stores.
+        if (paths != null) {
+          for (final path in paths) {
+            final stores = _resolveStores(path);
+            pathDataStores[path] = stores;
+            dataStores.addAll(stores);
+          }
+        } else {
+          // If no specific collections have been specified, then hydrate all file data stores.
+          dataStores.addAll(_index.values);
         }
-      }
-    } else {
-      for (final dataStore in dataStores) {
-        final (plaintextData, encryptedData) = dataStore.extractValues();
-        data.addAll(plaintextData);
-        data.addAll(encryptedData);
-      }
-    }
 
-    return data;
-  }
+        await Future.wait(dataStores.map((store) => store.hydrate()));
 
-  Future<void> persist(List<FilePersistDocument> docs) async {
-    if (docs.isEmpty) {
-      return;
-    }
-
-    for (final doc in docs) {
-      final collectionPath = doc.parent;
-      final docPath = doc.path;
-      final docData = doc.data;
-      final persistenceKey = doc.key;
-      final encrypted = doc.encrypted;
-
-      // If the document has been deleted, then clear it and its subcollections from the store.
-      if (docData == null) {
-        await _clear(docPath);
-        continue;
-      }
-
-      final prevDataStoreName = _resolveStoreName(docPath);
-      final prevDataStore = _index[prevDataStoreName];
-
-      // If the persistence key for the document is now null, then remove the previous
-      // key for the document (if it exists) ahead of resolving its data store name.
-      if (persistenceKey == null) {
-        _resolver.store.delete(docPath, recursive: false);
-      }
-
-      final dataStoreName = persistenceKey?.value ?? _resolveStoreName(docPath);
-      final dataStore = _index[dataStoreName] ??= DualFileDataStore(
-        name: dataStoreName,
-        encrypter: encrypter,
-        directory: directory,
-        isHydrated: true,
-      );
-
-      // If the resolved data store for the document has changed, then its data
-      // should be grafted from its previous data store to the updated one.
-      if (prevDataStore != null && prevDataStore != dataStore) {
-        await dataStore.graft(prevDataStore, docPath);
-      }
-
-      switch (persistenceKey?.type) {
-        case null:
-          break;
-        case FilePersistorKeyTypes.document:
-          // Update the resolver's persistence key for the document.
-          _resolver.store.write(docPath, dataStoreName);
-          break;
-        case FilePersistorKeyTypes.collection:
-          // If there is already a document-level persistence key in the resolver tree for this
-          // document then it should be removed, since the document is being persisted with a
-          // collection-level key.
-          _resolver.store.delete(docPath, recursive: false);
-
-          // If the resolved data store for the document's collection has changed, then its data
-          // should be grafted from its previous data store to the updated one.
-          final collectionDataStore = _index[_resolveStoreName(collectionPath)];
-          if (collectionDataStore != dataStore) {
-            _resolver.store.write(collectionPath, dataStoreName);
-
-            if (collectionDataStore != null) {
-              dataStore.graft(collectionDataStore, collectionPath);
+        final Map<String, Json> data = {};
+        if (paths != null) {
+          for (final path in paths) {
+            for (final dataStore in pathDataStores[path]!) {
+              // Since many different paths can be contained within the same file data store,
+              // we only extract the data in the hydrated store that falls under the requested path.
+              //
+              // Doing this ensures that the client's contract to only hydrate the data that the requested
+              // is fulfilled and it also offers a performance benefit since no unnecessary data is copied
+              // back from the worker to the main isolate.
+              //
+              // If later on the client requests to hydrate a path for a data store that has already been
+              // hydrated but has not yet delivered the data under that path to the client, then this still
+              // works as expected, as the hydration operation will just extract that data from the already hydrated
+              // data store and deliver it to the client as expected.
+              final (plaintextData, encryptedData) =
+                  dataStore.extractValues(path);
+              data.addAll(plaintextData);
+              data.addAll(encryptedData);
             }
           }
-          break;
+        } else {
+          for (final dataStore in dataStores) {
+            final (plaintextData, encryptedData) = dataStore.extractValues();
+            data.addAll(plaintextData);
+            data.addAll(encryptedData);
+          }
+        }
+
+        return data;
+      },
+    );
+  }
+
+  Future<void> persist(List<FilePersistDocument> docs) {
+    return _syncLock.run(() async {
+      if (docs.isEmpty) {
+        return;
       }
 
-      await dataStore.writePath(docPath, docData, encrypted);
-    }
+      for (final doc in docs) {
+        final collectionPath = doc.parent;
+        final docPath = doc.path;
+        final docData = doc.data;
+        final persistenceKey = doc.key;
+        final encrypted = doc.encrypted;
 
-    await _syncThrottle.run();
+        // If the document has been deleted, then clear it and its subcollections from the store.
+        if (docData == null) {
+          await _clear(docPath);
+          continue;
+        }
+
+        final prevDataStoreName = _resolveStoreName(docPath);
+        final prevDataStore = _index[prevDataStoreName];
+
+        // If the persistence key for the document is now null, then remove the previous
+        // key for the document (if it exists) ahead of resolving its data store name.
+        if (persistenceKey == null) {
+          _resolver.store.delete(docPath, recursive: false);
+        }
+
+        final dataStoreName =
+            persistenceKey?.value ?? _resolveStoreName(docPath);
+        final dataStore = _index[dataStoreName] ??= DualFileDataStore(
+          name: dataStoreName,
+          encrypter: encrypter,
+          directory: directory,
+          isHydrated: true,
+        );
+
+        // If the resolved data store for the document has changed, then its data
+        // should be grafted from its previous data store to the updated one.
+        if (prevDataStore != null && prevDataStore != dataStore) {
+          await dataStore.graft(prevDataStore, docPath);
+        }
+
+        switch (persistenceKey?.type) {
+          case null:
+            break;
+          case FilePersistorKeyTypes.document:
+            // Update the resolver's persistence key for the document.
+            _resolver.store.write(docPath, dataStoreName);
+            break;
+          case FilePersistorKeyTypes.collection:
+            // If there is already a document-level persistence key in the resolver tree for this
+            // document then it should be removed, since the document is being persisted with a
+            // collection-level key.
+            _resolver.store.delete(docPath, recursive: false);
+
+            // If the resolved data store for the document's collection has changed, then its data
+            // should be grafted from its previous data store to the updated one.
+            final collectionDataStore =
+                _index[_resolveStoreName(collectionPath)];
+            if (collectionDataStore != dataStore) {
+              _resolver.store.write(collectionPath, dataStoreName);
+
+              if (collectionDataStore != null) {
+                dataStore.graft(collectionDataStore, collectionPath);
+              }
+            }
+            break;
+        }
+
+        await dataStore.writePath(docPath, docData, encrypted);
+      }
+
+      _scheduleSync();
+    });
   }
 
-  Future<void> clear(List<String> paths) async {
-    await Future.wait(paths.map(_clear).toList());
-    await _syncThrottle.run();
+  Future<void> clear(List<String> paths) {
+    return _syncLock.run(() async {
+      await Future.wait(paths.map(_clear).toList());
+      _scheduleSync();
+    });
   }
 
-  Future<void> clearAll() async {
-    // Cancel any pending sync, since all data stores are being cleared immediately.
-    _syncThrottle.cancel();
+  Future<void> clearAll() {
+    return _syncLock.run(() async {
+      // Cancel any pending sync, since all data stores are being cleared immediately.
+      _cancelSync();
 
-    await Future.wait([
-      ..._index.values.map((dataStore) => dataStore.delete()),
-      _resolver.delete(),
-    ]);
+      await Future.wait([
+        ..._index.values.map((dataStore) => dataStore.delete()),
+        _resolver.delete(),
+      ]);
 
-    _index.clear();
+      _index.clear();
+    });
   }
 }

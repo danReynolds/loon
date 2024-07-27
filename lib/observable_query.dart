@@ -100,8 +100,8 @@ class ObservableQuery<T> extends Query<T>
     // The list of changes to the query. Note that the [BroadcastEvents] of the document
     // local to the query are different from the global broadcast events. For example, if a document
     // was modified globally such that now it should be included in the query and before was not,
-    // then its event type at the query-level is [BroadcastEventTypes.added] while its global event was
-    // [BroadcastEventTypes.modified].
+    // then its event type at the query-level is [BroadcastEvents.added] while its global event was
+    // [EventTypes.modified].
     final List<DocumentChangeSnapshot<T>> changeSnaps = [];
     final hasChangeListener = _changeController.hasListener;
 

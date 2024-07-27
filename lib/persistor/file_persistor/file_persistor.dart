@@ -25,6 +25,8 @@ class FilePersistor extends Persistor {
   /// duration are batched together into a single persist operation.
   final Duration persistenceThrottle;
 
+  final void Function()? onSync;
+
   final _secureStorageKey = 'loon_encrypted_file_persistor_key';
 
   late final Logger _logger;
@@ -35,6 +37,7 @@ class FilePersistor extends Persistor {
     super.onClear,
     super.onClearAll,
     super.onHydrate,
+    this.onSync,
     this.persistenceThrottle = const Duration(milliseconds: 100),
   }) : super(settings: settings ?? const FilePersistorSettings()) {
     _logger = Logger('FilePersistor', output: Loon.logger.log);
@@ -52,8 +55,11 @@ class FilePersistor extends Persistor {
 
   void _onMessage(dynamic message) {
     switch (message) {
-      case LogMessageResponse messageResponse:
-        _logger.log(messageResponse.text);
+      case LogMessage message:
+        _logger.log(message.text);
+        break;
+      case SyncCompleteMessage _:
+        onSync?.call();
         break;
       case MessageResponse messageResponse:
         final request = _messageRequestIndex[messageResponse.id];
@@ -101,7 +107,11 @@ class FilePersistor extends Persistor {
   Future<Directory> initDirectory() async {
     final applicationDirectory = await getApplicationDocumentsDirectory();
     final fileDirectory = Directory('${applicationDirectory.path}/loon');
-    return fileDirectory.create();
+    final directory = await fileDirectory.create();
+
+    _logger.log('Directory: ${directory.path}');
+
+    return directory;
   }
 
   @override
