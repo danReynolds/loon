@@ -1,3 +1,7 @@
+## 3.1.0
+
+* Updates to FilePersistor synchronization.
+
 ## 3.0.0
 
 * Refactors dependency behavior into the dependency manager and de-dupes dependency references to improve performance.
