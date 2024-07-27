@@ -5,7 +5,7 @@ import 'package:loon/loon.dart';
 import 'package:loon/persistor/file_persistor/file_data_store.dart';
 import 'package:loon/persistor/file_persistor/file_persist_document.dart';
 import 'package:loon/persistor/file_persistor/file_persistor_settings.dart';
-import 'package:loon/persistor/file_persistor/mutex.dart';
+import 'package:loon/persistor/file_persistor/lock.dart';
 import 'package:path/path.dart' as path;
 
 class FileDataStoreManager {
@@ -28,13 +28,13 @@ class FileDataStoreManager {
   /// The index of [FileDataStore] objects by name.
   final Map<String, DualFileDataStore> _index = {};
 
-  /// The sync mutex is used to block operations from accessing the file system while there is an ongoing sync
-  /// operation and conversely blocks a sync from starting until the ongoing operation holding the sync mutex has finished.
-  final _syncMutex = Mutex();
+  /// The sync lock is used to block operations from accessing the file system while there is an ongoing sync
+  /// operation and conversely blocks a sync from starting until the ongoing operation holding the lock has finished.
+  final _syncLock = Lock();
 
   /// The sync timer is used to throttle syncing changes to the file system using
   /// the given [persistenceThrottle]. After an that mutates the file system operation runs, it schedules
-  /// a sync to run on a timer. When the sync runs, it acquires the [_syncMutex], blocking any operations
+  /// a sync to run on a timer. When the sync runs, it acquires the [_syncLock], blocking any operations
   /// from being processed until the sync completes.
   Timer? _syncTimer;
 
@@ -86,7 +86,7 @@ class FileDataStoreManager {
   /// Syncs all file data stores to the file system, persisting dirty ones and deleting
   /// ones that can now be removed.
   Future<void> _sync() {
-    return _syncMutex.run(() {
+    return _syncLock.run(() {
       return _logger.measure('File Sync', () async {
         final dirtyStores =
             _index.values.where((dataStore) => dataStore.isDirty).toList();
@@ -148,7 +148,7 @@ class FileDataStoreManager {
 
   /// Hydrates the given paths and returns a map of document paths to their serialized data.
   Future<Map<String, Json>> hydrate(List<String>? paths) {
-    return _syncMutex.run(
+    return _syncLock.run(
       () async {
         final Map<String, Set<DualFileDataStore>> pathDataStores = {};
         final Set<DualFileDataStore> dataStores = {};
@@ -203,7 +203,7 @@ class FileDataStoreManager {
   }
 
   Future<void> persist(List<FilePersistDocument> docs) {
-    return _syncMutex.run(() async {
+    return _syncLock.run(() async {
       if (docs.isEmpty) {
         return;
       }
@@ -280,14 +280,14 @@ class FileDataStoreManager {
   }
 
   Future<void> clear(List<String> paths) {
-    return _syncMutex.run(() async {
+    return _syncLock.run(() async {
       await Future.wait(paths.map(_clear).toList());
       _scheduleSync();
     });
   }
 
   Future<void> clearAll() {
-    return _syncMutex.run(() async {
+    return _syncLock.run(() async {
       // Cancel any pending sync, since all data stores are being cleared immediately.
       _cancelSync();
 

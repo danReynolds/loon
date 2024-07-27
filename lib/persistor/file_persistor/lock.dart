@@ -1,6 +1,6 @@
 import 'dart:async';
 
-class Mutex {
+class Lock {
   Completer? _completer;
 
   Future<void> acquire() async {
