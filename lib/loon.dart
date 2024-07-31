@@ -1,6 +1,7 @@
 library loon;
 
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
 
@@ -68,14 +69,11 @@ class Loon {
     required PersistorSettings<T>? persistorSettings,
     required DependenciesBuilder<T>? dependenciesBuilder,
   }) {
-    if (snap is DocumentSnapshot<Json> && T != Json && T != dynamic) {
-      _validateTypeSerialization<T>(
-        persistenceEnabled: persistorSettings?.enabled ??
-            Loon._instance._isGlobalPersistenceEnabled,
-        fromJson: fromJson,
-        toJson: toJson,
-      );
+    if (snap is! DocumentSnapshot<T>) {
       final doc = snap.doc;
+      final data = snap.data;
+
+      _validateDataDeserialization<T>(doc: doc, fromJson: fromJson, data: data);
 
       return writeDocument<T>(
         Document<T>(
@@ -93,11 +91,7 @@ class Loon {
       );
     }
 
-    if (snap is DocumentSnapshot<T>) {
-      return snap;
-    }
-
-    throw DocumentTypeMismatchException<T>(snap);
+    return snap;
   }
 
   bool existsSnap<T>(Document<T> doc) {
@@ -146,10 +140,10 @@ class Loon {
     bool persist = true,
   }) {
     _validateDataSerialization(
+      doc: doc,
       persistenceEnabled: doc.persistorSettings?.enabled ??
           Loon._instance._isGlobalPersistenceEnabled,
       data: data,
-      fromJson: doc.fromJson,
       toJson: doc.toJson,
     );
 

@@ -53,7 +53,7 @@ class DualFileDataStore {
     return _plaintextStore.hasValue(path) || _encryptedStore.hasValue(path);
   }
 
-  Future<void> writePath(String path, Json value, bool encrypted) async {
+  Future<void> writePath(String path, dynamic value, bool encrypted) async {
     // Unhydrated stores must be hydrated before data can be written to them.
     if (!isHydrated) {
       await hydrate();
@@ -138,7 +138,10 @@ class DualFileDataStore {
   }
 
   /// Returns a flat map of all the values in the plaintext and encrypted data by path.
-  (Map<String, Json> plainText, Map<String, Json> encrypted) extractValues([
+  (
+    Map<String, dynamic> plainText,
+    Map<String, dynamic> encrypted,
+  ) extractValues([
     String path = '',
   ]) {
     return (
@@ -153,7 +156,7 @@ class FileDataStore {
   late final File _file;
 
   /// The data contained within the file data store.
-  ValueStore<Json> _store = ValueStore<Json>();
+  ValueStore _store = ValueStore();
 
   /// The name of the file data store.
   final String name;
@@ -214,7 +217,7 @@ class FileDataStore {
     return _store.hasValue(path);
   }
 
-  Future<void> writePath(String path, Json value) async {
+  Future<void> writePath(String path, dynamic value) async {
     // Unhydrated stores must be hydrated before data can be written to them.
     if (!isHydrated) {
       await hydrate();
@@ -335,7 +338,7 @@ class FileDataStore {
   }
 
   /// Returns a flat map of all values in the store by path.
-  Map<String, Json> extractValues([String path = '']) {
+  Map<String, dynamic> extractValues([String path = '']) {
     return _store.extractValues(path);
   }
 }

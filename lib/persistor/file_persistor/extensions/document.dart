@@ -32,8 +32,8 @@ extension DocumentExtensions<T> on Document<T> {
     return false;
   }
 
-  FilePersistDocument<T> toPersistenceDoc() {
-    return FilePersistDocument<T>(
+  FilePersistDocument toPersistenceDoc() {
+    return FilePersistDocument(
       id: id,
       parent: parent,
       encrypted: isEncrypted(),

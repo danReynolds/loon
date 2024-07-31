@@ -13,7 +13,7 @@ class TestPersistor extends Persistor {
     void Function(Set<Document> batch)? onPersist,
     void Function(Set<Collection> collections)? onClear,
     void Function()? onClearAll,
-    void Function(HydrationData data)? onHydrate,
+    void Function(Json data)? onHydrate,
     required this.seedData,
   }) : super(
           settings: const PersistorSettings(),
@@ -37,7 +37,7 @@ class TestPersistor extends Persistor {
 
   @override
   hydrate([collections]) async {
-    return seedData.fold<HydrationData>({}, (acc, doc) {
+    return seedData.fold<Json>({}, (acc, doc) {
       return {
         ...acc,
         doc.path: doc.data.toJson(),

@@ -127,7 +127,7 @@ class PersistManager {
     return _enqueue(ClearAllOperation());
   }
 
-  Future<HydrationData> hydrate([Set<StoreReference>? refs]) {
+  Future<Json> hydrate([Set<StoreReference>? refs]) {
     final lastOperation = _operationQueue.tryLast;
 
     if (refs == null) {

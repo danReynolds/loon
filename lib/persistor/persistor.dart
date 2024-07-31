@@ -1,9 +1,5 @@
 part of loon;
 
-/// The data returned on hydration from the hydration layer as a map of document
-/// paths to document data.
-typedef HydrationData = Map<String, Json>;
-
 class PersistorSettings<T> {
   final bool enabled;
 
@@ -20,7 +16,7 @@ abstract class Persistor {
   final void Function(Set<Document> batch)? onPersist;
   final void Function(Set<Collection> collections)? onClear;
   final void Function()? onClearAll;
-  final void Function(HydrationData data)? onHydrate;
+  final void Function(Json data)? onHydrate;
 
   Persistor({
     this.settings = const PersistorSettings(),
@@ -44,7 +40,7 @@ abstract class Persistor {
   /// Hydration function called to read data from persistence. If no entities are specified,
   /// then it hydrations all persisted data. if entities are specified, it hydrates only the data from
   /// the paths under those entities.
-  Future<HydrationData> hydrate([Set<StoreReference>? refs]);
+  Future<Json> hydrate([Set<StoreReference>? refs]);
 
   /// Clear function used to clear all documents under the given collections.
   Future<void> clear(Set<Collection> collections);

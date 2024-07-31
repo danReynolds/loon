@@ -1,3 +1,8 @@
+## 3.2.0
+
+* Adds support for persisting serializable documents (primitives or custom classes with toJson support)
+  using FilePersistor without specifying serializer.
+
 ## 3.1.0
 
 * Updates to FilePersistor synchronization.

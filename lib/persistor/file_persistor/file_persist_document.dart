@@ -19,7 +19,7 @@ class FilePersistDocument<T> {
   final FilePersistorKey? key;
 
   /// The updated document data.
-  final Json? data;
+  final dynamic data;
 
   /// Whether encryption is enabled for this document.
   final bool encrypted;

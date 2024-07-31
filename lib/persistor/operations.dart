@@ -34,11 +34,10 @@ class ClearOperation
   ClearOperation(super.batch);
 }
 
-class HydrateOperation
-    extends PersistorBatchOperation<StoreReference, HydrationData> {
+class HydrateOperation extends PersistorBatchOperation<StoreReference, Json> {
   HydrateOperation(super.batch);
 }
 
-class HydrateAllOperation extends PersistorOperation<HydrationData> {}
+class HydrateAllOperation extends PersistorOperation<Json> {}
 
 class ClearAllOperation extends PersistorOperation<void> {}

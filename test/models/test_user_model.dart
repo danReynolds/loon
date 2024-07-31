@@ -40,3 +40,5 @@ class TestUserModel {
     return "TestUserModel:$name";
   }
 }
+
+class UnserializableModel {}

@@ -171,16 +171,6 @@ class Document<T> implements StoreReference {
     return observe().streamChanges();
   }
 
-  Json? getJson() {
-    final data = get()?.data;
-
-    if (data is Json?) {
-      return data;
-    }
-
-    return toJson!(data);
-  }
-
   bool exists() {
     return Loon._instance.existsSnap(this);
   }
@@ -196,5 +186,13 @@ class Document<T> implements StoreReference {
   bool isPersistenceEnabled() {
     return persistorSettings?.enabled ??
         Loon._instance._isGlobalPersistenceEnabled;
+  }
+
+  dynamic getJson() {
+    final data = get()?.data;
+    if (data != null && toJson != null) {
+      return toJson!(data);
+    }
+    return data;
   }
 }

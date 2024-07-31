@@ -147,7 +147,7 @@ class FileDataStoreManager {
   }
 
   /// Hydrates the given paths and returns a map of document paths to their serialized data.
-  Future<Map<String, Json>> hydrate(List<String>? paths) {
+  Future<Map<String, dynamic>> hydrate(List<String>? paths) {
     return _syncLock.run(
       () async {
         final Map<String, Set<DualFileDataStore>> pathDataStores = {};
@@ -168,7 +168,7 @@ class FileDataStoreManager {
 
         await Future.wait(dataStores.map((store) => store.hydrate()));
 
-        final Map<String, Json> data = {};
+        final Map<String, dynamic> data = {};
         if (paths != null) {
           for (final path in paths) {
             for (final dataStore in pathDataStores[path]!) {

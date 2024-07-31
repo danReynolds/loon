@@ -1,7 +1,6 @@
 import 'dart:io';
 import 'dart:isolate';
 import 'package:encrypt/encrypt.dart';
-import 'package:loon/loon.dart';
 import 'package:loon/persistor/file_persistor/file_persist_document.dart';
 import 'package:uuid/uuid.dart';
 
@@ -59,7 +58,7 @@ class HydrateMessageRequest extends MessageRequest<HydrateMessageResponse> {
 
   HydrateMessageRequest([this.paths]);
 
-  HydrateMessageResponse success(Map<String, Json> data) {
+  HydrateMessageResponse success(Map<String, dynamic> data) {
     return HydrateMessageResponse(
       id: id,
       data: data,
@@ -69,7 +68,7 @@ class HydrateMessageRequest extends MessageRequest<HydrateMessageResponse> {
 
 class HydrateMessageResponse extends MessageResponse {
   /// A map of document paths to the document's hydrated data.
-  final Map<String, Json> data;
+  final Map<String, dynamic> data;
 
   HydrateMessageResponse({
     required super.id,

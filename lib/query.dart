@@ -55,10 +55,6 @@ class Query<T> extends Queryable<T> {
     );
   }
 
-  bool exists() {
-    return _filterQuery(collection.get()).isNotEmpty;
-  }
-
   Stream<List<DocumentSnapshot<T>>> stream() {
     return observe().stream();
   }
