@@ -452,7 +452,7 @@ class MyPersistor extends Persistor {
   /// Hydration function called to read data from persistence. If no entities are specified,
   /// then it hydrations all persisted data. if entities are specified, it hydrates only the data from
   /// the paths under those entities.
-  Future<HydrationData> hydrate([Set<StoreReference>? refs]);
+  Future<Json> hydrate([Set<StoreReference>? refs]);
 
   /// Clear function used to clear all documents under the given collections.
   Future<void> clear(Set<Collection> collections);
@@ -468,4 +468,4 @@ class MyPersistor extends Persistor {
 
 ## Happy coding
 
-That's all for now! Let us know of any issues you come across and features that you would like to see added.
+That's all for now! Want a feature? Found a bug? Create an issue!

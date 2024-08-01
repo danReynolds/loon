@@ -108,7 +108,7 @@ void main() {
               });
 
               test(
-                  'Does not throw an error when creating a persisted document with serializable data without serializer',
+                  'Does not throw an error when creating a persisted document with serializable data without a serializer',
                   () {
                 final userDoc = Loon.collection(
                   'users',
@@ -216,14 +216,14 @@ void main() {
                       (e) =>
                           e is DocumentTypeMismatchException &&
                           e.toString() ==
-                              'Document type mismatch: Document users__1 of type int attempted to read snapshot of type: <UnserializableModel>',
+                              'Document type mismatch: Document users__1 of type <int> attempted to read snapshot of type: <UnserializableModel>',
                     ),
                   );
                 },
               );
 
               test(
-                'Throws an exception if the new document does not have a serialization pair for parsing the existing snapshot',
+                'Throws an exception if the new document does not specify a serialization pair for parsing the existing snapshot',
                 () {
                   final usersCollection =
                       Loon.collection<TestUserModel>('users');

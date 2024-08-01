@@ -1418,6 +1418,8 @@ void main() {
 
       userFriendsCollection.doc('3').create(TestUserModel('Friend 3'));
 
+      Loon.doc('current_user_id').create('1');
+
       await completer.onSync;
 
       final storeFile = File('${testDirectory.path}/loon/__store__.json');
@@ -1435,6 +1437,11 @@ void main() {
             "1": {"name": "Friend 1"},
             "2": {"name": "Friend 2"},
           }
+        },
+        "root": {
+          "__values": {
+            "current_user_id": "1",
+          },
         }
       });
 

@@ -8,7 +8,7 @@ class DocumentTypeMismatchException<T> implements Exception {
 
   @override
   String toString() =>
-      'Document type mismatch: Document ${doc.path} of type $T attempted to read snapshot of type: <${data.runtimeType}>';
+      'Document type mismatch: Document ${doc.path} of type <$T> attempted to read snapshot of type: <${data.runtimeType}>';
 }
 
 enum MissingSerializerEvents {

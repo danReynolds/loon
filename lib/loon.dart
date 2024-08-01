@@ -23,9 +23,9 @@ part 'document_change_snapshot.dart';
 part 'broadcast_manager.dart';
 part 'dependency_manager.dart';
 part 'utils/validation.dart';
-part 'logger.dart';
+part 'utils/logger.dart';
 part 'store_reference.dart';
-part 'exceptions/document_type_mismatch.dart';
+part 'utils/exceptions.dart';
 part 'persistor/persistor.dart';
 part 'persistor/operations.dart';
 part 'persistor/persist_manager.dart';
@@ -244,7 +244,7 @@ class Loon {
         final data = entry.value;
 
         if (!_instance.documentStore.hasValue(docPath)) {
-          _instance.writeDocument<Json>(
+          _instance.writeDocument(
             Document.fromPath(docPath),
             data,
             event: BroadcastEvents.hydrated,
