@@ -110,8 +110,6 @@ class PersistManager {
     final lastOperation = _operationQueue.tryLast;
     if (lastOperation is ClearOperation) {
       lastOperation.batch.add(collection);
-      _next();
-
       return lastOperation.onComplete;
     }
 
