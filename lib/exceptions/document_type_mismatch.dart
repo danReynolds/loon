@@ -8,10 +8,10 @@ class DocumentTypeMismatchException<T> implements Exception {
 
   @override
   String toString() =>
-      'Document type mismatch: Persisted document ${doc.path} of type $T attempted to read snapshot of type: <${data.runtimeType}>';
+      'Document type mismatch: Document ${doc.path} of type $T attempted to read snapshot of type: <${data.runtimeType}>';
 }
 
-enum MissingSerializerTypes {
+enum MissingSerializerEvents {
   read,
   write,
 }
@@ -19,11 +19,11 @@ enum MissingSerializerTypes {
 class MissingSerializerException<T> implements Exception {
   final Document doc;
   final dynamic data;
-  final MissingSerializerTypes type;
+  final MissingSerializerEvents event;
 
-  MissingSerializerException(this.doc, this.data, this.type);
+  MissingSerializerException(this.doc, this.data, this.event);
 
   @override
   String toString() =>
-      'Missing serializer: Persisted document ${doc.path} of type <Document<$T>> attempted to ${type.name} snapshot of type <${data.runtimeType}> without specifying a fromJson/toJson serializer pair.';
+      'Missing serializer: Persisted document ${doc.path} of type <Document<$T>> attempted to ${event.name} snapshot of type <${data.runtimeType}> without specifying a fromJson/toJson serializer pair.';
 }

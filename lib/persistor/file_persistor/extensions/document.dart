@@ -38,7 +38,7 @@ extension DocumentExtensions<T> on Document<T> {
       parent: parent,
       encrypted: isEncrypted(),
       key: getPersistenceKey(),
-      data: getJson(),
+      data: getSerialized(),
     );
   }
 }

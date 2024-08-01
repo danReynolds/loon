@@ -188,11 +188,19 @@ class Document<T> implements StoreReference {
         Loon._instance._isGlobalPersistenceEnabled;
   }
 
-  dynamic getJson() {
+  /// Returns the serialized document data.
+  dynamic getSerialized() {
     final data = get()?.data;
+    final toJson = this.toJson;
+
+    // If the document has a [toJson] serializer, then it should return the
+    // serialized [Json] data.
     if (data != null && toJson != null) {
-      return toJson!(data);
+      return toJson(data);
     }
+
+    // Otherwise return the document data, which has been verified to be serializable
+    // in development mode using [_validateDataSerialization].
     return data;
   }
 }

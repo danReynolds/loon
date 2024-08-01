@@ -216,7 +216,7 @@ void main() {
                       (e) =>
                           e is DocumentTypeMismatchException &&
                           e.toString() ==
-                              'Document type mismatch: Persisted document users__1 of type int attempted to read snapshot of type: <UnserializableModel>',
+                              'Document type mismatch: Document users__1 of type int attempted to read snapshot of type: <UnserializableModel>',
                     ),
                   );
                 },

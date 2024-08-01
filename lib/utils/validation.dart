@@ -18,7 +18,7 @@ void _validateDataSerialization<T>({
       throw MissingSerializerException<T>(
         doc,
         data,
-        MissingSerializerTypes.write,
+        MissingSerializerEvents.write,
       );
     }
   }
@@ -44,7 +44,7 @@ void _validateDataDeserialization<T>({
     throw MissingSerializerException<T>(
       doc,
       data,
-      MissingSerializerTypes.read,
+      MissingSerializerEvents.read,
     );
   }
 }
