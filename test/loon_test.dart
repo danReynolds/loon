@@ -580,6 +580,78 @@ void main() {
           );
 
           test(
+            "Maintains its dependency cache correctly",
+            () async {
+              final usersCollection = Loon.collection('users');
+              final postsCollection = Loon.collection<Json>(
+                'posts',
+                dependenciesBuilder: (snap) {
+                  if (snap.data['userId'] != null) {
+                    return {
+                      usersCollection.doc(snap.data['userId'].toString()),
+                    };
+                  }
+                  return null;
+                },
+              );
+
+              final postDoc = postsCollection.doc('1');
+              final postData = {"id": 1, "text": "Post 1", "userId": 1};
+              final postData2 = {"id": 1, "text": "Post 1 updated"};
+              final postData3 = {
+                "id": 1,
+                "text": "Post 1 updated",
+                "userId": 3
+              };
+              final postObs = postDoc.observe();
+
+              postDoc.create(postData);
+              await asyncEvent();
+
+              // After creating the post document, it should have added its user dependency into the observable's
+              // dep tree.
+              expect(postObs.inspect(), {
+                "deps": {
+                  "__ref": 1,
+                  "users": {
+                    "__ref": 1,
+                    "1": 1,
+                  },
+                },
+              });
+
+              postDoc.update(postData2);
+              await asyncEvent();
+
+              // After updating the document, it should have removed the user dependency from the observable's
+              // dep tree.
+              expect(postObs.inspect(), {
+                "deps": {},
+              });
+
+              postDoc.update(postData3);
+              await asyncEvent();
+
+              // The observable should have been updated to have a user dependency again.
+              expect(postObs.inspect(), {
+                "deps": {
+                  "__ref": 1,
+                  "users": {
+                    "__ref": 1,
+                    "3": 1,
+                  },
+                },
+              });
+
+              postsCollection.delete();
+              await asyncEvent();
+
+              // After deleting the posts collection, observable should have cleared its dependencies.
+              expect(postObs.inspect(), {"deps": {}});
+            },
+          );
+
+          test(
             'Invalidates its cached value when the document is updated',
             () async {
               final usersCollection = Loon.collection(
@@ -1995,6 +2067,10 @@ void main() {
           await asyncEvent();
           usersCollection.doc('1').create(userData);
           await asyncEvent();
+          usersCollection.delete();
+          await asyncEvent();
+          usersCollection.doc('1').create(userData);
+          await asyncEvent();
           postDoc.update(updatedPostData1);
           await asyncEvent();
           // Skips this update to user doc, since the last update to the post
@@ -2003,7 +2079,7 @@ void main() {
           await asyncEvent();
           postDoc.delete();
 
-          final snaps = await postStream.take(8).toList();
+          final snaps = await postStream.take(10).toList();
 
           expect(snaps, [
             // No post yet
@@ -2017,6 +2093,10 @@ void main() {
             // Rebroadcast post when user deleted
             DocumentSnapshot(doc: postDoc, data: postData),
             // Rebroadcast post when user re-added (ensures dependencies remain across deletion/re-creation)
+            DocumentSnapshot(doc: postDoc, data: postData),
+            // Rebroadcast post when user collection deleted
+            DocumentSnapshot(doc: postDoc, data: postData),
+            // Rebroadcast post when user re-added
             DocumentSnapshot(doc: postDoc, data: postData),
             // Rebroadcast when post data is updated
             DocumentSnapshot(doc: postDoc, data: updatedPostData1),
