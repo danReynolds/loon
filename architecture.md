@@ -9,7 +9,7 @@ final messageDoc = Loon.collection('users').doc('1').subcollection('messages').d
 messageDoc.create('Hello');
 ```
 
-In this example, a user message is stored under its associated user in the document tree. This data structure is a variant of a trie that groups values under a given path, a helpful optimization for quick access to all values of a particular collection. Given the example above, the [ValueStore] representation is shown below:
+In this example, a user message is stored under its associated user in the document tree. The data is modeled as a tree data structure that groups values under a given path, enabling quick access to all values of a particular collection. Given the example above, the [ValueStore] representation is shown below:
 
 ```dart
 {
@@ -26,8 +26,6 @@ In this example, a user message is stored under its associated user in the docum
 ```
 
 Each node in the tree is a path segment which contains the paths to its direct children as well as a `__values` key which stores all the values at that node.
-
-Accessing data from the store involves walking down the given path and returning its associated value in the document [ValueStore].
 
 ## Reactivity Layer
 

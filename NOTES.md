@@ -1,7 +1,1 @@
-
-
-ObservableQuery keeps track of a version integer that gets set on a per collection basis. Whenever a query pending broadcast is accessed with get(),
-it checks the last version that it has processed. If its version is the same as the current broadcast version for that collection, then
-it can skip processing the broadcast.
-
-It caches its changeSnaps until the broadcast goes out.
+Look into structuring query dependencies in the dependency manager under a value store like the refactor for the broadcast manager to make it easy to handle ancestral path deletions.

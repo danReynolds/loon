@@ -105,8 +105,7 @@ class ObservableQuery<T> extends Query<T>
     final List<DocumentChangeSnapshot<T>> changeSnaps = [];
     final hasChangeListener = _changeController.hasListener;
 
-    // 1.  Any path above or equal to the query's collection has been removed. This is determined by finding
-    //     a [BroadcastEvents.removed] event anywhere above or at the query's collection path.
+    // 1.  Any path along the query's collection path has been removed.
     if (Loon._instance.broadcastManager.eventStore
             .findValue(path, BroadcastEvents.removed) !=
         null) {
