@@ -2,6 +2,7 @@
 
 * Adds support for persisting serializable documents (primitives or custom classes with toJson support)
   using FilePersistor without specifying serializer.
+* Fixes bug with ObservableDocument dependency updates.
 
 ## 3.1.0
 

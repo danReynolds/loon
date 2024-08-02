@@ -1,1 +1,0 @@
-Look into structuring query dependencies in the dependency manager under a value store like the refactor for the broadcast manager to make it easy to handle ancestral path deletions.
