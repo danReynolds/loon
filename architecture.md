@@ -9,7 +9,7 @@ final messageDoc = Loon.collection('users').doc('1').subcollection('messages').d
 messageDoc.create('Hello');
 ```
 
-In this example, a user message is stored under its associated user in the document tree. This data structure is a variant of a trie that groups values under a given path, a helpful optimization for quick access to all values of a particular collection. Given the example above, the [ValueStore] representation is shown below:
+In this example, a user message is stored under its associated user in the document tree. The data is modeled as a tree data structure that groups values under a given path, enabling quick access to all values of a particular collection. Given the example above, the [ValueStore] representation is shown below:
 
 ```dart
 {
@@ -26,8 +26,6 @@ In this example, a user message is stored under its associated user in the docum
 ```
 
 Each node in the tree is a path segment which contains the paths to its direct children as well as a `__values` key which stores all the values at that node.
-
-Accessing data from the store involves walking down the given path and returning its associated value in the document [ValueStore].
 
 ## Reactivity Layer
 
@@ -52,15 +50,13 @@ on the [BroadcastManager].
 When changes occur to documents in the store, the change event, such as an [EventTypes.added], [EventTypes.modified] or [EventTypes.removed]
 event, is recorded in a broadcast tree, which is another instance of a [ValueStore].
 
-All changes that occur in the same task of the event loop are batched into the current broadcast tree and are scheduled to be processed by broadcast observers
-as part of the next micro-task. The handing off of the batched change events to each broadcast observer for processing is called the *broadcast*.
+All changes that occur in the same task of the event loop are batched into the current broadcast tree and are scheduled to be processed asynchronously by broadcast observers. The handing off of the batched change events to each broadcast observer for processing is called the *broadcast*.
 
 On broadcast, each broadcast observer checks if it is affected by any of the changes in the current broadcast.
 
-* For an [ObservableDocument], this involves checking if the broadcast tree contains an event at its document path.
+* For an [ObservableDocument], this involves checking if the broadcast tree contains an event for itself.
 * For an [ObservableQuery], this involves iterating through the changes at its collection path in the broadcast tree
-  for each dirty document and determining whether it needs to inform listeners of any additions,
-  removals or updates to its documents.
+  and determining if any of those changes affect its result set.
 
 If the broadcast observer has changes, then it emits its updated data to its listeners.
 
@@ -95,9 +91,9 @@ final Map<Document, Set<Document>> dependentsStore = {};
 
 When a document is updated, it iterates through its set of dependents and marks each of them for broadcast with a [BroadcastEvent.touched] event.
 
-When a document or collection is deleted, each broadcast observer checks to see if the deleted path is present in its dependency tree and if it is, then the broadcast observer notifies its listeners.
+When a document or collection is deleted, each broadcast observer with dependencies checks to see if the deleted path is present in its dependency tree and if it is, then the broadcast observer notifies its listeners.
 
-Each broadcast observer has its own dependency tree called a [PathRefStore] which maintains a ref count of the number of times a path exists in the tree. When a path's ref count goes to 0, it is removed from the tree. This store is used to determine if a deleted path exists in an observer's dependencies.
+Each broadcast observer has its own cached dependency tree which maintains a ref count of the number of times a path exists in the tree. This tree is implemented using the [PathRefStore]. When a path's ref count goes to 0, it is removed from the tree. This ref store is used to determine if a deleted path exists in an observer's dependencies.
 
 ## Persistence Layer
 

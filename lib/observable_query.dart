@@ -21,7 +21,7 @@ class ObservableQuery<T> extends Query<T>
       _cacheDoc(snap);
     }
 
-    init(snaps, multicast: multicast);
+    _init(snaps, multicast: multicast);
   }
 
   /// Update the doc in the snapshot and dependency caches.
@@ -42,25 +42,7 @@ class ObservableQuery<T> extends Query<T>
         _docDepCache[doc] = deps;
       }
 
-      if (deps != null && prevDeps != null) {
-        final addedDeps = deps.difference(prevDeps);
-        final removedDeps = prevDeps.difference(deps);
-
-        for (final dep in addedDeps) {
-          _deps.inc(dep.path);
-        }
-        for (final dep in removedDeps) {
-          _deps.dec(dep.path);
-        }
-      } else if (deps != null) {
-        for (final dep in deps) {
-          _deps.inc(dep.path);
-        }
-      } else if (prevDeps != null) {
-        for (final dep in prevDeps) {
-          _deps.dec(dep.path);
-        }
-      }
+      _updateDeps(prevDeps, deps);
     }
   }
 
@@ -105,8 +87,7 @@ class ObservableQuery<T> extends Query<T>
     final List<DocumentChangeSnapshot<T>> changeSnaps = [];
     final hasChangeListener = _changeController.hasListener;
 
-    // 1.  Any path above or equal to the query's collection has been removed. This is determined by finding
-    //     a [BroadcastEvents.removed] event anywhere above or at the query's collection path.
+    // 1.  Any path along the query's collection path has been removed.
     if (Loon._instance.broadcastManager.eventStore
             .findValue(path, BroadcastEvents.removed) !=
         null) {
@@ -261,7 +242,7 @@ class ObservableQuery<T> extends Query<T>
     }
 
     // 3. The query itself has been touched for rebroadcast.
-    if (Loon._instance.broadcastManager.eventStore.get(path) ==
+    if (Loon._instance.broadcastManager.eventStore.get(_observerId) ==
         BroadcastEvents.touched) {
       shouldRebroadcast = true;
     }
@@ -275,7 +256,7 @@ class ObservableQuery<T> extends Query<T>
     // and then emitting it on the stream.
     if (shouldRebroadcast) {
       final updatedValue =
-          value ?? (value = _sortQuery(_snapCache.values.toList()));
+          _value ?? (_value = _sortQuery(_snapCache.values.toList()));
       add(updatedValue);
     }
   }
@@ -291,10 +272,10 @@ class ObservableQuery<T> extends Query<T>
   get() {
     // If the query does not have an up to date cached value, then it recomputes its value
     // and records it in the cache.
-    if (!hasValue) {
-      return value = super.get();
+    if (!_hasValue) {
+      return _value = super.get();
     }
-    return value!;
+    return _value!;
   }
 
   Map inspect() {

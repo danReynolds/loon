@@ -14,7 +14,7 @@ class TestFilePersistor extends FilePersistor {
     void Function(Set<Document> batch)? onPersist,
     void Function(Set<Collection> collections)? onClear,
     void Function()? onClearAll,
-    void Function(HydrationData data)? onHydrate,
+    void Function(Json data)? onHydrate,
     void Function()? onSync,
   }) : super(
           // To make tests run faster, in the test environment the persistence throttle

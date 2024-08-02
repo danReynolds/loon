@@ -28,7 +28,7 @@ mixin BroadcastObserver<T, S> {
   /// The dependencies of the observer in the store.
   final _deps = PathRefStore();
 
-  void init(
+  void _init(
     T initialValue, {
     required bool multicast,
   }) {
@@ -73,19 +73,42 @@ mixin BroadcastObserver<T, S> {
     return _changeController.stream;
   }
 
-  T? get value {
+  T? get _value {
     return Loon._instance.broadcastManager.observerValueStore.get(_observerId);
   }
 
-  set value(T? value) {
+  set _value(T? value) {
     Loon._instance.broadcastManager.observerValueStore
         .write(_observerId, value);
   }
 
-  /// Returns whether the observer has a cached value in the [ObserverValueStore].
-  bool get hasValue {
+  /// Returns whether the observer has a cached value in the [BroadcastManager.observerValueStore].
+  bool get _hasValue {
     return Loon._instance.broadcastManager.observerValueStore
         .hasValue(_observerId);
+  }
+
+  /// Updates the observer's dependency graph given the change in its previous and updated set of dependencies.
+  void _updateDeps(Set<Document>? prevDeps, Set<Document>? deps) {
+    if (deps != null && prevDeps != null) {
+      final addedDeps = deps.difference(prevDeps);
+      final removedDeps = prevDeps.difference(deps);
+
+      for (final dep in addedDeps) {
+        _deps.inc(dep.path);
+      }
+      for (final dep in removedDeps) {
+        _deps.dec(dep.path);
+      }
+    } else if (deps != null) {
+      for (final dep in deps) {
+        _deps.inc(dep.path);
+      }
+    } else if (prevDeps != null) {
+      for (final dep in prevDeps) {
+        _deps.dec(dep.path);
+      }
+    }
   }
 
   void _onBroadcast();

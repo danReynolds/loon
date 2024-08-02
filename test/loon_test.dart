@@ -91,14 +91,62 @@ void main() {
               });
 
               test(
-                  'Throws an error when creating a non-primitive document without a serializer',
+                  'Throws an error when creating a persisted document with non-serializable data without a serializer',
                   () {
                 expect(
                   () => Loon.collection(
                     'users',
                     persistorSettings: const PersistorSettings(),
-                  ).doc('1').create(TestUserModel('1')),
-                  throwsException,
+                  ).doc('1').create(UnserializableModel()),
+                  throwsA(
+                    (e) =>
+                        e is MissingSerializerException &&
+                        e.toString() ==
+                            'Missing serializer: Persisted document users__1 of type <Document<dynamic>> attempted to write snapshot of type <UnserializableModel> without specifying a fromJson/toJson serializer pair.',
+                  ),
+                );
+              });
+
+              test(
+                  'Does not throw an error when creating a persisted document with serializable data without a serializer',
+                  () {
+                final userDoc = Loon.collection(
+                  'users',
+                  persistorSettings: const PersistorSettings(),
+                ).doc('1');
+
+                expect(
+                  userDoc.create('1'),
+                  DocumentSnapshot(doc: userDoc, data: '1'),
+                );
+
+                userDoc.delete();
+
+                expect(
+                  userDoc.create(1),
+                  DocumentSnapshot(doc: userDoc, data: 1),
+                );
+
+                userDoc.delete();
+
+                final list = [];
+                expect(
+                  userDoc.create(list),
+                  DocumentSnapshot(doc: userDoc, data: list),
+                );
+
+                userDoc.delete();
+
+                // Data is serialized using [convert.jsonEncode] which will by default
+                // attempt to call toJson() on an unencodable object to serialize it.
+                // https://api.flutter.dev/flutter/dart-convert/jsonEncode.html
+                //
+                // Given that behavior, it is valid to create a [TestUserModel], which implements
+                // a toJson, without a serializer.
+                final userData = TestUserModel('Test 1');
+                expect(
+                  userDoc.create(userData),
+                  DocumentSnapshot(doc: userDoc, data: userData),
                 );
               });
 
@@ -153,17 +201,14 @@ void main() {
               });
 
               test(
-                'Throws an exception if the document does not match the snapshot type',
+                'Throws an exception if the existing snapshot is incompatible with the new document type',
                 () {
-                  final usersCollection = Loon.collection<TestUserModel>(
-                    'users',
-                    fromJson: TestUserModel.fromJson,
-                    toJson: (snap) => snap.toJson(),
-                  );
+                  final usersCollection =
+                      Loon.collection<UnserializableModel>('users');
 
                   final userDoc = usersCollection.doc('1');
 
-                  userDoc.create(TestUserModel('1'));
+                  userDoc.create(UnserializableModel());
 
                   expect(
                     () => Loon.collection<int>('users').doc('1').get(),
@@ -171,7 +216,29 @@ void main() {
                       (e) =>
                           e is DocumentTypeMismatchException &&
                           e.toString() ==
-                              'Document type mismatch: Requested type int does not match existing type TestUserModel',
+                              'Document type mismatch: Document users__1 of type <int> attempted to read snapshot of type: <UnserializableModel>',
+                    ),
+                  );
+                },
+              );
+
+              test(
+                'Throws an exception if the new document does not specify a serialization pair for parsing the existing snapshot',
+                () {
+                  final usersCollection =
+                      Loon.collection<TestUserModel>('users');
+
+                  Loon.collection('users').doc('1').create({
+                    "name": "User 1",
+                  });
+
+                  expect(
+                    () => usersCollection.doc('1').get(),
+                    throwsA(
+                      (e) =>
+                          e is MissingSerializerException &&
+                          e.toString() ==
+                              'Missing serializer: Persisted document users__1 of type <Document<TestUserModel>> attempted to read snapshot of type <_Map<String, String>> without specifying a fromJson/toJson serializer pair.',
                     ),
                   );
                 },
@@ -355,8 +422,12 @@ void main() {
                   () => Loon.collection(
                     'users',
                     persistorSettings: const PersistorSettings(),
-                  ).doc('1').modify((userSnap) => TestUserModel('1')),
-                  throwsException,
+                  ).doc('1').modify((userSnap) => UnserializableModel()),
+                  throwsA(
+                    (e) =>
+                        e.toString() ==
+                        'Missing serializer: Persisted document users__1 of type <Document<dynamic>> attempted to write snapshot of type <UnserializableModel> without specifying a fromJson/toJson serializer pair.',
+                  ),
                 );
               });
             },
@@ -505,6 +576,78 @@ void main() {
                   ],
                 );
               });
+            },
+          );
+
+          test(
+            "Maintains its dependency cache correctly",
+            () async {
+              final usersCollection = Loon.collection('users');
+              final postsCollection = Loon.collection<Json>(
+                'posts',
+                dependenciesBuilder: (snap) {
+                  if (snap.data['userId'] != null) {
+                    return {
+                      usersCollection.doc(snap.data['userId'].toString()),
+                    };
+                  }
+                  return null;
+                },
+              );
+
+              final postDoc = postsCollection.doc('1');
+              final postData = {"id": 1, "text": "Post 1", "userId": 1};
+              final postData2 = {"id": 1, "text": "Post 1 updated"};
+              final postData3 = {
+                "id": 1,
+                "text": "Post 1 updated",
+                "userId": 3
+              };
+              final postObs = postDoc.observe();
+
+              postDoc.create(postData);
+              await asyncEvent();
+
+              // After creating the post document, it should have added its user dependency into the observable's
+              // dep tree.
+              expect(postObs.inspect(), {
+                "deps": {
+                  "__ref": 1,
+                  "users": {
+                    "__ref": 1,
+                    "1": 1,
+                  },
+                },
+              });
+
+              postDoc.update(postData2);
+              await asyncEvent();
+
+              // After updating the document, it should have removed the user dependency from the observable's
+              // dep tree.
+              expect(postObs.inspect(), {
+                "deps": {},
+              });
+
+              postDoc.update(postData3);
+              await asyncEvent();
+
+              // The observable should have been updated to have a user dependency again.
+              expect(postObs.inspect(), {
+                "deps": {
+                  "__ref": 1,
+                  "users": {
+                    "__ref": 1,
+                    "3": 1,
+                  },
+                },
+              });
+
+              postsCollection.delete();
+              await asyncEvent();
+
+              // After deleting the posts collection, observable should have cleared its dependencies.
+              expect(postObs.inspect(), {"deps": {}});
             },
           );
 
@@ -1924,6 +2067,10 @@ void main() {
           await asyncEvent();
           usersCollection.doc('1').create(userData);
           await asyncEvent();
+          usersCollection.delete();
+          await asyncEvent();
+          usersCollection.doc('1').create(userData);
+          await asyncEvent();
           postDoc.update(updatedPostData1);
           await asyncEvent();
           // Skips this update to user doc, since the last update to the post
@@ -1932,7 +2079,7 @@ void main() {
           await asyncEvent();
           postDoc.delete();
 
-          final snaps = await postStream.take(8).toList();
+          final snaps = await postStream.take(10).toList();
 
           expect(snaps, [
             // No post yet
@@ -1946,6 +2093,10 @@ void main() {
             // Rebroadcast post when user deleted
             DocumentSnapshot(doc: postDoc, data: postData),
             // Rebroadcast post when user re-added (ensures dependencies remain across deletion/re-creation)
+            DocumentSnapshot(doc: postDoc, data: postData),
+            // Rebroadcast post when user collection deleted
+            DocumentSnapshot(doc: postDoc, data: postData),
+            // Rebroadcast post when user re-added
             DocumentSnapshot(doc: postDoc, data: postData),
             // Rebroadcast when post data is updated
             DocumentSnapshot(doc: postDoc, data: updatedPostData1),

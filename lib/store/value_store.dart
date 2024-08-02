@@ -51,8 +51,8 @@ class ValueStore<T> {
     }
   }
 
-  static ValueStore<Json> fromJson(Json json) {
-    return ValueStore<Json>(store: json);
+  static ValueStore fromJson(Json json) {
+    return ValueStore(store: json);
   }
 
   /// Returns the node at the given path.

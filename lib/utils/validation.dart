@@ -1,27 +1,50 @@
 part of loon;
 
+/// In debug mode, assert that the data being written for a document is serializable.
 void _validateDataSerialization<T>({
+  required Document<T> doc,
   required bool persistenceEnabled,
-  required FromJson<T>? fromJson,
   required ToJson<T>? toJson,
   required T? data,
 }) {
-  if (persistenceEnabled &&
-      data is! Json? &&
-      (fromJson == null || toJson == null)) {
-    throw Exception('Missing fromJson/toJson serializer');
+  if (!persistenceEnabled || data == null || !kDebugMode) {
+    return;
+  }
+
+  if (toJson == null) {
+    try {
+      jsonEncode(data);
+    } catch (e) {
+      throw MissingSerializerException<T>(
+        doc,
+        data,
+        MissingSerializerEvents.write,
+      );
+    }
   }
 }
 
-void _validateTypeSerialization<T>({
-  required bool persistenceEnabled,
+/// In debug mode, assert that the data being parsed for a document is serializable.
+void _validateDataDeserialization<T>({
+  required Document doc,
   required FromJson<T>? fromJson,
-  required ToJson<T>? toJson,
+  required dynamic data,
 }) {
-  if (persistenceEnabled &&
-      T != Json &&
-      T != dynamic &&
-      (fromJson == null && toJson == null)) {
-    throw Exception('Missing fromJson/toJson serializer');
+  if (data == null || !kDebugMode) {
+    return;
+  }
+
+  try {
+    jsonEncode(data);
+  } catch (e) {
+    throw DocumentTypeMismatchException<T>(doc, data);
+  }
+
+  if (fromJson == null) {
+    throw MissingSerializerException<T>(
+      doc,
+      data,
+      MissingSerializerEvents.read,
+    );
   }
 }

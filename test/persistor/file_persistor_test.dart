@@ -55,7 +55,7 @@ void main() {
       test(
         'Persists new documents in the root data store by default',
         () async {
-          final userCollection = Loon.collection(
+          final userCollection = Loon.collection<TestUserModel>(
             'users',
             fromJson: TestUserModel.fromJson,
             toJson: (user) => user.toJson(),
@@ -137,6 +137,37 @@ void main() {
                 "__values": {
                   "1": {'name': 'User 1'},
                   "2": {'name': 'User 2 updated'},
+                }
+              }
+            },
+          );
+        },
+      );
+
+      test(
+        'Persists primitive documents without a serializer',
+        () async {
+          final userCollection = Loon.collection('users');
+
+          userCollection.doc('1').create(1);
+          userCollection.doc('2').create('2');
+          userCollection.doc('3').create([]);
+          userCollection.doc('4').create(true);
+
+          await completer.onSync;
+
+          final file = File('${testDirectory.path}/loon/__store__.json');
+          final json = jsonDecode(file.readAsStringSync());
+
+          expect(
+            json,
+            {
+              "users": {
+                "__values": {
+                  "1": 1,
+                  "2": '2',
+                  "3": [],
+                  "4": true,
                 }
               }
             },
@@ -1387,6 +1418,8 @@ void main() {
 
       userFriendsCollection.doc('3').create(TestUserModel('Friend 3'));
 
+      Loon.doc('current_user_id').create('1');
+
       await completer.onSync;
 
       final storeFile = File('${testDirectory.path}/loon/__store__.json');
@@ -1404,6 +1437,11 @@ void main() {
             "1": {"name": "Friend 1"},
             "2": {"name": "Friend 2"},
           }
+        },
+        "root": {
+          "__values": {
+            "current_user_id": "1",
+          },
         }
       });
 

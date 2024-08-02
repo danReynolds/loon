@@ -93,7 +93,7 @@ class BroadcastManager {
     /// is presumed to be reasonable for performance, given the small number of deletions and deps observers.
     for (final observer in _depObservers) {
       if (observer._deps.has(path)) {
-        eventStore.write(observer.path, BroadcastEvents.touched);
+        eventStore.write(observer._observerId, BroadcastEvents.touched);
       }
     }
 

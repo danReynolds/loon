@@ -171,16 +171,6 @@ class Document<T> implements StoreReference {
     return observe().streamChanges();
   }
 
-  Json? getJson() {
-    final data = get()?.data;
-
-    if (data is Json?) {
-      return data;
-    }
-
-    return toJson!(data);
-  }
-
   bool exists() {
     return Loon._instance.existsSnap(this);
   }
@@ -196,5 +186,21 @@ class Document<T> implements StoreReference {
   bool isPersistenceEnabled() {
     return persistorSettings?.enabled ??
         Loon._instance._isGlobalPersistenceEnabled;
+  }
+
+  /// Returns the serialized document data.
+  dynamic getSerialized() {
+    final data = get()?.data;
+    final toJson = this.toJson;
+
+    // If the document has a [toJson] serializer, then it should return the
+    // serialized [Json] data.
+    if (data != null && toJson != null) {
+      return toJson(data);
+    }
+
+    // Otherwise return the document data, which has been verified to be serializable
+    // in development mode using [_validateDataSerialization].
+    return data;
   }
 }
