@@ -87,7 +87,7 @@ class ObservableDocument<T> extends Document<T>
 
   @override
   get() {
-    if (!_hasValue) {
+    if (!isCached) {
       return _value = super.get();
     }
     return _value!;

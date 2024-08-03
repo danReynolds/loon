@@ -83,7 +83,7 @@ mixin BroadcastObserver<T, S> {
   }
 
   /// Returns whether the observer has a cached value in the [BroadcastManager.observerValueStore].
-  bool get _hasValue {
+  bool get isCached {
     return Loon._instance.broadcastManager.observerValueStore
         .hasValue(_observerId);
   }

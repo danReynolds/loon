@@ -145,14 +145,16 @@ void main() {
       );
 
       test(
-        'Persists primitive documents without a serializer',
+        'Persists serializable document data without a serializer',
         () async {
           final userCollection = Loon.collection('users');
 
           userCollection.doc('1').create(1);
           userCollection.doc('2').create('2');
-          userCollection.doc('3').create([]);
-          userCollection.doc('4').create(true);
+          userCollection.doc('3').create(true);
+          userCollection.doc('4').create({
+            "name": 1,
+          });
 
           await completer.onSync;
 
@@ -166,8 +168,10 @@ void main() {
                 "__values": {
                   "1": 1,
                   "2": '2',
-                  "3": [],
-                  "4": true,
+                  "3": true,
+                  "4": {
+                    "name": 1,
+                  }
                 }
               }
             },
@@ -1418,7 +1422,8 @@ void main() {
 
       userFriendsCollection.doc('3').create(TestUserModel('Friend 3'));
 
-      Loon.doc('current_user_id').create('1');
+      final currentUserDoc = Loon.doc('current_user_id');
+      currentUserDoc.create('1');
 
       await completer.onSync;
 
@@ -1522,6 +1527,11 @@ void main() {
           data: TestUserModel('Friend 3'),
         ),
       ]);
+
+      expect(
+        currentUserDoc.get(),
+        DocumentSnapshot(doc: currentUserDoc, data: '1'),
+      );
     });
 
     test(
