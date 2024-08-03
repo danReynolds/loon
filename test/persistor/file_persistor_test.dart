@@ -429,19 +429,21 @@ void main() {
           final user = TestUserModel('User 1');
           final user2 = TestUserModel('User 2');
 
+          final friend1 = TestUserModel('Friend 1');
+          final friend2 = TestUserModel('Friend 2');
+
           userDoc.create(user);
           userDoc2.create(user2);
-          userDoc2
-              .subcollection(
-                'friends',
-                fromJson: TestUserModel.fromJson,
-                toJson: (user) => user.toJson(),
-                // Aggregate all the `friends` subcollections of users into the `friends` data store.
-                persistorSettings:
-                    FilePersistorSettings(key: FilePersistor.key('friends')),
-              )
-              .doc('1')
-              .create(user);
+          final friendsCollection = userDoc2.subcollection(
+            'friends',
+            fromJson: TestUserModel.fromJson,
+            toJson: (user) => user.toJson(),
+            // Aggregate all the `friends` subcollections of users into the `friends` data store.
+            persistorSettings:
+                FilePersistorSettings(key: FilePersistor.key('friends')),
+          );
+          friendsCollection.doc('1').create(friend1);
+          friendsCollection.doc('2').create(friend2);
 
           await completer.onSync;
 
@@ -469,7 +471,8 @@ void main() {
                 "2": {
                   "friends": {
                     "__values": {
-                      "1": {'name': 'User 1'},
+                      "1": {'name': 'Friend 1'},
+                      "2": {'name': 'Friend 2'},
                     }
                   }
                 }
