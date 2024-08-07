@@ -17,6 +17,8 @@ class FileDataStoreManager {
   /// The duration by which to throttle persistence changes to the file system.
   final Duration persistenceThrottle;
 
+  final FilePersistorSettings settings;
+
   final void Function() onSync;
 
   final void Function(String text) onLog;
@@ -46,6 +48,7 @@ class FileDataStoreManager {
     required this.persistenceThrottle,
     required this.onSync,
     required this.onLog,
+    required this.settings,
   });
 
   /// Resolves the data store name for the given path as the nearest value found working up from
@@ -140,6 +143,16 @@ class FileDataStoreManager {
       }
     }
 
+    // Initialize the root file data store if it does not exist yet.
+    if (!_index.containsKey(FileDataStore.defaultKey)) {
+      _index[FileDataStore.defaultKey] = DualFileDataStore(
+        name: FileDataStore.defaultKey,
+        directory: directory,
+        encrypter: encrypter,
+        isHydrated: true,
+      );
+    }
+
     // Initialize and immediately hydrate the resolver data, since it is required
     // for processing subsequent data store hydrate/persist operations.
     _resolver = FileDataStoreResolver(directory: directory);
@@ -202,77 +215,62 @@ class FileDataStoreManager {
     );
   }
 
-  Future<void> persist(List<FilePersistDocument> docs) {
+  Future<void> persist(
+    Map<String, String?> keys,
+    List<FilePersistDocument> docs,
+  ) {
     return _syncLock.run(() async {
+      // Process the persistor keys associated with the updated documents, grafting
+      // data at a given path that has changed its persistence key, and marking the updated
+      // keys for paths in the data store resolver.
+      for (final entry in keys.entries) {
+        final path = entry.key;
+        final prevDataStoreName = _resolveStoreName(path);
+        final dataStoreName = entry.value;
+
+        if (prevDataStoreName != dataStoreName) {
+          final prevDataStore = _index[prevDataStoreName];
+          final defaultedDataStoreName =
+              entry.value ?? FileDataStore.defaultKey;
+          final dataStore =
+              _index[defaultedDataStoreName] ??= DualFileDataStore(
+            name: defaultedDataStoreName,
+            encrypter: encrypter,
+            directory: directory,
+            isHydrated: true,
+          );
+
+          // If the resolved data store for the persistence path has changed, then its data
+          // should be grafted from its previous data store to the updated one.
+          if (prevDataStore != null) {
+            dataStore.graft(prevDataStore, path);
+          }
+
+          if (dataStoreName != null) {
+            _resolver.store.write(path, dataStoreName);
+          } else {
+            _resolver.store.delete(path, recursive: false);
+          }
+        }
+      }
+
       if (docs.isEmpty) {
         return;
       }
 
       for (final doc in docs) {
-        final collectionPath = doc.parent;
         final docPath = doc.path;
         final docData = doc.data;
-        final persistenceKey = doc.key;
         final encrypted = doc.encrypted;
 
         // If the document has been deleted, then clear it and its subcollections from the store.
         if (docData == null) {
           await _clear(docPath);
-          continue;
+          // Otherwise, write its associated data store with the updated document data.
+        } else {
+          final dataStore = _index[_resolveStoreName(docPath)]!;
+          await dataStore.writePath(docPath, docData, encrypted);
         }
-
-        final prevDataStoreName = _resolveStoreName(docPath);
-        final prevDataStore = _index[prevDataStoreName];
-
-        // If the persistence key for the document is now null, then remove the previous
-        // key for the document (if it exists) ahead of resolving its data store name.
-        if (persistenceKey == null) {
-          _resolver.store.delete(docPath, recursive: false);
-        }
-
-        final dataStoreName =
-            persistenceKey?.value ?? _resolveStoreName(docPath);
-        final dataStore = _index[dataStoreName] ??= DualFileDataStore(
-          name: dataStoreName,
-          encrypter: encrypter,
-          directory: directory,
-          isHydrated: true,
-        );
-
-        // If the resolved data store for the document has changed, then its data
-        // should be grafted from its previous data store to the updated one.
-        if (prevDataStore != null && prevDataStore != dataStore) {
-          await dataStore.graft(prevDataStore, docPath);
-        }
-
-        switch (persistenceKey?.type) {
-          case null:
-            break;
-          case FilePersistorKeyTypes.document:
-            // Update the resolver's persistence key for the document.
-            _resolver.store.write(docPath, dataStoreName);
-            break;
-          case FilePersistorKeyTypes.collection:
-            // If there is already a document-level persistence key in the resolver tree for this
-            // document then it should be removed, since the document is being persisted with a
-            // collection-level key.
-            _resolver.store.delete(docPath, recursive: false);
-
-            // If the resolved data store for the document's collection has changed, then its data
-            // should be grafted from its previous data store to the updated one.
-            final collectionDataStore =
-                _index[_resolveStoreName(collectionPath)];
-            if (collectionDataStore != dataStore) {
-              _resolver.store.write(collectionPath, dataStoreName);
-
-              if (collectionDataStore != null) {
-                dataStore.graft(collectionDataStore, collectionPath);
-              }
-            }
-            break;
-        }
-
-        await dataStore.writePath(docPath, docData, encrypted);
       }
 
       _scheduleSync();

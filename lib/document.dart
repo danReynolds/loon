@@ -5,23 +5,31 @@ class Document<T> implements StoreReference {
   final String parent;
   final FromJson<T>? fromJson;
   final ToJson<T>? toJson;
-  final PersistorSettings<T>? persistorSettings;
   final DependenciesBuilder<T>? dependenciesBuilder;
+  late final PersistorSettings? persistorSettings;
 
   Document(
     this.parent,
     this.id, {
     this.fromJson,
     this.toJson,
-    this.persistorSettings,
     this.dependenciesBuilder,
-  });
+    PersistorSettings? persistorSettings,
+  }) {
+    if (persistorSettings != null &&
+        persistorSettings is! DocumentPersistorSettings) {
+      this.persistorSettings =
+          DocumentPersistorSettings(settings: persistorSettings, doc: this);
+    } else {
+      this.persistorSettings = null;
+    }
+  }
 
   static Document<S> fromPath<S>(
     String path, {
     FromJson<S>? fromJson,
     ToJson<S>? toJson,
-    PersistorSettings<S>? persistorSettings,
+    PersistorSettings? persistorSettings,
     DependenciesBuilder<S>? dependenciesBuilder,
   }) {
     final [...pathSegments, id] = path.split(ValueStore.delimiter);
@@ -64,7 +72,7 @@ class Document<T> implements StoreReference {
     String name, {
     FromJson<S>? fromJson,
     ToJson<S>? toJson,
-    PersistorSettings<S>? persistorSettings,
+    PersistorSettings? persistorSettings,
     DependenciesBuilder<S>? dependenciesBuilder,
   }) {
     return Collection<S>(
@@ -72,7 +80,7 @@ class Document<T> implements StoreReference {
       name,
       fromJson: fromJson,
       toJson: toJson,
-      persistorSettings: persistorSettings,
+      persistorSettings: persistorSettings ?? this.persistorSettings,
       dependenciesBuilder: dependenciesBuilder,
     );
   }
@@ -198,9 +206,6 @@ class Document<T> implements StoreReference {
     if (data != null && toJson != null) {
       return toJson(data);
     }
-
-    // Otherwise return the document data, which has been verified to be serializable
-    // in development mode using [_validateDataSerialization].
     return data;
   }
 }

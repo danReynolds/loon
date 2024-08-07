@@ -65,7 +65,7 @@ class Loon {
     DocumentSnapshot snap, {
     required FromJson<T>? fromJson,
     required ToJson<T>? toJson,
-    required PersistorSettings<T>? persistorSettings,
+    required PersistorSettings? persistorSettings,
     required DependenciesBuilder<T>? dependenciesBuilder,
   }) {
     if (snap is! DocumentSnapshot<T>) {
@@ -261,7 +261,7 @@ class Loon {
     String id, {
     FromJson<T>? fromJson,
     ToJson<T>? toJson,
-    PersistorSettings<T>? persistorSettings,
+    PersistorSettings? persistorSettings,
   }) {
     return collection<T>(
       _rootKey,
@@ -275,7 +275,7 @@ class Loon {
     String name, {
     FromJson<T>? fromJson,
     ToJson<T>? toJson,
-    PersistorSettings<T>? persistorSettings,
+    PersistorSettings? persistorSettings,
     DependenciesBuilder<T>? dependenciesBuilder,
   }) {
     return Collection<T>(

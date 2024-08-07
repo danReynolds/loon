@@ -1,11 +1,26 @@
 part of loon;
 
-class PersistorSettings<T> {
+class PersistorSettings {
   final bool enabled;
 
   const PersistorSettings({
     this.enabled = true,
   });
+}
+
+class DocumentPersistorSettings extends PersistorSettings {
+  final Document doc;
+  final PersistorSettings settings;
+
+  const DocumentPersistorSettings({
+    required this.settings,
+    required this.doc,
+  });
+
+  @override
+  get enabled {
+    return settings.enabled;
+  }
 }
 
 /// Abstract persistor that implements the base persistence batching, de-duping and locking of
@@ -19,11 +34,11 @@ abstract class Persistor {
   final void Function(Json data)? onHydrate;
 
   Persistor({
-    this.settings = const PersistorSettings(),
     this.onPersist,
     this.onClear,
     this.onClearAll,
     this.onHydrate,
+    this.settings = const PersistorSettings(),
   });
 
   ///

@@ -33,43 +33,9 @@ import 'package:loon/loon.dart';
 /// Documents from the same collection can be given different persistence keys using [FilePersistor.keyBuilder].
 /// This allows you to customize persistence on a per-document level, supporting scenarios like sharding of large collections.
 
-enum FilePersistorKeyTypes {
-  collection,
-  document,
-}
+typedef FilePersistorKeyBuilder<T> = String Function(DocumentSnapshot<T> snap);
 
-class FilePersistorKey<T> {
-  final String value;
-  final FilePersistorKeyTypes type;
-
-  FilePersistorKey(this.value, this.type);
-}
-
-abstract class FilePersistorKeyBuilder<T> {}
-
-class FilePersistorCollectionKeyBuilder<T> extends FilePersistorKeyBuilder<T> {
-  final String value;
-
-  FilePersistorCollectionKeyBuilder(
-    this.value,
-  );
-
-  build() {
-    return FilePersistorKey<T>(value, FilePersistorKeyTypes.collection);
-  }
-}
-
-class FilePersistorDocumentKeyBuilder<T> extends FilePersistorKeyBuilder<T> {
-  final String Function(DocumentSnapshot<T> snap) builder;
-
-  FilePersistorDocumentKeyBuilder(this.builder);
-
-  FilePersistorKey<T> build(DocumentSnapshot<T> snap) {
-    return FilePersistorKey<T>(builder(snap), FilePersistorKeyTypes.document);
-  }
-}
-
-class FilePersistorSettings<T> extends PersistorSettings<T> {
+class FilePersistorSettings<T> extends PersistorSettings {
   /// The persistence key to use for this collection. The key corresponds to the name of the file
   /// that the collection's data and all of the data of its subcollections (that don't specify their own custom key)
   /// is stored in.
@@ -101,26 +67,17 @@ class FilePersistorSettings<T> extends PersistorSettings<T> {
   ///   ),
   /// );
   /// ```
-  final FilePersistorKeyBuilder<T>? key;
+  final FilePersistorKeyBuilder<T>? keyBuilder;
+
+  final String? key;
 
   /// Whether encryption is enabled globally for all collections in the store.
   final bool encrypted;
 
   const FilePersistorSettings({
     this.key,
+    this.keyBuilder,
     this.encrypted = false,
     super.enabled = true,
   });
-
-  FilePersistorSettings<T> copyWith({
-    FilePersistorKeyBuilder<T>? key,
-    bool? encrypted,
-    bool? enabled,
-  }) {
-    return FilePersistorSettings<T>(
-      key: key ?? this.key,
-      encrypted: encrypted ?? this.encrypted,
-      enabled: enabled ?? this.enabled,
-    );
-  }
 }

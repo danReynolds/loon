@@ -12,7 +12,7 @@ class Collection<T> implements Queryable<T>, StoreReference {
   final String name;
   final FromJson<T>? fromJson;
   final ToJson<T>? toJson;
-  final PersistorSettings<T>? persistorSettings;
+  final PersistorSettings? persistorSettings;
 
   /// Returns the set of documents that the document associated with the given
   /// [DocumentSnapshot] is dependent on.
@@ -25,18 +25,19 @@ class Collection<T> implements Queryable<T>, StoreReference {
     this.name, {
     this.fromJson,
     this.toJson,
-    this.persistorSettings,
     this.dependenciesBuilder,
+    this.persistorSettings,
   });
 
   static Collection<S> fromPath<S>(
     String path, {
     FromJson<S>? fromJson,
     ToJson<S>? toJson,
-    PersistorSettings<S>? persistorSettings,
+    PersistorSettings? persistorSettings,
     DependenciesBuilder<S>? dependenciesBuilder,
   }) {
     final [...pathSegments, id] = path.split(ValueStore.delimiter);
+
     return Collection<S>(
       pathSegments.join(ValueStore.delimiter),
       id,

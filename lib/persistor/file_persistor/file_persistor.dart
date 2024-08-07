@@ -5,6 +5,7 @@ import 'package:encrypt/encrypt.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:loon/loon.dart';
 import 'package:loon/persistor/file_persistor/extensions/document.dart';
+import 'package:loon/persistor/file_persistor/file_persist_document.dart';
 import 'package:loon/persistor/file_persistor/file_persistor_settings.dart';
 import 'package:loon/persistor/file_persistor/file_persistor_worker.dart';
 import 'package:loon/persistor/file_persistor/messages.dart';
@@ -31,26 +32,20 @@ class FilePersistor extends Persistor {
 
   late final Logger _logger;
 
+  @override
+  // ignore: overridden_fields
+  final FilePersistorSettings settings;
+
   FilePersistor({
-    FilePersistorSettings? settings,
     super.onPersist,
     super.onClear,
     super.onClearAll,
     super.onHydrate,
     this.onSync,
+    this.settings = const FilePersistorSettings(),
     this.persistenceThrottle = const Duration(milliseconds: 100),
-  }) : super(settings: settings ?? const FilePersistorSettings()) {
+  }) {
     _logger = Logger('FilePersistor', output: Loon.logger.log);
-  }
-
-  static FilePersistorCollectionKeyBuilder<T> key<T>(String value) {
-    return FilePersistorCollectionKeyBuilder(value);
-  }
-
-  static FilePersistorDocumentKeyBuilder<T> keyBuilder<T>(
-    String Function(DocumentSnapshot<T> snap) builder,
-  ) {
-    return FilePersistorDocumentKeyBuilder<T>(builder);
   }
 
   void _onMessage(dynamic message) {
@@ -134,6 +129,7 @@ class FilePersistor extends Persistor {
       directory: directory as Directory,
       encrypter: encrypter as Encrypter,
       persistenceThrottle: persistenceThrottle,
+      settings: settings,
     );
 
     final completer =
@@ -167,9 +163,41 @@ class FilePersistor extends Persistor {
 
   @override
   persist(docs) async {
-    // Marshall file persist documents to be sent to and persisted by the worker isolate.
-    final data = docs.map((doc) => doc.toPersistenceDoc()).toList();
-    await _sendMessage(PersistMessageRequest(data: data));
+    final Map<String, String?> keys = {};
+    final List<FilePersistDocument> persistDocs = [];
+
+    for (final doc in docs) {
+      final persistorSettings = doc.persistorSettings;
+
+      if (persistorSettings is DocumentPersistorSettings) {
+        final persistorDoc = persistorSettings.doc;
+        final docSettings = persistorSettings.settings;
+
+        if (docSettings is FilePersistorSettings) {
+          if (docSettings.key != null) {
+            keys[persistorDoc.parent] = docSettings.key;
+          } else if ((docSettings as dynamic).keyBuilder != null) {
+            final snap = persistorDoc.get();
+            if (snap == null) {
+              keys[persistorDoc.path] = null;
+            } else {
+              keys[persistorDoc.path] =
+                  (docSettings as dynamic).keyBuilder(snap);
+            }
+          }
+        }
+      }
+
+      persistDocs.add(
+        FilePersistDocument(
+          path: doc.path,
+          data: doc.getSerialized(),
+          encrypted: doc.isEncrypted(),
+        ),
+      );
+    }
+
+    await _sendMessage(PersistMessageRequest(keys: keys, docs: persistDocs));
   }
 
   @override

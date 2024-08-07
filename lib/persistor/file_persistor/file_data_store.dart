@@ -218,10 +218,6 @@ class FileDataStore {
   }
 
   Future<void> writePath(String path, dynamic value) async {
-    if (name == "financial_groups_meta_data" && suffix == ".encrypted") {
-      print('here');
-    }
-
     // Unhydrated stores must be hydrated before data can be written to them.
     if (!isHydrated) {
       await hydrate();
