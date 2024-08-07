@@ -48,6 +48,16 @@ class FilePersistor extends Persistor {
     _logger = Logger('FilePersistor', output: Loon.logger.log);
   }
 
+  static FilePersistorKey key<T>(String value) {
+    return FilePersistorValueKey(value);
+  }
+
+  static FilePersistorKey keyBuilder<T>(
+    String Function(DocumentSnapshot<T> snap) builder,
+  ) {
+    return FilePersistorBuilderKey<T>(builder);
+  }
+
   void _onMessage(dynamic message) {
     switch (message) {
       case LogMessage message:
@@ -173,18 +183,16 @@ class FilePersistor extends Persistor {
         final persistorDoc = persistorSettings.doc;
         final docSettings = persistorSettings.settings;
 
-        if (docSettings is FilePersistorSettings) {
-          if (docSettings.key != null) {
-            keys[persistorDoc.parent] = docSettings.key;
-          } else if ((docSettings as dynamic).keyBuilder != null) {
+        switch (docSettings) {
+          case FilePersistorSettings(key: FilePersistorValueKey key):
+            keys[persistorDoc.parent] = key.value;
+          case FilePersistorSettings(key: FilePersistorBuilderKey keyBuilder):
             final snap = persistorDoc.get();
             if (snap == null) {
               keys[persistorDoc.path] = null;
             } else {
-              keys[persistorDoc.path] =
-                  (docSettings as dynamic).keyBuilder(snap);
+              keys[persistorDoc.path] = (keyBuilder as dynamic)(snap);
             }
-          }
         }
       }
 

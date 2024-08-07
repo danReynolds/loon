@@ -35,6 +35,24 @@ import 'package:loon/loon.dart';
 
 typedef FilePersistorKeyBuilder<T> = String Function(DocumentSnapshot<T> snap);
 
+class FilePersistorKey {}
+
+class FilePersistorValueKey extends FilePersistorKey {
+  final String value;
+
+  FilePersistorValueKey(this.value);
+}
+
+class FilePersistorBuilderKey<T> extends FilePersistorKey {
+  final FilePersistorKeyBuilder<T> _builder;
+
+  FilePersistorBuilderKey(this._builder);
+
+  String call(DocumentSnapshot<T> snap) {
+    return _builder(snap);
+  }
+}
+
 class FilePersistorSettings<T> extends PersistorSettings {
   /// The persistence key to use for this collection. The key corresponds to the name of the file
   /// that the collection's data and all of the data of its subcollections (that don't specify their own custom key)
@@ -67,16 +85,14 @@ class FilePersistorSettings<T> extends PersistorSettings {
   ///   ),
   /// );
   /// ```
-  final FilePersistorKeyBuilder<T>? keyBuilder;
 
-  final String? key;
+  final FilePersistorKey? key;
 
   /// Whether encryption is enabled globally for all collections in the store.
   final bool encrypted;
 
   const FilePersistorSettings({
     this.key,
-    this.keyBuilder,
     this.encrypted = false,
     super.enabled = true,
   });

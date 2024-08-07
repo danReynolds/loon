@@ -257,14 +257,14 @@ void main() {
       );
 
       test(
-        'Persists documents using a key builder',
+        'Persists documents with a key builder',
         () async {
           final userCollection = Loon.collection<TestUserModel>(
             'users',
             fromJson: TestUserModel.fromJson,
             toJson: (user) => user.toJson(),
-            persistorSettings: FilePersistorSettings<TestUserModel>(
-              keyBuilder: ((snap) {
+            persistorSettings: FilePersistorSettings(
+              key: FilePersistor.keyBuilder<TestUserModel>((snap) {
                 if (snap.id == '1') {
                   return 'users';
                 }
@@ -329,14 +329,16 @@ void main() {
       );
 
       test(
-        'Removes documents using a key builder',
+        'Removes documents with a key builder',
         () async {
           final userCollection = Loon.collection<TestUserModel>(
             'users',
             fromJson: TestUserModel.fromJson,
             toJson: (user) => user.toJson(),
             persistorSettings: FilePersistorSettings(
-              keyBuilder: (_) => 'users',
+              key: FilePersistor.keyBuilder((snap) {
+                return 'users';
+              }),
             ),
           );
 
@@ -413,7 +415,7 @@ void main() {
       );
 
       test(
-        'Persists documents using a key',
+        'Persists documents with a value key',
         () async {
           final userCollection = Loon.collection<TestUserModel>(
             'users',
@@ -437,7 +439,8 @@ void main() {
             fromJson: TestUserModel.fromJson,
             toJson: (friend) => friend.toJson(),
             // Aggregate all the `friends` subcollections of users into the `friends` data store.
-            persistorSettings: const FilePersistorSettings(key: 'friends'),
+            persistorSettings:
+                FilePersistorSettings(key: FilePersistor.key('friends')),
           );
           friendsCollection.doc('1').create(friend1);
           friendsCollection.doc('2').create(friend2);
@@ -500,13 +503,15 @@ void main() {
       );
 
       test(
-        'Subcollections inherit a parent collection-level key',
+        'Subcollections inherit a parent value key',
         () async {
           final userCollection = Loon.collection<TestUserModel>(
             'users',
             fromJson: TestUserModel.fromJson,
             toJson: (user) => user.toJson(),
-            persistorSettings: const FilePersistorSettings(key: 'users'),
+            persistorSettings: FilePersistorSettings(
+              key: FilePersistor.key('users'),
+            ),
           );
 
           final userDoc = userCollection.doc('1');
@@ -579,13 +584,15 @@ void main() {
       );
 
       test(
-        'Subcollections that specify a different key override a parent key',
+        'Subcollections can override a parent key',
         () async {
           final userCollection = Loon.collection<TestUserModel>(
             'users',
             fromJson: TestUserModel.fromJson,
             toJson: (user) => user.toJson(),
-            persistorSettings: const FilePersistorSettings(key: 'users'),
+            persistorSettings: FilePersistorSettings(
+              key: FilePersistor.key('users'),
+            ),
           );
 
           final userDoc = userCollection.doc('1');
@@ -603,7 +610,9 @@ void main() {
             'friends',
             fromJson: TestUserModel.fromJson,
             toJson: (friend) => friend.toJson(),
-            persistorSettings: const FilePersistorSettings(key: 'friends'),
+            persistorSettings: FilePersistorSettings(
+              key: FilePersistor.key('friends'),
+            ),
           );
           friendsCollection.doc('1').create(friend1);
           friendsCollection.doc('2').create(friend2);
@@ -647,7 +656,7 @@ void main() {
               File('${testDirectory.path}/loon/__resolver__.json');
           final resolverJson = jsonDecode(resolverFile.readAsStringSync());
 
-          // Since the friends collection under users__2 specifies a "friends" collection-level key,
+          // Since the friends collection under users__2 specifies a "friends" key,
           // this overrides the parent "users" key on the users collection.
           expect(
             resolverJson,
@@ -680,10 +689,10 @@ void main() {
             'users',
             fromJson: TestUserModel.fromJson,
             toJson: (user) => user.toJson(),
-            persistorSettings: FilePersistorSettings<TestUserModel>(
-              keyBuilder: (snap) {
+            persistorSettings: FilePersistorSettings(
+              key: FilePersistor.keyBuilder<TestUserModel>((snap) {
                 return 'users_${snap.id}';
-              },
+              }),
             ),
           );
 
@@ -795,7 +804,9 @@ void main() {
                     fromJson: TestUserModel.fromJson,
                     toJson: (user) => user.toJson(),
                     persistorSettings: FilePersistorSettings(
-                      keyBuilder: (snap) => 'users_${snap.id}',
+                      key: FilePersistor.keyBuilder(
+                        (snap) => 'users_${snap.id}',
+                      ),
                     ),
                   );
 
@@ -916,8 +927,9 @@ void main() {
                     'users',
                     fromJson: TestUserModel.fromJson,
                     toJson: (user) => user.toJson(),
-                    persistorSettings:
-                        const FilePersistorSettings(key: 'other_users'),
+                    persistorSettings: FilePersistorSettings(
+                      key: FilePersistor.key('other_users'),
+                    ),
                   );
 
                   usersCollection.doc('1').create(TestUserModel('User 1'));
@@ -1021,7 +1033,9 @@ void main() {
                     fromJson: TestUserModel.fromJson,
                     toJson: (user) => user.toJson(),
                     persistorSettings: FilePersistorSettings(
-                      keyBuilder: (snap) => "users_${snap.id}",
+                      key: FilePersistor.keyBuilder(
+                        (snap) => "users_${snap.id}",
+                      ),
                     ),
                   );
                   final usersCollection = Loon.collection<TestUserModel>(
@@ -1177,13 +1191,15 @@ void main() {
                     'users',
                     fromJson: TestUserModel.fromJson,
                     toJson: (user) => user.toJson(),
-                    persistorSettings: FilePersistorSettings<TestUserModel>(
-                      keyBuilder: (snap) {
-                        if (snap.data.name.endsWith('updated')) {
-                          return 'updated_users';
-                        }
-                        return 'users';
-                      },
+                    persistorSettings: FilePersistorSettings(
+                      key: FilePersistor.keyBuilder<TestUserModel>(
+                        (snap) {
+                          if (snap.data.name.endsWith('updated')) {
+                            return 'updated_users';
+                          }
+                          return 'users';
+                        },
+                      ),
                     ),
                   );
 
@@ -1312,7 +1328,9 @@ void main() {
                     fromJson: TestUserModel.fromJson,
                     toJson: (user) => user.toJson(),
                     persistorSettings: FilePersistorSettings(
-                      keyBuilder: (snap) => "users_${snap.id}",
+                      key: FilePersistor.keyBuilder(
+                        (snap) => "users_${snap.id}",
+                      ),
                     ),
                   );
 
@@ -1320,8 +1338,9 @@ void main() {
                     'users',
                     fromJson: TestUserModel.fromJson,
                     toJson: (user) => user.toJson(),
-                    persistorSettings:
-                        const FilePersistorSettings(key: 'other_users'),
+                    persistorSettings: FilePersistorSettings(
+                      key: FilePersistor.key('other_users'),
+                    ),
                   );
 
                   documentKeyUsersCollection
@@ -1493,8 +1512,9 @@ void main() {
                     'users',
                     fromJson: TestUserModel.fromJson,
                     toJson: (user) => user.toJson(),
-                    persistorSettings:
-                        const FilePersistorSettings(key: 'other_users'),
+                    persistorSettings: FilePersistorSettings(
+                      key: FilePersistor.key('other_users'),
+                    ),
                   );
 
                   final otherUsersUpdatedCollection =
@@ -1502,8 +1522,9 @@ void main() {
                     'users',
                     fromJson: TestUserModel.fromJson,
                     toJson: (user) => user.toJson(),
-                    persistorSettings:
-                        const FilePersistorSettings(key: 'other_users_updated'),
+                    persistorSettings: FilePersistorSettings(
+                      key: FilePersistor.key('other_users_updated'),
+                    ),
                   );
 
                   otherUsersCollection.doc('1').create(TestUserModel('User 1'));
@@ -1662,14 +1683,14 @@ void main() {
         toJson: (user) => user.toJson(),
       );
 
-      final userFriendsCollection = Loon.collection('users')
-          .doc('1')
-          .subcollection<TestUserModel>(
-            'friends',
-            fromJson: TestUserModel.fromJson,
-            toJson: (user) => user.toJson(),
-            persistorSettings: const FilePersistorSettings(key: 'my_friends'),
-          );
+      final userFriendsCollection =
+          Loon.collection('users').doc('1').subcollection<TestUserModel>(
+                'friends',
+                fromJson: TestUserModel.fromJson,
+                toJson: (user) => user.toJson(),
+                persistorSettings:
+                    FilePersistorSettings(key: FilePersistor.key('my_friends')),
+              );
 
       userCollection.doc('1').create(TestUserModel('User 1'));
       userCollection.doc('2').create(TestUserModel('User 2'));
@@ -1810,8 +1831,9 @@ void main() {
                   'friends',
                   fromJson: TestUserModel.fromJson,
                   toJson: (user) => user.toJson(),
-                  persistorSettings:
-                      const FilePersistorSettings(key: 'user_friends'),
+                  persistorSettings: FilePersistorSettings(
+                    key: FilePersistor.key('user_friends'),
+                  ),
                 );
 
         userCollection.doc('1').create(TestUserModel('User 1'));
@@ -2176,7 +2198,7 @@ void main() {
             fromJson: TestUserModel.fromJson,
             toJson: (user) => user.toJson(),
             persistorSettings: FilePersistorSettings(
-              keyBuilder: (snap) => 'users_${snap.id}',
+              key: FilePersistor.keyBuilder((snap) => 'users${snap.id}'),
             ),
           );
 
@@ -2184,9 +2206,9 @@ void main() {
           userCollection.doc('2').create(TestUserModel('User 2'));
           userCollection.doc('3').create(TestUserModel('User 3'));
 
-          final file1 = File('${testDirectory.path}/loon/users_1.json');
-          final file2 = File('${testDirectory.path}/loon/users_2.json');
-          final file3 = File('${testDirectory.path}/loon/users_3.json');
+          final file1 = File('${testDirectory.path}/loon/users1.json');
+          final file2 = File('${testDirectory.path}/loon/users2.json');
+          final file3 = File('${testDirectory.path}/loon/users3.json');
 
           await completer.onSync;
 
@@ -2216,7 +2238,9 @@ void main() {
                 'friends',
                 fromJson: TestUserModel.fromJson,
                 toJson: (user) => user.toJson(),
-                persistorSettings: const FilePersistorSettings(key: 'friends'),
+                persistorSettings: FilePersistorSettings(
+                  key: FilePersistor.key('friends'),
+                ),
               );
 
           userCollection.doc('1').create(TestUserModel('User 1'));
@@ -2315,7 +2339,9 @@ void main() {
             'users',
             fromJson: TestUserModel.fromJson,
             toJson: (user) => user.toJson(),
-            persistorSettings: const FilePersistorSettings(key: 'users'),
+            persistorSettings: FilePersistorSettings(
+              key: FilePersistor.key('users'),
+            ),
           );
 
           userCollection.doc('1').create(TestUserModel('User 1'));
