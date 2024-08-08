@@ -38,17 +38,17 @@ class PersistManager {
           current.complete(null);
           break;
         case PersistOperation(batch: final docs):
-          await persistor.persist(docs);
+          await persistor.persist(docs.toList());
           current.complete(docs);
           persistor.onPersist?.call(docs);
           break;
         case ClearOperation(batch: final collections):
-          await persistor.clear(collections);
+          await persistor.clear(collections.toList());
           current.complete(collections);
           persistor.onClear?.call(collections);
           break;
         case HydrateOperation(batch: final refs):
-          final data = await persistor.hydrate(refs);
+          final data = await persistor.hydrate(refs.toList());
           current.complete(data);
           persistor.onHydrate?.call(data);
           break;
@@ -103,7 +103,7 @@ class PersistManager {
       return lastOperation.onComplete;
     }
 
-    return _enqueue(PersistOperation({doc}));
+    return _enqueue(PersistOperation(LinkedHashSet.of([doc])));
   }
 
   Future<void> clear(Collection collection) {
@@ -113,7 +113,7 @@ class PersistManager {
       return lastOperation.onComplete;
     }
 
-    return _enqueue(ClearOperation({collection}));
+    return _enqueue(ClearOperation(LinkedHashSet.of([collection])));
   }
 
   Future<void> clearAll() {
@@ -125,7 +125,7 @@ class PersistManager {
     return _enqueue(ClearAllOperation());
   }
 
-  Future<Json> hydrate([Set<StoreReference>? refs]) {
+  Future<Json> hydrate([List<StoreReference>? refs]) {
     final lastOperation = _operationQueue.tryLast;
 
     if (refs == null) {
@@ -140,6 +140,6 @@ class PersistManager {
       return lastOperation.onComplete;
     }
 
-    return _enqueue(HydrateOperation(refs));
+    return _enqueue(HydrateOperation(LinkedHashSet.from(refs)));
   }
 }

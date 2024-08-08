@@ -2,6 +2,7 @@ import 'dart:io';
 import 'dart:isolate';
 import 'package:encrypt/encrypt.dart';
 import 'package:loon/persistor/file_persistor/file_persist_document.dart';
+import 'package:loon/persistor/file_persistor/file_persistor_settings.dart';
 import 'package:uuid/uuid.dart';
 
 const uuid = Uuid();
@@ -31,12 +32,14 @@ class InitMessageRequest extends MessageRequest<InitMessageResponse> {
   final Directory directory;
   final Encrypter encrypter;
   final Duration persistenceThrottle;
+  final FilePersistorSettings settings;
 
   InitMessageRequest({
     required this.sendPort,
     required this.directory,
     required this.encrypter,
     required this.persistenceThrottle,
+    required this.settings,
   });
 
   InitMessageResponse success(SendPort sendPort) {
@@ -77,10 +80,12 @@ class HydrateMessageResponse extends MessageResponse {
 }
 
 class PersistMessageRequest extends MessageRequest<PersistMessageResponse> {
-  final List<FilePersistDocument> data;
+  final Map<String, String?> keys;
+  final List<FilePersistDocument> docs;
 
   PersistMessageRequest({
-    required this.data,
+    required this.keys,
+    required this.docs,
   });
 
   PersistMessageResponse success() {

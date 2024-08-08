@@ -4,6 +4,7 @@ import 'dart:isolate';
 import 'package:encrypt/encrypt.dart';
 import 'package:loon/loon.dart';
 import 'package:loon/persistor/file_persistor/file_data_store_manager.dart';
+import 'package:loon/persistor/file_persistor/file_persistor_settings.dart';
 import 'package:loon/persistor/file_persistor/messages.dart';
 
 /// The file persistor worker is run on a background isolate to manage file system operations
@@ -24,12 +25,14 @@ class FilePersistorWorker {
     required Directory directory,
     required Encrypter encrypter,
     required Duration persistenceThrottle,
+    required FilePersistorSettings settings,
   }) {
     logger = Logger('Worker', output: _sendLogMessage);
     manager = FileDataStoreManager(
       directory: directory,
       encrypter: encrypter,
       persistenceThrottle: persistenceThrottle,
+      settings: settings,
       onSync: _sendSyncMessage,
       onLog: _sendLogMessage,
     );
@@ -41,6 +44,7 @@ class FilePersistorWorker {
       directory: request.directory,
       encrypter: request.encrypter,
       persistenceThrottle: request.persistenceThrottle,
+      settings: request.settings,
     )._onMessage(request);
   }
 
@@ -101,8 +105,8 @@ class FilePersistorWorker {
   void _persist(PersistMessageRequest request) {
     logger.measure('Persist operation', () async {
       try {
-        logger.log('Persist operation batch size: ${request.data.length}');
-        await manager.persist(request.data);
+        logger.log('Persist operation batch size: ${request.docs.length}');
+        await manager.persist(request.keys, request.docs);
         _sendMessage(request.success());
       } catch (e) {
         _sendMessage(request.error('Persist error'));

@@ -145,14 +145,16 @@ void main() {
       );
 
       test(
-        'Persists primitive documents without a serializer',
+        'Persists serializable document data without a serializer',
         () async {
           final userCollection = Loon.collection('users');
 
           userCollection.doc('1').create(1);
           userCollection.doc('2').create('2');
-          userCollection.doc('3').create([]);
-          userCollection.doc('4').create(true);
+          userCollection.doc('3').create(true);
+          userCollection.doc('4').create({
+            "name": 1,
+          });
 
           await completer.onSync;
 
@@ -166,8 +168,10 @@ void main() {
                 "__values": {
                   "1": 1,
                   "2": '2',
-                  "3": [],
-                  "4": true,
+                  "3": true,
+                  "4": {
+                    "name": 1,
+                  }
                 }
               }
             },
@@ -253,14 +257,146 @@ void main() {
       );
 
       test(
-        'Persists documents using a document-level key',
+        'Persists documents with a value key',
+        () async {
+          final userCollection = Loon.collection<TestUserModel>(
+            'users',
+            fromJson: TestUserModel.fromJson,
+            toJson: (user) => user.toJson(),
+          );
+
+          final userDoc = userCollection.doc('1');
+          final userDoc2 = userCollection.doc('2');
+
+          final user = TestUserModel('User 1');
+          final user2 = TestUserModel('User 2');
+
+          final friend1 = TestUserModel('Friend 1');
+          final friend2 = TestUserModel('Friend 2');
+
+          userDoc.create(user);
+          userDoc2.create(user2);
+          final friendsCollection = userDoc2.subcollection(
+            'friends',
+            fromJson: TestUserModel.fromJson,
+            toJson: (friend) => friend.toJson(),
+            // Aggregate all the `friends` subcollections of users into the `friends` data store.
+            persistorSettings:
+                FilePersistorSettings(key: FilePersistor.key('friends')),
+          );
+          friendsCollection.doc('1').create(friend1);
+          friendsCollection.doc('2').create(friend2);
+
+          await completer.onSync;
+
+          final storeFile = File('${testDirectory.path}/loon/__store__.json');
+          final friendsFile = File('${testDirectory.path}/loon/friends.json');
+          var storeJson = jsonDecode(storeFile.readAsStringSync());
+          var friendsJson = jsonDecode(friendsFile.readAsStringSync());
+
+          expect(
+            storeJson,
+            {
+              "users": {
+                "__values": {
+                  "1": {'name': 'User 1'},
+                  "2": {'name': 'User 2'},
+                },
+              }
+            },
+          );
+
+          expect(
+            friendsJson,
+            {
+              "users": {
+                "2": {
+                  "friends": {
+                    "__values": {
+                      "1": {'name': 'Friend 1'},
+                      "2": {'name': 'Friend 2'},
+                    }
+                  }
+                }
+              }
+            },
+          );
+
+          final resolverFile =
+              File('${testDirectory.path}/loon/__resolver__.json');
+          var resolverJson = jsonDecode(resolverFile.readAsStringSync());
+
+          expect(
+            resolverJson,
+            {
+              "users": {
+                "2": {
+                  "__refs": {
+                    "friends": 1,
+                  },
+                  "__values": {
+                    "friends": "friends",
+                  },
+                }
+              }
+            },
+          );
+
+          friendsCollection.doc('1').delete();
+
+          await completer.onSync;
+
+          friendsJson = jsonDecode(friendsFile.readAsStringSync());
+          expect(
+            friendsJson,
+            {
+              "users": {
+                "2": {
+                  "friends": {
+                    "__values": {
+                      "2": {'name': 'Friend 2'},
+                    }
+                  }
+                }
+              }
+            },
+          );
+
+          resolverJson = jsonDecode(resolverFile.readAsStringSync());
+          expect(
+            resolverJson,
+            {
+              "users": {
+                "2": {
+                  "__refs": {
+                    "friends": 1,
+                  },
+                  "__values": {
+                    "friends": "friends",
+                  },
+                }
+              }
+            },
+          );
+
+          friendsCollection.delete();
+
+          await completer.onSync;
+
+          expect(friendsFile.existsSync(), false);
+          expect(resolverFile.existsSync(), false);
+        },
+      );
+
+      test(
+        'Persists documents with a key builder',
         () async {
           final userCollection = Loon.collection<TestUserModel>(
             'users',
             fromJson: TestUserModel.fromJson,
             toJson: (user) => user.toJson(),
             persistorSettings: FilePersistorSettings(
-              key: FilePersistor.keyBuilder((snap) {
+              key: FilePersistor.keyBuilder<TestUserModel>((snap) {
                 if (snap.id == '1') {
                   return 'users';
                 }
@@ -277,8 +413,8 @@ void main() {
           final usersFile = File('${testDirectory.path}/loon/users.json');
           final otherUsersFile =
               File('${testDirectory.path}/loon/other_users.json');
-          final usersJson = jsonDecode(usersFile.readAsStringSync());
-          final otherUsersJson = jsonDecode(otherUsersFile.readAsStringSync());
+          var usersJson = jsonDecode(usersFile.readAsStringSync());
+          var otherUsersJson = jsonDecode(otherUsersFile.readAsStringSync());
 
           expect(
             usersJson,
@@ -304,7 +440,7 @@ void main() {
 
           final resolverFile =
               File('${testDirectory.path}/loon/__resolver__.json');
-          final resolverJson = jsonDecode(resolverFile.readAsStringSync());
+          var resolverJson = jsonDecode(resolverFile.readAsStringSync());
 
           expect(
             resolverJson,
@@ -321,69 +457,14 @@ void main() {
               }
             },
           );
-        },
-      );
-
-      test(
-        'Removes documents with a document-level key',
-        () async {
-          final userCollection = Loon.collection<TestUserModel>(
-            'users',
-            fromJson: TestUserModel.fromJson,
-            toJson: (user) => user.toJson(),
-            persistorSettings: FilePersistorSettings(
-              key: FilePersistor.keyBuilder((snap) {
-                return 'users';
-              }),
-            ),
-          );
-
-          userCollection.doc('1').create(TestUserModel('User 1'));
-          userCollection.doc('2').create(TestUserModel('User 2'));
-
-          await completer.onSync;
-
-          final usersFile = File('${testDirectory.path}/loon/users.json');
-          var usersJson = jsonDecode(usersFile.readAsStringSync());
-
-          expect(
-            usersJson,
-            {
-              "users": {
-                "__values": {
-                  "1": {'name': 'User 1'},
-                  "2": {'name': 'User 2'},
-                },
-              }
-            },
-          );
-
-          final resolverFile =
-              File('${testDirectory.path}/loon/__resolver__.json');
-          var resolverJson = jsonDecode(resolverFile.readAsStringSync());
-
-          expect(
-            resolverJson,
-            {
-              "users": {
-                "__refs": {
-                  "users": 2,
-                },
-                "__values": {
-                  "1": "users",
-                  "2": "users",
-                }
-              }
-            },
-          );
 
           userCollection.doc('1').delete();
 
           await completer.onSync;
 
-          usersJson = jsonDecode(usersFile.readAsStringSync());
+          expect(usersFile.existsSync(), false);
           expect(
-            usersJson,
+            otherUsersJson,
             {
               "users": {
                 "__values": {
@@ -399,24 +480,34 @@ void main() {
             {
               "users": {
                 "__refs": {
-                  "users": 1,
+                  "other_users": 1,
                 },
                 "__values": {
-                  "2": "users",
+                  "2": "other_users",
                 }
               }
             },
           );
+
+          userCollection.delete();
+
+          await completer.onSync;
+
+          expect(otherUsersFile.existsSync(), false);
+          expect(resolverFile.existsSync(), false);
         },
       );
 
       test(
-        'Persists documents using a collection-level key',
+        'Subcollections inherit a parent value key',
         () async {
           final userCollection = Loon.collection<TestUserModel>(
             'users',
             fromJson: TestUserModel.fromJson,
             toJson: (user) => user.toJson(),
+            persistorSettings: FilePersistorSettings(
+              key: FilePersistor.key('users'),
+            ),
           );
 
           final userDoc = userCollection.doc('1');
@@ -425,29 +516,112 @@ void main() {
           final user = TestUserModel('User 1');
           final user2 = TestUserModel('User 2');
 
+          final friend1 = TestUserModel('Friend 1');
+          final friend2 = TestUserModel('Friend 2');
+
           userDoc.create(user);
           userDoc2.create(user2);
-          userDoc2
-              .subcollection(
-                'friends',
-                fromJson: TestUserModel.fromJson,
-                toJson: (user) => user.toJson(),
-                // Aggregate all the `friends` subcollections of users into the `friends` data store.
-                persistorSettings:
-                    FilePersistorSettings(key: FilePersistor.key('friends')),
-              )
-              .doc('1')
-              .create(user);
+          final friendsCollection = userDoc2.subcollection(
+            'friends',
+            fromJson: TestUserModel.fromJson,
+            toJson: (friend) => friend.toJson(),
+          );
+          friendsCollection.doc('1').create(friend1);
+          friendsCollection.doc('2').create(friend2);
 
           await completer.onSync;
 
           final storeFile = File('${testDirectory.path}/loon/__store__.json');
+          final usersFile = File('${testDirectory.path}/loon/users.json');
+          final usersJson = jsonDecode(usersFile.readAsStringSync());
+
+          // All data is stored in the users.json
+          expect(storeFile.existsSync(), false);
+
+          expect(
+            usersJson,
+            {
+              "users": {
+                "__values": {
+                  "1": {'name': 'User 1'},
+                  "2": {'name': 'User 2'},
+                },
+                "2": {
+                  "friends": {
+                    "__values": {
+                      "1": {'name': 'Friend 1'},
+                      "2": {'name': 'Friend 2'},
+                    }
+                  }
+                }
+              }
+            },
+          );
+
+          final resolverFile =
+              File('${testDirectory.path}/loon/__resolver__.json');
+          final resolverJson = jsonDecode(resolverFile.readAsStringSync());
+
+          // Since the user documents were written first, the resolver enters their data store as the "users" key.
+          // Then when the friends collection documents are written with the same collection data store, there is no need to write
+          // an entry for their collection key, since the nearest parent key is the same "users" key.
+          expect(
+            resolverJson,
+            {
+              "__refs": {
+                "users": 1,
+              },
+              "__values": {
+                "users": "users",
+              },
+            },
+          );
+        },
+      );
+
+      test(
+        'Subcollections can override a parent value key',
+        () async {
+          final userCollection = Loon.collection<TestUserModel>(
+            'users',
+            fromJson: TestUserModel.fromJson,
+            toJson: (user) => user.toJson(),
+            persistorSettings: FilePersistorSettings(
+              key: FilePersistor.key('users'),
+            ),
+          );
+
+          final userDoc = userCollection.doc('1');
+          final userDoc2 = userCollection.doc('2');
+
+          final user = TestUserModel('User 1');
+          final user2 = TestUserModel('User 2');
+
+          final friend1 = TestUserModel('Friend 1');
+          final friend2 = TestUserModel('Friend 2');
+
+          userDoc.create(user);
+          userDoc2.create(user2);
+          final friendsCollection = userDoc2.subcollection(
+            'friends',
+            fromJson: TestUserModel.fromJson,
+            toJson: (friend) => friend.toJson(),
+            persistorSettings: FilePersistorSettings(
+              key: FilePersistor.key('friends'),
+            ),
+          );
+          friendsCollection.doc('1').create(friend1);
+          friendsCollection.doc('2').create(friend2);
+
+          await completer.onSync;
+
+          final usersFile = File('${testDirectory.path}/loon/users.json');
           final friendsFile = File('${testDirectory.path}/loon/friends.json');
-          final storeJson = jsonDecode(storeFile.readAsStringSync());
+          final usersJson = jsonDecode(usersFile.readAsStringSync());
           final friendsJson = jsonDecode(friendsFile.readAsStringSync());
 
           expect(
-            storeJson,
+            usersJson,
             {
               "users": {
                 "__values": {
@@ -465,7 +639,120 @@ void main() {
                 "2": {
                   "friends": {
                     "__values": {
-                      "1": {'name': 'User 1'},
+                      "1": {'name': 'Friend 1'},
+                      "2": {'name': 'Friend 2'},
+                    }
+                  }
+                }
+              }
+            },
+          );
+
+          final resolverFile =
+              File('${testDirectory.path}/loon/__resolver__.json');
+          final resolverJson = jsonDecode(resolverFile.readAsStringSync());
+
+          // Since the friends collection under users__2 specifies a "friends" key,
+          // this overrides the parent path's "users" key on the users collection and
+          // therefore resolves the friends documents to the "friends" data store.
+          expect(
+            resolverJson,
+            {
+              "__refs": {
+                "users": 1,
+              },
+              "__values": {
+                "users": "users",
+              },
+              "users": {
+                "2": {
+                  "__refs": {
+                    "friends": 1,
+                  },
+                  "__values": {
+                    "friends": "friends",
+                  }
+                }
+              },
+            },
+          );
+        },
+      );
+
+      test(
+        'Subcollections inherit a parent key builder',
+        () async {
+          final userCollection = Loon.collection<TestUserModel>(
+            'users',
+            fromJson: TestUserModel.fromJson,
+            toJson: (user) => user.toJson(),
+            persistorSettings: FilePersistorSettings(
+              key: FilePersistor.keyBuilder<TestUserModel>((snap) {
+                return 'users_${snap.id}';
+              }),
+            ),
+          );
+
+          final userDoc = userCollection.doc('1');
+          final userDoc2 = userCollection.doc('2');
+
+          final user = TestUserModel('User 1');
+          final user2 = TestUserModel('User 2');
+
+          final friend1 = TestUserModel('Friend 1');
+          final friend2 = TestUserModel('Friend 2');
+
+          userDoc.create(user);
+          userDoc2.create(user2);
+          final friendsCollection = userDoc.subcollection(
+            'friends',
+            fromJson: TestUserModel.fromJson,
+            toJson: (friend) => friend.toJson(),
+          );
+          final friends2Collection = userDoc2.subcollection(
+            'friends',
+            fromJson: TestUserModel.fromJson,
+            toJson: (friend) => friend.toJson(),
+          );
+          friendsCollection.doc('1').create(friend1);
+          friends2Collection.doc('2').create(friend2);
+
+          await completer.onSync;
+
+          final users1File = File('${testDirectory.path}/loon/users_1.json');
+          final users2File = File('${testDirectory.path}/loon/users_2.json');
+          final users1Json = jsonDecode(users1File.readAsStringSync());
+          final users2Json = jsonDecode(users2File.readAsStringSync());
+
+          expect(
+            users1Json,
+            {
+              "users": {
+                "__values": {
+                  "1": {'name': 'User 1'},
+                },
+                "1": {
+                  "friends": {
+                    "__values": {
+                      "1": {'name': 'Friend 1'},
+                    }
+                  }
+                }
+              }
+            },
+          );
+
+          expect(
+            users2Json,
+            {
+              "users": {
+                "__values": {
+                  "2": {'name': 'User 2'},
+                },
+                "2": {
+                  "friends": {
+                    "__values": {
+                      "2": {'name': 'Friend 2'},
                     }
                   }
                 }
@@ -481,19 +768,178 @@ void main() {
             resolverJson,
             {
               "users": {
-                "2": {
-                  "__refs": {
-                    "friends": 1,
-                  },
-                  "__values": {
-                    "friends": "friends",
-                  },
+                "__refs": {
+                  "users_1": 1,
+                  "users_2": 1,
+                },
+                "__values": {
+                  "1": "users_1",
+                  "2": "users_2",
                 }
               }
             },
           );
         },
       );
+
+      test(
+        'Subcollections can override a parent key builder',
+        () async {
+          final userCollection = Loon.collection<TestUserModel>(
+            'users',
+            fromJson: TestUserModel.fromJson,
+            toJson: (user) => user.toJson(),
+            persistorSettings: FilePersistorSettings(
+              key: FilePersistor.keyBuilder<TestUserModel>((snap) {
+                return 'users_${snap.id}';
+              }),
+            ),
+          );
+
+          final userDoc = userCollection.doc('1');
+          final userDoc2 = userCollection.doc('2');
+
+          final user = TestUserModel('User 1');
+          final user2 = TestUserModel('User 2');
+
+          final friend1 = TestUserModel('Friend 1');
+          final friend2 = TestUserModel('Friend 2');
+
+          userDoc.create(user);
+          userDoc2.create(user2);
+          final friendsCollection = userDoc.subcollection(
+            'friends',
+            fromJson: TestUserModel.fromJson,
+            toJson: (friend) => friend.toJson(),
+            persistorSettings: FilePersistorSettings(
+              key: FilePersistor.keyBuilder<TestUserModel>((snap) {
+                return 'friends_${snap.id}';
+              }),
+            ),
+          );
+          final friends2Collection = userDoc2.subcollection(
+            'friends',
+            fromJson: TestUserModel.fromJson,
+            toJson: (friend) => friend.toJson(),
+            persistorSettings: FilePersistorSettings(
+              key: FilePersistor.keyBuilder<TestUserModel>((snap) {
+                return 'friends_${snap.id}';
+              }),
+            ),
+          );
+          friendsCollection.doc('1').create(friend1);
+          friends2Collection.doc('2').create(friend2);
+
+          await completer.onSync;
+
+          final users1File = File('${testDirectory.path}/loon/users_1.json');
+          final users2File = File('${testDirectory.path}/loon/users_2.json');
+          final users1Json = jsonDecode(users1File.readAsStringSync());
+          final users2Json = jsonDecode(users2File.readAsStringSync());
+          final friends1File =
+              File('${testDirectory.path}/loon/friends_1.json');
+          final friends2File =
+              File('${testDirectory.path}/loon/friends_2.json');
+          final friends1Json = jsonDecode(friends1File.readAsStringSync());
+          final friends2Json = jsonDecode(friends2File.readAsStringSync());
+
+          expect(
+            users1Json,
+            {
+              "users": {
+                "__values": {
+                  "1": {'name': 'User 1'},
+                },
+              }
+            },
+          );
+          expect(
+            friends1Json,
+            {
+              "users": {
+                "1": {
+                  "friends": {
+                    "__values": {
+                      "1": {'name': 'Friend 1'},
+                    }
+                  }
+                }
+              }
+            },
+          );
+
+          expect(
+            users2Json,
+            {
+              "users": {
+                "__values": {
+                  "2": {'name': 'User 2'},
+                },
+              }
+            },
+          );
+          expect(
+            friends2Json,
+            {
+              "users": {
+                "2": {
+                  "friends": {
+                    "__values": {
+                      "2": {'name': 'Friend 2'},
+                    }
+                  }
+                }
+              }
+            },
+          );
+
+          final resolverFile =
+              File('${testDirectory.path}/loon/__resolver__.json');
+          final resolverJson = jsonDecode(resolverFile.readAsStringSync());
+
+          expect(
+            resolverJson,
+            {
+              "users": {
+                "__refs": {
+                  "users_1": 1,
+                  "users_2": 1,
+                },
+                "__values": {
+                  "1": "users_1",
+                  "2": "users_2",
+                },
+                "1": {
+                  "friends": {
+                    "__refs": {
+                      "friends_1": 1,
+                    },
+                    "__values": {
+                      "1": "friends_1",
+                    }
+                  }
+                },
+                "2": {
+                  "friends": {
+                    "__refs": {
+                      "friends_2": 1,
+                    },
+                    "__values": {
+                      "2": "friends_2",
+                    }
+                  }
+                },
+              }
+            },
+          );
+        },
+      );
+
+      // TODO:
+      // Add root persistor key tests
+      // Add global persistor key test (works for value key, should not for builder, throw error)
+      // In persistor_test: Add inheritence of persistor enabled setting tests.
+      // In encrypted_file_persistor_test: Add inheritance of encryption setting tests.
 
       // The following group of tests cover the valid scenarios where a persistence key for a value changes:
       // 1. null -> document-level key
@@ -1418,7 +1864,8 @@ void main() {
 
       userFriendsCollection.doc('3').create(TestUserModel('Friend 3'));
 
-      Loon.doc('current_user_id').create('1');
+      final currentUserDoc = Loon.doc('current_user_id');
+      currentUserDoc.create('1');
 
       await completer.onSync;
 
@@ -1522,6 +1969,11 @@ void main() {
           data: TestUserModel('Friend 3'),
         ),
       ]);
+
+      expect(
+        currentUserDoc.get(),
+        DocumentSnapshot(doc: currentUserDoc, data: '1'),
+      );
     });
 
     test(
