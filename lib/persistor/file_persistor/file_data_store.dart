@@ -149,6 +149,13 @@ class DualFileDataStore {
       _encryptedStore.extractValues(path),
     );
   }
+
+  Map inspect() {
+    return {
+      "plaintext": _plaintextStore.inspect(),
+      "encrypted": _encryptedStore.inspect(),
+    };
+  }
 }
 
 class FileDataStore {
@@ -340,6 +347,10 @@ class FileDataStore {
   /// Returns a flat map of all values in the store by path.
   Map<String, dynamic> extractValues([String path = '']) {
     return _store.extractValues(path);
+  }
+
+  Map inspect() {
+    return _store.inspect();
   }
 }
 

@@ -195,7 +195,7 @@ class FilePersistor extends Persistor {
             String path;
 
             /// A value key is stored at the parent path of the document unless it is a document
-            /// on the root collection which supports variable collection persistor settings via [Loon.doc].
+            /// on the root collection, which supports variable collection persistor settings via [Loon.doc].
             if (persistorDoc.parent != Collection.root.path) {
               path = persistorDoc.parent;
             } else {
@@ -203,7 +203,7 @@ class FilePersistor extends Persistor {
             }
 
             if (!keys.containsKey(path)) {
-              keys[persistorDoc.parent] = key.value;
+              keys[path] = key.value;
             }
 
             break;

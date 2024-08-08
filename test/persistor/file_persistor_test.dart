@@ -941,21 +941,133 @@ void main() {
       // In persistor_test: Add inheritence of persistor enabled setting tests.
       // In encrypted_file_persistor_test: Add inheritance of encryption setting tests.
 
-      // The following group of tests cover the valid scenarios where a persistence key for a value changes:
-      // 1. null -> document-level key
-      // 2. null -> collection-level key
-      // 3. document-level key -> null
-      // 4. document-level key -> updated document-level key
-      // 5. document-level key -> collection-level key
-      // 6. collection-level key -> updated collection-level key
+      // The following group of tests cover the valid scenarios where a persistence key for a path changes:
+      // 1. null -> value key
+      // 2. null -> builder key
+      // 3. builder key -> null
+      // 4. value key -> updated value key
+      // 5. value key -> builder key
+      // 6. builder key -> updated builder key
       group(
         'Persistence key changes',
         () {
           group(
-            '1. null -> document-level key',
+            '1. null -> value key',
             () {
               test(
-                'Moves the document and its subcollections in root default store to the store specified by its document-level key',
+                'Moves all documents and their subcollections in the default store to the store specified by the value key',
+                () async {
+                  final usersCollection = Loon.collection<TestUserModel>(
+                    'users',
+                    fromJson: TestUserModel.fromJson,
+                    toJson: (user) => user.toJson(),
+                  );
+
+                  final updatedUsersCollection = Loon.collection<TestUserModel>(
+                    'users',
+                    fromJson: TestUserModel.fromJson,
+                    toJson: (user) => user.toJson(),
+                    persistorSettings: FilePersistorSettings(
+                      key: FilePersistor.key('other_users'),
+                    ),
+                  );
+
+                  usersCollection.doc('1').create(TestUserModel('User 1'));
+                  usersCollection.doc('2').create(TestUserModel('User 2'));
+                  usersCollection
+                      .doc('1')
+                      .subcollection(
+                        'friends',
+                        fromJson: TestUserModel.fromJson,
+                        toJson: (user) => user.toJson(),
+                      )
+                      .doc('1')
+                      .create(TestUserModel('Friend 1'));
+
+                  await completer.onSync;
+
+                  final storeFile =
+                      File('${testDirectory.path}/loon/__store__.json');
+                  var storeJson = jsonDecode(storeFile.readAsStringSync());
+
+                  expect(
+                    storeJson,
+                    {
+                      "users": {
+                        "__values": {
+                          "1": {"name": "User 1"},
+                          "2": {"name": "User 2"},
+                        },
+                        "1": {
+                          "friends": {
+                            "__values": {
+                              "1": {"name": "Friend 1"},
+                            }
+                          }
+                        }
+                      }
+                    },
+                  );
+
+                  final resolverFile =
+                      File('${testDirectory.path}/loon/__resolver__.json');
+                  expect(resolverFile.existsSync(), false);
+
+                  updatedUsersCollection
+                      .doc('1')
+                      .update(TestUserModel('User 1 updated'));
+
+                  await completer.onSync;
+
+                  final otherUsersFile =
+                      File('${testDirectory.path}/loon/other_users.json');
+                  var otherUsersJson =
+                      jsonDecode(otherUsersFile.readAsStringSync());
+
+                  expect(storeFile.existsSync(), false);
+
+                  expect(
+                    otherUsersJson,
+                    {
+                      "users": {
+                        "__values": {
+                          "1": {"name": "User 1 updated"},
+                          "2": {"name": "User 2"},
+                        },
+                        "1": {
+                          "friends": {
+                            "__values": {
+                              "1": {"name": "Friend 1"},
+                            }
+                          }
+                        }
+                      }
+                    },
+                  );
+
+                  var resolverJson =
+                      jsonDecode(resolverFile.readAsStringSync());
+                  expect(
+                    resolverJson,
+                    {
+                      "__refs": {
+                        "other_users": 1,
+                      },
+                      "__values": {
+                        "users": "other_users",
+                      },
+                    },
+                  );
+                },
+              );
+            },
+          );
+
+          group(
+            '2. null -> builder key',
+            () {
+              test(
+                'Moves the document and its subcollections in the default store to the store specified by its builder key',
                 () async {
                   final usersCollection = Loon.collection<TestUserModel>(
                     'users',
@@ -1076,117 +1188,7 @@ void main() {
           );
 
           group(
-            '2. null -> collection-level key',
-            () {
-              test(
-                'Moves all documents and their subcollections in the default store to the store specified by the collection-level key',
-                () async {
-                  final usersCollection = Loon.collection<TestUserModel>(
-                    'users',
-                    fromJson: TestUserModel.fromJson,
-                    toJson: (user) => user.toJson(),
-                  );
-
-                  final updatedUsersCollection = Loon.collection<TestUserModel>(
-                    'users',
-                    fromJson: TestUserModel.fromJson,
-                    toJson: (user) => user.toJson(),
-                    persistorSettings: FilePersistorSettings(
-                      key: FilePersistor.key('other_users'),
-                    ),
-                  );
-
-                  usersCollection.doc('1').create(TestUserModel('User 1'));
-                  usersCollection.doc('2').create(TestUserModel('User 2'));
-                  usersCollection
-                      .doc('1')
-                      .subcollection(
-                        'friends',
-                        fromJson: TestUserModel.fromJson,
-                        toJson: (user) => user.toJson(),
-                      )
-                      .doc('1')
-                      .create(TestUserModel('Friend 1'));
-
-                  await completer.onSync;
-
-                  final storeFile =
-                      File('${testDirectory.path}/loon/__store__.json');
-                  var storeJson = jsonDecode(storeFile.readAsStringSync());
-
-                  expect(
-                    storeJson,
-                    {
-                      "users": {
-                        "__values": {
-                          "1": {"name": "User 1"},
-                          "2": {"name": "User 2"},
-                        },
-                        "1": {
-                          "friends": {
-                            "__values": {
-                              "1": {"name": "Friend 1"},
-                            }
-                          }
-                        }
-                      }
-                    },
-                  );
-
-                  final resolverFile =
-                      File('${testDirectory.path}/loon/__resolver__.json');
-                  expect(resolverFile.existsSync(), false);
-
-                  updatedUsersCollection
-                      .doc('1')
-                      .update(TestUserModel('User 1 updated'));
-
-                  await completer.onSync;
-
-                  final otherUsersFile =
-                      File('${testDirectory.path}/loon/other_users.json');
-                  var otherUsersJson =
-                      jsonDecode(otherUsersFile.readAsStringSync());
-
-                  expect(
-                    otherUsersJson,
-                    {
-                      "users": {
-                        "__values": {
-                          "1": {"name": "User 1 updated"},
-                          "2": {"name": "User 2"},
-                        },
-                        "1": {
-                          "friends": {
-                            "__values": {
-                              "1": {"name": "Friend 1"},
-                            }
-                          }
-                        }
-                      }
-                    },
-                  );
-
-                  var resolverJson =
-                      jsonDecode(resolverFile.readAsStringSync());
-                  expect(
-                    resolverJson,
-                    {
-                      "__refs": {
-                        "other_users": 1,
-                      },
-                      "__values": {
-                        "users": "other_users",
-                      },
-                    },
-                  );
-                },
-              );
-            },
-          );
-
-          group(
-            '3. document-level key -> null',
+            '3. builder key -> null',
             () {
               test(
                 'Moves the document and its subcollections in the previous document store to the root store',

@@ -242,7 +242,7 @@ class FileDataStoreManager {
           // If the resolved data store for the persistence path has changed, then its data
           // should be grafted from its previous data store to the updated one.
           if (prevDataStore != null) {
-            dataStore.graft(prevDataStore, path);
+            await dataStore.graft(prevDataStore, path);
           }
 
           if (dataStoreName != null) {
@@ -253,8 +253,6 @@ class FileDataStoreManager {
         }
       }
 
-      // After updating the resolved data stores for document paths, iterate through the updated
-      // documents and
       for (final doc in docs) {
         final docPath = doc.path;
         final docData = doc.data;
