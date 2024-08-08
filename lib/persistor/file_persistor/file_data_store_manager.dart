@@ -54,7 +54,7 @@ class FileDataStoreManager {
   /// Resolves the data store name for the given path as the nearest value found working up from
   /// the full path, falling back to the default store key if none is found.
   String _resolveStoreName(String path) {
-    return _resolver.store.getNearest(path) ?? FileDataStore.defaultKey;
+    return _resolver.getNearest(path) ?? FileDataStore.defaultKey;
   }
 
   /// Resolves the set of [FileDataStore] that exist at the given path and under it.
@@ -69,11 +69,7 @@ class FileDataStoreManager {
       // Traversing the resolver tree to extract the set of data stores referenced under a given path is generally performant,
       // since the number of nodes traversed in the resolver tree scales O(m) where m is the number of distinct collections that
       // specify a unique persistence key under the given path and is generally small.
-      ..._resolver.store
-          .extractRefs(path)
-          .keys
-          .map((name) => _index[name]!)
-          .toSet(),
+      ..._resolver.extractRefs(path).keys.map((name) => _index[name]!).toSet(),
     };
   }
 
@@ -100,7 +96,7 @@ class FileDataStoreManager {
 
         await Future.wait([
           ...dirtyStores.map((store) => store.sync()),
-          _resolver.persist(),
+          if (_resolver.isDirty) _resolver.sync(),
         ]);
 
         for (final store in dirtyStores) {
@@ -120,7 +116,7 @@ class FileDataStoreManager {
   Future<void> _clear(String path) async {
     final stores = _resolveStores(path);
     await Future.wait(stores.map((store) => store.deletePath(path)));
-    _resolver.store.delete(path);
+    _resolver.deletePath(path);
   }
 
   Future<void> init() async {
@@ -216,13 +212,16 @@ class FileDataStoreManager {
   }
 
   Future<void> persist(
+    /// A map of paths in the store to the [FileDataStore] key in which documents
+    /// under the given path should be stored.
     Map<String, String?> keys,
+
+    /// The list of updated documents to persist.
     List<FilePersistDocument> docs,
   ) {
     return _syncLock.run(() async {
-      // Process the persistor keys associated with the updated documents, grafting
-      // data at a given path that has changed its persistence key, and marking the updated
-      // keys for paths in the data store resolver.
+      // First process the persistor keys associated with the updated documents, moving
+      // data that has changed stores and updating resolver paths with the updated keys.
       for (final entry in keys.entries) {
         final path = entry.key;
         final prevDataStoreName = _resolveStoreName(path);
@@ -247,17 +246,15 @@ class FileDataStoreManager {
           }
 
           if (dataStoreName != null) {
-            _resolver.store.write(path, dataStoreName);
+            _resolver.writePath(path, dataStoreName);
           } else {
-            _resolver.store.delete(path, recursive: false);
+            _resolver.deletePath(path, recursive: false);
           }
         }
       }
 
-      if (docs.isEmpty) {
-        return;
-      }
-
+      // After updating the resolved data stores for document paths, iterate through the updated
+      // documents and
       for (final doc in docs) {
         final docPath = doc.path;
         final docData = doc.data;

@@ -17,7 +17,7 @@ abstract class PersistorOperation<T> {
 }
 
 abstract class PersistorBatchOperation<S, T> extends PersistorOperation<T> {
-  final Set<S> batch;
+  final LinkedHashSet<S> batch;
 
   PersistorBatchOperation(this.batch);
 }
@@ -25,12 +25,12 @@ abstract class PersistorBatchOperation<S, T> extends PersistorOperation<T> {
 class InitOperation extends PersistorOperation<void> {}
 
 class PersistOperation
-    extends PersistorBatchOperation<Document, Set<Document>> {
+    extends PersistorBatchOperation<Document, LinkedHashSet<Document>> {
   PersistOperation(super.batch);
 }
 
 class ClearOperation
-    extends PersistorBatchOperation<Collection, Set<Collection>> {
+    extends PersistorBatchOperation<Collection, LinkedHashSet<Collection>> {
   ClearOperation(super.batch);
 }
 

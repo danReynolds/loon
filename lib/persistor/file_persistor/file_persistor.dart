@@ -4,7 +4,6 @@ import 'dart:isolate';
 import 'package:encrypt/encrypt.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:loon/loon.dart';
-import 'package:loon/persistor/file_persistor/extensions/document.dart';
 import 'package:loon/persistor/file_persistor/file_persist_document.dart';
 import 'package:loon/persistor/file_persistor/file_persistor_settings.dart';
 import 'package:loon/persistor/file_persistor/file_persistor_worker.dart';
@@ -176,31 +175,64 @@ class FilePersistor extends Persistor {
     final Map<String, String?> keys = {};
     final List<FilePersistDocument> persistDocs = [];
 
-    for (final doc in docs) {
+    // The documents are iterated in reversed insertion order, so that newer
+    // updates to persistor paths are applied versus older ones.
+    for (final doc in docs.reversed) {
       final persistorSettings = doc.persistorSettings;
+      final globalPersistorSettings = Loon.persistorSettings;
 
-      if (persistorSettings is DocumentPersistorSettings) {
+      bool encrypted;
+
+      if (persistorSettings != null) {
         final persistorDoc = persistorSettings.doc;
         final docSettings = persistorSettings.settings;
 
+        encrypted =
+            docSettings is FilePersistorSettings && docSettings.encrypted;
+
         switch (docSettings) {
           case FilePersistorSettings(key: FilePersistorValueKey key):
-            keys[persistorDoc.parent] = key.value;
+            String path;
+
+            /// A value key is stored at the parent path of the document unless it is a document
+            /// on the root collection which supports variable collection persistor settings via [Loon.doc].
+            if (persistorDoc.parent != Collection.root.path) {
+              path = persistorDoc.parent;
+            } else {
+              path = persistorDoc.path;
+            }
+
+            if (!keys.containsKey(path)) {
+              keys[persistorDoc.parent] = key.value;
+            }
+
+            break;
           case FilePersistorSettings(key: FilePersistorBuilderKey keyBuilder):
             final snap = persistorDoc.get();
-            if (snap == null) {
-              keys[persistorDoc.path] = null;
-            } else {
-              keys[persistorDoc.path] = (keyBuilder as dynamic)(snap);
+            final path = persistorDoc.path;
+
+            if (keys.containsKey(path)) {
+              break;
             }
+
+            if (snap == null) {
+              keys[path] = null;
+            } else {
+              keys[path] = (keyBuilder as dynamic)(snap);
+            }
+
+            break;
         }
+      } else {
+        encrypted = globalPersistorSettings is FilePersistorSettings &&
+            globalPersistorSettings.encrypted;
       }
 
       persistDocs.add(
         FilePersistDocument(
           path: doc.path,
           data: doc.getSerialized(),
-          encrypted: doc.isEncrypted(),
+          encrypted: encrypted,
         ),
       );
     }

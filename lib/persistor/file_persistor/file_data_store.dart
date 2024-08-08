@@ -386,11 +386,13 @@ class EncryptedFileDataStore extends FileDataStore {
 class FileDataStoreResolver {
   late final File _file;
 
-  var store = RefValueStore<String>();
+  var _store = RefValueStore<String>();
 
   static const name = '__resolver__';
 
   late final Logger _logger;
+
+  bool isDirty = false;
 
   FileDataStoreResolver({
     required Directory directory,
@@ -402,6 +404,31 @@ class FileDataStoreResolver {
     _file = File("${directory.path}/$name.json");
   }
 
+  void writePath(String path, dynamic value) async {
+    if (_store.get(path) != value) {
+      _store.write(path, value);
+      isDirty = true;
+    }
+  }
+
+  void deletePath(
+    String path, {
+    bool recursive = true,
+  }) {
+    if (_store.hasValue(path) || recursive && _store.hasPath(path)) {
+      _store.delete(path, recursive: recursive);
+      isDirty = true;
+    }
+  }
+
+  Map<String, int> extractRefs([String path = '']) {
+    return _store.extractRefs(path);
+  }
+
+  String? getNearest(String path) {
+    return _store.getNearest(path);
+  }
+
   Future<void> hydrate() async {
     try {
       await _logger.measure(
@@ -409,7 +436,7 @@ class FileDataStoreResolver {
         () async {
           if (await (_file.exists())) {
             final fileStr = await _file.readAsString();
-            store = RefValueStore(jsonDecode(fileStr));
+            _store = RefValueStore(jsonDecode(fileStr));
           }
         },
       );
@@ -422,14 +449,14 @@ class FileDataStoreResolver {
   }
 
   Future<void> persist() async {
-    if (store.isEmpty) {
+    if (_store.isEmpty) {
       _logger.log('Empty persist');
       return;
     }
 
     await _logger.measure(
       'Persist',
-      () => _file.writeAsString(jsonEncode(store.inspect())),
+      () => _file.writeAsString(jsonEncode(_store.inspect())),
     );
   }
 
@@ -440,8 +467,16 @@ class FileDataStoreResolver {
         if (await _file.exists()) {
           await _file.delete();
         }
-        store.clear();
+        _store.clear();
       },
     );
+  }
+
+  Future<void> sync() async {
+    if (_store.isEmpty) {
+      await delete();
+    } else if (isDirty) {
+      await persist();
+    }
   }
 }

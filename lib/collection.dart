@@ -3,8 +3,10 @@ part of loon;
 const _rootKey = 'root';
 
 class _RootCollection extends StoreReference {
+  const _RootCollection();
+
   @override
-  String get path => _rootKey;
+  final String path = _rootKey;
 }
 
 class Collection<T> implements Queryable<T>, StoreReference {
@@ -18,7 +20,7 @@ class Collection<T> implements Queryable<T>, StoreReference {
   /// [DocumentSnapshot] is dependent on.
   final DependenciesBuilder<T>? dependenciesBuilder;
 
-  static final root = _RootCollection();
+  static const root = _RootCollection();
 
   Collection(
     this.parent,

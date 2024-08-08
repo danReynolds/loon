@@ -3,6 +3,7 @@ library loon;
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
+import 'dart:collection';
 
 export 'widgets/query_stream_builder.dart';
 export 'widgets/document_stream_builder.dart';
@@ -236,7 +237,7 @@ class Loon {
       return;
     }
     try {
-      final data = await _instance.persistManager!.hydrate(refs?.toSet());
+      final data = await _instance.persistManager!.hydrate(refs);
 
       for (final entry in data.entries) {
         final docPath = entry.key;
