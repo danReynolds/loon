@@ -172,7 +172,7 @@ class FilePersistor extends Persistor {
 
   @override
   persist(docs) async {
-    final Map<String, String?> keys = {};
+    final resolver = ValueStore<String>();
     final List<FilePersistDocument> persistDocs = [];
 
     // The documents are iterated in reversed insertion order, so that newer
@@ -202,8 +202,8 @@ class FilePersistor extends Persistor {
               path = persistorDoc.path;
             }
 
-            if (!keys.containsKey(path)) {
-              keys[path] = key.value;
+            if (!resolver.hasPath(path)) {
+              resolver.write(path, key.value);
             }
 
             break;
@@ -211,14 +211,8 @@ class FilePersistor extends Persistor {
             final snap = persistorDoc.get();
             final path = persistorDoc.path;
 
-            if (keys.containsKey(path)) {
-              break;
-            }
-
-            if (snap == null) {
-              keys[path] = null;
-            } else {
-              keys[path] = (keyBuilder as dynamic)(snap);
+            if (!resolver.hasPath(path) && snap != null) {
+              resolver.write(path, (keyBuilder as dynamic)(snap));
             }
 
             break;
@@ -237,7 +231,9 @@ class FilePersistor extends Persistor {
       );
     }
 
-    await _sendMessage(PersistMessageRequest(keys: keys, docs: persistDocs));
+    await _sendMessage(
+      PersistMessageRequest(resolver: resolver, docs: persistDocs),
+    );
   }
 
   @override

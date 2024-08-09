@@ -51,16 +51,12 @@ class FileDataStoreManager {
     required this.settings,
   });
 
-  /// Resolves the data store name for the given path as the nearest value found working up from
-  /// the full path, falling back to the default store key if none is found.
-  String _resolveStoreName(String path) {
-    return _resolver.getNearest(path) ?? FileDataStore.defaultKey;
-  }
-
   /// Resolves the set of [FileDataStore] that exist at the given path and under it.
   Set<DualFileDataStore> _resolveStores(String path) {
     // Resolve the store for the document path itself separately.
-    final store = _index[_resolveStoreName(path)];
+    // TODO: Why does it need to be resolved separately? Should extractRefs include the value at the given path?
+    final store =
+        _index[_resolver.getNearest(path)?.$2 ?? FileDataStore.defaultKey];
 
     return {
       if (store != null) store,
@@ -163,7 +159,7 @@ class FileDataStoreManager {
         final Set<DualFileDataStore> dataStores = {};
 
         // If the hydration operation is only for certain paths, then resolve all of the file data stores
-        // relevant to the given paths and their subpaths and hydrate those data stores.
+        // reachable under the given paths and hydrate only those data stores.
         if (paths != null) {
           for (final path in paths) {
             final stores = _resolveStores(path);
@@ -184,8 +180,8 @@ class FileDataStoreManager {
               // Since many different paths can be contained within the same file data store,
               // we only extract the data in the hydrated store that falls under the requested path.
               //
-              // Doing this ensures that the client's contract to only hydrate the data that the requested
-              // is fulfilled and it also offers a performance benefit since no unnecessary data is copied
+              // Doing this ensures that the client's contract to only hydrate the data that was requested
+              // is ensured and it also offers a performance benefit since no unnecessary data is copied
               // back from the worker to the main isolate.
               //
               // If later on the client requests to hydrate a path for a data store that has already been
@@ -212,46 +208,35 @@ class FileDataStoreManager {
   }
 
   Future<void> persist(
-    /// A map of paths in the store to the [FileDataStore] key in which documents
-    /// under the given path should be stored.
-    Map<String, String?> keys,
+    ValueStore<String> localResolver,
 
     /// The list of updated documents to persist.
     List<FilePersistDocument> docs,
   ) {
     return _syncLock.run(() async {
-      // First process the persistor keys associated with the updated documents, moving
-      // data that has changed stores and updating resolver paths with the updated keys.
-      for (final entry in keys.entries) {
-        final path = entry.key;
-        final prevDataStoreName = _resolveStoreName(path);
-        final dataStoreName = entry.value;
+      // for (final entry in keys.entries) {
+      //   final path = entry.key;
+      //   final prevDataStoreName = _resolver.get(path);
+      //   final dataStoreName = entry.value;
 
-        if (prevDataStoreName != dataStoreName) {
-          final prevDataStore = _index[prevDataStoreName];
-          final defaultedDataStoreName =
-              entry.value ?? FileDataStore.defaultKey;
-          final dataStore =
-              _index[defaultedDataStoreName] ??= DualFileDataStore(
-            name: defaultedDataStoreName,
-            encrypter: encrypter,
-            directory: directory,
-            isHydrated: true,
-          );
+      //   if (prevDataStoreName != dataStoreName) {
+      //     final prevDataStore = _index[prevDataStoreName];
+      //     final dataStore = _index[dataStoreName] ??= DualFileDataStore(
+      //       name: dataStoreName,
+      //       encrypter: encrypter,
+      //       directory: directory,
+      //       isHydrated: true,
+      //     );
 
-          // If the resolved data store for the persistence path has changed, then its data
-          // should be grafted from its previous data store to the updated one.
-          if (prevDataStore != null) {
-            await dataStore.graft(prevDataStore, path);
-          }
+      //     // If the resolved data store for the persistence path has changed, then its data
+      //     // should be grafted from its previous data store to the updated one.
+      //     if (prevDataStore != null) {
+      //       await dataStore.graft(prevDataStore, path);
+      //     }
 
-          if (dataStoreName != null) {
-            _resolver.writePath(path, dataStoreName);
-          } else {
-            _resolver.deletePath(path, recursive: false);
-          }
-        }
-      }
+      //     _resolver.writePath(path, dataStoreName);
+      //   }
+      // }
 
       for (final doc in docs) {
         final docPath = doc.path;
@@ -263,7 +248,48 @@ class FileDataStoreManager {
           await _clear(docPath);
           // Otherwise, write its associated data store with the updated document data.
         } else {
-          final dataStore = _index[_resolveStoreName(docPath)]!;
+          final prevResult = _resolver.getNearest(docPath);
+          final prevResolverPath = prevResult?.$1;
+          final prevResolverValue = prevResult?.$2;
+
+          final nextResult = localResolver.getNearest(docPath);
+          final nextResolverPath = nextResult?.$1;
+          final nextResolverValue = nextResult?.$2;
+
+          final prevDataStoreName =
+              prevResolverValue ?? FileDataStore.defaultKey;
+          final dataStoreName = nextResolverValue ?? FileDataStore.defaultKey;
+          final dataStore = _index[dataStoreName] ??= DualFileDataStore(
+            name: dataStoreName,
+            encrypter: encrypter,
+            directory: directory,
+            isHydrated: true,
+          );
+
+          // users__1__friends__2
+
+          if (nextResolverValue != prevResolverValue) {
+            final prevDataStore = _index[prevDataStoreName]!;
+
+            if (nextResolverPath == prevResolverPath) {
+              _resolver.writePath(nextResolverPath!, nextResolverValue);
+              await dataStore.graft(prevDataStore, nextResolverPath);
+            } else if (nextResolverPath == null) {
+              _resolver.deletePath(prevResolverPath!, recursive: false);
+              await dataStore.graft(prevDataStore, prevResolverPath);
+            } else if (prevResolverPath == null) {
+              _resolver.writePath(nextResolverPath, nextResolverValue);
+              await dataStore.graft(prevDataStore, nextResolverPath);
+            } else {
+              // Think this one through more. users__1__friends__1 goes from
+              // resolving from path users__1__friends to users__1. Think it depends
+              // on whether the new resolution is because now there is a resolver path
+              // downstream of the old one vs upstream.
+              _resolver.writePath(nextResolverPath, nextResolverValue);
+              await dataStore.graft(prevDataStore, prevResolverPath);
+            }
+          }
+
           await dataStore.writePath(docPath, docData, encrypted);
         }
       }

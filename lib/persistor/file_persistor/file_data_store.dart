@@ -436,8 +436,12 @@ class FileDataStoreResolver {
     return _store.extractRefs(path);
   }
 
-  String? getNearest(String path) {
+  (String, String)? getNearest(String path) {
     return _store.getNearest(path);
+  }
+
+  String? get(String path) {
+    return _store.get(path);
   }
 
   Future<void> hydrate() async {

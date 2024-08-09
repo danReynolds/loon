@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'dart:isolate';
 import 'package:encrypt/encrypt.dart';
+import 'package:loon/loon.dart';
 import 'package:loon/persistor/file_persistor/file_persist_document.dart';
 import 'package:loon/persistor/file_persistor/file_persistor_settings.dart';
 import 'package:uuid/uuid.dart';
@@ -80,11 +81,11 @@ class HydrateMessageResponse extends MessageResponse {
 }
 
 class PersistMessageRequest extends MessageRequest<PersistMessageResponse> {
-  final Map<String, String?> keys;
+  final ValueStore<String> resolver;
   final List<FilePersistDocument> docs;
 
   PersistMessageRequest({
-    required this.keys,
+    required this.resolver,
     required this.docs,
   });
 

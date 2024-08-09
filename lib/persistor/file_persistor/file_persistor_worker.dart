@@ -106,7 +106,7 @@ class FilePersistorWorker {
     logger.measure('Persist operation', () async {
       try {
         logger.log('Persist operation batch size: ${request.docs.length}');
-        await manager.persist(request.keys, request.docs);
+        await manager.persist(request.resolver, request.docs);
         _sendMessage(request.success());
       } catch (e) {
         _sendMessage(request.error('Persist error'));

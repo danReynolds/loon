@@ -126,7 +126,7 @@ class ValueStore<T> {
     )?[_values]?[segments.last];
   }
 
-  T? _getNearest(Map? node, List<String> segments, int index) {
+  (String, T)? _getNearest(Map? node, List<String> segments, int index) {
     if (node == null) {
       return null;
     }
@@ -134,20 +134,30 @@ class ValueStore<T> {
     if (index < segments.length - 1) {
       final segment = segments[index];
 
-      final value = _getNearest(node[segment], segments, index + 1);
-      if (value != null) {
-        return value;
+      final result = _getNearest(node[segment], segments, index + 1);
+      if (result != null) {
+        return result;
       }
 
-      return node[_values]?[segment];
+      final value = node[_values]?[segment];
+      if (value != null) {
+        return (segments.sublist(0, index + 1).join(delimiter), value);
+      }
+
+      return null;
     }
 
-    return node[_values]?[segments[index]];
+    final value = node[_values]?[segments[index]];
+    if (value != null) {
+      return (segments.sublist(0, index + 1).join(delimiter), value);
+    }
+
+    return null;
   }
 
-  /// Returns the nearest value along the given path, beginning at the full path
+  /// Returns the nearest path along with its value that exists along the given path, beginning at the full path
   /// and then attempting to find a non-null value for any parent node moving up the tree.
-  T? getNearest(String path) {
+  (String, T)? getNearest(String path) {
     return _getNearest(_store, path.split(delimiter), 0);
   }
 
