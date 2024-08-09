@@ -249,11 +249,11 @@ class FileDataStoreManager {
           // Otherwise, write its associated data store with the updated document data.
         } else {
           final prevResult = _resolver.getNearest(docPath);
-          final prevResolverPath = prevResult?.$1;
+          final prevResolverPath = prevResult?.$1 ?? '';
           final prevResolverValue = prevResult?.$2;
 
           final nextResult = localResolver.getNearest(docPath);
-          final nextResolverPath = nextResult?.$1;
+          final nextResolverPath = nextResult?.$1 ?? '';
           final nextResolverValue = nextResult?.$2;
 
           final prevDataStoreName =
@@ -266,31 +266,87 @@ class FileDataStoreManager {
             isHydrated: true,
           );
 
-          // users__1__friends__2
-
           if (nextResolverValue != prevResolverValue) {
             final prevDataStore = _index[prevDataStoreName]!;
 
+            // Scenario 1: A document's resolver value changes and its path stays the same.
+            //
+            // When a document is written with the same resolver path a__b__c and updated resolver value 2 from 1,
+            // then store 1 grafts *all* its data under resolver path a__b__c into store 2 at resolver path a__b__c.
             if (nextResolverPath == prevResolverPath) {
-              _resolver.writePath(nextResolverPath!, nextResolverValue);
-              await dataStore.graft(prevDataStore, nextResolverPath);
-            } else if (nextResolverPath == null) {
-              _resolver.deletePath(prevResolverPath!, recursive: false);
-              await dataStore.graft(prevDataStore, prevResolverPath);
-            } else if (prevResolverPath == null) {
               _resolver.writePath(nextResolverPath, nextResolverValue);
-              await dataStore.graft(prevDataStore, nextResolverPath);
+              await dataStore.graft(
+                nextResolverPath,
+                prevResolverPath,
+                null,
+                prevDataStore,
+              );
             } else {
-              // Think this one through more. users__1__friends__1 goes from
-              // resolving from path users__1__friends to users__1. Think it depends
-              // on whether the new resolution is because now there is a resolver path
-              // downstream of the old one vs upstream.
+              // Scenario 2: A document's resolver value changes and its resolver path changes from a shorter path to a descendant path.
+              //
+              // When a document is updated from previous resolver path a__b__c and resolver value 1 to descendant resolver path a__b__c__d and resolver value 2,
+              // then data under path a__b__c__d in resolver path a__b__c of store 1 should be grafted into store 2 with resolver path a__b__c__d.
+              //
+              if (nextResolverPath.length > prevResolverPath.length) {
+                _resolver.writePath(nextResolverPath, nextResolverValue);
+                await dataStore.graft(
+                  nextResolverPath,
+                  prevResolverPath,
+                  nextResolverPath,
+                  prevDataStore,
+                );
+                // Scenario 3: A document's resolver value changes and its resolver path changes from a longer path to a sub path.
+                //
+                // When a document is updated from previous resolver path a__b__c__d and resolver value 1 to resolver path a__b__c and resolver value 2,
+                // then *all* data in resolver path a__b__c__d of store 1 should be grafted into store 2 with resolver path a__b__c.
+              } else {
+                _resolver.writePath(nextResolverPath, nextResolverValue);
+                _resolver.deletePath(prevResolverPath, recursive: false);
+
+                await dataStore.graft(
+                  nextResolverPath,
+                  prevResolverPath,
+                  null,
+                  prevDataStore,
+                );
+              }
+            }
+            // Scenario 4: A document's resolver value stays the same and its resolver path changes from a shorter path to a descendant path.
+            //
+            // When a document is written with the same resolver value 2 and updated resolver path a__b__c__d from a__b__c,
+            // then store 2 grafts its data under path a__b__c__d in resolver path a__b__c to resolver path a__b__c__d.
+          } else if (nextResolverPath != prevResolverPath) {
+            if (nextResolverPath.length > prevResolverPath.length) {
               _resolver.writePath(nextResolverPath, nextResolverValue);
-              await dataStore.graft(prevDataStore, prevResolverPath);
+
+              await dataStore.graft(
+                nextResolverPath,
+                prevResolverPath,
+                nextResolverPath,
+                dataStore,
+              );
+              // Scenario 5: A document's resolver value stays the same and its resolver path changes from a longer path to a sub path.
+              //
+              // When a document is written with the same resolver value 2 and updated resolver path a__b__c from a__b__c__d,
+              // then store 2 grafts *all* its data in resolver path a__b__c__d to resolver path a__b__c.
+            } else {
+              _resolver.deletePath(prevResolverPath, recursive: false);
+
+              await dataStore.graft(
+                nextResolverPath,
+                prevResolverPath,
+                null,
+                dataStore,
+              );
             }
           }
 
-          await dataStore.writePath(docPath, docData, encrypted);
+          await dataStore.writePath(
+            nextResolverPath,
+            docPath,
+            docData,
+            encrypted,
+          );
         }
       }
 

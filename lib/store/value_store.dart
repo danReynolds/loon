@@ -374,10 +374,10 @@ class ValueStore<T> {
   /// Removes the subtree at the given [path] of the other provided [ValueStore] and recursively
   /// merges it onto this store at the given path.
   void graft(
-    ValueStore<T> other, [
-    String path = '',
-  ]) {
-    if (path.isEmpty) {
+    ValueStore<T> other,
+    String? path,
+  ) {
+    if (path == null || path.isEmpty) {
       final otherNode = other._store;
       other.clear();
       _mergeNode(_store, otherNode);
