@@ -77,25 +77,6 @@ void main() {
     });
   });
 
-  group('findValue', () {
-    test(
-      "Returns the first subpath along the given path with the provided value",
-      () {
-        final store = ValueStore<String>();
-        store.write('users__1', 'Dan');
-        store.write('users__1__messages__1', 'Dan');
-        store.write('users__1__messages__2', 'Sonja');
-
-        expect(store.findValue('users__1__messages__1', 'Dan'), 'users__1');
-        expect(
-          store.findValue('users__1__messages__2', 'Sonja'),
-          'users__1__messages__2',
-        );
-        expect(store.findValue('users__1__messages__1', 'Sonja'), null);
-      },
-    );
-  });
-
   group('delete', () {
     group(
       "when recursive",
@@ -572,7 +553,7 @@ void main() {
 
   group('getNearest', () {
     test(
-      'Returns the nearest value of a node in the path moving from the bottom up.',
+      'With no value, returns the nearest non-null node along the given path.',
       () {
         final store = ValueStore<String>();
 
@@ -596,6 +577,22 @@ void main() {
         store.delete('users__1');
 
         expect(store.getNearest('users__1__posts__2__reactions__3'), null);
+      },
+    );
+
+    test(
+      "With a value, returns the first matching value along the given path.",
+      () {
+        final store = ValueStore<String>();
+        store.write('users__1', 'Dan');
+        store.write('users__1__messages__1', 'Dan');
+        store.write('users__1__messages__2', 'Sonja');
+
+        expect(store.getNearest('users__1__messages__1', 'Dan'), 'users__1');
+        expect(
+          store.getNearest('users__1__messages__2', 'Sonja'),
+          'users__1__messages__2',
+        );
       },
     );
   });

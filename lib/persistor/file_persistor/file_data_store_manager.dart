@@ -51,24 +51,6 @@ class FileDataStoreManager {
     required this.settings,
   });
 
-  /// Resolves the set of [FileDataStore] that exist at the given path and under it.
-  Set<DualFileDataStore> _resolveStores(String path) {
-    // Resolve the store for the document path itself separately.
-    // TODO: Why does it need to be resolved separately? Should extractRefs include the value at the given path?
-    final store =
-        _index[_resolver.getNearest(path)?.$2 ?? FileDataStore.defaultKey];
-
-    return {
-      if (store != null) store,
-      // Then resolve all of the data stores under the given path.
-      //
-      // Traversing the resolver tree to extract the set of data stores referenced under a given path is generally performant,
-      // since the number of nodes traversed in the resolver tree scales O(m) where m is the number of distinct collections that
-      // specify a unique persistence key under the given path and is generally small.
-      ..._resolver.extractRefs(path).keys.map((name) => _index[name]!).toSet(),
-    };
-  }
-
   void _cancelSync() {
     _syncTimer?.cancel();
     _syncTimer = null;
@@ -110,9 +92,26 @@ class FileDataStoreManager {
   /// Clears the provided path and all of its subpaths from each data store that contains
   /// data under that path.
   Future<void> _clear(String path) async {
-    final stores = _resolveStores(path);
-    await Future.wait(stores.map((store) => store.deletePath(path)));
-    _resolver.deletePath(path);
+    final extracted = _resolver.extractValues(path);
+    await Future.wait(
+      extracted.entries.map(
+        (entry) async {
+          for (final entry in extracted.entries) {
+            final resolverPath = entry.key;
+            final dataStoreName = entry.value;
+            final dataStore = _index[dataStoreName]!;
+
+            if (!dataStore.isHydrated) {
+              await dataStore.hydrate();
+            }
+
+            dataStore.deletePath(resolverPath, path);
+          }
+
+          _resolver.deletePath(path);
+        },
+      ),
+    );
   }
 
   Future<void> init() async {
@@ -155,16 +154,20 @@ class FileDataStoreManager {
   Future<Map<String, dynamic>> hydrate(List<String>? paths) {
     return _syncLock.run(
       () async {
-        final Map<String, Set<DualFileDataStore>> pathDataStores = {};
+        final Map<String, DualFileDataStore> resolverPathIndex = {};
         final Set<DualFileDataStore> dataStores = {};
 
         // If the hydration operation is only for certain paths, then resolve all of the file data stores
         // reachable under the given paths and hydrate only those data stores.
         if (paths != null) {
           for (final path in paths) {
-            final stores = _resolveStores(path);
-            pathDataStores[path] = stores;
-            dataStores.addAll(stores);
+            final extractedValues = _resolver.extractValues(path);
+            for (final entry in extractedValues.entries) {
+              final resolverPath = entry.key;
+              final dataStore = _index[entry.value]!;
+              resolverPathIndex[resolverPath] = dataStore;
+              dataStores.add(dataStore);
+            }
           }
         } else {
           // If no specific collections have been specified, then hydrate all file data stores.
@@ -175,30 +178,26 @@ class FileDataStoreManager {
 
         final Map<String, dynamic> data = {};
         if (paths != null) {
-          for (final path in paths) {
-            for (final dataStore in pathDataStores[path]!) {
-              // Since many different paths can be contained within the same file data store,
-              // we only extract the data in the hydrated store that falls under the requested path.
-              //
-              // Doing this ensures that the client's contract to only hydrate the data that was requested
-              // is ensured and it also offers a performance benefit since no unnecessary data is copied
-              // back from the worker to the main isolate.
+          for (final entry in resolverPathIndex.entries) {
+            final resolverPath = entry.key;
+            final dataStore = entry.value;
+
+            for (final path in paths) {
+              // Only extract the data in the hydrated store that falls under the requested store path. This ensures that
+              // only the data that was requested is hydrated and limits the data copied over to the main isolate to only what is necessary.
               //
               // If later on the client requests to hydrate a path for a data store that has already been
               // hydrated but has not yet delivered the data under that path to the client, then this still
               // works as expected, as the hydration operation will just extract that data from the already hydrated
-              // data store and deliver it to the client as expected.
-              final (plaintextData, encryptedData) =
-                  dataStore.extractValues(path);
-              data.addAll(plaintextData);
-              data.addAll(encryptedData);
+              // data store and return it.
+              final resolverValues =
+                  dataStore.extractValuesForResolver(resolverPath, path);
+              data.addAll(resolverValues);
             }
           }
         } else {
           for (final dataStore in dataStores) {
-            final (plaintextData, encryptedData) = dataStore.extractValues();
-            data.addAll(plaintextData);
-            data.addAll(encryptedData);
+            data.addAll(dataStore.extractValues());
           }
         }
 
@@ -214,141 +213,100 @@ class FileDataStoreManager {
     List<FilePersistDocument> docs,
   ) {
     return _syncLock.run(() async {
-      // for (final entry in keys.entries) {
-      //   final path = entry.key;
-      //   final prevDataStoreName = _resolver.get(path);
-      //   final dataStoreName = entry.value;
+      await Future.wait(
+        docs.map((doc) async {
+          final docPath = doc.path;
+          final docData = doc.data;
+          final encrypted = doc.encrypted;
 
-      //   if (prevDataStoreName != dataStoreName) {
-      //     final prevDataStore = _index[prevDataStoreName];
-      //     final dataStore = _index[dataStoreName] ??= DualFileDataStore(
-      //       name: dataStoreName,
-      //       encrypter: encrypter,
-      //       directory: directory,
-      //       isHydrated: true,
-      //     );
+          // If the document has been deleted, then clear it and its subcollections from the store.
+          if (docData == null) {
+            await _clear(docPath);
+            // Otherwise, write its associated data store with the updated document data.
+          } else {
+            final prevResult = _resolver.getNearest(docPath);
+            final prevResolverPath = prevResult?.$1 ?? '';
+            final prevResolverValue = prevResult?.$2;
 
-      //     // If the resolved data store for the persistence path has changed, then its data
-      //     // should be grafted from its previous data store to the updated one.
-      //     if (prevDataStore != null) {
-      //       await dataStore.graft(prevDataStore, path);
-      //     }
+            final nextResult = localResolver.getNearest(docPath);
+            final nextResolverPath = nextResult?.$1 ?? '';
+            final nextResolverValue = nextResult?.$2;
 
-      //     _resolver.writePath(path, dataStoreName);
-      //   }
-      // }
-
-      for (final doc in docs) {
-        final docPath = doc.path;
-        final docData = doc.data;
-        final encrypted = doc.encrypted;
-
-        // If the document has been deleted, then clear it and its subcollections from the store.
-        if (docData == null) {
-          await _clear(docPath);
-          // Otherwise, write its associated data store with the updated document data.
-        } else {
-          final prevResult = _resolver.getNearest(docPath);
-          final prevResolverPath = prevResult?.$1 ?? '';
-          final prevResolverValue = prevResult?.$2;
-
-          final nextResult = localResolver.getNearest(docPath);
-          final nextResolverPath = nextResult?.$1 ?? '';
-          final nextResolverValue = nextResult?.$2;
-
-          final prevDataStoreName =
-              prevResolverValue ?? FileDataStore.defaultKey;
-          final dataStoreName = nextResolverValue ?? FileDataStore.defaultKey;
-          final dataStore = _index[dataStoreName] ??= DualFileDataStore(
-            name: dataStoreName,
-            encrypter: encrypter,
-            directory: directory,
-            isHydrated: true,
-          );
-
-          if (nextResolverValue != prevResolverValue) {
+            final prevDataStoreName =
+                prevResolverValue ?? FileDataStore.defaultKey;
             final prevDataStore = _index[prevDataStoreName]!;
+
+            final dataStoreName = nextResolverValue ?? FileDataStore.defaultKey;
+            final dataStore = _index[dataStoreName] ??= DualFileDataStore(
+              name: dataStoreName,
+              encrypter: encrypter,
+              directory: directory,
+              isHydrated: true,
+            );
+
+            if (nextResolverValue != prevResolverValue) {
+              _resolver.writePath(nextResolverPath, nextResolverValue);
+            }
+
+            final isHydrated = dataStore.isHydrated;
+            final prevIsHydrated = prevDataStore.isHydrated;
+            if (!isHydrated && !prevIsHydrated) {
+              await Future.wait([dataStore.hydrate(), prevDataStore.hydrate()]);
+            } else if (!isHydrated) {
+              await dataStore.hydrate();
+            } else if (!prevIsHydrated) {
+              await prevDataStore.hydrate();
+            }
 
             // Scenario 1: A document's resolver value changes and its path stays the same.
             //
             // When a document is written with the same resolver path a__b__c and updated resolver value 2 from 1,
             // then store 1 grafts *all* its data under resolver path a__b__c into store 2 at resolver path a__b__c.
-            if (nextResolverPath == prevResolverPath) {
-              _resolver.writePath(nextResolverPath, nextResolverValue);
-              await dataStore.graft(
+            if (nextResolverValue != prevResolverValue &&
+                nextResolverPath == prevResolverPath) {
+              dataStore.graft(
                 nextResolverPath,
                 prevResolverPath,
                 null,
                 prevDataStore,
               );
-            } else {
-              // Scenario 2: A document's resolver value changes and its resolver path changes from a shorter path to a descendant path.
-              //
-              // When a document is updated from previous resolver path a__b__c and resolver value 1 to descendant resolver path a__b__c__d and resolver value 2,
-              // then data under path a__b__c__d in resolver path a__b__c of store 1 should be grafted into store 2 with resolver path a__b__c__d.
-              //
-              if (nextResolverPath.length > prevResolverPath.length) {
-                _resolver.writePath(nextResolverPath, nextResolverValue);
-                await dataStore.graft(
-                  nextResolverPath,
-                  prevResolverPath,
-                  nextResolverPath,
-                  prevDataStore,
-                );
-                // Scenario 3: A document's resolver value changes and its resolver path changes from a longer path to a sub path.
-                //
-                // When a document is updated from previous resolver path a__b__c__d and resolver value 1 to resolver path a__b__c and resolver value 2,
-                // then *all* data in resolver path a__b__c__d of store 1 should be grafted into store 2 with resolver path a__b__c.
-              } else {
-                _resolver.writePath(nextResolverPath, nextResolverValue);
-                _resolver.deletePath(prevResolverPath, recursive: false);
-
-                await dataStore.graft(
-                  nextResolverPath,
-                  prevResolverPath,
-                  null,
-                  prevDataStore,
-                );
-              }
             }
-            // Scenario 4: A document's resolver value stays the same and its resolver path changes from a shorter path to a descendant path.
+            // Scenario 2: A document's resolver path changes from a shorter path to a longer path.
             //
-            // When a document is written with the same resolver value 2 and updated resolver path a__b__c__d from a__b__c,
-            // then store 2 grafts its data under path a__b__c__d in resolver path a__b__c to resolver path a__b__c__d.
-          } else if (nextResolverPath != prevResolverPath) {
+            // When a document is updated from previous resolver path a__b__c to descendant resolver path a__b__c__d,
+            // then data under path a__b__c__d in resolver path a__b__c of the previous store should be grafted into resolver path a__b__c__d of the next store.
+            //
             if (nextResolverPath.length > prevResolverPath.length) {
-              _resolver.writePath(nextResolverPath, nextResolverValue);
-
-              await dataStore.graft(
+              dataStore.graft(
                 nextResolverPath,
                 prevResolverPath,
                 nextResolverPath,
-                dataStore,
+                prevDataStore,
               );
-              // Scenario 5: A document's resolver value stays the same and its resolver path changes from a longer path to a sub path.
-              //
-              // When a document is written with the same resolver value 2 and updated resolver path a__b__c from a__b__c__d,
-              // then store 2 grafts *all* its data in resolver path a__b__c__d to resolver path a__b__c.
-            } else {
+            }
+            // Scenario 3: A document's resolver path changes from a longer path to a shorter path.
+            //
+            // When a document is updated from previous resolver path a__b__c__d to resolver path a__b__c,
+            // then *all* data in resolver path a__b__c__d of the previous store should be grafted into the next store with resolver path a__b__c.
+            if (nextResolverPath.length < prevResolverPath.length) {
               _resolver.deletePath(prevResolverPath, recursive: false);
-
-              await dataStore.graft(
+              dataStore.graft(
                 nextResolverPath,
                 prevResolverPath,
                 null,
-                dataStore,
+                prevDataStore,
               );
             }
-          }
 
-          await dataStore.writePath(
-            nextResolverPath,
-            docPath,
-            docData,
-            encrypted,
-          );
-        }
-      }
+            dataStore.writePath(
+              nextResolverPath,
+              docPath,
+              docData,
+              encrypted,
+            );
+          }
+        }),
+      );
 
       _scheduleSync();
     });
