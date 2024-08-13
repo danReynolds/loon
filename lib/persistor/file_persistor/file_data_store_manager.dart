@@ -92,26 +92,24 @@ class FileDataStoreManager {
   /// Clears the provided path and all of its subpaths from each data store that contains
   /// data under that path.
   Future<void> _clear(String path) async {
-    final extracted = _resolver.extractValues(path);
+    final dataStoreNames = _resolver.getRefs(path)?.keys;
+    if (dataStoreNames == null) {
+      return;
+    }
+
     await Future.wait(
-      extracted.entries.map(
-        (entry) async {
-          for (final entry in extracted.entries) {
-            final resolverPath = entry.key;
-            final dataStoreName = entry.value;
-            final dataStore = _index[dataStoreName]!;
-
-            if (!dataStore.isHydrated) {
-              await dataStore.hydrate();
-            }
-
-            dataStore.deletePath(resolverPath, path);
+      dataStoreNames.map(
+        (dataStoreName) async {
+          final dataStore = _index[dataStoreName]!;
+          if (!dataStore.isHydrated) {
+            await dataStore.hydrate();
           }
-
-          _resolver.deletePath(path);
+          dataStore.recursiveDelete(path);
         },
       ),
     );
+
+    _resolver.deletePath(path);
   }
 
   Future<void> init() async {
@@ -154,20 +152,19 @@ class FileDataStoreManager {
   Future<Map<String, dynamic>> hydrate(List<String>? paths) {
     return _syncLock.run(
       () async {
-        final Map<String, DualFileDataStore> resolverPathIndex = {};
+        final Map<String, List<DualFileDataStore>> pathDataStores = {};
         final Set<DualFileDataStore> dataStores = {};
 
         // If the hydration operation is only for certain paths, then resolve all of the file data stores
         // reachable under the given paths and hydrate only those data stores.
         if (paths != null) {
           for (final path in paths) {
-            final extractedValues = _resolver.extractValues(path);
-            for (final entry in extractedValues.entries) {
-              final resolverPath = entry.key;
-              final dataStore = _index[entry.value]!;
-              resolverPathIndex[resolverPath] = dataStore;
-              dataStores.add(dataStore);
-            }
+            final dataStores = _resolver
+                .getRefs(path)!
+                .keys
+                .map((dataStoreName) => _index[dataStoreName]!)
+                .toList();
+            pathDataStores[path] = dataStores;
           }
         } else {
           // If no specific collections have been specified, then hydrate all file data stores.
@@ -178,21 +175,16 @@ class FileDataStoreManager {
 
         final Map<String, dynamic> data = {};
         if (paths != null) {
-          for (final entry in resolverPathIndex.entries) {
-            final resolverPath = entry.key;
-            final dataStore = entry.value;
-
-            for (final path in paths) {
-              // Only extract the data in the hydrated store that falls under the requested store path. This ensures that
-              // only the data that was requested is hydrated and limits the data copied over to the main isolate to only what is necessary.
-              //
-              // If later on the client requests to hydrate a path for a data store that has already been
-              // hydrated but has not yet delivered the data under that path to the client, then this still
-              // works as expected, as the hydration operation will just extract that data from the already hydrated
-              // data store and return it.
-              final resolverValues =
-                  dataStore.extractValuesForResolver(resolverPath, path);
-              data.addAll(resolverValues);
+          for (final path in paths) {
+            // Only extract the data in the hydrated store that falls under the requested store path. This ensures that
+            // only the data that was requested is hydrated and limits the data copied over to the main isolate to only what is necessary.
+            //
+            // If later on the client requests to hydrate a path for a data store that has already been
+            // hydrated but has not yet delivered the data under that path to the client, then this still
+            // works as expected, as the hydration operation will just extract that data from the already hydrated
+            // data store and return it.
+            for (final dataStore in pathDataStores[path]!) {
+              data.addAll(dataStore.extractValues(path));
             }
           }
         } else {
@@ -224,29 +216,24 @@ class FileDataStoreManager {
             await _clear(docPath);
             // Otherwise, write its associated data store with the updated document data.
           } else {
-            final prevResult = _resolver.getNearest(docPath);
-            final prevResolverPath = prevResult?.$1 ?? '';
-            final prevResolverValue = prevResult?.$2;
+            final prevResult = _resolver.getNearest(docPath)!;
+            final prevResolverPath = prevResult.$1;
+            final prevResolverValue = prevResult.$2;
 
-            final nextResult = localResolver.getNearest(docPath);
-            final nextResolverPath = nextResult?.$1 ?? '';
-            final nextResolverValue = nextResult?.$2;
+            final nextResult = localResolver.getNearest(docPath)!;
+            final nextResolverPath = nextResult.$1;
+            final nextResolverValue = nextResult.$2;
 
-            final prevDataStoreName =
-                prevResolverValue ?? FileDataStore.defaultKey;
+            final prevDataStoreName = prevResolverValue;
             final prevDataStore = _index[prevDataStoreName]!;
 
-            final dataStoreName = nextResolverValue ?? FileDataStore.defaultKey;
+            final dataStoreName = nextResolverValue;
             final dataStore = _index[dataStoreName] ??= DualFileDataStore(
               name: dataStoreName,
               encrypter: encrypter,
               directory: directory,
               isHydrated: true,
             );
-
-            if (nextResolverValue != prevResolverValue) {
-              _resolver.writePath(nextResolverPath, nextResolverValue);
-            }
 
             final isHydrated = dataStore.isHydrated;
             final prevIsHydrated = prevDataStore.isHydrated;
@@ -257,6 +244,8 @@ class FileDataStoreManager {
             } else if (!prevIsHydrated) {
               await prevDataStore.hydrate();
             }
+
+            _resolver.writePath(nextResolverPath, nextResolverValue);
 
             // Scenario 1: A document's resolver value changes and its path stays the same.
             //

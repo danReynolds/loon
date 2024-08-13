@@ -31,9 +31,9 @@ class Document<T> implements StoreReference {
     PersistorSettings? persistorSettings,
     DependenciesBuilder<S>? dependenciesBuilder,
   }) {
-    final [...pathSegments, id] = path.split(ValueStore.delimiter);
+    final [...pathSegments, id] = path.split(_BaseValueStore.delimiter);
     return Document<S>(
-      pathSegments.join(ValueStore.delimiter),
+      pathSegments.join(_BaseValueStore.delimiter),
       id,
       fromJson: fromJson,
       toJson: toJson,

@@ -54,13 +54,13 @@ void main() {
       store.write('users__2', 'Sonja');
       store.write('users__1__friends__1', 'Nik');
 
-      expect(store.getChildValues('users__1'), null);
-      expect(store.getChildValues('users__2'), null);
-      expect(store.getChildValues('users'), {
+      expect(store.getValues('users__1'), null);
+      expect(store.getValues('users__2'), null);
+      expect(store.getValues('users'), {
         "1": "Dan",
         "2": "Sonja",
       });
-      expect(store.getChildValues('users__1__friends'), {
+      expect(store.getValues('users__1__friends'), {
         "1": "Nik",
       });
     });

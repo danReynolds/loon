@@ -7,7 +7,7 @@ import 'package:loon/persistor/file_persistor/file_persistor_worker.dart';
 import 'package:path/path.dart' as path;
 
 final fileRegex = RegExp(
-  r'^(?!__resolver__)(\w+?)(?:.encrypted)?\.json$',
+  r'^(?!__localResolver__)(\w+?)(?:.encrypted)?\.json$',
 );
 
 class DualFileDataStore {
@@ -60,28 +60,33 @@ class DualFileDataStore {
     dynamic value,
     bool encrypted,
   ) async {
+    resolverPath ??= '';
+
     // If the document was previously not encrypted and now is, then it should be removed
     // from the plaintext store and added to the encrypted one and vice-versa.
     if (encrypted) {
       if (_plaintextStore.hasValue(resolverPath, path)) {
-        _plaintextStore.deletePath(resolverPath, path, recursive: false);
+        _plaintextStore.shallowDelete(resolverPath, path);
       }
       _encryptedStore.writePath(resolverPath, path, value);
     } else {
       if (_encryptedStore.hasValue(resolverPath, path)) {
-        _encryptedStore.deletePath(resolverPath, path, recursive: false);
+        _encryptedStore.shallowDelete(resolverPath, path);
       }
       _plaintextStore.writePath(resolverPath, path, value);
     }
   }
 
-  void deletePath(
-    String? resolverPath,
-    String path, {
-    bool recursive = true,
-  }) async {
-    _plaintextStore.deletePath(resolverPath, path, recursive: recursive);
-    _encryptedStore.deletePath(resolverPath, path, recursive: recursive);
+  /// Deletes the path recursively from all resolver stores.
+  void recursiveDelete(String path) {
+    _plaintextStore.recursiveDelete(path);
+    _encryptedStore.recursiveDelete(path);
+  }
+
+  /// Deletes the path shallowly from the given resolver path store.
+  void shallowDelete(String resolverPath, String path) {
+    _plaintextStore.shallowDelete(resolverPath, path);
+    _encryptedStore.shallowDelete(resolverPath, path);
   }
 
   Future<void> hydrate() async {
@@ -115,8 +120,8 @@ class DualFileDataStore {
   /// Grafts the data under resolver path [otherResolverPath] from the [other] data store
   /// into this data store at resolver path [resolverPath].
   void graft(
-    String? resolverPath,
-    String? otherResolverPath,
+    String resolverPath,
+    String otherResolverPath,
     String? dataPath,
     DualFileDataStore other,
   ) async {
@@ -149,31 +154,8 @@ class DualFileDataStore {
     );
   }
 
-  /// Returns a map of values in the data store indexed by store path under the given resolver path.
-  Map<String, dynamic> extractValuesForResolver(
-    String resolverPath, [
-    String path = '',
-  ]) {
-    return {
-      ..._plaintextStore.extractValuesForResolver(resolverPath, path),
-      ..._encryptedStore.extractValuesForResolver(resolverPath, path),
-    };
-  }
-
-  /// Returns a map of all values in the data store indexed by resolver path and store path.
-  Map<String?, Map<String, dynamic>> extractValuesByResolver([
-    String path = '',
-  ]) {
-    return {
-      ..._plaintextStore.extractValuesByResolver(path),
-      ..._encryptedStore.extractValuesByResolver(path),
-    };
-  }
-
-  /// Returns a map of all values in the data store indexed by store path.
-  Map<String, dynamic> extractValues([
-    String path = '',
-  ]) {
+  /// Returns a map of all values in the data store under the given path.
+  Map<String, dynamic> extractValues([String path = '']) {
     return {
       ..._plaintextStore.extractValues(path),
       ..._encryptedStore.extractValues(path),
@@ -192,8 +174,10 @@ class FileDataStore {
   /// The file associated with the data store.
   late final File _file;
 
-  /// Documents are stored in a file data store by their resolver path, followed by their document path.
-  final Map<String?, ValueStore> _resolver = {};
+  /// The file data store indexes documents into a local resolver by resolver path,
+  /// then a value store by document path. This is done to enable efficient access and modification
+  /// of data by resolver path and path.
+  final _localResolver = ValueRefStore<ValueStore>();
 
   /// The name of the file data store.
   final String name;
@@ -254,41 +238,80 @@ class FileDataStore {
     assert(isHydrated, 'FileDataStore data accessed before hydrated.');
   }
 
-  bool hasValue(String? resolverPath, String path) {
+  bool hasValue(String resolverPath, String path) {
     _assertHydrated();
 
-    return _resolver[resolverPath]?.hasValue(path) ?? false;
+    return _localResolver.get(resolverPath)?.hasValue(path) ?? false;
+  }
+
+  /// Returns a map of the subset of documents in the store under the given path.
+  /// Data for the given path can exist in two different places:
+  /// 1. It necessarily exists in all of the value stores resolved under the given path.
+  /// 2. It *could* exist in any of the parent value stores of the given path, such as in the example of the "users"
+  ///    path containing data for path users__1, users__1__friends__1, etc.
+  Map<String, dynamic> extractValues([String path = '']) {
+    Map<String, dynamic> data = {};
+
+    final parentStores = _localResolver.getSubpathValues(path);
+    final childStores = _localResolver.getRefs(path)?.keys ?? [];
+    final stores = {
+      ...parentStores,
+      ...childStores,
+    };
+
+    for (final store in stores) {
+      data.addAll(store.extractValues(path));
+    }
+
+    return data;
   }
 
   void writePath(
-    String? resolverPath,
+    String resolverPath,
     String path,
     dynamic value,
   ) async {
     _assertHydrated();
 
-    final store = _resolver[resolverPath] ??= ValueStore<String>();
+    ValueStore? store = _localResolver.get(resolverPath) ??
+        _localResolver.write(resolverPath, ValueStore());
     store.write(path, value);
 
     isDirty = true;
   }
 
-  void deletePath(
-    String? resolverPath,
-    String path, {
-    bool recursive = true,
-  }) async {
+  /// Deletes the given path from the data store recursively. Documents under the given path could be stored
+  /// in one of two places:
+  /// 1. In resolver paths under/equal to the given path.
+  ///    These documents can easily be deleted by deleting all value stores under the document path in the resolver.
+  /// 2. In a resolver path that is a parent path of the given path.
+  ///    Ex. When deleting path users__1, all user documents might be stored in resolver path "users", or if no
+  ///        custom persistence key has been specified anywhere along the path, then in the default store.
+  ///
+  ///    Therefore to delete the remaining documents under the given path, each value store in the resolver above the given path is visited
+  ///    and has the given path evicted from its store.
+  void recursiveDelete(String path) async {
     _assertHydrated();
 
-    final store = _resolver[resolverPath];
-    if (store == null) {
-      return;
-    }
+    // 1. Delete the given path from the resolver, evicting all documents under that path that were stored in
+    //    resolver paths at or under that path.
+    _localResolver.delete(path);
 
-    if (store.hasValue(path) || recursive && store.hasPath(path)) {
-      store.delete(path, recursive: recursive);
-      isDirty = true;
+    // 2. Evict the given path from any parent stores above the given path.
+    final stores = _localResolver.getSubpathValues(path);
+    for (final store in stores) {
+      // Data under the given path can only exist in one parent path store at a time, so deletion can exit early
+      // once a parent path is found.
+      if (store.hasPath(path)) {
+        store.delete(path);
+        break;
+      }
     }
+  }
+
+  /// Shallowly deletes the given document path from the given resolver path store.
+  void shallowDelete(String resolverPath, String path) {
+    _localResolver.get(resolverPath)?.delete(path, recursive: false);
   }
 
   Future<void> hydrate() async {
@@ -312,9 +335,12 @@ class FileDataStore {
           _hydrationCompleter = Completer();
           final encodedStore = await _readFile();
           if (encodedStore != null) {
-            final Map stores = jsonDecode(encodedStore);
-            for (final entry in stores.entries) {
-              _resolver[entry.key] = ValueStore.fromJson(entry.value);
+            final Map json = jsonDecode(encodedStore);
+
+            for (final entry in json.entries) {
+              final resolverPath = entry.key;
+              final valueStore = ValueStore.fromJson(entry.value);
+              _localResolver.write(resolverPath, valueStore);
             }
           }
           _hydrationCompleter!.complete();
@@ -366,21 +392,25 @@ class FileDataStore {
   }
 
   bool get isEmpty {
-    return _resolver.isEmpty;
+    return _localResolver.isEmpty;
   }
 
   /// Grafts the data at the given [path] in the other [FileDataStore] onto
   /// this data store at that path.
   void graft(
-    String? resolverPath,
-    String? otherResolverPath,
+    String resolverPath,
+    String otherResolverPath,
     String? dataPath,
     FileDataStore other,
   ) {
     _assertHydrated();
 
-    final store = _resolver[resolverPath] ?? ValueStore<String>();
-    final otherStore = other._resolver[otherResolverPath]!;
+    final store = _localResolver.get(resolverPath) ?? ValueStore<String>();
+    final otherStore = other._localResolver.get(otherResolverPath);
+
+    if (otherStore == null) {
+      return;
+    }
 
     store.graft(otherStore, dataPath);
 
@@ -389,52 +419,8 @@ class FileDataStore {
     other.isDirty = true;
   }
 
-  /// Returns a map of values in the data store indexed by store path under the given resolver path.
-  Map<String, dynamic> extractValuesForResolver(
-    String resolverPath, [
-    String path = '',
-  ]) {
-    _assertHydrated();
-
-    return _resolver[resolverPath]?.extractValues(path) ?? {};
-  }
-
-  /// Returns a map of all values in the data store indexed by resolver path and store path.
-  Map<String?, Map<String, dynamic>> extractValuesByResolver([
-    String path = '',
-  ]) {
-    _assertHydrated();
-
-    return _resolver.entries.fold(
-      {},
-      (acc, entry) {
-        acc[entry.key] = entry.value.extractValues();
-        return acc;
-      },
-    );
-  }
-
-  /// Returns a map of all values in the data store indexed by store path.
-  Map<String, dynamic> extractValues([String path = '']) {
-    _assertHydrated();
-
-    return _resolver.entries.fold(
-      {},
-      (acc, entry) {
-        acc.addAll(entry.value.extractValues());
-        return acc;
-      },
-    );
-  }
-
   Map inspect() {
-    return _resolver.entries.fold(
-      {},
-      (acc, entry) {
-        acc[entry.key] = entry.value.inspect();
-        return acc;
-      },
-    );
+    return _localResolver.extractValues();
   }
 }
 
@@ -481,9 +467,9 @@ class EncryptedFileDataStore extends FileDataStore {
 class FileDataStoreResolver {
   late final File _file;
 
-  var _store = ValueStore<String>();
+  var _store = ValueRefStore<String>();
 
-  static const name = '__resolver__';
+  static const name = '__localResolver__';
 
   late final Logger _logger;
 
@@ -497,6 +483,9 @@ class FileDataStoreResolver {
       output: FilePersistorWorker.logger.log,
     );
     _file = File("${directory.path}/$name.json");
+
+    // Initialize the store with a root key of the default file data store.
+    _store.write('', FileDataStore.defaultKey);
   }
 
   void writePath(String path, dynamic value) {
@@ -516,8 +505,8 @@ class FileDataStoreResolver {
     }
   }
 
-  Map<String, String> extractValues([String path = '']) {
-    return _store.extractValues(path);
+  Map<String, int>? getRefs(String path) {
+    return _store.getRefs(path);
   }
 
   (String, String)? getNearest(String path) {
@@ -535,7 +524,7 @@ class FileDataStoreResolver {
         () async {
           if (await (_file.exists())) {
             final fileStr = await _file.readAsString();
-            _store = ValueStore(jsonDecode(fileStr));
+            _store = ValueRefStore<String>(jsonDecode(fileStr));
           }
         },
       );

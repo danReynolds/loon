@@ -38,10 +38,10 @@ class Collection<T> implements Queryable<T>, StoreReference {
     PersistorSettings? persistorSettings,
     DependenciesBuilder<S>? dependenciesBuilder,
   }) {
-    final [...pathSegments, id] = path.split(ValueStore.delimiter);
+    final [...pathSegments, id] = path.split(_BaseValueStore.delimiter);
 
     return Collection<S>(
-      pathSegments.join(ValueStore.delimiter),
+      pathSegments.join(_BaseValueStore.delimiter),
       id,
       fromJson: fromJson,
       toJson: toJson,
@@ -104,7 +104,7 @@ class Collection<T> implements Queryable<T>, StoreReference {
   }
 
   bool exists() {
-    return Loon._instance.documentStore.hasChildValues(path);
+    return Loon._instance.documentStore.hasValues(path);
   }
 
   Stream<List<DocumentSnapshot<T>>> stream() {

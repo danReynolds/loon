@@ -9,8 +9,10 @@ export 'widgets/query_stream_builder.dart';
 export 'widgets/document_stream_builder.dart';
 export 'persistor/file_persistor/file_persistor.dart';
 
+part 'store/base_value_store.dart';
 part 'store/path_ref_store.dart';
 part 'store/value_store.dart';
+part 'store/value_ref_store.dart';
 part 'broadcast_observer.dart';
 part 'query.dart';
 part 'observable_query.dart';
@@ -116,7 +118,7 @@ class Loon {
 
   List<DocumentSnapshot<T>> getSnapshots<T>(Collection<T> collection) {
     final snaps = documentStore
-        .getChildValues(collection.path)
+        .getValues(collection.path)
         ?.values
         .map(
           (snap) => parseSnap(

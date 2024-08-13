@@ -86,15 +86,17 @@ void main() {
           expect(
             json,
             {
-              "users": {
-                "__values": {
-                  "1": {'name': 'User 1'},
-                  "2": {'name': 'User 2'},
-                },
-                "2": {
-                  "friends": {
-                    "__values": {
-                      "1": {'name': 'User 1'},
+              "": {
+                "users": {
+                  "__values": {
+                    "1": {'name': 'User 1'},
+                    "2": {'name': 'User 2'},
+                  },
+                  "2": {
+                    "friends": {
+                      "__values": {
+                        "1": {'name': 'User 1'},
+                      }
                     }
                   }
                 }
@@ -133,10 +135,12 @@ void main() {
           expect(
             json,
             {
-              "users": {
-                "__values": {
-                  "1": {'name': 'User 1'},
-                  "2": {'name': 'User 2 updated'},
+              "": {
+                "users": {
+                  "__values": {
+                    "1": {'name': 'User 1'},
+                    "2": {'name': 'User 2 updated'},
+                  }
                 }
               }
             },
@@ -164,13 +168,15 @@ void main() {
           expect(
             json,
             {
-              "users": {
-                "__values": {
-                  "1": 1,
-                  "2": '2',
-                  "3": true,
-                  "4": {
-                    "name": 1,
+              "": {
+                "users": {
+                  "__values": {
+                    "1": 1,
+                    "2": '2',
+                    "3": true,
+                    "4": {
+                      "name": 1,
+                    }
                   }
                 }
               }
@@ -199,11 +205,13 @@ void main() {
           expect(
             json,
             {
-              "users": {
-                "__values": {
-                  "1": {"name": "User 1"},
-                  "2": {"name": "User 2"}
-                },
+              "": {
+                "users": {
+                  "__values": {
+                    "1": {"name": "User 1"},
+                    "2": {"name": "User 2"}
+                  },
+                }
               }
             },
           );
@@ -218,10 +226,12 @@ void main() {
           expect(
             json,
             {
-              "users": {
-                "__values": {
-                  "1": {"name": "User 1"}
-                },
+              "": {
+                "users": {
+                  "__values": {
+                    "1": {"name": "User 1"}
+                  },
+                }
               }
             },
           );
