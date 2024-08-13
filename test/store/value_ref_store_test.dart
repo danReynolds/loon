@@ -32,6 +32,11 @@ void main() {
                       },
                       "__values": {
                         "1": 'test',
+                      },
+                      "1": {
+                        "__refs": {
+                          "test": 1,
+                        }
                       }
                     }
                   }
@@ -68,6 +73,21 @@ void main() {
                         "1": 'test',
                         "2": 'test',
                         "3": 'test2',
+                      },
+                      "1": {
+                        "__refs": {
+                          "test": 1,
+                        }
+                      },
+                      "2": {
+                        "__refs": {
+                          "test": 1,
+                        }
+                      },
+                      "3": {
+                        "__refs": {
+                          "test2": 1,
+                        }
                       }
                     }
                   }
@@ -98,6 +118,7 @@ void main() {
                     "__refs": {
                       'test': 2,
                       'test2': 1,
+                      'User 1': 1,
                     },
                     "friends": {
                       "__refs": {
@@ -108,6 +129,21 @@ void main() {
                         "1": 'test',
                         "2": 'test',
                         "3": 'test2',
+                      },
+                      "1": {
+                        "__refs": {
+                          "test": 1,
+                        }
+                      },
+                      "2": {
+                        "__refs": {
+                          "test": 1,
+                        }
+                      },
+                      "3": {
+                        "__refs": {
+                          "test2": 1,
+                        }
                       }
                     }
                   }
@@ -139,6 +175,7 @@ void main() {
                     "__refs": {
                       'test': 2,
                       'test2': 1,
+                      'User 1': 1,
                     },
                     "friends": {
                       "__refs": {
@@ -149,6 +186,21 @@ void main() {
                         "1": 'test',
                         "2": 'test',
                         "3": 'test2',
+                      },
+                      "1": {
+                        "__refs": {
+                          "test": 1,
+                        }
+                      },
+                      "2": {
+                        "__refs": {
+                          "test": 1,
+                        }
+                      },
+                      "3": {
+                        "__refs": {
+                          "test2": 1,
+                        }
                       }
                     }
                   }
@@ -180,6 +232,7 @@ void main() {
                     "__refs": {
                       'test': 1,
                       'test2': 2,
+                      'User 1': 1,
                     },
                     "friends": {
                       "__refs": {
@@ -190,8 +243,23 @@ void main() {
                         "1": 'test2',
                         "2": 'test',
                         "3": 'test2',
+                      },
+                      "1": {
+                        "__refs": {
+                          "test2": 1,
+                        }
+                      },
+                      "2": {
+                        "__refs": {
+                          "test": 1,
+                        }
+                      },
+                      "3": {
+                        "__refs": {
+                          "test2": 1,
+                        }
                       }
-                    }
+                    },
                   }
                 }
               },
@@ -207,6 +275,11 @@ void main() {
                   'test2': 2,
                   'User 1': 1,
                   '__root__': 1,
+                },
+                "": {
+                  "__refs": {
+                    "__root__": 1,
+                  }
                 },
                 "__values": {
                   "": '__root__',
@@ -224,6 +297,7 @@ void main() {
                     "__refs": {
                       'test': 1,
                       'test2': 2,
+                      'User 1': 1,
                     },
                     "friends": {
                       "__refs": {
@@ -234,8 +308,23 @@ void main() {
                         "1": 'test2',
                         "2": 'test',
                         "3": 'test2',
+                      },
+                      "1": {
+                        "__refs": {
+                          "test2": 1,
+                        }
+                      },
+                      "2": {
+                        "__refs": {
+                          "test": 1,
+                        }
+                      },
+                      "3": {
+                        "__refs": {
+                          "test2": 1,
+                        }
                       }
-                    }
+                    },
                   }
                 }
               },
@@ -248,7 +337,7 @@ void main() {
         'delete',
         () {
           test(
-            'Decrements parent refs by all child refs',
+            'Decrements parent refs',
             () {
               final store = ValueRefStore();
 
@@ -286,6 +375,21 @@ void main() {
                           "1": 'test',
                           "2": 'test2',
                           "3": 'test3',
+                        },
+                        "1": {
+                          "__refs": {
+                            "test": 1,
+                          }
+                        },
+                        "2": {
+                          "__refs": {
+                            "test2": 1,
+                          },
+                        },
+                        "3": {
+                          "__refs": {
+                            "test3": 1,
+                          },
                         }
                       }
                     }
@@ -320,7 +424,17 @@ void main() {
                         "__values": {
                           "1": 'test',
                           "2": 'test2',
-                        }
+                        },
+                        "1": {
+                          "__refs": {
+                            "test": 1,
+                          }
+                        },
+                        "2": {
+                          "__refs": {
+                            "test2": 1,
+                          },
+                        },
                       }
                     }
                   }
@@ -328,26 +442,100 @@ void main() {
               );
 
               store.write('users__1', 'User 1');
-              store.delete('users__1__friends');
 
               expect(
                 store.inspect(),
                 {
                   "__refs": {
+                    'test': 1,
+                    'test2': 1,
                     'User 1': 1,
                   },
                   "users": {
                     "__refs": {
+                      'test': 1,
+                      'test2': 1,
                       'User 1': 1,
                     },
                     "__values": {
                       "1": "User 1",
                     },
+                    "1": {
+                      "__refs": {
+                        'test': 1,
+                        'test2': 1,
+                        'User 1': 1,
+                      },
+                      "friends": {
+                        "__refs": {
+                          'test': 1,
+                          'test2': 1,
+                        },
+                        "__values": {
+                          "1": 'test',
+                          "2": 'test2',
+                        },
+                        "1": {
+                          "__refs": {
+                            "test": 1,
+                          }
+                        },
+                        "2": {
+                          "__refs": {
+                            "test2": 1,
+                          },
+                        },
+                      }
+                    }
                   }
                 },
               );
 
-              store.delete('users__1');
+              store.delete('users__1', recursive: false);
+
+              expect(
+                store.inspect(),
+                {
+                  "__refs": {
+                    'test': 1,
+                    'test2': 1,
+                  },
+                  "users": {
+                    "__refs": {
+                      'test': 1,
+                      'test2': 1,
+                    },
+                    "1": {
+                      "__refs": {
+                        'test': 1,
+                        'test2': 1,
+                      },
+                      "friends": {
+                        "__refs": {
+                          'test': 1,
+                          'test2': 1,
+                        },
+                        "__values": {
+                          "1": 'test',
+                          "2": 'test2',
+                        },
+                        "1": {
+                          "__refs": {
+                            "test": 1,
+                          }
+                        },
+                        "2": {
+                          "__refs": {
+                            "test2": 1,
+                          },
+                        },
+                      }
+                    }
+                  }
+                },
+              );
+
+              store.delete('users__1__friends');
 
               expect(store.inspect(), {});
             },
@@ -355,41 +543,43 @@ void main() {
         },
       );
 
-      group(
-        'get',
-        () {
-          test(
-            'Returns the value at the given path',
-            () {
-              final store = ValueRefStore();
+      group('getRefs', () {
+        test(
+          'Returns the refs under the given path',
+          () {
+            final store = ValueRefStore();
 
-              store.write('users__1__friends__1', 'test');
+            store.write('users__1', 'Dan');
+            store.write('users__1__friends__1', 'Nik');
+            store.write('users__1__friends__2', 'Dan');
 
-              expect(store.get('users__1__friends__1'), 'test');
-              expect(store.get('users__1__friends__2'), null);
-              expect(store.get('users__1__friends'), null);
-            },
-          );
-        },
-      );
+            expect(
+              store.getRefs(),
+              {'Dan': 2, 'Nik': 1},
+            );
 
-      group(
-        'getSubpathValues',
-        () {
-          test(
-            'Returns all values along the given path',
-            () {
-              final store = ValueRefStore();
+            expect(
+              store.getRefs('users'),
+              {'Dan': 2, 'Nik': 1},
+            );
 
-              store.write('users__1', 1);
-              store.write('users__1__friends__2', 2);
+            expect(
+              store.getRefs('users__1'),
+              {'Dan': 1, 'Nik': 1},
+            );
 
-              expect(store.getSubpathValues('users__1'), [1]);
-              expect(store.getSubpathValues('users__1__friends__2'), [1, 2]);
-            },
-          );
-        },
-      );
+            expect(
+              store.getRefs('users__1__friends'),
+              {'Dan': 1, 'Nik': 1},
+            );
+
+            expect(
+              store.getRefs('users__1__friends__1'),
+              null,
+            );
+          },
+        );
+      });
     },
   );
 }

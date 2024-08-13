@@ -46,7 +46,7 @@ void main() {
     });
   });
 
-  group('getChildValues', () {
+  group('getValues', () {
     test('Retrieves all of the values of the children of the given path', () {
       final store = ValueStore<String>();
 
@@ -635,4 +635,22 @@ void main() {
       });
     });
   });
+
+  group(
+    'getSubpathValues',
+    () {
+      test(
+        'Returns all values along the given path',
+        () {
+          final store = ValueStore();
+
+          store.write('users__1', 1);
+          store.write('users__1__friends__2', 2);
+
+          expect(store.getSubpathValues('users__1'), [1]);
+          expect(store.getSubpathValues('users__1__friends__2'), [1, 2]);
+        },
+      );
+    },
+  );
 }

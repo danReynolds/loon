@@ -13,6 +13,22 @@ class ValueRefStore<T> extends _BaseValueStore<T> {
       final values = node[_BaseValueStore._values] ??= <String, T>{};
       prevValue = values[segment];
       values[segment] = value;
+
+      if (prevValue != value) {
+        final child = node[segment] ??= {};
+        final Map<T, int> childRefs = child[_refs] ??= <T, int>{};
+        childRefs[value] ??= 0;
+
+        if (prevValue != null && childRefs[prevValue] != null) {
+          if (childRefs[prevValue] == 1) {
+            childRefs.remove(prevValue);
+          } else {
+            childRefs[prevValue] = childRefs[prevValue]! - 1;
+          }
+        }
+
+        childRefs[value] = childRefs[value]! + 1;
+      }
     } else {
       final Map child = node[segment] ??= {};
       prevValue = _write(child, segments, index + 1, value);
@@ -22,9 +38,9 @@ class ValueRefStore<T> extends _BaseValueStore<T> {
       return value;
     }
 
-    final refs = node[_refs] ??= <T, int>{};
+    final Map<T, int> refs = node[_refs] ??= <T, int>{};
     refs[value] ??= 0;
-    refs[value]++;
+    refs[value] = refs[value]! + 1;
 
     if (prevValue != null) {
       if (refs[prevValue] == 1) {
@@ -34,7 +50,7 @@ class ValueRefStore<T> extends _BaseValueStore<T> {
           refs.remove(prevValue);
         }
       } else {
-        refs[prevValue]--;
+        refs[prevValue] = refs[prevValue]! - 1;
       }
     }
 
@@ -49,44 +65,59 @@ class ValueRefStore<T> extends _BaseValueStore<T> {
   ) {
     final segment = segments[index];
     final Map? child = node[segment];
-    Map<T, int>? refs;
+    Map<T, int>? removedRefs;
+
+    if (child == null) {
+      return null;
+    }
 
     if (index < segments.length - 1) {
-      if (child == null) {
-        return null;
-      }
-
-      refs = _delete(child, segments, index + 1, recursive);
+      removedRefs = _delete(child, segments, index + 1, recursive);
 
       if (child.isEmpty) {
         node.remove(segment);
       }
     } else {
       final Map? values = node[_BaseValueStore._values];
-      refs = child?[_refs];
 
       if (values != null) {
-        final value = values[segment];
-        refs ??= {};
-        refs[value] ??= 0;
-        refs[value] = refs[value]! + 1;
-
         if (values.length == 1) {
           node.remove(_BaseValueStore._values);
         } else {
           values.remove(segment);
         }
+
+        if (!recursive) {
+          final childValue = values[segment];
+          if (childValue != null) {
+            final childRefs = child[_refs];
+            final childRefCount = childRefs[childValue];
+            if (childRefCount == 1) {
+              if (childRefs.length == 1) {
+                child.remove(_refs);
+              } else {
+                childRefs.remove(childValue);
+              }
+            } else {
+              childRefs[childValue] = childRefCount - 1;
+            }
+
+            removedRefs = {childValue: 1};
+          }
+        }
       }
 
       if (recursive) {
+        removedRefs = child[_refs]!;
         node.remove(segment);
       }
     }
 
-    if (refs != null) {
-      for (final entry in refs.entries) {
+    if (removedRefs != null) {
+      final Map<T, int> nodeRefs = node[_refs];
+
+      for (final entry in removedRefs.entries) {
         final key = entry.key;
-        final Map nodeRefs = node[_refs];
         final nodeRefCount = node[_refs][key];
         final childRefCount = entry.value;
 
@@ -102,7 +133,7 @@ class ValueRefStore<T> extends _BaseValueStore<T> {
       }
     }
 
-    return refs;
+    return removedRefs;
   }
 
   Map<T, int>? getRefs([String path = '']) {
@@ -113,7 +144,7 @@ class ValueRefStore<T> extends _BaseValueStore<T> {
     final segments = path.split(_BaseValueStore.delimiter);
     return _getNode(
       _store,
-      segments.isEmpty ? segments : segments.sublist(0, segments.length - 1),
+      segments.isEmpty ? segments : segments.sublist(0, segments.length),
       0,
     )?[_refs];
   }
