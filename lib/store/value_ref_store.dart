@@ -13,22 +13,6 @@ class ValueRefStore<T> extends _BaseValueStore<T> {
       final values = node[_BaseValueStore._values] ??= <String, T>{};
       prevValue = values[segment];
       values[segment] = value;
-
-      if (prevValue != value) {
-        final child = node[segment] ??= {};
-        final Map<T, int> childRefs = child[_refs] ??= <T, int>{};
-        childRefs[value] ??= 0;
-
-        if (prevValue != null && childRefs[prevValue] != null) {
-          if (childRefs[prevValue] == 1) {
-            childRefs.remove(prevValue);
-          } else {
-            childRefs[prevValue] = childRefs[prevValue]! - 1;
-          }
-        }
-
-        childRefs[value] = childRefs[value]! + 1;
-      }
     } else {
       final Map child = node[segment] ??= {};
       prevValue = _write(child, segments, index + 1, value);
@@ -65,51 +49,41 @@ class ValueRefStore<T> extends _BaseValueStore<T> {
   ) {
     final segment = segments[index];
     final Map? child = node[segment];
+
+    T? childValue;
     Map<T, int>? removedRefs;
 
-    if (child == null) {
-      return null;
-    }
-
     if (index < segments.length - 1) {
-      removedRefs = _delete(child, segments, index + 1, recursive);
+      if (child == null) {
+        return null;
+      }
 
+      removedRefs = _delete(child, segments, index + 1, recursive);
       if (child.isEmpty) {
         node.remove(segment);
       }
     } else {
       final Map? values = node[_BaseValueStore._values];
-
       if (values != null) {
+        childValue = values[segment];
         if (values.length == 1) {
           node.remove(_BaseValueStore._values);
         } else {
           values.remove(segment);
         }
-
-        if (!recursive) {
-          final childValue = values[segment];
-          if (childValue != null) {
-            final childRefs = child[_refs];
-            final childRefCount = childRefs[childValue];
-            if (childRefCount == 1) {
-              if (childRefs.length == 1) {
-                child.remove(_refs);
-              } else {
-                childRefs.remove(childValue);
-              }
-            } else {
-              childRefs[childValue] = childRefCount - 1;
-            }
-
-            removedRefs = {childValue: 1};
-          }
-        }
       }
 
-      if (recursive) {
+      if (recursive && child != null) {
         removedRefs = child[_refs]!;
+
+        if (childValue != null) {
+          removedRefs![childValue] ??= 0;
+          removedRefs[childValue] = removedRefs[childValue]! + 1;
+        }
+
         node.remove(segment);
+      } else if (childValue != null) {
+        removedRefs = {childValue: 1};
       }
     }
 
@@ -121,7 +95,7 @@ class ValueRefStore<T> extends _BaseValueStore<T> {
         final nodeRefCount = node[_refs][key];
         final childRefCount = entry.value;
 
-        if (nodeRefCount - childRefCount == 0) {
+        if (nodeRefCount == childRefCount) {
           nodeRefs.remove(key);
         } else {
           nodeRefs[key] = nodeRefCount - childRefCount;
