@@ -172,16 +172,26 @@ class FilePersistor extends Persistor {
 
   @override
   persist(docs) async {
+    // The updated persistence keys for documents are built into a local resolver
+    // passed to the worker. This has two main benefits:
+    // 1. It pre-computes the resolved persistence keys across the document updates, eliminating conflicts.
+    //    Ex. If an update to users__1__friends__1 which resolves to persistence key "users" at resolver path "users"
+    //        is followed a subsequent update to users__1 that changes the persistence key at resolver path "users" to "other_users",
+    //        then the previous update to users__1__friends__1 would have an inaccurate persistence key.
+
+    //    Pre-computing the local resolver ensures that all documents can lookup accurate persistence keys.
+    //    were not pre-computed in this way, then there could be conflicts between the changes documents make
+    //
+    // 2. It de-duplicates persistence keys. If there are many documents that all roll up
+    //    to a given key, then the key is only specified once in the local resolver rather than
+    //    being duplicated and sent independently with each document.
     final resolver = ValueStore<String>();
     final List<FilePersistDocument> persistDocs = [];
 
-    // The documents are iterated in reversed insertion order, so that newer
-    // updates to persistor paths are applied versus older ones.
-    for (final doc in docs.reversed) {
+    for (final doc in docs) {
+      bool encrypted;
       final persistorSettings = doc.persistorSettings;
       final globalPersistorSettings = Loon.persistorSettings;
-
-      bool encrypted;
 
       if (persistorSettings != null) {
         final persistorDoc = persistorSettings.doc;
@@ -202,16 +212,14 @@ class FilePersistor extends Persistor {
               path = persistorDoc.path;
             }
 
-            if (!resolver.hasPath(path)) {
-              resolver.write(path, key.value);
-            }
+            resolver.write(path, key.value);
 
             break;
           case FilePersistorSettings(key: FilePersistorBuilderKey keyBuilder):
             final snap = persistorDoc.get();
             final path = persistorDoc.path;
 
-            if (!resolver.hasPath(path) && snap != null) {
+            if (snap != null) {
               resolver.write(path, (keyBuilder as dynamic)(snap));
             }
 

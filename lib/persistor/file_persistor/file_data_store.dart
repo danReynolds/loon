@@ -155,10 +155,10 @@ class DualFileDataStore {
   }
 
   /// Returns a map of all values in the data store under the given path.
-  Map<String, dynamic> extractValues([String path = '']) {
+  Map<String, dynamic> extract([String path = '']) {
     return {
-      ..._plaintextStore.extractValues(path),
-      ..._encryptedStore.extractValues(path),
+      ..._plaintextStore.extract(path),
+      ..._encryptedStore.extract(path),
     };
   }
 
@@ -190,9 +190,6 @@ class FileDataStore {
 
   /// Whether the file data store has been hydrated yet from its persisted file.
   bool isHydrated;
-
-  // Completer used to await hydration of the data store.
-  Completer<void>? _hydrationCompleter;
 
   late final Logger _logger;
 
@@ -249,28 +246,25 @@ class FileDataStore {
   /// 1. It necessarily exists in all of the value stores resolved under the given path.
   /// 2. It *could* exist in any of the parent value stores of the given path, such as in the example of the "users"
   ///    path containing data for path users__1, users__1__friends__1, etc.
-  Map<String, dynamic> extractValues([String path = '']) {
+  Map<String, dynamic> extract([String path = '']) {
+    _assertHydrated();
+
     Map<String, dynamic> data = {};
 
     final parentStores = _localResolver.getPathValues(path);
     final childStores = _localResolver.extractUniqueValues(path);
-    final stores = {
-      ...parentStores,
-      ...childStores,
-    };
 
-    for (final store in stores) {
+    for (final store in parentStores) {
+      data.addAll(store.extract(path));
+    }
+    for (final store in childStores) {
       data.addAll(store.extract(path));
     }
 
     return data;
   }
 
-  void writePath(
-    String resolverPath,
-    String path,
-    dynamic value,
-  ) async {
+  void writePath(String resolverPath, String path, dynamic value) async {
     _assertHydrated();
 
     ValueStore? store = _localResolver.get(resolverPath) ??
@@ -311,16 +305,21 @@ class FileDataStore {
 
   /// Shallowly deletes the given document path from the given resolver path store.
   void shallowDelete(String resolverPath, String path) {
-    _localResolver.get(resolverPath)?.delete(path, recursive: false);
+    final resolver = _localResolver.get(resolverPath);
+
+    if (resolver == null) {
+      return;
+    }
+
+    resolver.delete(path, recursive: false);
+    if (resolver.isEmpty) {
+      _localResolver.delete(resolverPath, recursive: false);
+    }
   }
 
   Future<void> hydrate() async {
     if (isHydrated) {
       return;
-    }
-
-    if (_hydrationCompleter != null) {
-      return _hydrationCompleter!.future;
     }
 
     if (!(await _file.exists())) {
@@ -332,7 +331,6 @@ class FileDataStore {
       await _logger.measure(
         'Hydrate',
         () async {
-          _hydrationCompleter = Completer();
           final encodedStore = await _readFile();
           if (encodedStore != null) {
             final Map json = jsonDecode(encodedStore);
@@ -343,12 +341,10 @@ class FileDataStore {
               _localResolver.write(resolverPath, valueStore);
             }
           }
-          _hydrationCompleter!.complete();
           isHydrated = true;
         },
       );
     } catch (e) {
-      _hydrationCompleter!.completeError(e);
       _logger.log('Corrupt file data store $name');
       rethrow;
     }
@@ -395,8 +391,8 @@ class FileDataStore {
     return _localResolver.isEmpty;
   }
 
-  /// Grafts the data at the given [path] in the other [FileDataStore] onto
-  /// this data store at that path.
+  /// Grafts the data in the given [other] data store under resolver path [otherResolverPath] and data path [dataPath]
+  /// into this data store under resolver path [resolverPath] at data path [dataPath].
   void graft(
     String resolverPath,
     String otherResolverPath,

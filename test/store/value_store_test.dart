@@ -690,6 +690,8 @@ void main() {
             store.extractUniqueValues('users__1__friends__1'),
             {'Friend 1'},
           );
+
+          expect(store.extractUniqueValues('users__3'), <String>{});
         },
       );
     },
