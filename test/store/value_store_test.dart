@@ -46,7 +46,7 @@ void main() {
     });
   });
 
-  group('getValues', () {
+  group('getChildValues', () {
     test('Retrieves all of the values of the children of the given path', () {
       final store = ValueStore<String>();
 
@@ -54,13 +54,13 @@ void main() {
       store.write('users__2', 'Sonja');
       store.write('users__1__friends__1', 'Nik');
 
-      expect(store.getValues('users__1'), null);
-      expect(store.getValues('users__2'), null);
-      expect(store.getValues('users'), {
+      expect(store.getChildValues('users__1'), null);
+      expect(store.getChildValues('users__2'), null);
+      expect(store.getChildValues('users'), {
         "1": "Dan",
         "2": "Sonja",
       });
-      expect(store.getValues('users__1__friends'), {
+      expect(store.getChildValues('users__1__friends'), {
         "1": "Nik",
       });
     });
@@ -597,7 +597,7 @@ void main() {
     );
   });
 
-  group('extractValues', () {
+  group('extract', () {
     test('Extracts all values in the store to a path/value map', () {
       final store = ValueStore<String>();
       store.write('users__1', 'Dan');
@@ -607,7 +607,7 @@ void main() {
       store.write('users__2__messages__1', 'Hey!');
       store.write('users__2__messages__2', "I'm good.");
 
-      expect(store.extractValues(), {
+      expect(store.extract(), {
         'users__1': 'Dan',
         'users__2': 'Sonja',
         'users__1__messages__1': 'Hello',
@@ -628,7 +628,7 @@ void main() {
       store.write('users__2__messages__1', 'Hey!');
       store.write('users__2__messages__2', "I'm good.");
 
-      expect(store.extractValues('users__1'), {
+      expect(store.extract('users__1'), {
         'users__1': 'Dan',
         'users__1__messages__1': 'Hello',
         'users__1__messages__2': 'How are you?',
@@ -637,7 +637,7 @@ void main() {
   });
 
   group(
-    'getSubpathValues',
+    'getPathValues',
     () {
       test(
         'Returns all values along the given path',
@@ -647,8 +647,49 @@ void main() {
           store.write('users__1', 1);
           store.write('users__1__friends__2', 2);
 
-          expect(store.getSubpathValues('users__1'), [1]);
-          expect(store.getSubpathValues('users__1__friends__2'), [1, 2]);
+          expect(store.getPathValues('users__1'), [1]);
+          expect(store.getPathValues('users__1__friends__2'), [1, 2]);
+        },
+      );
+    },
+  );
+
+  group(
+    'extractUniqueValues',
+    () {
+      test(
+        'Extracts all unique values under the given path',
+        () {
+          final store = ValueStore();
+          store.write('users__1', 'User 1');
+          store.write('users__2', 'User 2');
+          store.write('users__1__friends__1', 'Friend 1');
+          store.write('users__1__friends__2', 'Friend 2');
+          store.write('users__1__friends__3', 'Friend 2');
+
+          expect(
+            store.extractUniqueValues(),
+            {
+              'User 1',
+              'User 2',
+              'Friend 1',
+              'Friend 2',
+            },
+          );
+
+          expect(
+            store.extractUniqueValues('users__1'),
+            {
+              'User 1',
+              'Friend 1',
+              'Friend 2',
+            },
+          );
+
+          expect(
+            store.extractUniqueValues('users__1__friends__1'),
+            {'Friend 1'},
+          );
         },
       );
     },

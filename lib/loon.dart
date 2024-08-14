@@ -118,7 +118,7 @@ class Loon {
 
   List<DocumentSnapshot<T>> getSnapshots<T>(Collection<T> collection) {
     final snaps = documentStore
-        .getValues(collection.path)
+        .getChildValues(collection.path)
         ?.values
         .map(
           (snap) => parseSnap(

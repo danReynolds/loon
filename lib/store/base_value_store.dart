@@ -51,7 +51,7 @@ abstract class _BaseValueStore<T> {
     return null;
   }
 
-  List<T> _getSubpathValues(
+  List<T> _getPathValues(
     Map node,
     List<String> segments,
     int index,
@@ -67,7 +67,7 @@ abstract class _BaseValueStore<T> {
       values.add(value);
     }
     if (index < segments.length - 1 && child != null) {
-      values.addAll(_getSubpathValues(child, segments, index + 1));
+      values.addAll(_getPathValues(child, segments, index + 1));
     }
 
     return values;
@@ -88,7 +88,7 @@ abstract class _BaseValueStore<T> {
     return child;
   }
 
-  Map<String, T> _extractValues(
+  Map<String, T> _extract(
     Map? node,
     Map<String, T> values,
     String path,
@@ -107,7 +107,30 @@ abstract class _BaseValueStore<T> {
     for (final key in node.keys) {
       if (key != _values) {
         final childPath = path.isEmpty ? key : "$path$delimiter$key";
-        _extractValues(node[key], values, childPath);
+        _extract(node[key], values, childPath);
+      }
+    }
+
+    return values;
+  }
+
+  Set<T> _extractUniqueValues(
+    Map? node,
+    Set<T> values,
+  ) {
+    if (node == null) {
+      return values;
+    }
+
+    final Map<String, T>? nodeValues = node[_values];
+
+    if (nodeValues != null) {
+      values.addAll(nodeValues.values);
+    }
+
+    for (final key in node.keys) {
+      if (key != _values) {
+        _extractUniqueValues(node[key], values);
       }
     }
 
@@ -128,15 +151,15 @@ abstract class _BaseValueStore<T> {
   }
 
   /// Returns a map of all values that are immediate children of the given path.
-  Map<String, T>? getValues(String path) {
+  Map<String, T>? getChildValues(String path) {
     return _getNode(_store, path.split(delimiter), 0)?[_values];
   }
 
-  /// Returns all values along the given path at every sub path.
+  /// Returns all values at every node node along the given path.
   /// For example, if the path is users__1__friends__1 and both users__1 and users__1__friends__1
   /// exist as distinct values in the store, then it returns both values.
-  List<T> getSubpathValues(String path) {
-    return _getSubpathValues(_store, path.split(delimiter), 0);
+  List<T> getPathValues(String path) {
+    return _getPathValues(_store, path.split(delimiter), 0);
   }
 
   /// Returns the nearest path/value pair that has a matching value along the given path, beginning at the full path
@@ -161,10 +184,10 @@ abstract class _BaseValueStore<T> {
   T write(String path, T value);
   void delete(String path, {bool recursive = true});
 
-  /// Extracts all values under the given path into a set of flat key-value pairs of paths to values.
-  Map<String, T> extractValues([String path = '']) {
+  /// Extracts all data under the given path into a set of flat key-value pairs of paths to values.
+  Map<String, T> extract([String path = '']) {
     if (path.isEmpty) {
-      return _extractValues(_store, {}, path);
+      return _extract(_store, {}, path);
     }
 
     final Map<String, T> values = {};
@@ -181,7 +204,29 @@ abstract class _BaseValueStore<T> {
       values[path] = parentNode[_values][lastSegment];
     }
 
-    return _extractValues(parentNode[lastSegment], values, path);
+    return _extract(parentNode[lastSegment], values, path);
+  }
+
+  /// Returns a set of the unique values that exist in the store under the given path.
+  Set<T> extractUniqueValues([String path = '']) {
+    if (path.isEmpty) {
+      return _extractUniqueValues(_store, {});
+    }
+
+    final Set<T> values = {};
+    final segments = path.split(delimiter);
+    final lastSegment = segments.removeLast();
+
+    final parentNode = _getNode(_store, segments, 0);
+    if (parentNode == null) {
+      return values;
+    }
+
+    if (parentNode[_values]?.containsKey(lastSegment) ?? false) {
+      values.add(parentNode[_values][lastSegment]);
+    }
+
+    return _extractUniqueValues(parentNode[lastSegment], values);
   }
 
   Map touch(String path) {
@@ -193,8 +238,8 @@ abstract class _BaseValueStore<T> {
   }
 
   /// Returns whether the store has any child values under the given path.
-  bool hasValues(String path) {
-    return getValues(path)?.isNotEmpty ?? false;
+  bool hasChildValues(String path) {
+    return getChildValues(path)?.isNotEmpty ?? false;
   }
 
   void clear() {

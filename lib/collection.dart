@@ -104,7 +104,7 @@ class Collection<T> implements Queryable<T>, StoreReference {
   }
 
   bool exists() {
-    return Loon._instance.documentStore.hasValues(path);
+    return Loon._instance.documentStore.hasChildValues(path);
   }
 
   Stream<List<DocumentSnapshot<T>>> stream() {

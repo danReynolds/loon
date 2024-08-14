@@ -177,7 +177,7 @@ class FileDataStore {
   /// The file data store indexes documents into a local resolver by resolver path,
   /// then a value store by document path. This is done to enable efficient access and modification
   /// of data by resolver path and path.
-  final _localResolver = ValueRefStore<ValueStore>();
+  final _localResolver = ValueStore<ValueStore>();
 
   /// The name of the file data store.
   final String name;
@@ -252,15 +252,15 @@ class FileDataStore {
   Map<String, dynamic> extractValues([String path = '']) {
     Map<String, dynamic> data = {};
 
-    final parentStores = _localResolver.getSubpathValues(path);
-    final childStores = _localResolver.getRefs(path)?.keys ?? [];
+    final parentStores = _localResolver.getPathValues(path);
+    final childStores = _localResolver.extractUniqueValues(path);
     final stores = {
       ...parentStores,
       ...childStores,
     };
 
     for (final store in stores) {
-      data.addAll(store.extractValues(path));
+      data.addAll(store.extract(path));
     }
 
     return data;
@@ -298,7 +298,7 @@ class FileDataStore {
     _localResolver.delete(path);
 
     // 2. Evict the given path from any parent stores above the given path.
-    final stores = _localResolver.getSubpathValues(path);
+    final stores = _localResolver.getPathValues(path);
     for (final store in stores) {
       // Data under the given path can only exist in one parent path store at a time, so deletion can exit early
       // once a parent path is found.
@@ -420,7 +420,7 @@ class FileDataStore {
   }
 
   Map inspect() {
-    return _localResolver.extractValues();
+    return _localResolver.extract();
   }
 }
 
