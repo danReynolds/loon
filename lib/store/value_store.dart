@@ -234,4 +234,8 @@ class ValueStore<T> extends _BaseValueStore<T> {
       _graft(_store, other._store, path.split(_BaseValueStore.delimiter), 0);
     }
   }
+
+  Map toJson() {
+    return _store;
+  }
 }

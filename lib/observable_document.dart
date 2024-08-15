@@ -50,7 +50,7 @@ class ObservableDocument<T> extends Document<T>
 
     // 2.
     final isRemoved = Loon._instance.broadcastManager.eventStore
-            .getNearest(path, BroadcastEvents.removed) !=
+            .getNearestMatch(path, BroadcastEvents.removed) !=
         null;
 
     if (event == null && isRemoved) {

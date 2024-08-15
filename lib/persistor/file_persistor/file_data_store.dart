@@ -6,9 +6,7 @@ import 'package:loon/loon.dart';
 import 'package:loon/persistor/file_persistor/file_persistor_worker.dart';
 import 'package:path/path.dart' as path;
 
-final fileRegex = RegExp(
-  r'^(?!__localResolver__)(\w+?)(?:.encrypted)?\.json$',
-);
+final fileRegex = RegExp(r'^(?!__resolver__)(\w+?)(?:.encrypted)?\.json$');
 
 class DualFileDataStore {
   late final FileDataStore _plaintextStore;
@@ -465,7 +463,7 @@ class FileDataStoreResolver {
 
   var _store = ValueRefStore<String>();
 
-  static const name = '__localResolver__';
+  static const name = '__resolver__';
 
   late final Logger _logger;
 
@@ -552,6 +550,8 @@ class FileDataStoreResolver {
           await _file.delete();
         }
         _store.clear();
+        // Re-initialize the store with the root store value.
+        _store.write('', FileDataStore.defaultKey);
       },
     );
   }

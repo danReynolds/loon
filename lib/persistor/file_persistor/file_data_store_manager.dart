@@ -66,7 +66,7 @@ class FileDataStoreManager {
     return _syncLock.run(() {
       return _logger.measure('File Sync', () async {
         final dirtyStores =
-            _index.values.where((dataStore) => dataStore.isDirty).toList();
+            _index.values.where((dataStore) => dataStore.isDirty);
 
         if (dirtyStores.isEmpty) {
           return;
@@ -190,7 +190,7 @@ class FileDataStoreManager {
       Set<DualFileDataStore> dataStores = {};
       Map<String, List<DualFileDataStore>> pathDataStores = {};
 
-      // Pre-calculate and hydrate all resolved file data stores involved in the document updates.
+      // Pre-calculate and hydrate all resolved file data stores relevant to the updated documents.
       for (final doc in docs) {
         final docPath = doc.path;
         final docData = doc.data;

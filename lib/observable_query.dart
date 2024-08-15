@@ -89,7 +89,7 @@ class ObservableQuery<T> extends Query<T>
 
     // 1.  Any path along the query's collection path has been removed.
     if (Loon._instance.broadcastManager.eventStore
-            .getNearest(path, BroadcastEvents.removed) !=
+            .getNearestMatch(path, BroadcastEvents.removed) !=
         null) {
       if (_controllerValue.isNotEmpty) {
         shouldRebroadcast = true;

@@ -48,6 +48,12 @@ abstract class _BaseValueStore<T> {
       return (segments.sublist(0, index + 1).join(delimiter), nodeValue);
     }
 
+    // Default to the value at the root of the store if no value is found at a deeper path.
+    final rootValue = _store[_values]?[''];
+    if (index == 0 && rootValue != null) {
+      return ('', rootValue);
+    }
+
     return null;
   }
 
@@ -162,11 +168,15 @@ abstract class _BaseValueStore<T> {
     return _getPathValues(_store, path.split(delimiter), 0);
   }
 
-  /// Returns the nearest path/value pair that has a matching value along the given path, beginning at the full path
-  /// and then attempting to find the value at any parent node moving up the tree. If no value is provided, it returns
-  /// the nearest non-null path.
-  (String, T)? getNearest(String path, [T? value]) {
-    return _getNearest(_store, path.split(delimiter), 0, value);
+  /// Returns the nearest path/value pair that has a value along the given path, beginning at the full path
+  /// and then attempting to find a non-null value at any parent node moving up the tree.
+  (String, T)? getNearest(String path) {
+    return _getNearest(_store, path.split(delimiter), 0, null);
+  }
+
+  /// Returns the nearest path that has a matching value along the given path.
+  String? getNearestMatch(String path, T value) {
+    return _getNearest(_store, path.split(delimiter), 0, value)?.$1;
   }
 
   bool hasValue(String path) {

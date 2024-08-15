@@ -557,40 +557,60 @@ void main() {
       () {
         final store = ValueStore<String>();
 
+        store.write('', 'Root value');
         store.write('users__1', 'Dan');
         store.write('users__1__posts__2', "You all mean so much to me");
         store.write('users__1__posts__2__reactions__3', 'Like');
 
-        expect(store.getNearest('users__1__posts__2__reactions__3'), 'Like');
+        expect(
+          store.getNearest('users__1__posts__2__reactions__3'),
+          ('users__1__posts__2__reactions__3', 'Like'),
+        );
 
         store.delete('users__1__posts__2__reactions__3');
 
         expect(
           store.getNearest('users__1__posts__2__reactions__3'),
-          "You all mean so much to me",
+          ("users__1__posts__2", "You all mean so much to me"),
         );
 
         store.delete('users__1__posts__2');
 
-        expect(store.getNearest('users__1__posts__2__reactions__3'), 'Dan');
+        expect(
+          store.getNearest('users__1__posts__2__reactions__3'),
+          ('users__1', 'Dan'),
+        );
 
         store.delete('users__1');
 
-        expect(store.getNearest('users__1__posts__2__reactions__3'), null);
+        expect(
+          store.getNearest('users__1__posts__2__reactions__3'),
+          ('', 'Root value'),
+        );
       },
     );
+  });
 
+  group('getNearestMatch', () {
     test(
-      "With a value, returns the first matching value along the given path.",
+      "Returns the first matching value along the given path.",
       () {
         final store = ValueStore<String>();
         store.write('users__1', 'Dan');
         store.write('users__1__messages__1', 'Dan');
         store.write('users__1__messages__2', 'Sonja');
 
-        expect(store.getNearest('users__1__messages__1', 'Dan'), 'users__1');
         expect(
-          store.getNearest('users__1__messages__2', 'Sonja'),
+          store.getNearestMatch('users__1__messages__1', 'Dan'),
+          'users__1__messages__1',
+        );
+        expect(
+          store.getNearestMatch('users__1__messages__2', 'Sonja'),
+          'users__1__messages__2',
+        );
+
+        expect(
+          store.getNearestMatch('users__1__messages__2__reactions__3', 'Sonja'),
           'users__1__messages__2',
         );
       },
