@@ -5,6 +5,7 @@ abstract class _BaseValueStore<T> {
 
   static const _values = '__values';
   static const delimiter = '__';
+  static const root = '';
 
   _BaseValueStore([Map? store]) {
     if (store != null) {
@@ -49,9 +50,9 @@ abstract class _BaseValueStore<T> {
     }
 
     // Default to the value at the root of the store if no value is found at a deeper path.
-    final rootValue = _store[_values]?[''];
+    final rootValue = _store[_values]?[root];
     if (index == 0 && rootValue != null) {
-      return ('', rootValue);
+      return (root, rootValue);
     }
 
     return null;

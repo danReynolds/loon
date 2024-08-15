@@ -47,6 +47,11 @@ class DualFileDataStore {
   @override
   int get hashCode => Object.hashAll([name]);
 
+  bool hasPath(String resolverPath, String path) {
+    return _plaintextStore.hasPath(resolverPath, path) ||
+        _encryptedStore.hasPath(resolverPath, path);
+  }
+
   bool hasValue(String resolverPath, String path) {
     return _plaintextStore.hasValue(resolverPath, path) ||
         _encryptedStore.hasValue(resolverPath, path);
@@ -237,6 +242,12 @@ class FileDataStore {
     _assertHydrated();
 
     return _localResolver.get(resolverPath)?.hasValue(path) ?? false;
+  }
+
+  bool hasPath(String resolverPath, String path) {
+    _assertHydrated();
+
+    return _localResolver.get(resolverPath)?.hasPath(path) ?? false;
   }
 
   /// Returns a map of the subset of documents in the store under the given path.
@@ -499,8 +510,8 @@ class FileDataStoreResolver {
     }
   }
 
-  Map<String, int>? getRefs(String path) {
-    return _store.getRefs(path);
+  Set<String> resolvePath(String path) {
+    return _store.getRefs(path)?.keys.toSet() ?? {};
   }
 
   (String, String)? getNearest(String path) {

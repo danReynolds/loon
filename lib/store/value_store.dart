@@ -40,6 +40,8 @@ part of loon;
 class ValueStore<T> extends _BaseValueStore<T> {
   ValueStore([Map? store]) : super(store);
 
+  static const root = _BaseValueStore.root;
+
   static ValueStore fromJson(Json json) {
     return ValueStore(json);
   }

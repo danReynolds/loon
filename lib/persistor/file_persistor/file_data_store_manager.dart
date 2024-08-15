@@ -91,7 +91,15 @@ class FileDataStoreManager {
 
   /// Returns a list of all data stores resolved under a given path.
   List<DualFileDataStore> _resolveDataStores(String path) {
-    final dataStoreNames = _resolver.getRefs(path)?.keys ?? [];
+    final dataStoreNames = _resolver.resolvePath(path);
+
+    // Documents under the given path could also have been stored in the default data store,
+    // since defaulted documents do not add entries into the resolver.
+    final defaultStore = _index[FileDataStore.defaultKey];
+    if (defaultStore != null && defaultStore.hasPath('', path)) {
+      dataStoreNames.add(FileDataStore.defaultKey);
+    }
+
     return dataStoreNames
         .map((dataStoreName) => _index[dataStoreName]!)
         .toList();
