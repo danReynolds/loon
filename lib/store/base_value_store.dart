@@ -61,28 +61,28 @@ abstract class _BaseValueStore<T> {
     return null;
   }
 
-  List<T> _getParentPathValues(
+  Map<String, T> _extractParentPath(
     Map node,
     List<String> segments,
     int index,
+    Map<String, T> values,
   ) {
     final segment = segments[index];
 
     final child = node[segment];
     final value = node[_values]?[segment];
 
-    final List<T> values = [];
-
     if (value != null) {
-      values.add(value);
+      final path = segments.sublist(0, index + 1).join(delimiter);
+      values[path] = value;
     }
     if (index < segments.length - 1 && child != null) {
-      values.addAll(_getParentPathValues(child, segments, index + 1));
+      _extractParentPath(child, segments, index + 1, values);
     }
 
     final rootValue = _store[_values]?[root];
     if (index == 0 && rootValue != null) {
-      values.add(rootValue);
+      values[ValueStore.root] = rootValue;
     }
 
     return values;
@@ -129,10 +129,7 @@ abstract class _BaseValueStore<T> {
     return values;
   }
 
-  Set<T> _extractUniqueValues(
-    Map? node,
-    Set<T> values,
-  ) {
+  Set<T> _extractValues(Map? node, Set<T> values) {
     if (node == null) {
       return values;
     }
@@ -145,7 +142,7 @@ abstract class _BaseValueStore<T> {
 
     for (final key in node.keys) {
       if (key != _values) {
-        _extractUniqueValues(node[key], values);
+        _extractValues(node[key], values);
       }
     }
 
@@ -168,13 +165,6 @@ abstract class _BaseValueStore<T> {
   /// Returns a map of all values that are immediate children of the given path.
   Map<String, T>? getChildValues(String path) {
     return _getNode(_store, _getSegments(path), 0)?[_values];
-  }
-
-  /// Returns all values at every parent node node of the given path.
-  /// For example, if the path is users__1__friends__1 and both users__1 and users__1__friends__1
-  /// exist as distinct values in the store, then it returns both values.
-  List<T> getParentPathValues(String path) {
-    return _getParentPathValues(_store, _getSegments(path), 0);
   }
 
   /// Returns the nearest path/value pair that has a value along the given path, beginning at the full path
@@ -203,7 +193,7 @@ abstract class _BaseValueStore<T> {
   T write(String path, T value);
   void delete(String path, {bool recursive = true});
 
-  /// Extracts all data under the given path into a set of flat key-value pairs of paths to values.
+  /// Extracts all values under the given path into a set of flat key-value pairs of paths to values.
   Map<String, T> extract([String path = '']) {
     if (path.isEmpty) {
       return _extract(_store, {}, path);
@@ -226,10 +216,17 @@ abstract class _BaseValueStore<T> {
     return _extract(parentNode[lastSegment], values, path);
   }
 
+  /// Extracts all values at parent paths of the given path into a set of flat key-value pairs of paths to values.
+  /// For example, if the path is users__1__friends__1 and both users__1 and users__1__friends__1
+  /// exist as distinct values in the store, then it returns both values.
+  Map<String, T> extractParentPath(String path) {
+    return _extractParentPath(_store, _getSegments(path), 0, {});
+  }
+
   /// Returns a set of the unique values that exist in the store under the given path.
-  Set<T> extractUniqueValues([String path = '']) {
+  Set<T> extractValues([String path = '']) {
     if (path.isEmpty) {
-      return _extractUniqueValues(_store, {});
+      return _extractValues(_store, {});
     }
 
     final Set<T> values = {};
@@ -245,7 +242,7 @@ abstract class _BaseValueStore<T> {
       values.add(parentNode[_values][lastSegment]);
     }
 
-    return _extractUniqueValues(parentNode[lastSegment], values);
+    return _extractValues(parentNode[lastSegment], values);
   }
 
   Map touch(String path) {

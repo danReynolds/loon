@@ -115,12 +115,20 @@ class ValueRefStore<T> extends _BaseValueStore<T> {
       return null;
     }
 
-    final segments = path.split(_BaseValueStore.delimiter);
+    final segments = _getSegments(path);
     return _getNode(
       _store,
       segments.isEmpty ? segments : segments.sublist(0, segments.length),
       0,
     )?[_refs];
+  }
+
+  @override
+
+  /// A [ValueRefStore] overrides the default [ValueStore.extractUniqueValues] behavior
+  /// since the values under a given path are pre-computed by the ref store.
+  Set<T> extractValues([String path = '']) {
+    return getRefs(path)?.keys.toSet() ?? {};
   }
 
   @override

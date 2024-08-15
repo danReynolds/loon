@@ -307,24 +307,28 @@ void main() {
           expect(
             storeJson,
             {
-              "users": {
-                "__values": {
-                  "1": {'name': 'User 1'},
-                  "2": {'name': 'User 2'},
-                },
-              }
+              ValueStore.root: {
+                "users": {
+                  "__values": {
+                    "1": {'name': 'User 1'},
+                    "2": {'name': 'User 2'},
+                  },
+                }
+              },
             },
           );
 
           expect(
             friendsJson,
             {
-              "users": {
-                "2": {
-                  "friends": {
-                    "__values": {
-                      "1": {'name': 'Friend 1'},
-                      "2": {'name': 'Friend 2'},
+              "users__2__friends": {
+                "users": {
+                  "2": {
+                    "friends": {
+                      "__values": {
+                        "1": {'name': 'Friend 1'},
+                        "2": {'name': 'Friend 2'},
+                      }
                     }
                   }
                 }
@@ -339,7 +343,17 @@ void main() {
           expect(
             resolverJson,
             {
+              "__refs": {
+                "friends": 1,
+                FilePersistor.defaultKey: 1,
+              },
+              "__values": {
+                ValueStore.root: FilePersistor.defaultKey,
+              },
               "users": {
+                "__refs": {
+                  "friends": 1,
+                },
                 "2": {
                   "__refs": {
                     "friends": 1,
@@ -360,11 +374,13 @@ void main() {
           expect(
             friendsJson,
             {
-              "users": {
-                "2": {
-                  "friends": {
-                    "__values": {
-                      "2": {'name': 'Friend 2'},
+              "users__2__friends": {
+                "users": {
+                  "2": {
+                    "friends": {
+                      "__values": {
+                        "2": {'name': 'Friend 2'},
+                      }
                     }
                   }
                 }
@@ -376,7 +392,17 @@ void main() {
           expect(
             resolverJson,
             {
+              "__refs": {
+                "friends": 1,
+                FilePersistor.defaultKey: 1,
+              },
+              "__values": {
+                ValueStore.root: FilePersistor.defaultKey,
+              },
               "users": {
+                "__refs": {
+                  "friends": 1,
+                },
                 "2": {
                   "__refs": {
                     "friends": 1,
@@ -394,7 +420,19 @@ void main() {
           await completer.onSync;
 
           expect(friendsFile.existsSync(), false);
-          expect(resolverFile.existsSync(), false);
+
+          resolverJson = jsonDecode(resolverFile.readAsStringSync());
+          expect(
+            resolverJson,
+            {
+              "__refs": {
+                FilePersistor.defaultKey: 1,
+              },
+              "__values": {
+                ValueStore.root: FilePersistor.defaultKey,
+              },
+            },
+          );
         },
       );
 

@@ -4,7 +4,6 @@ import 'dart:isolate';
 import 'package:encrypt/encrypt.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:loon/loon.dart';
-import 'package:loon/persistor/file_persistor/file_data_store.dart';
 import 'package:loon/persistor/file_persistor/file_persist_document.dart';
 import 'package:loon/persistor/file_persistor/file_persistor_settings.dart';
 import 'package:loon/persistor/file_persistor/file_persistor_worker.dart';
@@ -47,6 +46,9 @@ class FilePersistor extends Persistor {
   }) {
     _logger = Logger('FilePersistor', output: Loon.logger.log);
   }
+
+  /// The name of the default [FileDataStore] key.
+  static const defaultKey = '__store__';
 
   static FilePersistorKey key<T>(String value) {
     return FilePersistorValueKey(value);
@@ -186,7 +188,7 @@ class FilePersistor extends Persistor {
     // 2. It de-duplicates persistence keys. If there are many documents that all roll up
     //    to a given key, then the key is only specified once in the local resolver rather than
     //    being duplicated and sent independently with each document.
-    final resolver = ValueStore<String>()..write('', FileDataStore.defaultKey);
+    final resolver = ValueStore<String>()..write('', FilePersistor.defaultKey);
     final List<FilePersistDocument> persistDocs = [];
 
     for (final doc in docs) {

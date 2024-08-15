@@ -424,6 +424,11 @@ void main() {
             );
 
             expect(
+              store.getRefs(ValueStore.root),
+              {'Dan': 2, 'Nik': 1},
+            );
+
+            expect(
               store.getRefs('users'),
               {'Dan': 2, 'Nik': 1},
             );

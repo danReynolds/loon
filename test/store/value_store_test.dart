@@ -657,25 +657,36 @@ void main() {
   });
 
   group(
-    'getParentPathValues',
+    'extractParentPath',
     () {
       test(
         'Returns all values along the given path',
         () {
           final store = ValueStore();
 
+          store.write(ValueStore.root, 'Root value');
           store.write('users__1', 1);
           store.write('users__1__friends__2', 2);
 
-          expect(store.getParentPathValues('users__1'), [1]);
-          expect(store.getParentPathValues('users__1__friends__2'), [1, 2]);
+          expect(store.extractParentPath('users__1'), {
+            ValueStore.root: 'Root value',
+            'users__1': 1,
+          });
+          expect(store.extractParentPath('users__1__friends__2'), {
+            ValueStore.root: 'Root value',
+            'users__1': 1,
+            'users__1__friends__2': 2,
+          });
+          expect(store.extractParentPath('other_users'), {
+            ValueStore.root: 'Root value',
+          });
         },
       );
     },
   );
 
   group(
-    'extractUniqueValues',
+    'extractValues',
     () {
       test(
         'Extracts all unique values under the given path',
@@ -688,7 +699,7 @@ void main() {
           store.write('users__1__friends__3', 'Friend 2');
 
           expect(
-            store.extractUniqueValues(),
+            store.extractValues(),
             {
               'User 1',
               'User 2',
@@ -698,7 +709,7 @@ void main() {
           );
 
           expect(
-            store.extractUniqueValues('users__1'),
+            store.extractValues('users__1'),
             {
               'User 1',
               'Friend 1',
@@ -707,11 +718,11 @@ void main() {
           );
 
           expect(
-            store.extractUniqueValues('users__1__friends__1'),
+            store.extractValues('users__1__friends__1'),
             {'Friend 1'},
           );
 
-          expect(store.extractUniqueValues('users__3'), <String>{});
+          expect(store.extractValues('users__3'), <String>{});
         },
       );
     },

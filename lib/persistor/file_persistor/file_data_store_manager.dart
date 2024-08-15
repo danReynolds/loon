@@ -77,7 +77,7 @@ class FileDataStoreManager {
           if (_resolver.isDirty) _resolver.sync(),
         ]);
 
-        for (final store in dirtyStores) {
+        for (final store in dirtyStores.toList()) {
           if (store.isEmpty) {
             _index.remove(store.name);
           }
@@ -89,16 +89,22 @@ class FileDataStoreManager {
     });
   }
 
-  /// Returns a list of all data stores resolved under a given path.
+  /// Returns a list of all data stores that contain documents at/under the given path.
+  /// These data stores include:
+  ///
+  /// 1. The nearest data store for the resolver path going up the resolver tree.
+  /// 2. The set of data stores that exist in the subtree of the resolver under the given path.
   List<DualFileDataStore> _resolveDataStores(String path) {
-    final dataStoreNames = _resolver.resolvePath(path);
+    final List<String> dataStoreNames = [];
 
-    // Documents under the given path could also have been stored in the default data store,
-    // since defaulted documents do not add entries into the resolver.
-    final defaultStore = _index[FileDataStore.defaultKey];
-    if (defaultStore != null && defaultStore.hasPath(ValueStore.root, path)) {
-      dataStoreNames.add(FileDataStore.defaultKey);
+    // 1.
+    final nearestDataStoreName = _resolver.getNearest(path)?.$2;
+    if (nearestDataStoreName != null) {
+      dataStoreNames.add(nearestDataStoreName);
     }
+
+    // 2.
+    dataStoreNames.addAll(_resolver.extractValues(path));
 
     return dataStoreNames
         .map((dataStoreName) => _index[dataStoreName]!)
@@ -126,9 +132,9 @@ class FileDataStoreManager {
     }
 
     // Initialize the root file data store if it does not exist yet.
-    if (!_index.containsKey(FileDataStore.defaultKey)) {
-      _index[FileDataStore.defaultKey] = DualFileDataStore(
-        name: FileDataStore.defaultKey,
+    if (!_index.containsKey(FilePersistor.defaultKey)) {
+      _index[FilePersistor.defaultKey] = DualFileDataStore(
+        name: FilePersistor.defaultKey,
         directory: directory,
         encrypter: encrypter,
         isHydrated: true,
@@ -208,8 +214,7 @@ class FileDataStoreManager {
           dataStores.addAll(stores);
         } else {
           final prevDataStoreName = _resolver.getNearest(docPath)!.$2;
-          final nextDataStoreName =
-              localResolver.getNearest(docPath)?.$2 ?? FileDataStore.defaultKey;
+          final nextDataStoreName = localResolver.getNearest(docPath)!.$2;
           final prevDataStore = _index[prevDataStoreName]!;
           final nextDataStore = _index[nextDataStoreName] ??= DualFileDataStore(
             name: nextDataStoreName,
