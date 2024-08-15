@@ -13,6 +13,10 @@ abstract class _BaseValueStore<T> {
     }
   }
 
+  List<String> _getSegments(String path) {
+    return path.split(delimiter);
+  }
+
   Map? _getNode(Map? node, List<String> segments, int index) {
     if (node == null || index == segments.length) {
       return node;
@@ -49,7 +53,6 @@ abstract class _BaseValueStore<T> {
       return (segments.sublist(0, index + 1).join(delimiter), nodeValue);
     }
 
-    // Default to the value at the root of the store if no value is found at a deeper path.
     final rootValue = _store[_values]?[root];
     if (index == 0 && rootValue != null) {
       return (root, rootValue);
@@ -58,7 +61,7 @@ abstract class _BaseValueStore<T> {
     return null;
   }
 
-  List<T> _getPathValues(
+  List<T> _getParentPathValues(
     Map node,
     List<String> segments,
     int index,
@@ -74,7 +77,12 @@ abstract class _BaseValueStore<T> {
       values.add(value);
     }
     if (index < segments.length - 1 && child != null) {
-      values.addAll(_getPathValues(child, segments, index + 1));
+      values.addAll(_getParentPathValues(child, segments, index + 1));
+    }
+
+    final rootValue = _store[_values]?[root];
+    if (index == 0 && rootValue != null) {
+      values.add(rootValue);
     }
 
     return values;
@@ -149,35 +157,35 @@ abstract class _BaseValueStore<T> {
       return null;
     }
 
-    final segments = path.split(delimiter);
+    final segments = _getSegments(path);
     return _getNode(
       _store,
-      segments.isEmpty ? segments : segments.sublist(0, segments.length - 1),
+      segments.sublist(0, segments.length - 1),
       0,
     )?[_values]?[segments.last];
   }
 
   /// Returns a map of all values that are immediate children of the given path.
   Map<String, T>? getChildValues(String path) {
-    return _getNode(_store, path.split(delimiter), 0)?[_values];
+    return _getNode(_store, _getSegments(path), 0)?[_values];
   }
 
-  /// Returns all values at every node node along the given path.
+  /// Returns all values at every parent node node of the given path.
   /// For example, if the path is users__1__friends__1 and both users__1 and users__1__friends__1
   /// exist as distinct values in the store, then it returns both values.
-  List<T> getPathValues(String path) {
-    return _getPathValues(_store, path.split(delimiter), 0);
+  List<T> getParentPathValues(String path) {
+    return _getParentPathValues(_store, _getSegments(path), 0);
   }
 
   /// Returns the nearest path/value pair that has a value along the given path, beginning at the full path
   /// and then attempting to find a non-null value at any parent node moving up the tree.
   (String, T)? getNearest(String path) {
-    return _getNearest(_store, path.split(delimiter), 0, null);
+    return _getNearest(_store, _getSegments(path), 0, null);
   }
 
   /// Returns the nearest path that has a matching value along the given path.
   String? getNearestMatch(String path, T value) {
-    return _getNearest(_store, path.split(delimiter), 0, value)?.$1;
+    return _getNearest(_store, _getSegments(path), 0, value)?.$1;
   }
 
   bool hasValue(String path) {
@@ -189,7 +197,7 @@ abstract class _BaseValueStore<T> {
       return true;
     }
 
-    return hasValue(path) || _getNode(_store, path.split(delimiter), 0) != null;
+    return hasValue(path) || _getNode(_store, _getSegments(path), 0) != null;
   }
 
   T write(String path, T value);
@@ -202,7 +210,7 @@ abstract class _BaseValueStore<T> {
     }
 
     final Map<String, T> values = {};
-    final segments = path.split(delimiter);
+    final segments = _getSegments(path);
     final lastSegment = segments.removeLast();
 
     final parentNode = _getNode(_store, segments, 0);
@@ -225,7 +233,7 @@ abstract class _BaseValueStore<T> {
     }
 
     final Set<T> values = {};
-    final segments = path.split(delimiter);
+    final segments = _getSegments(path);
     final lastSegment = segments.removeLast();
 
     final parentNode = _getNode(_store, segments, 0);

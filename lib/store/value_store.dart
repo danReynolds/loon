@@ -82,7 +82,7 @@ class ValueStore<T> extends _BaseValueStore<T> {
 
   @override
   write(String path, T value) {
-    _write(_store, path.split(_BaseValueStore.delimiter), 0, value);
+    _write(_store, _getSegments(path), 0, value);
     return value;
   }
 
@@ -154,7 +154,7 @@ class ValueStore<T> extends _BaseValueStore<T> {
       return;
     }
 
-    _delete(_store, path.split(_BaseValueStore.delimiter), 0, recursive);
+    _delete(_store, _getSegments(path), 0, recursive);
   }
 
   /// Returns whether the store has a value for the given path.
@@ -233,7 +233,7 @@ class ValueStore<T> extends _BaseValueStore<T> {
       other.clear();
       _mergeNode(_store, otherNode);
     } else {
-      _graft(_store, other._store, path.split(_BaseValueStore.delimiter), 0);
+      _graft(_store, other._store, _getSegments(path), 0);
     }
   }
 

@@ -96,7 +96,7 @@ class FileDataStoreManager {
     // Documents under the given path could also have been stored in the default data store,
     // since defaulted documents do not add entries into the resolver.
     final defaultStore = _index[FileDataStore.defaultKey];
-    if (defaultStore != null && defaultStore.hasPath('', path)) {
+    if (defaultStore != null && defaultStore.hasPath(ValueStore.root, path)) {
       dataStoreNames.add(FileDataStore.defaultKey);
     }
 

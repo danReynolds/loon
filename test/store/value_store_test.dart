@@ -557,7 +557,7 @@ void main() {
       () {
         final store = ValueStore<String>();
 
-        store.write('', 'Root value');
+        store.write(ValueStore.root, 'Root value');
         store.write('users__1', 'Dan');
         store.write('users__1__posts__2', "You all mean so much to me");
         store.write('users__1__posts__2__reactions__3', 'Like');
@@ -585,7 +585,7 @@ void main() {
 
         expect(
           store.getNearest('users__1__posts__2__reactions__3'),
-          ('', 'Root value'),
+          (ValueStore.root, 'Root value'),
         );
       },
     );
@@ -657,7 +657,7 @@ void main() {
   });
 
   group(
-    'getPathValues',
+    'getParentPathValues',
     () {
       test(
         'Returns all values along the given path',
@@ -667,8 +667,8 @@ void main() {
           store.write('users__1', 1);
           store.write('users__1__friends__2', 2);
 
-          expect(store.getPathValues('users__1'), [1]);
-          expect(store.getPathValues('users__1__friends__2'), [1, 2]);
+          expect(store.getParentPathValues('users__1'), [1]);
+          expect(store.getParentPathValues('users__1__friends__2'), [1, 2]);
         },
       );
     },

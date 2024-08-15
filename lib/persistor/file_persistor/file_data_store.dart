@@ -260,7 +260,7 @@ class FileDataStore {
 
     Map<String, dynamic> data = {};
 
-    final parentStores = _localResolver.getPathValues(path);
+    final parentStores = _localResolver.getParentPathValues(path);
     final childStores = _localResolver.extractUniqueValues(path);
 
     for (final store in parentStores) {
@@ -301,12 +301,13 @@ class FileDataStore {
     _localResolver.delete(path);
 
     // 2. Evict the given path from any parent stores above the given path.
-    final stores = _localResolver.getPathValues(path);
+    final stores = _localResolver.getParentPathValues(path);
     for (final store in stores) {
       // Data under the given path can only exist in one parent path store at a time, so deletion can exit early
       // once a parent path is found.
       if (store.hasPath(path)) {
         store.delete(path);
+        isDirty = true;
         break;
       }
     }
@@ -320,7 +321,13 @@ class FileDataStore {
       return;
     }
 
+    if (!resolver.hasValue(path)) {
+      return;
+    }
+
     resolver.delete(path, recursive: false);
+    isDirty = true;
+
     if (resolver.isEmpty) {
       _localResolver.delete(resolverPath, recursive: false);
     }
@@ -489,8 +496,10 @@ class FileDataStoreResolver {
     );
     _file = File("${directory.path}/$name.json");
 
-    // Initialize the store with a root key of the default file data store.
-    _store.write('', FileDataStore.defaultKey);
+    // Initialize the root of the resolver with the default file data store key.
+    // This ensures that all lookups of values in the resolver by parent path roll up
+    // to the default store as a fallback if no other value exists for a given path in the resolver.
+    _store.write(ValueStore.root, FileDataStore.defaultKey);
   }
 
   void writePath(String path, dynamic value) {
