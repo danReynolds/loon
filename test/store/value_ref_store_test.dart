@@ -400,6 +400,65 @@ void main() {
                 },
               );
 
+              store.delete('users__1__friends__1');
+
+              expect(
+                store.inspect(),
+                {
+                  "__refs": {
+                    'test2': 1,
+                  },
+                  "users": {
+                    "__refs": {
+                      'test2': 1,
+                    },
+                    "1": {
+                      "__refs": {
+                        'test2': 1,
+                      },
+                      "friends": {
+                        "__refs": {
+                          'test2': 1,
+                        },
+                        "__values": {
+                          "2": 'test2',
+                        },
+                      }
+                    }
+                  }
+                },
+              );
+
+              // No-op since the path `users__1__friends__3` does not exist in the store.
+              store.delete('users__1__friends__3');
+
+              expect(
+                store.inspect(),
+                {
+                  "__refs": {
+                    'test2': 1,
+                  },
+                  "users": {
+                    "__refs": {
+                      'test2': 1,
+                    },
+                    "1": {
+                      "__refs": {
+                        'test2': 1,
+                      },
+                      "friends": {
+                        "__refs": {
+                          'test2': 1,
+                        },
+                        "__values": {
+                          "2": 'test2',
+                        },
+                      }
+                    }
+                  }
+                },
+              );
+
               store.delete('users__1__friends');
 
               expect(store.inspect(), {});

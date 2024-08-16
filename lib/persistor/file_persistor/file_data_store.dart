@@ -427,7 +427,8 @@ class FileDataStore {
   ) {
     _assertHydrated();
 
-    final store = _storeResolver.get(resolverPath) ?? ValueStore();
+    final store = _storeResolver.get(resolverPath) ??
+        _storeResolver.write(resolverPath, ValueStore());
     final otherStore = other._storeResolver.get(otherResolverPath);
 
     if (otherStore == null) {
@@ -435,6 +436,10 @@ class FileDataStore {
     }
 
     store.graft(otherStore, dataPath);
+
+    if (otherStore.isEmpty) {
+      other._storeResolver.delete(otherResolverPath, recursive: false);
+    }
 
     // After the graft, both affected data stores must be marked as dirty.
     isDirty = true;
@@ -509,7 +514,7 @@ class FileDataStoreResolver {
     // Initialize the root of the resolver with the default file data store key.
     // This ensures that all lookups of values in the resolver by parent path roll up
     // to the default store as a fallback if no other value exists for a given path in the resolver.
-    _store.write(ValueStore.root, FilePersistor.defaultKey);
+    _store.write(ValueStore.root, FilePersistor.defaultKey.value);
   }
 
   void writePath(String path, dynamic value) {
@@ -585,7 +590,7 @@ class FileDataStoreResolver {
         }
         _store.clear();
         // Re-initialize the root of the store to the default persistor key.
-        _store.write(ValueStore.root, FilePersistor.defaultKey);
+        _store.write(ValueStore.root, FilePersistor.defaultKey.value);
       },
     );
   }

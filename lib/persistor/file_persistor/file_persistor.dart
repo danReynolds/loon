@@ -48,13 +48,14 @@ class FilePersistor extends Persistor {
   }
 
   /// The name of the default [FileDataStore] key.
-  static const defaultKey = '__store__';
+  static final FilePersistorValueKey defaultKey =
+      FilePersistor.key('__store__');
 
-  static FilePersistorKey key<T>(String value) {
+  static FilePersistorValueKey key<T>(String value) {
     return FilePersistorValueKey(value);
   }
 
-  static FilePersistorKey keyBuilder<T>(
+  static FilePersistorBuilderKey keyBuilder<T>(
     String Function(DocumentSnapshot<T> snap) builder,
   ) {
     return FilePersistorBuilderKey<T>(builder);
@@ -188,7 +189,8 @@ class FilePersistor extends Persistor {
     // 2. It de-duplicates persistence keys. If there are many documents that all roll up
     //    to a given key, then the key is only specified once in the local resolver rather than
     //    being duplicated and sent independently with each document.
-    final resolver = ValueStore<String>()..write('', FilePersistor.defaultKey);
+    final resolver = ValueStore<String>()
+      ..write('', FilePersistor.defaultKey.value);
     final List<FilePersistDocument> persistDocs = [];
 
     for (final doc in docs) {

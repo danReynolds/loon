@@ -345,10 +345,10 @@ void main() {
             {
               "__refs": {
                 "friends": 1,
-                FilePersistor.defaultKey: 1,
+                FilePersistor.defaultKey.value: 1,
               },
               "__values": {
-                ValueStore.root: FilePersistor.defaultKey,
+                ValueStore.root: FilePersistor.defaultKey.value,
               },
               "users": {
                 "__refs": {
@@ -394,10 +394,10 @@ void main() {
             {
               "__refs": {
                 "friends": 1,
-                FilePersistor.defaultKey: 1,
+                FilePersistor.defaultKey.value: 1,
               },
               "__values": {
-                ValueStore.root: FilePersistor.defaultKey,
+                ValueStore.root: FilePersistor.defaultKey.value,
               },
               "users": {
                 "__refs": {
@@ -426,10 +426,10 @@ void main() {
             resolverJson,
             {
               "__refs": {
-                FilePersistor.defaultKey: 1,
+                FilePersistor.defaultKey.value: 1,
               },
               "__values": {
-                ValueStore.root: FilePersistor.defaultKey,
+                ValueStore.root: FilePersistor.defaultKey.value,
               },
             },
           );
@@ -467,21 +467,25 @@ void main() {
           expect(
             usersJson,
             {
-              "users": {
-                "__values": {
-                  "1": {'name': 'User 1'},
-                },
-              }
+              "users__1": {
+                "users": {
+                  "__values": {
+                    "1": {'name': 'User 1'},
+                  },
+                }
+              },
             },
           );
 
           expect(
             otherUsersJson,
             {
-              "users": {
-                "__values": {
-                  "2": {'name': 'User 2'},
-                },
+              "users__2": {
+                "users": {
+                  "__values": {
+                    "2": {'name': 'User 2'},
+                  },
+                }
               }
             },
           );
@@ -493,6 +497,14 @@ void main() {
           expect(
             resolverJson,
             {
+              "__refs": {
+                "users": 1,
+                "other_users": 1,
+                FilePersistor.defaultKey.value: 1,
+              },
+              "__values": {
+                ValueStore.root: FilePersistor.defaultKey.value,
+              },
               "users": {
                 "__refs": {
                   "users": 1,
@@ -514,10 +526,12 @@ void main() {
           expect(
             otherUsersJson,
             {
-              "users": {
-                "__values": {
-                  "2": {'name': 'User 2'},
-                },
+              "users__2": {
+                "users": {
+                  "__values": {
+                    "2": {'name': 'User 2'},
+                  },
+                }
               }
             },
           );
@@ -526,6 +540,13 @@ void main() {
           expect(
             resolverJson,
             {
+              "__refs": {
+                "other_users": 1,
+                FilePersistor.defaultKey.value: 1,
+              },
+              "__values": {
+                ValueStore.root: FilePersistor.defaultKey.value,
+              },
               "users": {
                 "__refs": {
                   "other_users": 1,
@@ -542,7 +563,19 @@ void main() {
           await completer.onSync;
 
           expect(otherUsersFile.existsSync(), false);
-          expect(resolverFile.existsSync(), false);
+
+          resolverJson = jsonDecode(resolverFile.readAsStringSync());
+          expect(
+            resolverJson,
+            {
+              "__refs": {
+                FilePersistor.defaultKey.value: 1,
+              },
+              "__values": {
+                ValueStore.root: FilePersistor.defaultKey.value,
+              },
+            },
+          );
         },
       );
 
@@ -590,15 +623,17 @@ void main() {
             usersJson,
             {
               "users": {
-                "__values": {
-                  "1": {'name': 'User 1'},
-                  "2": {'name': 'User 2'},
-                },
-                "2": {
-                  "friends": {
-                    "__values": {
-                      "1": {'name': 'Friend 1'},
-                      "2": {'name': 'Friend 2'},
+                "users": {
+                  "__values": {
+                    "1": {'name': 'User 1'},
+                    "2": {'name': 'User 2'},
+                  },
+                  "2": {
+                    "friends": {
+                      "__values": {
+                        "1": {'name': 'Friend 1'},
+                        "2": {'name': 'Friend 2'},
+                      }
                     }
                   }
                 }
@@ -610,16 +645,15 @@ void main() {
               File('${testDirectory.path}/loon/__resolver__.json');
           final resolverJson = jsonDecode(resolverFile.readAsStringSync());
 
-          // Since the user documents were written first, the resolver enters their data store as the "users" key.
-          // Then when the friends collection documents are written with the same collection data store, there is no need to write
-          // an entry for their collection key, since the nearest parent key is the same "users" key.
           expect(
             resolverJson,
             {
               "__refs": {
                 "users": 1,
+                FilePersistor.defaultKey.value: 1,
               },
               "__values": {
+                ValueStore.root: FilePersistor.defaultKey.value,
                 "users": "users",
               },
             },
@@ -672,10 +706,12 @@ void main() {
             usersJson,
             {
               "users": {
-                "__values": {
-                  "1": {'name': 'User 1'},
-                  "2": {'name': 'User 2'},
-                },
+                "users": {
+                  "__values": {
+                    "1": {'name': 'User 1'},
+                    "2": {'name': 'User 2'},
+                  },
+                }
               }
             },
           );
@@ -683,12 +719,14 @@ void main() {
           expect(
             friendsJson,
             {
-              "users": {
-                "2": {
-                  "friends": {
-                    "__values": {
-                      "1": {'name': 'Friend 1'},
-                      "2": {'name': 'Friend 2'},
+              "users__2__friends": {
+                "users": {
+                  "2": {
+                    "friends": {
+                      "__values": {
+                        "1": {'name': 'Friend 1'},
+                        "2": {'name': 'Friend 2'},
+                      }
                     }
                   }
                 }
@@ -708,11 +746,17 @@ void main() {
             {
               "__refs": {
                 "users": 1,
+                "friends": 1,
+                FilePersistor.defaultKey.value: 1,
               },
               "__values": {
+                ValueStore.root: FilePersistor.defaultKey.value,
                 "users": "users",
               },
               "users": {
+                "__refs": {
+                  "friends": 1,
+                },
                 "2": {
                   "__refs": {
                     "friends": 1,
@@ -775,14 +819,16 @@ void main() {
           expect(
             users1Json,
             {
-              "users": {
-                "__values": {
-                  "1": {'name': 'User 1'},
-                },
-                "1": {
-                  "friends": {
-                    "__values": {
-                      "1": {'name': 'Friend 1'},
+              "users__1": {
+                "users": {
+                  "__values": {
+                    "1": {'name': 'User 1'},
+                  },
+                  "1": {
+                    "friends": {
+                      "__values": {
+                        "1": {'name': 'Friend 1'},
+                      }
                     }
                   }
                 }
@@ -793,14 +839,16 @@ void main() {
           expect(
             users2Json,
             {
-              "users": {
-                "__values": {
-                  "2": {'name': 'User 2'},
-                },
-                "2": {
-                  "friends": {
-                    "__values": {
-                      "2": {'name': 'Friend 2'},
+              "users__2": {
+                "users": {
+                  "__values": {
+                    "2": {'name': 'User 2'},
+                  },
+                  "2": {
+                    "friends": {
+                      "__values": {
+                        "2": {'name': 'Friend 2'},
+                      }
                     }
                   }
                 }
@@ -815,6 +863,14 @@ void main() {
           expect(
             resolverJson,
             {
+              "__refs": {
+                FilePersistor.defaultKey.value: 1,
+                "users_1": 1,
+                "users_2": 1,
+              },
+              "__values": {
+                ValueStore.root: FilePersistor.defaultKey.value,
+              },
               "users": {
                 "__refs": {
                   "users_1": 1,
@@ -894,21 +950,25 @@ void main() {
           expect(
             users1Json,
             {
-              "users": {
-                "__values": {
-                  "1": {'name': 'User 1'},
-                },
+              "users__1": {
+                "users": {
+                  "__values": {
+                    "1": {'name': 'User 1'},
+                  },
+                }
               }
             },
           );
           expect(
             friends1Json,
             {
-              "users": {
-                "1": {
-                  "friends": {
-                    "__values": {
-                      "1": {'name': 'Friend 1'},
+              "users__1__friends__1": {
+                "users": {
+                  "1": {
+                    "friends": {
+                      "__values": {
+                        "1": {'name': 'Friend 1'},
+                      }
                     }
                   }
                 }
@@ -919,21 +979,25 @@ void main() {
           expect(
             users2Json,
             {
-              "users": {
-                "__values": {
-                  "2": {'name': 'User 2'},
-                },
+              "users__2": {
+                "users": {
+                  "__values": {
+                    "2": {'name': 'User 2'},
+                  },
+                }
               }
             },
           );
           expect(
             friends2Json,
             {
-              "users": {
-                "2": {
-                  "friends": {
-                    "__values": {
-                      "2": {'name': 'Friend 2'},
+              "users__2__friends__2": {
+                "users": {
+                  "2": {
+                    "friends": {
+                      "__values": {
+                        "2": {'name': 'Friend 2'},
+                      }
                     }
                   }
                 }
@@ -948,16 +1012,31 @@ void main() {
           expect(
             resolverJson,
             {
+              "__refs": {
+                "users_1": 1,
+                "users_2": 1,
+                "friends_1": 1,
+                "friends_2": 1,
+                FilePersistor.defaultKey.value: 1,
+              },
+              "__values": {
+                ValueStore.root: FilePersistor.defaultKey.value,
+              },
               "users": {
                 "__refs": {
                   "users_1": 1,
                   "users_2": 1,
+                  "friends_1": 1,
+                  "friends_2": 1,
                 },
                 "__values": {
                   "1": "users_1",
                   "2": "users_2",
                 },
                 "1": {
+                  "__refs": {
+                    "friends_1": 1,
+                  },
                   "friends": {
                     "__refs": {
                       "friends_1": 1,
@@ -968,6 +1047,9 @@ void main() {
                   }
                 },
                 "2": {
+                  "__refs": {
+                    "friends_2": 1,
+                  },
                   "friends": {
                     "__refs": {
                       "friends_2": 1,
@@ -983,19 +1065,129 @@ void main() {
         },
       );
 
+      test(
+        'Subcollections can specify to be persisted in the default store.',
+        () async {
+          final userCollection = Loon.collection<TestUserModel>(
+            'users',
+            fromJson: TestUserModel.fromJson,
+            toJson: (user) => user.toJson(),
+            persistorSettings: FilePersistorSettings(
+              key: FilePersistor.key('users'),
+            ),
+          );
+
+          final userDoc = userCollection.doc('1');
+          final userDoc2 = userCollection.doc('2');
+
+          final user = TestUserModel('User 1');
+          final user2 = TestUserModel('User 2');
+
+          final friend1 = TestUserModel('Friend 1');
+          final friend2 = TestUserModel('Friend 2');
+
+          userDoc.create(user);
+          userDoc2.create(user2);
+          final friendsCollection = userDoc2.subcollection(
+            'friends',
+            fromJson: TestUserModel.fromJson,
+            toJson: (friend) => friend.toJson(),
+            persistorSettings:
+                FilePersistorSettings(key: FilePersistor.defaultKey),
+          );
+          friendsCollection.doc('1').create(friend1);
+          friendsCollection.doc('2').create(friend2);
+
+          await completer.onSync;
+
+          final usersFile = File('${testDirectory.path}/loon/users.json');
+          final storeFile = File('${testDirectory.path}/loon/__store__.json');
+          final usersJson = jsonDecode(usersFile.readAsStringSync());
+          final storeJson = jsonDecode(storeFile.readAsStringSync());
+
+          expect(
+            usersJson,
+            {
+              "users": {
+                "users": {
+                  "__values": {
+                    "1": {'name': 'User 1'},
+                    "2": {'name': 'User 2'},
+                  },
+                }
+              }
+            },
+          );
+
+          expect(
+            storeJson,
+            {
+              "users__2__friends": {
+                "users": {
+                  "2": {
+                    "friends": {
+                      "__values": {
+                        "1": {'name': 'Friend 1'},
+                        "2": {'name': 'Friend 2'},
+                      }
+                    }
+                  }
+                }
+              }
+            },
+          );
+
+          final resolverFile =
+              File('${testDirectory.path}/loon/__resolver__.json');
+          final resolverJson = jsonDecode(resolverFile.readAsStringSync());
+
+          // Since the friends collection under users__2 specifies a "friends" key,
+          // this overrides the parent path's "users" key on the users collection and
+          // therefore resolves the friends documents to the "friends" data store.
+          expect(
+            resolverJson,
+            {
+              "__refs": {
+                "users": 1,
+                FilePersistor.defaultKey.value: 2,
+              },
+              "__values": {
+                ValueStore.root: FilePersistor.defaultKey.value,
+                "users": "users",
+              },
+              "users": {
+                "__refs": {
+                  FilePersistor.defaultKey.value: 1,
+                },
+                "2": {
+                  "__refs": {
+                    FilePersistor.defaultKey.value: 1,
+                  },
+                  "__values": {
+                    "friends": FilePersistor.defaultKey.value,
+                  }
+                }
+              },
+            },
+          );
+        },
+      );
+
       // TODO:
-      // Add root persistor key tests
+      // Add default persistor key tests
       // Add global persistor key test (works for value key, should not for builder, throw error)
       // In persistor_test: Add inheritence of persistor enabled setting tests.
       // In encrypted_file_persistor_test: Add inheritance of encryption setting tests.
 
-      // The following group of tests cover the valid scenarios where a persistence key for a path changes:
+      // The following group of tests cover the scenarios where a persistence key for a path changes:
       // 1. null -> value key
       // 2. null -> builder key
-      // 3. builder key -> null
-      // 4. value key -> updated value key
-      // 5. value key -> builder key
+      // 3. value key -> null
+      // 4. builder key -> null
+      // 5. value key -> updated value key
       // 6. builder key -> updated builder key
+      // 7. value key -> builder key
+      // 8. builder key -> value key
       group(
         'Persistence key changes',
         () {
@@ -1041,15 +1233,17 @@ void main() {
                   expect(
                     storeJson,
                     {
-                      "users": {
-                        "__values": {
-                          "1": {"name": "User 1"},
-                          "2": {"name": "User 2"},
-                        },
-                        "1": {
-                          "friends": {
-                            "__values": {
-                              "1": {"name": "Friend 1"},
+                      ValueStore.root: {
+                        "users": {
+                          "__values": {
+                            "1": {"name": "User 1"},
+                            "2": {"name": "User 2"},
+                          },
+                          "1": {
+                            "friends": {
+                              "__values": {
+                                "1": {"name": "Friend 1"},
+                              }
                             }
                           }
                         }
@@ -1078,14 +1272,16 @@ void main() {
                     otherUsersJson,
                     {
                       "users": {
-                        "__values": {
-                          "1": {"name": "User 1 updated"},
-                          "2": {"name": "User 2"},
-                        },
-                        "1": {
-                          "friends": {
-                            "__values": {
-                              "1": {"name": "Friend 1"},
+                        "users": {
+                          "__values": {
+                            "1": {"name": "User 1 updated"},
+                            "2": {"name": "User 2"},
+                          },
+                          "1": {
+                            "friends": {
+                              "__values": {
+                                "1": {"name": "Friend 1"},
+                              }
                             }
                           }
                         }
@@ -1093,16 +1289,18 @@ void main() {
                     },
                   );
 
-                  var resolverJson =
+                  final resolverJson =
                       jsonDecode(resolverFile.readAsStringSync());
                   expect(
                     resolverJson,
                     {
                       "__refs": {
                         "other_users": 1,
+                        FilePersistor.defaultKey.value: 1,
                       },
                       "__values": {
                         "users": "other_users",
+                        ValueStore.root: FilePersistor.defaultKey.value,
                       },
                     },
                   );
@@ -1155,15 +1353,17 @@ void main() {
                   expect(
                     storeJson,
                     {
-                      "users": {
-                        "__values": {
-                          "1": {"name": "User 1"},
-                          "2": {"name": "User 2"},
-                        },
-                        "1": {
-                          "friends": {
-                            "__values": {
-                              "1": {"name": "Friend 1"},
+                      ValueStore.root: {
+                        "users": {
+                          "__values": {
+                            "1": {"name": "User 1"},
+                            "2": {"name": "User 2"},
+                          },
+                          "1": {
+                            "friends": {
+                              "__values": {
+                                "1": {"name": "Friend 1"},
+                              }
                             }
                           }
                         }
@@ -1185,10 +1385,12 @@ void main() {
                   expect(
                     storeJson,
                     {
-                      "users": {
-                        "__values": {
-                          "2": {"name": "User 2"},
-                        },
+                      ValueStore.root: {
+                        "users": {
+                          "__values": {
+                            "2": {"name": "User 2"},
+                          },
+                        }
                       }
                     },
                   );
@@ -1200,14 +1402,16 @@ void main() {
                   expect(
                     users1Json,
                     {
-                      "users": {
-                        "__values": {
-                          "1": {"name": "User 1 updated"},
-                        },
-                        "1": {
-                          "friends": {
-                            "__values": {
-                              "1": {"name": "Friend 1"},
+                      "users__1": {
+                        "users": {
+                          "__values": {
+                            "1": {"name": "User 1 updated"},
+                          },
+                          "1": {
+                            "friends": {
+                              "__values": {
+                                "1": {"name": "Friend 1"},
+                              }
                             }
                           }
                         }
@@ -1220,6 +1424,13 @@ void main() {
                   expect(
                     resolverJson,
                     {
+                      "__refs": {
+                        FilePersistor.defaultKey.value: 1,
+                        "users_1": 1,
+                      },
+                      "__values": {
+                        ValueStore.root: FilePersistor.defaultKey.value,
+                      },
                       "users": {
                         "__refs": {
                           "users_1": 1,
@@ -1236,12 +1447,147 @@ void main() {
           );
 
           group(
-            '3. builder key -> null',
+            '3. value key -> null',
             () {
               test(
-                'Moves the document and its subcollections in the previous document store to the root store',
+                'Moves the collection and its subcollections in the previous document store to the default store',
                 () async {
-                  final documentKeyUsersCollection =
+                  final valueKeyUsersCollection =
+                      Loon.collection<TestUserModel>(
+                    'users',
+                    fromJson: TestUserModel.fromJson,
+                    toJson: (user) => user.toJson(),
+                    persistorSettings: FilePersistorSettings(
+                      key: FilePersistor.key('users'),
+                    ),
+                  );
+                  final usersCollection = Loon.collection<TestUserModel>(
+                    'users',
+                    fromJson: TestUserModel.fromJson,
+                    toJson: (user) => user.toJson(),
+                  );
+
+                  valueKeyUsersCollection
+                      .doc('1')
+                      .create(TestUserModel('User 1'));
+                  valueKeyUsersCollection
+                      .doc('2')
+                      .create(TestUserModel('User 2'));
+                  valueKeyUsersCollection
+                      .doc('1')
+                      .subcollection(
+                        'friends',
+                        fromJson: TestUserModel.fromJson,
+                        toJson: (user) => user.toJson(),
+                      )
+                      .doc('1')
+                      .create(TestUserModel('Friend 1'));
+
+                  await completer.onSync;
+
+                  final storeFile =
+                      File('${testDirectory.path}/loon/__store__.json');
+                  expect(storeFile.existsSync(), false);
+
+                  final usersFile =
+                      File('${testDirectory.path}/loon/users.json');
+                  var usersJson = jsonDecode(usersFile.readAsStringSync());
+
+                  expect(
+                    usersJson,
+                    {
+                      "users": {
+                        "users": {
+                          "__values": {
+                            "1": {"name": "User 1"},
+                            "2": {"name": "User 2"},
+                          },
+                          "1": {
+                            "friends": {
+                              "__values": {
+                                "1": {"name": "Friend 1"},
+                              }
+                            }
+                          }
+                        }
+                      }
+                    },
+                  );
+
+                  final resolverFile =
+                      File('${testDirectory.path}/loon/__resolver__.json');
+                  var resolverJson =
+                      jsonDecode(resolverFile.readAsStringSync());
+
+                  expect(
+                    resolverJson,
+                    {
+                      "__refs": {
+                        FilePersistor.defaultKey.value: 1,
+                        "users": 1,
+                      },
+                      "__values": {
+                        ValueStore.root: FilePersistor.defaultKey.value,
+                        "users": "users",
+                      },
+                    },
+                  );
+
+                  usersCollection
+                      .doc('1')
+                      .update(TestUserModel('User 1 updated'));
+
+                  await completer.onSync;
+
+                  var storeJson = jsonDecode(storeFile.readAsStringSync());
+
+                  expect(
+                    storeJson,
+                    {
+                      ValueStore.root: {
+                        "users": {
+                          "__values": {
+                            "1": {"name": "User 1 updated"},
+                            "2": {"name": "User 2"},
+                          },
+                          "1": {
+                            "friends": {
+                              "__values": {
+                                "1": {"name": "Friend 1"},
+                              }
+                            }
+                          }
+                        }
+                      }
+                    },
+                  );
+
+                  expect(usersFile.existsSync(), false);
+
+                  resolverJson = jsonDecode(resolverFile.readAsStringSync());
+                  expect(
+                    resolverJson,
+                    {
+                      "__refs": {
+                        FilePersistor.defaultKey.value: 1,
+                      },
+                      "__values": {
+                        ValueStore.root: FilePersistor.defaultKey.value,
+                      },
+                    },
+                  );
+                },
+              );
+            },
+          );
+
+          group(
+            '4. builder key -> null',
+            () {
+              test(
+                'Moves the document and its subcollections in the previous document store to the default store',
+                () async {
+                  final keyBuilderUsersCollection =
                       Loon.collection<TestUserModel>(
                     'users',
                     fromJson: TestUserModel.fromJson,
@@ -1258,13 +1604,13 @@ void main() {
                     toJson: (user) => user.toJson(),
                   );
 
-                  documentKeyUsersCollection
+                  keyBuilderUsersCollection
                       .doc('1')
                       .create(TestUserModel('User 1'));
-                  documentKeyUsersCollection
+                  keyBuilderUsersCollection
                       .doc('2')
                       .create(TestUserModel('User 2'));
-                  documentKeyUsersCollection
+                  keyBuilderUsersCollection
                       .doc('1')
                       .subcollection(
                         'friends',
@@ -1276,6 +1622,10 @@ void main() {
 
                   await completer.onSync;
 
+                  final storeFile =
+                      File('${testDirectory.path}/loon/__store__.json');
+                  expect(storeFile.existsSync(), false);
+
                   final users1File =
                       File('${testDirectory.path}/loon/users_1.json');
                   var users1Json = jsonDecode(users1File.readAsStringSync());
@@ -1283,14 +1633,16 @@ void main() {
                   expect(
                     users1Json,
                     {
-                      "users": {
-                        "__values": {
-                          "1": {"name": "User 1"},
-                        },
-                        "1": {
-                          "friends": {
-                            "__values": {
-                              "1": {"name": "Friend 1"},
+                      "users__1": {
+                        "users": {
+                          "__values": {
+                            "1": {"name": "User 1"},
+                          },
+                          "1": {
+                            "friends": {
+                              "__values": {
+                                "1": {"name": "Friend 1"},
+                              }
                             }
                           }
                         }
@@ -1305,10 +1657,12 @@ void main() {
                   expect(
                     users2Json,
                     {
-                      "users": {
-                        "__values": {
-                          "2": {"name": "User 2"},
-                        },
+                      "users__2": {
+                        "users": {
+                          "__values": {
+                            "2": {"name": "User 2"},
+                          },
+                        }
                       }
                     },
                   );
@@ -1321,6 +1675,14 @@ void main() {
                   expect(
                     resolverJson,
                     {
+                      "__refs": {
+                        FilePersistor.defaultKey.value: 1,
+                        "users_1": 1,
+                        "users_2": 1,
+                      },
+                      "__values": {
+                        ValueStore.root: FilePersistor.defaultKey.value,
+                      },
                       "users": {
                         "__refs": {
                           "users_1": 1,
@@ -1340,21 +1702,21 @@ void main() {
 
                   await completer.onSync;
 
-                  final storeFile =
-                      File('${testDirectory.path}/loon/__store__.json');
                   var storeJson = jsonDecode(storeFile.readAsStringSync());
 
                   expect(
                     storeJson,
                     {
-                      "users": {
-                        "__values": {
-                          "1": {"name": "User 1 updated"},
-                        },
-                        "1": {
-                          "friends": {
-                            "__values": {
-                              "1": {"name": "Friend 1"},
+                      ValueStore.root: {
+                        "users": {
+                          "__values": {
+                            "1": {"name": "User 1 updated"},
+                          },
+                          "1": {
+                            "friends": {
+                              "__values": {
+                                "1": {"name": "Friend 1"},
+                              }
                             }
                           }
                         }
@@ -1368,10 +1730,12 @@ void main() {
                   expect(
                     users2Json,
                     {
-                      "users": {
-                        "__values": {
-                          "2": {"name": "User 2"},
-                        },
+                      "users__2": {
+                        "users": {
+                          "__values": {
+                            "2": {"name": "User 2"},
+                          },
+                        }
                       }
                     },
                   );
@@ -1380,6 +1744,13 @@ void main() {
                   expect(
                     resolverJson,
                     {
+                      "__refs": {
+                        FilePersistor.defaultKey.value: 1,
+                        "users_2": 1,
+                      },
+                      "__values": {
+                        ValueStore.root: FilePersistor.defaultKey.value,
+                      },
                       "users": {
                         "__refs": {
                           "users_2": 1,
@@ -1396,10 +1767,150 @@ void main() {
           );
 
           group(
-            '4. document-level key -> updated document-level key',
+            '5. value key -> updated value key',
             () {
               test(
-                'Moves the document and its subcollections from the previous store to the store specified by its updated document-level key',
+                'Moves the collection and its subcollections from the previous store to the store specified by its updated value key',
+                () async {
+                  final userCollection = Loon.collection<TestUserModel>(
+                    'users',
+                    fromJson: TestUserModel.fromJson,
+                    toJson: (user) => user.toJson(),
+                    persistorSettings: FilePersistorSettings(
+                      key: FilePersistor.key('users'),
+                    ),
+                  );
+                  final updatedUsersCollection = Loon.collection<TestUserModel>(
+                    'users',
+                    fromJson: TestUserModel.fromJson,
+                    toJson: (user) => user.toJson(),
+                    persistorSettings: FilePersistorSettings(
+                      key: FilePersistor.key('updated_users'),
+                    ),
+                  );
+
+                  final userDoc = userCollection.doc('1');
+                  final userDoc2 = userCollection.doc('2');
+
+                  userDoc.create(TestUserModel('User 1'));
+                  userDoc2.create(TestUserModel('User 2'));
+
+                  userDoc2
+                      .subcollection(
+                        'friends',
+                        fromJson: TestUserModel.fromJson,
+                        toJson: (user) => user.toJson(),
+                      )
+                      .doc('1')
+                      .create(TestUserModel('Friend 1'));
+
+                  await completer.onSync;
+
+                  final usersFile =
+                      File('${testDirectory.path}/loon/users.json');
+                  var usersJson = jsonDecode(usersFile.readAsStringSync());
+
+                  expect(
+                    usersJson,
+                    {
+                      "users": {
+                        "users": {
+                          "__values": {
+                            "1": {"name": "User 1"},
+                            "2": {"name": "User 2"},
+                          },
+                          "2": {
+                            "friends": {
+                              "__values": {
+                                "1": {"name": "Friend 1"},
+                              }
+                            }
+                          }
+                        },
+                      },
+                    },
+                  );
+
+                  var resolverFile =
+                      File('${testDirectory.path}/loon/__resolver__.json');
+                  var resolverJson =
+                      jsonDecode(resolverFile.readAsStringSync());
+
+                  expect(
+                    resolverJson,
+                    {
+                      "__refs": {
+                        FilePersistor.defaultKey.value: 1,
+                        "users": 1,
+                      },
+                      "__values": {
+                        ValueStore.root: FilePersistor.defaultKey.value,
+                        "users": "users",
+                      },
+                    },
+                  );
+
+                  updatedUsersCollection
+                      .doc('2')
+                      .update(TestUserModel('User 2 updated'));
+
+                  await completer.onSync;
+
+                  expect(usersFile.existsSync(), false);
+
+                  final updatedUsersFile =
+                      File('${testDirectory.path}/loon/updated_users.json');
+                  final updatedUsersJson =
+                      jsonDecode(updatedUsersFile.readAsStringSync());
+
+                  expect(
+                    updatedUsersJson,
+                    {
+                      "users": {
+                        "users": {
+                          "__values": {
+                            "1": {"name": "User 1"},
+                            "2": {"name": "User 2 updated"},
+                          },
+                          "2": {
+                            "friends": {
+                              "__values": {
+                                "1": {"name": "Friend 1"},
+                              }
+                            }
+                          }
+                        }
+                      }
+                    },
+                  );
+
+                  resolverFile =
+                      File('${testDirectory.path}/loon/__resolver__.json');
+                  resolverJson = jsonDecode(resolverFile.readAsStringSync());
+
+                  expect(
+                    resolverJson,
+                    {
+                      "__refs": {
+                        FilePersistor.defaultKey.value: 1,
+                        "updated_users": 1,
+                      },
+                      "__values": {
+                        ValueStore.root: FilePersistor.defaultKey.value,
+                        "users": "updated_users",
+                      },
+                    },
+                  );
+                },
+              );
+            },
+          );
+
+          group(
+            '6. key builder -> updated key builder',
+            () {
+              test(
+                'Moves the document and its subcollections from the previous store to the store specified by its updated key builder',
                 () async {
                   final userCollection = Loon.collection<TestUserModel>(
                     'users',
@@ -1441,19 +1952,54 @@ void main() {
                   expect(
                     usersJson,
                     {
-                      "users": {
-                        "__values": {
-                          "1": {"name": "User 1"},
-                          "2": {"name": "User 2"},
+                      "users__1": {
+                        "users": {
+                          "__values": {
+                            "1": {"name": "User 1"},
+                          },
                         },
-                        "2": {
-                          "friends": {
-                            "__values": {
-                              "1": {"name": "Friend 1"},
+                      },
+                      "users__2": {
+                        "users": {
+                          "__values": {
+                            "2": {"name": "User 2"},
+                          },
+                          "2": {
+                            "friends": {
+                              "__values": {
+                                "1": {"name": "Friend 1"},
+                              }
                             }
                           }
                         }
                       }
+                    },
+                  );
+
+                  var resolverFile =
+                      File('${testDirectory.path}/loon/__resolver__.json');
+                  var resolverJson =
+                      jsonDecode(resolverFile.readAsStringSync());
+
+                  expect(
+                    resolverJson,
+                    {
+                      "__refs": {
+                        FilePersistor.defaultKey.value: 1,
+                        "users": 2,
+                      },
+                      "__values": {
+                        ValueStore.root: FilePersistor.defaultKey.value,
+                      },
+                      "users": {
+                        "__refs": {
+                          "users": 2,
+                        },
+                        "__values": {
+                          "1": "users",
+                          "2": "users",
+                        },
+                      },
                     },
                   );
 
@@ -1467,9 +2013,11 @@ void main() {
                   expect(
                     usersJson,
                     {
-                      "users": {
-                        "__values": {
-                          "1": {"name": "User 1"},
+                      "users__1": {
+                        "users": {
+                          "__values": {
+                            "1": {"name": "User 1"},
+                          }
                         }
                       }
                     },
@@ -1484,14 +2032,16 @@ void main() {
                   expect(
                     updatedUsersJson,
                     {
-                      "users": {
-                        "__values": {
-                          "2": {"name": "User 2 updated"},
-                        },
-                        "2": {
-                          "friends": {
-                            "__values": {
-                              "1": {"name": "Friend 1"},
+                      "users__2": {
+                        "users": {
+                          "__values": {
+                            "2": {"name": "User 2 updated"},
+                          },
+                          "2": {
+                            "friends": {
+                              "__values": {
+                                "1": {"name": "Friend 1"},
+                              }
                             }
                           }
                         }
@@ -1499,14 +2049,21 @@ void main() {
                     },
                   );
 
-                  final resolverFile =
+                  resolverFile =
                       File('${testDirectory.path}/loon/__resolver__.json');
-                  final resolverJson =
-                      jsonDecode(resolverFile.readAsStringSync());
+                  resolverJson = jsonDecode(resolverFile.readAsStringSync());
 
                   expect(
                     resolverJson,
                     {
+                      "__refs": {
+                        FilePersistor.defaultKey.value: 1,
+                        "users": 1,
+                        "updated_users": 1,
+                      },
+                      "__values": {
+                        ValueStore.root: FilePersistor.defaultKey.value,
+                      },
                       "users": {
                         "__refs": {
                           "users": 1,
@@ -1525,18 +2082,21 @@ void main() {
           );
 
           group(
-            '5. document-level key -> collection-level key',
+            '7. value key -> key builder',
             () {
               test(
-                'Moves the document, its subcollections, and any other documents in the previous default document store, to the store specified by its collection key',
+                'Moves the document and its subcollections in the previous store to the updated store',
                 () async {
                   final usersCollection = Loon.collection<TestUserModel>(
                     'users',
                     fromJson: TestUserModel.fromJson,
                     toJson: (user) => user.toJson(),
+                    persistorSettings: FilePersistorSettings(
+                      key: FilePersistor.key('users'),
+                    ),
                   );
 
-                  final documentKeyUsersCollection =
+                  final keyBuilderUsersCollection =
                       Loon.collection<TestUserModel>(
                     'users',
                     fromJson: TestUserModel.fromJson,
@@ -1548,43 +2108,59 @@ void main() {
                     ),
                   );
 
-                  final otherUsersCollection = Loon.collection<TestUserModel>(
-                    'users',
-                    fromJson: TestUserModel.fromJson,
-                    toJson: (user) => user.toJson(),
-                    persistorSettings: FilePersistorSettings(
-                      key: FilePersistor.key('other_users'),
-                    ),
-                  );
-
-                  documentKeyUsersCollection
-                      .doc('1')
-                      .create(TestUserModel('User 1'));
-                  documentKeyUsersCollection
-                      .doc('2')
-                      .create(TestUserModel('User 2'));
-                  documentKeyUsersCollection
-                      .doc('1')
-                      .subcollection(
-                        'friends',
-                        fromJson: TestUserModel.fromJson,
-                        toJson: (user) => user.toJson(),
-                      )
-                      .doc('1')
-                      .create(TestUserModel('Friend 1'));
-                  usersCollection.doc('3').create(TestUserModel('User 3'));
+                  usersCollection.doc('1').create(TestUserModel('User 1'));
+                  usersCollection.doc('2').create(TestUserModel('User 2'));
 
                   await completer.onSync;
 
-                  final storeFile =
-                      File('${testDirectory.path}/loon/__store__.json');
-                  var storeJson = jsonDecode(storeFile.readAsStringSync());
+                  final usersFile =
+                      File('${testDirectory.path}/loon/users.json');
+                  var usersJson = jsonDecode(usersFile.readAsStringSync());
 
-                  expect(storeJson, {
+                  expect(usersJson, {
                     "users": {
-                      "__values": {
-                        "3": {"name": "User 3"},
+                      "users": {
+                        "__values": {
+                          "1": {"name": "User 1"},
+                          "2": {"name": "User 2"},
+                        },
+                      }
+                    }
+                  });
+
+                  final resolverFile =
+                      File('${testDirectory.path}/loon/__resolver__.json');
+                  var resolverJson =
+                      jsonDecode(resolverFile.readAsStringSync());
+
+                  expect(
+                    resolverJson,
+                    {
+                      "__refs": {
+                        FilePersistor.defaultKey.value: 1,
+                        "users": 1,
                       },
+                      "__values": {
+                        ValueStore.root: FilePersistor.defaultKey.value,
+                        "users": "users",
+                      },
+                    },
+                  );
+
+                  keyBuilderUsersCollection
+                      .doc('1')
+                      .update(TestUserModel('User 1 updated'));
+
+                  await completer.onSync;
+
+                  usersJson = jsonDecode(usersFile.readAsStringSync());
+                  expect(usersJson, {
+                    "users": {
+                      "users": {
+                        "__values": {
+                          "2": {"name": "User 2"},
+                        },
+                      }
                     }
                   });
 
@@ -1595,35 +2171,102 @@ void main() {
                   expect(
                     users1Json,
                     {
-                      "users": {
-                        "__values": {
-                          "1": {"name": "User 1"},
-                        },
-                        "1": {
-                          "friends": {
-                            "__values": {
-                              "1": {"name": "Friend 1"},
-                            }
-                          }
+                      "users__1": {
+                        "users": {
+                          "__values": {
+                            "1": {"name": "User 1 updated"},
+                          },
                         }
                       }
                     },
                   );
 
+                  resolverJson = jsonDecode(resolverFile.readAsStringSync());
+                  expect(
+                    resolverJson,
+                    {
+                      "__refs": {
+                        FilePersistor.defaultKey.value: 1,
+                        "users": 1,
+                        "users_1": 1,
+                      },
+                      "__values": {
+                        ValueStore.root: FilePersistor.defaultKey.value,
+                        "users": "users",
+                      },
+                      "users": {
+                        "__refs": {
+                          "users_1": 1,
+                        },
+                        "__values": {
+                          "1": "users_1",
+                        }
+                      }
+                    },
+                  );
+                },
+              );
+            },
+          );
+
+          group(
+            '8. key builder -> value key',
+            () {
+              test(
+                'Moves the document and its subcollections in the previous store to the updated store',
+                () async {
+                  final usersCollection = Loon.collection<TestUserModel>(
+                    'users',
+                    fromJson: TestUserModel.fromJson,
+                    toJson: (user) => user.toJson(),
+                    persistorSettings: FilePersistorSettings(
+                      key: FilePersistor.keyBuilder(
+                        (snap) => "users_${snap.id}",
+                      ),
+                    ),
+                  );
+
+                  final valueKeyCollection = Loon.collection<TestUserModel>(
+                    'users',
+                    fromJson: TestUserModel.fromJson,
+                    toJson: (user) => user.toJson(),
+                    persistorSettings: FilePersistorSettings(
+                      key: FilePersistor.key('users'),
+                    ),
+                  );
+
+                  usersCollection.doc('1').create(TestUserModel('User 1'));
+                  usersCollection.doc('2').create(TestUserModel('User 2'));
+
+                  await completer.onSync;
+
+                  final users1File =
+                      File('${testDirectory.path}/loon/users_1.json');
+                  var users1Json = jsonDecode(users1File.readAsStringSync());
+
+                  expect(users1Json, {
+                    "users__1": {
+                      "users": {
+                        "__values": {
+                          "1": {"name": "User 1"},
+                        },
+                      }
+                    }
+                  });
+
                   final users2File =
                       File('${testDirectory.path}/loon/users_2.json');
                   var users2Json = jsonDecode(users2File.readAsStringSync());
 
-                  expect(
-                    users2Json,
-                    {
+                  expect(users2Json, {
+                    "users__2": {
                       "users": {
                         "__values": {
                           "2": {"name": "User 2"},
                         },
                       }
-                    },
-                  );
+                    }
+                  });
 
                   final resolverFile =
                       File('${testDirectory.path}/loon/__resolver__.json');
@@ -1633,6 +2276,14 @@ void main() {
                   expect(
                     resolverJson,
                     {
+                      "__refs": {
+                        FilePersistor.defaultKey.value: 1,
+                        "users_1": 1,
+                        "users_2": 1,
+                      },
+                      "__values": {
+                        ValueStore.root: FilePersistor.defaultKey.value,
+                      },
                       "users": {
                         "__refs": {
                           "users_1": 1,
@@ -1646,60 +2297,50 @@ void main() {
                     },
                   );
 
-                  otherUsersCollection
+                  valueKeyCollection
                       .doc('1')
                       .update(TestUserModel('User 1 updated'));
 
                   await completer.onSync;
 
-                  final otherUsersFile =
-                      File('${testDirectory.path}/loon/other_users.json');
-                  var otherUsersJson =
-                      jsonDecode(otherUsersFile.readAsStringSync());
-
-                  expect(
-                    otherUsersJson,
-                    {
+                  final usersFile =
+                      File('${testDirectory.path}/loon/users.json');
+                  final usersJson = jsonDecode(usersFile.readAsStringSync());
+                  expect(usersJson, {
+                    "users": {
                       "users": {
                         "__values": {
                           "1": {"name": "User 1 updated"},
-                          "3": {"name": "User 3"},
                         },
-                        "1": {
-                          "friends": {
-                            "__values": {
-                              "1": {"name": "Friend 1"},
-                            }
-                          }
-                        }
                       }
-                    },
-                  );
+                    }
+                  });
 
-                  expect(storeFile.existsSync(), false);
                   expect(users1File.existsSync(), false);
 
                   users2Json = jsonDecode(users2File.readAsStringSync());
-                  expect(
-                    users2Json,
-                    {
+                  expect(users2Json, {
+                    "users__2": {
                       "users": {
                         "__values": {
                           "2": {"name": "User 2"},
                         },
                       }
-                    },
-                  );
+                    }
+                  });
 
                   resolverJson = jsonDecode(resolverFile.readAsStringSync());
                   expect(
                     resolverJson,
                     {
                       "__refs": {
-                        "other_users": 1,
+                        FilePersistor.defaultKey.value: 1,
+                        "users": 1,
+                        "users_2": 1,
                       },
                       "__values": {
-                        "users": "other_users",
+                        ValueStore.root: FilePersistor.defaultKey.value,
+                        "users": "users",
                       },
                       "users": {
                         "__refs": {
@@ -1709,106 +2350,6 @@ void main() {
                           "2": "users_2",
                         }
                       }
-                    },
-                  );
-                },
-              );
-            },
-          );
-
-          group(
-            '6. collection-level key -> updated collection-level key',
-            () {
-              test(
-                'Moves all documents of the collection in the previous default document store to the store specified by its collection key',
-                () async {
-                  final otherUsersCollection = Loon.collection<TestUserModel>(
-                    'users',
-                    fromJson: TestUserModel.fromJson,
-                    toJson: (user) => user.toJson(),
-                    persistorSettings: FilePersistorSettings(
-                      key: FilePersistor.key('other_users'),
-                    ),
-                  );
-
-                  final otherUsersUpdatedCollection =
-                      Loon.collection<TestUserModel>(
-                    'users',
-                    fromJson: TestUserModel.fromJson,
-                    toJson: (user) => user.toJson(),
-                    persistorSettings: FilePersistorSettings(
-                      key: FilePersistor.key('other_users_updated'),
-                    ),
-                  );
-
-                  otherUsersCollection.doc('1').create(TestUserModel('User 1'));
-                  otherUsersCollection.doc('2').create(TestUserModel('User 2'));
-
-                  await completer.onSync;
-
-                  final otherUsersFile =
-                      File('${testDirectory.path}/loon/other_users.json');
-                  var otherUsersJson =
-                      jsonDecode(otherUsersFile.readAsStringSync());
-
-                  expect(otherUsersJson, {
-                    "users": {
-                      "__values": {
-                        "1": {"name": "User 1"},
-                        "2": {"name": "User 2"},
-                      }
-                    }
-                  });
-
-                  final resolverFile =
-                      File('${testDirectory.path}/loon/__resolver__.json');
-                  var resolverJson =
-                      jsonDecode(resolverFile.readAsStringSync());
-
-                  expect(
-                    resolverJson,
-                    {
-                      "__refs": {
-                        "other_users": 1,
-                      },
-                      "__values": {
-                        "users": "other_users",
-                      },
-                    },
-                  );
-
-                  otherUsersUpdatedCollection
-                      .doc('1')
-                      .update(TestUserModel('Updated user 1'));
-
-                  await completer.onSync;
-
-                  final otherUsersUpdatedFile = File(
-                      '${testDirectory.path}/loon/other_users_updated.json');
-                  var otherUsersUpdatedJson =
-                      jsonDecode(otherUsersUpdatedFile.readAsStringSync());
-
-                  expect(otherUsersUpdatedJson, {
-                    "users": {
-                      "__values": {
-                        "1": {"name": "Updated user 1"},
-                        "2": {"name": "User 2"},
-                      }
-                    }
-                  });
-
-                  expect(otherUsersFile.existsSync(), false);
-
-                  resolverJson = jsonDecode(resolverFile.readAsStringSync());
-                  expect(
-                    resolverJson,
-                    {
-                      "__refs": {
-                        "other_users_updated": 1,
-                      },
-                      "__values": {
-                        "users": "other_users_updated",
-                      },
                     },
                   );
                 },

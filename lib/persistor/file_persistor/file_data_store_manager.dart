@@ -133,8 +133,8 @@ class FileDataStoreManager {
 
     // Initialize the root file data store if it does not exist yet.
     if (!_index.containsKey(FilePersistor.defaultKey)) {
-      _index[FilePersistor.defaultKey] = DualFileDataStore(
-        name: FilePersistor.defaultKey,
+      _index[FilePersistor.defaultKey.value] = DualFileDataStore(
+        name: FilePersistor.defaultKey.value,
         directory: directory,
         encrypter: encrypter,
         isHydrated: true,
@@ -237,6 +237,7 @@ class FileDataStoreManager {
         // If the document has been deleted, then clear its data recursively from each of its
         // resolved data stores.
         if (docData == null) {
+          _resolver.deletePath(docPath);
           for (final dataStore in pathDataStores[docPath]!) {
             dataStore.recursiveDelete(docPath);
           }

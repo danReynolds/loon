@@ -66,10 +66,12 @@ class ValueRefStore<T> extends _BaseValueStore<T> {
       final Map? values = node[_BaseValueStore._values];
       if (values != null) {
         childValue = values[segment];
-        if (values.length == 1) {
-          node.remove(_BaseValueStore._values);
-        } else {
-          values.remove(segment);
+        if (childValue != null) {
+          if (values.length == 1) {
+            node.remove(_BaseValueStore._values);
+          } else {
+            values.remove(segment);
+          }
         }
       }
 
