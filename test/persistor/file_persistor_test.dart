@@ -1174,12 +1174,6 @@ void main() {
           },
         );
 
-        // TODO:
-        // Add default persistor key tests
-        // Add global persistor key test (works for value key, should not for builder, throw error)
-        // In persistor_test: Add inheritence of persistor enabled setting tests.
-        // In encrypted_file_persistor_test: Add inheritance of encryption setting tests.
-
         // The following group of tests cover the scenarios where a persistence key for a path changes:
         // 1. null -> value key
         // 2. null -> builder key

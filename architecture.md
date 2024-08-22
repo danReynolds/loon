@@ -156,32 +156,6 @@ into messages that it sends to the [FilePersistorWorker], which runs on a separa
 The worker receives persistence operation messages from the main isolate and passes them off to the [FileDataStoreManager] for processing. The [FileDataStoreManager]
 maintains a set of hydrated [FileDataStore] objects, which map 1:1 with a persistence file and are responsible for hydrating and persisting documents to and from their associated files.
 
-Each [FileDataStore] stores the document data it contains in memory using a variant of a [ValueStore] called a [RefValueStore]. The [RefValueStore] stores data in the same format as the [ValueStore], with the addition of a ref count for each unique value stored in a given collection.
-
-Based on our original [ValueStore] example, its [RefValueStore] representation is shown below:
-
-```dart
-final messageDoc = Loon.collection('users').doc('1').subcollection('messages').doc('1');
-messageDoc.create('Hello');
-```
-
-```dart
-{
-  "users": {
-    "1": {
-      "messages": {
-        "__refs": {
-          "Hello" 1,
-        },
-        "__values": {
-          "1": "Hello"
-        }
-      }
-    }
-  }
-}
-```
-
 Each [FileDataStore] can contain any arbitrary subset of document data from across various collections. By default, all document data is stored in a single [FileDataStore] that writes documents to a `__store__.json` file.
 
 Individual collections can customize their persistence file by specifying a persistor key:
@@ -247,7 +221,8 @@ Whenever a document is updated, it will evaluate the `keyBuilder` function with 
 
 This level of persistence granularity is done to support features like sharding of large collections across multiple files (like breaking one big messages collection into `messages_shard_1`, `messages_shard_2`, etc) and grouping of small subcollections into the same file (like grouping subcollections of posts with document paths `posts__1__reactions__2`, `posts__2__reactions__1`, etc into one large reactions file).
 
-Since any given collection can be spread across multiple [FileDataStore] objects, a [FileDataStoreResolver] is used to lookup the set of files that contain data for a given store path. The `FileDataStoreResolver` maintains a [RefValueStore] that maps documents to file persistence keys.
+Since any given collection can be spread across multiple [FileDataStore] objects, a [FileDataStoreResolver] is used to lookup the set of files that contain data for a given store path. The [FileDataStoreResolver] uses a variant of the [ValueStore] implementation called a [ValueRefStore] which extends the [ValueStore] with ref counting
+of the values that exist under a given path.
 
 To illustrate how this works, consider the case of hydrating a users collection that is spread across multiple files in the format `users_1`, `users_2`, etc. using a `FilePersistor.keyBuilder`.
 
@@ -255,10 +230,14 @@ The resolver mapping for this collection could look like the following:
 
 ```dart
 {
+   "__refs": {
+    "users_1": 3,
+    "users_2": 1,
+  },
   "users": {
     "__refs": {
       "users_1": 3,
-      "users_2": 4,
+      "users_2": 1,
     },
     "__values": {
       "1": "users_1",
@@ -269,6 +248,8 @@ The resolver mapping for this collection could look like the following:
   }
 }
 ```
+
+Each node of the resolver contains a ref count of the values that exist under its path in the tree. Because the number of files should be small (assumption that storing data across 100s is files is an edge case not desirable for users), the references at each node will also be small and the performance benefit of being able to quickly resolve the set of stores that exist under a given path is worth the memory trade-off.
 
 The resolver persists this mapping to a `__resolver__.json` file that is hydrated automatically when the [FilePersistor] is initialized.
 
@@ -284,10 +265,10 @@ Future<void> main() async {
 
 When the hydration operation for the users collection is executed, the [FilePersistor] sends a [hydrate] message for the given collection to the [FilePersistorWorker] on the background isolate.
 
-The worker parses the message and tells the [FileDataStoreManager] to hydrate the appropriate [FileDataStore] objects containing data for the given collection. The manager uses the [FileDataStoreResolver] to look up all of the file key refs for the `users` collection and immediately finds two values: `users_1` and `users_2`. The ref counting feature of the [RefValueStore] allows for this to be done without checking each individual document in the collection.
+The worker parses the message and tells the [FileDataStoreManager] to hydrate the appropriate [FileDataStore] objects containing data for the given collection. The manager uses the [FileDataStoreResolver] to look up all of the file key refs for the `users` collection and immediately finds two values: `users_1` and `users_2`.
 
-The [FileDataStoreManager] then iterates over each resolved [FileDataStore] and hydrates its file from disk. The manager returns only the requested collection data hydrated from the file to the [FileDataStoreWorker], which packages it and sends its response back to the [FilePersistor] on the main isolate.
+The [FileDataStoreManager] then iterates over each resolved [FileDataStore] and hydrates its file from disk. The manager returns only the requested collection data hydrated from the file to the [FileDataStoreWorker], which packages it into a message and sends its response back to the [FilePersistor] on the main isolate.
 
-The documents are then written into the Loon document store on the main isolate and are now available to the client.
+The documents are then written into the Loon document store on the main isolate and are available to the client.
 
 

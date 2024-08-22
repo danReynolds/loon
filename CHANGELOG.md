@@ -1,3 +1,10 @@
+## 4.0.0
+
+* Rewrites file persistence.
+* Fixes some edge case bugs with file persistence key resolution and improves subtree resolution performance.
+* Decreases the isolate persistence payload through the use of a local resolver when persisting documents, enabling a smaller isolate message payload that decreases
+  copy-time on the main isolate.
+
 ## 3.2.0
 
 * Adds support for persisting serializable documents (primitives or custom classes with toJson support)
