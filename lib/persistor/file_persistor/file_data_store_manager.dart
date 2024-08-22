@@ -132,7 +132,7 @@ class FileDataStoreManager {
     }
 
     // Initialize the root file data store if it does not exist yet.
-    if (!_index.containsKey(FilePersistor.defaultKey)) {
+    if (!_index.containsKey(FilePersistor.defaultKey.value)) {
       _index[FilePersistor.defaultKey.value] = DualFileDataStore(
         name: FilePersistor.defaultKey.value,
         directory: directory,
@@ -183,7 +183,7 @@ class FileDataStoreManager {
             }
           }
         } else {
-          for (final dataStore in dataStores) {
+          for (final dataStore in _index.values) {
             data.addAll(dataStore.extract());
           }
         }

@@ -2637,34 +2637,38 @@ void main() {
       final storeJson = jsonDecode(storeFile.readAsStringSync());
 
       expect(storeJson, {
-        "users": {
-          "__values": {
-            "1": {"name": "User 1"},
-            "2": {"name": "User 2"},
-          }
-        },
-        "friends": {
-          "__values": {
-            "1": {"name": "Friend 1"},
-            "2": {"name": "Friend 2"},
-          }
-        },
-        "root": {
-          "__values": {
-            "current_user_id": "1",
+        "": {
+          "users": {
+            "__values": {
+              "1": {"name": "User 1"},
+              "2": {"name": "User 2"},
+            }
           },
-        }
+          "friends": {
+            "__values": {
+              "1": {"name": "Friend 1"},
+              "2": {"name": "Friend 2"},
+            }
+          },
+          "root": {
+            "__values": {
+              "current_user_id": "1",
+            },
+          }
+        },
       });
 
       final myFriendsFile = File('${testDirectory.path}/loon/my_friends.json');
       final myFriendsJson = jsonDecode(myFriendsFile.readAsStringSync());
 
       expect(myFriendsJson, {
-        "users": {
-          "1": {
-            "friends": {
-              "__values": {
-                "3": {"name": "Friend 3"},
+        "users__1__friends": {
+          "users": {
+            "1": {
+              "friends": {
+                "__values": {
+                  "3": {"name": "Friend 3"},
+                }
               }
             }
           }
@@ -2675,7 +2679,17 @@ void main() {
       final resolverJson = jsonDecode(resolverFile.readAsStringSync());
 
       expect(resolverJson, {
+        "__refs": {
+          FilePersistor.defaultKey.value: 1,
+          "my_friends": 1,
+        },
+        "__values": {
+          ValueStore.root: FilePersistor.defaultKey.value,
+        },
         "users": {
+          "__refs": {
+            "my_friends": 1,
+          },
           "1": {
             "__refs": {
               "my_friends": 1,
@@ -2695,6 +2709,7 @@ void main() {
 
       storeFile.writeAsStringSync(jsonEncode(storeJson));
       myFriendsFile.writeAsStringSync(jsonEncode(myFriendsJson));
+      resolverFile.writeAsStringSync(jsonEncode(resolverJson));
 
       // After clearing the data and reinitializing it from disk to verify with hydration,
       // the persistor needs to be re-created so that it re-reads all data stores from disk.
@@ -2778,18 +2793,20 @@ void main() {
         final storeJson = jsonDecode(storeFile.readAsStringSync());
 
         expect(storeJson, {
-          "users": {
-            "__values": {
-              "1": {"name": "User 1"},
-              "2": {"name": "User 2"},
-            }
-          },
-          "friends": {
-            "__values": {
-              "1": {"name": "Friend 1"},
-              "2": {"name": "Friend 2"},
+          "": {
+            "users": {
+              "__values": {
+                "1": {"name": "User 1"},
+                "2": {"name": "User 2"},
+              }
             },
-          },
+            "friends": {
+              "__values": {
+                "1": {"name": "Friend 1"},
+                "2": {"name": "Friend 2"},
+              },
+            },
+          }
         });
 
         final userFriendsFile =
@@ -2797,11 +2814,13 @@ void main() {
         final userFriendsJson = jsonDecode(userFriendsFile.readAsStringSync());
 
         expect(userFriendsJson, {
-          "users": {
-            "1": {
-              "friends": {
-                "__values": {
-                  "3": {"name": "Friend 3"},
+          "users__1__friends": {
+            "users": {
+              "1": {
+                "friends": {
+                  "__values": {
+                    "3": {"name": "Friend 3"},
+                  }
                 }
               }
             }
@@ -2813,7 +2832,17 @@ void main() {
         final resolverJson = jsonDecode(resolverFile.readAsStringSync());
 
         expect(resolverJson, {
+          "__refs": {
+            FilePersistor.defaultKey.value: 1,
+            "user_friends": 1,
+          },
+          "__values": {
+            ValueStore.root: FilePersistor.defaultKey.value,
+          },
           "users": {
+            "__refs": {
+              "user_friends": 1,
+            },
             "1": {
               "__refs": {
                 "user_friends": 1,
@@ -2893,7 +2922,9 @@ void main() {
       }
 
       final file = File('${testDirectory.path}/loon/users.json');
-      file.writeAsStringSync(jsonEncode(store.inspect()));
+      file.writeAsStringSync(jsonEncode({
+        ValueStore.root: store.inspect(),
+      }));
 
       await Loon.hydrate();
 
@@ -2944,10 +2975,12 @@ void main() {
         expect(
           json,
           {
-            "root": {
-              "__values": {
-                "current_user": {'name': 'Dan'},
-              },
+            "": {
+              "root": {
+                "__values": {
+                  "current_user": {'name': 'Dan'},
+                },
+              }
             }
           },
         );
@@ -2995,14 +3028,16 @@ void main() {
         expect(
           json,
           {
-            "root": {
-              "__values": {
-                "current_user": {'name': 'Dan'},
+            "": {
+              "root": {
+                "__values": {
+                  "current_user": {'name': 'Dan'},
+                },
               },
-            },
-            "users": {
-              "__values": {
-                "1": {'name': 'User 1'},
+              "users": {
+                "__values": {
+                  "1": {'name': 'User 1'},
+                }
               }
             }
           },
@@ -3029,7 +3064,7 @@ void main() {
     );
 
     test(
-      "Hydrates only data under the root document",
+      "Hydrates only data under the root collection",
       () async {
         final userCollection = Loon.collection(
           'users',
@@ -3053,14 +3088,16 @@ void main() {
         expect(
           json,
           {
-            "root": {
-              "__values": {
-                "current_user": {'name': 'Dan'},
+            "": {
+              "root": {
+                "__values": {
+                  "current_user": {'name': 'Dan'},
+                },
               },
-            },
-            "users": {
-              "__values": {
-                "1": {'name': 'User 1'},
+              "users": {
+                "__values": {
+                  "1": {'name': 'User 1'},
+                }
               }
             }
           },
@@ -3221,18 +3258,20 @@ void main() {
           expect(
             json,
             {
-              "users": {
-                "__values": {
-                  "1": {'name': 'User 1'},
-                  "2": {'name': 'User 2'},
-                }
-              },
-              "friends": {
-                "__values": {
-                  "1": {'name': 'Friend 1'},
-                  "2": {'name': 'Friend 2'},
+              "": {
+                "users": {
+                  "__values": {
+                    "1": {'name': 'User 1'},
+                    "2": {'name': 'User 2'},
+                  }
                 },
-              },
+                "friends": {
+                  "__values": {
+                    "1": {'name': 'Friend 1'},
+                    "2": {'name': 'Friend 2'},
+                  },
+                },
+              }
             },
           );
 
@@ -3244,12 +3283,14 @@ void main() {
           expect(
             json,
             {
-              "friends": {
-                "__values": {
-                  "1": {'name': 'Friend 1'},
-                  "2": {'name': 'Friend 2'},
+              "": {
+                "friends": {
+                  "__values": {
+                    "1": {'name': 'Friend 1'},
+                    "2": {'name': 'Friend 2'},
+                  },
                 },
-              },
+              }
             },
           );
         },

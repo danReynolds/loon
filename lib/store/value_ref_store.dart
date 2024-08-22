@@ -22,7 +22,7 @@ class ValueRefStore<T> extends _BaseValueStore<T> {
       return value;
     }
 
-    final Map<T, int> refs = node[_refs] ??= <T, int>{};
+    final refs = node[_refs] ??= {};
     refs[value] ??= 0;
     refs[value] = refs[value]! + 1;
 
@@ -41,7 +41,7 @@ class ValueRefStore<T> extends _BaseValueStore<T> {
     return prevValue;
   }
 
-  Map<T, int>? _delete(
+  Map? _delete(
     Map node,
     List<String> segments,
     int index,
@@ -51,7 +51,7 @@ class ValueRefStore<T> extends _BaseValueStore<T> {
     final Map? child = node[segment];
 
     T? childValue;
-    Map<T, int>? removedRefs;
+    Map? removedRefs;
 
     if (index < segments.length - 1) {
       if (child == null) {
@@ -90,7 +90,7 @@ class ValueRefStore<T> extends _BaseValueStore<T> {
     }
 
     if (removedRefs != null) {
-      final Map<T, int> nodeRefs = node[_refs];
+      final Map nodeRefs = node[_refs];
 
       for (final entry in removedRefs.entries) {
         final key = entry.key;
@@ -118,11 +118,24 @@ class ValueRefStore<T> extends _BaseValueStore<T> {
     }
 
     final segments = _getSegments(path);
-    return _getNode(
+    final Map? node = _getNode(
       _store,
       segments.isEmpty ? segments : segments.sublist(0, segments.length),
       0,
-    )?[_refs];
+    );
+
+    if (node == null) {
+      return null;
+    }
+
+    final refs = node[_refs];
+    if (refs is Map<T, int>?) {
+      return null;
+    }
+
+    // If the store was hydrated, then the refs may have been instantiated as a
+    // `Map<String, dynamic>` in which case it must be converted to a Map<String, int>.
+    return node[_refs] = Map<T, int>.from(refs);
   }
 
   @override
