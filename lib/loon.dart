@@ -1,6 +1,7 @@
 library loon;
 
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
 import 'dart:collection';

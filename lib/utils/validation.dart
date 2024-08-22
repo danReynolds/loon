@@ -1,11 +1,20 @@
 part of loon;
 
 bool _isSerializable(dynamic data) {
-  return data == null ||
-      data is num ||
-      data is String ||
-      data is bool ||
-      data is Json;
+  if (data == null || data is num || data is String || data is bool) {
+    return true;
+  }
+
+  if (data is Map) {
+    try {
+      jsonEncode(data);
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  return false;
 }
 
 /// In debug mode, assert that the data being written for a document is serializable.

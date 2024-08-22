@@ -189,14 +189,19 @@ class FilePersistor extends Persistor {
     // 2. It de-duplicates persistence keys. If there are many documents that all roll up
     //    to a given key, then the key is only specified once in the local resolver rather than
     //    being duplicated and sent independently with each document.
-    final resolver = ValueStore<String>()
-      ..write('', FilePersistor.defaultKey.value);
+    final resolver = ValueStore<String>();
     final List<FilePersistDocument> persistDocs = [];
+    final globalPersistorSettings = Loon.persistorSettings;
+
+    final defaultKey = switch (globalPersistorSettings) {
+      FilePersistorSettings(key: FilePersistorValueKey key) => key,
+      _ => FilePersistor.defaultKey,
+    };
+    resolver.write(ValueStore.root, defaultKey.value);
 
     for (final doc in docs) {
-      bool encrypted;
+      bool encrypted = false;
       final persistorSettings = doc.persistorSettings;
-      final globalPersistorSettings = Loon.persistorSettings;
 
       if (persistorSettings != null) {
         final persistorDoc = persistorSettings.doc;
@@ -210,7 +215,7 @@ class FilePersistor extends Persistor {
             String path;
 
             /// A value key is stored at the parent path of the document unless it is a document
-            /// on the root collection, which supports variable collection persistor settings via [Loon.doc].
+            /// on the root collection via [Loon.doc], which should store keys under its own path.
             if (persistorDoc.parent != Collection.root.path) {
               path = persistorDoc.parent;
             } else {
@@ -230,9 +235,21 @@ class FilePersistor extends Persistor {
 
             break;
         }
-      } else {
-        encrypted = globalPersistorSettings is FilePersistorSettings &&
-            globalPersistorSettings.encrypted;
+      } else if (globalPersistorSettings is FilePersistorSettings) {
+        encrypted = globalPersistorSettings.encrypted;
+
+        switch (globalPersistorSettings) {
+          case FilePersistorSettings(key: FilePersistorBuilderKey keyBuilder):
+            final snap = doc.get();
+            final path = doc.path;
+
+            if (snap != null) {
+              resolver.write(path, (keyBuilder as dynamic)(snap));
+            }
+            break;
+          default:
+            break;
+        }
       }
 
       persistDocs.add(

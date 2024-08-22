@@ -53,7 +53,7 @@ void main() {
     'persist',
     () {
       test(
-        'Persists new documents in the root data store by default',
+        'Persists new documents in the default data store by default',
         () async {
           final userCollection = Loon.collection<TestUserModel>(
             'users',
@@ -2359,6 +2359,175 @@ void main() {
         },
       );
 
+      group(
+        'Global persistence',
+        () {
+          test(
+            'Stores documents under the given value key',
+            () async {
+              Loon.configure(
+                persistor: TestFilePersistor(
+                  settings: FilePersistorSettings(
+                    key: FilePersistor.key('users'),
+                  ),
+                ),
+              );
+
+              final usersCollection = Loon.collection(
+                'users',
+                fromJson: TestUserModel.fromJson,
+                toJson: (user) => user.toJson(),
+              );
+
+              final userDoc = usersCollection.doc('1');
+
+              userDoc.create(TestUserModel('User 1'));
+
+              await completer.onSync;
+
+              final usersFile = File('${testDirectory.path}/loon/users.json');
+              final usersJson = jsonDecode(usersFile.readAsStringSync());
+
+              expect(
+                usersJson,
+                {
+                  "": {
+                    "users": {
+                      "__values": {
+                        "1": {
+                          "name": "User 1",
+                        },
+                      },
+                    },
+                  },
+                },
+              );
+
+              final resolverFile =
+                  File('${testDirectory.path}/loon/__resolver__.json');
+              final resolverJson = jsonDecode(resolverFile.readAsStringSync());
+
+              expect(
+                resolverJson,
+                {
+                  "__refs": {
+                    "users": 1,
+                  },
+                  "__values": {
+                    "": "users",
+                  },
+                },
+              );
+            },
+          );
+
+          test(
+            'Stores documents using the given key builder',
+            () async {
+              Loon.configure(
+                persistor: TestFilePersistor(
+                  settings: FilePersistorSettings(
+                    key: FilePersistor.keyBuilder((snap) {
+                      return switch (snap.data) {
+                        TestUserModel _ => 'users',
+                        _ => FilePersistor.defaultKey.value,
+                      };
+                    }),
+                  ),
+                ),
+              );
+
+              final usersCollection = Loon.collection(
+                'users',
+                fromJson: TestUserModel.fromJson,
+                toJson: (user) => user.toJson(),
+              );
+
+              final userDoc = usersCollection.doc('1');
+
+              userDoc.create(TestUserModel('User 1'));
+              Loon.collection('posts').doc('1').create({
+                "userId": 1,
+                "text": "This is a post",
+              });
+
+              await completer.onSync;
+
+              final usersFile = File('${testDirectory.path}/loon/users.json');
+              final usersJson = jsonDecode(usersFile.readAsStringSync());
+
+              expect(
+                usersJson,
+                {
+                  "users__1": {
+                    "users": {
+                      "__values": {
+                        "1": {
+                          "name": "User 1",
+                        },
+                      },
+                    },
+                  },
+                },
+              );
+
+              final storeFile =
+                  File('${testDirectory.path}/loon/__store__.json');
+              final storeJson = jsonDecode(storeFile.readAsStringSync());
+
+              expect(
+                storeJson,
+                {
+                  "posts__1": {
+                    "posts": {
+                      "__values": {
+                        "1": {
+                          "userId": 1,
+                          "text": "This is a post",
+                        }
+                      }
+                    }
+                  },
+                },
+              );
+
+              final resolverFile =
+                  File('${testDirectory.path}/loon/__resolver__.json');
+              final resolverJson = jsonDecode(resolverFile.readAsStringSync());
+
+              expect(
+                resolverJson,
+                {
+                  "__refs": {
+                    "users": 1,
+                    FilePersistor.defaultKey.value: 2,
+                  },
+                  "__values": {
+                    ValueStore.root: FilePersistor.defaultKey.value,
+                  },
+                  "users": {
+                    "__refs": {
+                      "users": 1,
+                    },
+                    "__values": {
+                      "1": "users",
+                    },
+                  },
+                  "posts": {
+                    "__refs": {
+                      FilePersistor.defaultKey.value: 1,
+                    },
+                    "__values": {
+                      "1": FilePersistor.defaultKey.value,
+                    },
+                  },
+                },
+              );
+            },
+          );
+        },
+      );
+
       test(
         'Data stored under the root collection is persisted in the root data store',
         () async {
@@ -2376,10 +2545,12 @@ void main() {
           expect(
             json,
             {
-              "root": {
-                "__values": {
-                  "current_user": {'name': 'Dan'},
-                },
+              "": {
+                "root": {
+                  "__values": {
+                    "current_user": {'name': 'Dan'},
+                  },
+                }
               }
             },
           );
@@ -2413,10 +2584,12 @@ void main() {
           expect(
             json,
             {
-              "users": {
-                "__values": {
-                  "1": {'name': 'User 1'},
-                },
+              "": {
+                "users": {
+                  "__values": {
+                    "1": {'name': 'User 1'},
+                  },
+                }
               }
             },
           );
