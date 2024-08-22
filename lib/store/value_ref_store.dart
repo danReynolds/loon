@@ -130,7 +130,7 @@ class ValueRefStore<T> extends _BaseValueStore<T> {
 
     final refs = node[_refs];
     if (refs is Map<T, int>?) {
-      return null;
+      return refs;
     }
 
     // If the store was hydrated, then the refs may have been instantiated as a
