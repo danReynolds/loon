@@ -1,3 +1,7 @@
+## 4.0.1
+
+* Bugfix for default file data store instantiation.
+
 ## 4.0.0
 
 * Rewrites file persistence.

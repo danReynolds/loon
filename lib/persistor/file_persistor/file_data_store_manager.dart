@@ -107,7 +107,8 @@ class FileDataStoreManager {
     dataStoreNames.addAll(_resolver.extractValues(path));
 
     return dataStoreNames
-        .map((dataStoreName) => _index[dataStoreName]!)
+        .map((dataStoreName) => _index[dataStoreName])
+        .whereType<DualFileDataStore>()
         .toList();
   }
 
@@ -129,16 +130,6 @@ class FileDataStoreManager {
       if (!_index.containsKey(dataStoreName)) {
         _index[dataStoreName] = dataStore;
       }
-    }
-
-    // Initialize the root file data store if it does not exist yet.
-    if (!_index.containsKey(FilePersistor.defaultKey.value)) {
-      _index[FilePersistor.defaultKey.value] = DualFileDataStore(
-        name: FilePersistor.defaultKey.value,
-        directory: directory,
-        encrypter: encrypter,
-        isHydrated: true,
-      );
     }
 
     // Initialize and immediately hydrate the resolver data, since it is required
@@ -215,7 +206,12 @@ class FileDataStoreManager {
         } else {
           final prevDataStoreName = _resolver.getNearest(docPath)!.$2;
           final nextDataStoreName = localResolver.getNearest(docPath)!.$2;
-          final prevDataStore = _index[prevDataStoreName]!;
+          final prevDataStore = _index[prevDataStoreName] ??= DualFileDataStore(
+            name: prevDataStoreName,
+            encrypter: encrypter,
+            directory: directory,
+            isHydrated: true,
+          );
           final nextDataStore = _index[nextDataStoreName] ??= DualFileDataStore(
             name: nextDataStoreName,
             encrypter: encrypter,
@@ -255,12 +251,7 @@ class FileDataStoreManager {
           final prevDataStore = _index[prevDataStoreName]!;
 
           final dataStoreName = nextResolverValue;
-          final dataStore = _index[dataStoreName] ??= DualFileDataStore(
-            name: dataStoreName,
-            encrypter: encrypter,
-            directory: directory,
-            isHydrated: true,
-          );
+          final dataStore = _index[dataStoreName]!;
 
           _resolver.writePath(nextResolverPath, nextResolverValue);
 
