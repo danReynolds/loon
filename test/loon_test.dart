@@ -10,6 +10,10 @@ void main() {
   group(
     'Loon',
     () {
+      setUp(() {
+        Loon.configure(persistor: null);
+      });
+
       tearDown(() async {
         Loon.unsubscribe();
         await Loon.clearAll();
@@ -19,15 +23,47 @@ void main() {
         'Document',
         () {
           group(
+            'parent',
+            () {
+              test(
+                'Returns the parent path',
+                () {
+                  expect(Loon.collection('users').doc('1').parent, 'users');
+                  expect(
+                    Loon.collection('users')
+                        .doc('1')
+                        .subcollection('posts')
+                        .doc('2')
+                        .parent,
+                    'users__1__posts',
+                  );
+                },
+              );
+            },
+          );
+
+          group(
             'create',
             () {
               test(
-                'Creates primitive documents',
+                'Creates documents',
                 () {
                   final usersCollection = Loon.collection('users');
                   final userDoc = usersCollection.doc('1');
+                  final userDoc2 = usersCollection.doc('2');
+                  final userDoc3 = usersCollection.doc('3');
+                  final userDoc4 = usersCollection.doc('4');
+                  final userDoc5 = TestUserModel.store.doc('5');
+                  final userData = TestUserModel('5');
+                  final userJson = {
+                    "name": 'Test',
+                  };
 
                   userDoc.create('Test');
+                  userDoc2.create(2);
+                  userDoc3.create(true);
+                  userDoc4.create(userJson);
+                  userDoc5.create(userData);
 
                   expect(
                     Loon.inspect()['store'],
@@ -35,60 +71,16 @@ void main() {
                       "users": {
                         "__values": {
                           "1": DocumentSnapshot(doc: userDoc, data: 'Test'),
+                          "2": DocumentSnapshot(doc: userDoc2, data: 2),
+                          "3": DocumentSnapshot(doc: userDoc3, data: true),
+                          "4": DocumentSnapshot(doc: userDoc4, data: userJson),
+                          "5": DocumentSnapshot(doc: userDoc5, data: userData),
                         }
                       }
                     },
                   );
                 },
               );
-
-              test(
-                'Creates serializable documents',
-                () {
-                  final user = TestUserModel('User 1');
-                  final userDoc = TestUserModel.store.doc('1');
-
-                  userDoc.create(user);
-
-                  expect(
-                    Loon.inspect()['store'],
-                    {
-                      "users": {
-                        "__values": {
-                          "1": DocumentSnapshot(
-                            doc: userDoc,
-                            data: user,
-                          ),
-                        }
-                      }
-                    },
-                  );
-                },
-              );
-
-              test('Creates JSON documents successfully', () {
-                final userCollection = Loon.collection('users');
-                final userDoc = userCollection.doc('2');
-                final userJson = {
-                  "name": "User 2",
-                };
-
-                userDoc.create(userJson);
-
-                expect(
-                  Loon.inspect()['store'],
-                  {
-                    "users": {
-                      "__values": {
-                        "2": DocumentSnapshot(
-                          doc: userDoc,
-                          data: userJson,
-                        ),
-                      },
-                    }
-                  },
-                );
-              });
 
               test(
                   'Throws an error when creating a persisted document with non-serializable data without a serializer',
@@ -97,12 +89,25 @@ void main() {
                   () => Loon.collection(
                     'users',
                     persistorSettings: const PersistorSettings(),
-                  ).doc('1').create(UnserializableModel()),
+                  ).doc('1').create(TestUserModel('1')),
                   throwsA(
                     (e) =>
                         e is MissingSerializerException &&
                         e.toString() ==
-                            'Missing serializer: Persisted document users__1 of type <Document<dynamic>> attempted to write snapshot of type <UnserializableModel> without specifying a fromJson/toJson serializer pair.',
+                            'Missing serializer: Persisted document users__1 of type <Document<dynamic>> attempted to write snapshot of type <TestUserModel> without specifying a fromJson/toJson serializer pair.',
+                  ),
+                );
+
+                expect(
+                  () => Loon.collection(
+                    'users',
+                    persistorSettings: const PersistorSettings(),
+                  ).doc('2').create([]),
+                  throwsA(
+                    (e) =>
+                        e is MissingSerializerException &&
+                        e.toString() ==
+                            'Missing serializer: Persisted document users__2 of type <Document<dynamic>> attempted to write snapshot of type <List<dynamic>> without specifying a fromJson/toJson serializer pair.',
                   ),
                 );
               });
@@ -129,21 +134,16 @@ void main() {
 
                 userDoc.delete();
 
-                final list = [];
                 expect(
-                  userDoc.create(list),
-                  DocumentSnapshot(doc: userDoc, data: list),
+                  userDoc.create(true),
+                  DocumentSnapshot(doc: userDoc, data: true),
                 );
 
                 userDoc.delete();
 
-                // Data is serialized using [convert.jsonEncode] which will by default
-                // attempt to call toJson() on an unencodable object to serialize it.
-                // https://api.flutter.dev/flutter/dart-convert/jsonEncode.html
-                //
-                // Given that behavior, it is valid to create a [TestUserModel], which implements
-                // a toJson, without a serializer.
-                final userData = TestUserModel('Test 1');
+                final userData = {
+                  "name": "User 1",
+                };
                 expect(
                   userDoc.create(userData),
                   DocumentSnapshot(doc: userDoc, data: userData),
@@ -167,36 +167,73 @@ void main() {
           group(
             'get',
             () {
-              test('Returns serializable document snapshots', () {
-                final user = TestUserModel('User 1');
-                final userDoc = TestUserModel.store.doc('1');
+              test('Returns document snapshots', () {
+                final userDoc = Loon.collection('users').doc('1');
+                final userDoc2 = Loon.collection('users').doc('2');
+                final userDoc3 = Loon.collection('users').doc('3');
+                final userDoc4 = Loon.collection('users').doc('4');
 
-                userDoc.create(user);
-
-                expect(
-                  userDoc.get(),
-                  DocumentSnapshot(
-                    doc: userDoc,
-                    data: user,
-                  ),
-                );
-              });
-
-              test('Returns JSON document snapshots', () {
-                final userCollection = Loon.collection('users');
-                final userDoc = userCollection.doc('2');
-                final userJson = {
+                final userData = TestUserModel('User 1');
+                final user2Data = {
                   "name": "User 2",
                 };
 
-                userDoc.create(userJson);
+                userDoc.create(userData);
+                userDoc2.create(user2Data);
+                userDoc3.create('3');
+                userDoc4.create(true);
 
                 expect(
                   userDoc.get(),
-                  DocumentSnapshot(
-                    doc: userDoc,
-                    data: userJson,
-                  ),
+                  DocumentSnapshot(doc: userDoc, data: userData),
+                );
+                expect(
+                  userDoc2.get(),
+                  DocumentSnapshot(doc: userDoc2, data: user2Data),
+                );
+                expect(
+                  userDoc3.get(),
+                  DocumentSnapshot(doc: userDoc3, data: '3'),
+                );
+                expect(
+                  userDoc4.get(),
+                  DocumentSnapshot(doc: userDoc4, data: true),
+                );
+              });
+
+              test('Returns serializable persisted document snapshots', () {
+                Loon.configure(persistor: TestPersistor());
+
+                final userDoc = TestUserModel.store.doc('1');
+                final userDoc2 = Loon.collection('users').doc('2');
+                final userDoc3 = Loon.collection('users').doc('3');
+                final userDoc4 = Loon.collection('users').doc('4');
+
+                final userData = TestUserModel('User 1');
+                final user2Data = {
+                  "name": "User 2",
+                };
+
+                userDoc.create(userData);
+                userDoc2.create(user2Data);
+                userDoc3.create('3');
+                userDoc4.create(true);
+
+                expect(
+                  userDoc.get(),
+                  DocumentSnapshot(doc: userDoc, data: userData),
+                );
+                expect(
+                  userDoc2.get(),
+                  DocumentSnapshot(doc: userDoc2, data: user2Data),
+                );
+                expect(
+                  userDoc3.get(),
+                  DocumentSnapshot(doc: userDoc3, data: '3'),
+                );
+                expect(
+                  userDoc4.get(),
+                  DocumentSnapshot(doc: userDoc4, data: true),
                 );
               });
 
@@ -204,11 +241,11 @@ void main() {
                 'Throws an exception if the existing snapshot is incompatible with the new document type',
                 () {
                   final usersCollection =
-                      Loon.collection<UnserializableModel>('users');
+                      Loon.collection<TestUserModel>('users');
 
                   final userDoc = usersCollection.doc('1');
 
-                  userDoc.create(UnserializableModel());
+                  userDoc.create(TestUserModel('User 1'));
 
                   expect(
                     () => Loon.collection<int>('users').doc('1').get(),
@@ -216,7 +253,7 @@ void main() {
                       (e) =>
                           e is DocumentTypeMismatchException &&
                           e.toString() ==
-                              'Document type mismatch: Document users__1 of type <int> attempted to read snapshot of type: <UnserializableModel>',
+                              'Document type mismatch: Document users__1 of type <int> attempted to read snapshot of type: <TestUserModel>',
                     ),
                   );
                 },
@@ -422,11 +459,11 @@ void main() {
                   () => Loon.collection(
                     'users',
                     persistorSettings: const PersistorSettings(),
-                  ).doc('1').modify((userSnap) => UnserializableModel()),
+                  ).doc('1').modify((userSnap) => TestUserModel('1')),
                   throwsA(
                     (e) =>
                         e.toString() ==
-                        'Missing serializer: Persisted document users__1 of type <Document<dynamic>> attempted to write snapshot of type <UnserializableModel> without specifying a fromJson/toJson serializer pair.',
+                        'Missing serializer: Persisted document users__1 of type <Document<dynamic>> attempted to write snapshot of type <TestUserModel> without specifying a fromJson/toJson serializer pair.',
                   ),
                 );
               });

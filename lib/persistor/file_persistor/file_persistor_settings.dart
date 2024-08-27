@@ -33,43 +33,27 @@ import 'package:loon/loon.dart';
 /// Documents from the same collection can be given different persistence keys using [FilePersistor.keyBuilder].
 /// This allows you to customize persistence on a per-document level, supporting scenarios like sharding of large collections.
 
-enum FilePersistorKeyTypes {
-  collection,
-  document,
-}
+typedef FilePersistorKeyBuilder<T> = String Function(DocumentSnapshot<T> snap);
 
-class FilePersistorKey<T> {
-  final String value;
-  final FilePersistorKeyTypes type;
+class FilePersistorKey {}
 
-  FilePersistorKey(this.value, this.type);
-}
-
-abstract class FilePersistorKeyBuilder<T> {}
-
-class FilePersistorCollectionKeyBuilder<T> extends FilePersistorKeyBuilder<T> {
+class FilePersistorValueKey extends FilePersistorKey {
   final String value;
 
-  FilePersistorCollectionKeyBuilder(
-    this.value,
-  );
+  FilePersistorValueKey(this.value);
+}
 
-  build() {
-    return FilePersistorKey<T>(value, FilePersistorKeyTypes.collection);
+class FilePersistorBuilderKey<T> extends FilePersistorKey {
+  final FilePersistorKeyBuilder<T> _builder;
+
+  FilePersistorBuilderKey(this._builder);
+
+  String call(DocumentSnapshot<T> snap) {
+    return _builder(snap);
   }
 }
 
-class FilePersistorDocumentKeyBuilder<T> extends FilePersistorKeyBuilder<T> {
-  final String Function(DocumentSnapshot<T> snap) builder;
-
-  FilePersistorDocumentKeyBuilder(this.builder);
-
-  FilePersistorKey<T> build(DocumentSnapshot<T> snap) {
-    return FilePersistorKey<T>(builder(snap), FilePersistorKeyTypes.document);
-  }
-}
-
-class FilePersistorSettings<T> extends PersistorSettings<T> {
+class FilePersistorSettings<T> extends PersistorSettings {
   /// The persistence key to use for this collection. The key corresponds to the name of the file
   /// that the collection's data and all of the data of its subcollections (that don't specify their own custom key)
   /// is stored in.
@@ -101,7 +85,8 @@ class FilePersistorSettings<T> extends PersistorSettings<T> {
   ///   ),
   /// );
   /// ```
-  final FilePersistorKeyBuilder<T>? key;
+
+  final FilePersistorKey? key;
 
   /// Whether encryption is enabled globally for all collections in the store.
   final bool encrypted;
@@ -111,16 +96,4 @@ class FilePersistorSettings<T> extends PersistorSettings<T> {
     this.encrypted = false,
     super.enabled = true,
   });
-
-  FilePersistorSettings<T> copyWith({
-    FilePersistorKeyBuilder<T>? key,
-    bool? encrypted,
-    bool? enabled,
-  }) {
-    return FilePersistorSettings<T>(
-      key: key ?? this.key,
-      encrypted: encrypted ?? this.encrypted,
-      enabled: enabled ?? this.enabled,
-    );
-  }
 }

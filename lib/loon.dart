@@ -4,13 +4,16 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
+import 'dart:collection';
 
 export 'widgets/query_stream_builder.dart';
 export 'widgets/document_stream_builder.dart';
 export 'persistor/file_persistor/file_persistor.dart';
 
+part 'store/base_value_store.dart';
 part 'store/path_ref_store.dart';
 part 'store/value_store.dart';
+part 'store/value_ref_store.dart';
 part 'broadcast_observer.dart';
 part 'query.dart';
 part 'observable_query.dart';
@@ -66,7 +69,7 @@ class Loon {
     DocumentSnapshot snap, {
     required FromJson<T>? fromJson,
     required ToJson<T>? toJson,
-    required PersistorSettings<T>? persistorSettings,
+    required PersistorSettings? persistorSettings,
     required DependenciesBuilder<T>? dependenciesBuilder,
   }) {
     if (snap is! DocumentSnapshot<T>) {
@@ -84,7 +87,7 @@ class Loon {
           persistorSettings: persistorSettings,
           dependenciesBuilder: dependenciesBuilder,
         ),
-        fromJson!(snap.data),
+        fromJson?.call(snap.data) ?? data as T,
         event: BroadcastEvents.modified,
         broadcast: false,
         persist: false,
@@ -139,14 +142,6 @@ class Loon {
     bool broadcast = true,
     bool persist = true,
   }) {
-    _validateDataSerialization(
-      doc: doc,
-      persistenceEnabled: doc.persistorSettings?.enabled ??
-          Loon._instance._isGlobalPersistenceEnabled,
-      data: data,
-      toJson: doc.toJson,
-    );
-
     if (broadcast) {
       broadcastManager.writeDocument(doc, event);
     }
@@ -157,6 +152,12 @@ class Loon {
     documentStore.write(doc.path, snap);
 
     if (persist && doc.isPersistenceEnabled()) {
+      _validateDataSerialization(
+        doc: doc,
+        data: data,
+        toJson: doc.toJson,
+      );
+
       persistManager?.persist(doc);
     }
 
@@ -224,20 +225,22 @@ class Loon {
 
     if (persistor != null) {
       _instance.persistManager = PersistManager(persistor: persistor);
+    } else {
+      _instance.persistManager = null;
     }
   }
 
   /// Hydrates persisted data from the store using the persistor specified in [Loon.configure].
   /// If no arguments are provided, then the entire store is hydrated by default. If specific
   /// [StoreReference] documents and collections are provided, then only data in the store under those
-  /// entities is hydrated.
+  /// references are hydrated.
   static Future<void> hydrate([List<StoreReference>? refs]) async {
     if (_instance.persistManager == null) {
       logger.log('Hydration skipped - persistence not enabled');
       return;
     }
     try {
-      final data = await _instance.persistManager!.hydrate(refs?.toSet());
+      final data = await _instance.persistManager!.hydrate(refs);
 
       for (final entry in data.entries) {
         final docPath = entry.key;
@@ -262,7 +265,7 @@ class Loon {
     String id, {
     FromJson<T>? fromJson,
     ToJson<T>? toJson,
-    PersistorSettings<T>? persistorSettings,
+    PersistorSettings? persistorSettings,
   }) {
     return collection<T>(
       _rootKey,
@@ -276,7 +279,7 @@ class Loon {
     String name, {
     FromJson<T>? fromJson,
     ToJson<T>? toJson,
-    PersistorSettings<T>? persistorSettings,
+    PersistorSettings? persistorSettings,
     DependenciesBuilder<T>? dependenciesBuilder,
   }) {
     return Collection<T>(

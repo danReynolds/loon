@@ -343,7 +343,7 @@ class UserModel {
       'users',
       fromJson: UserModel.fromJson,
       toJson: (user) => user.toJson(),
-      // Disable encryption specifically for this collection.
+      // Disable encryption specifically for this collection and its subcollections.
       settings: FilePersistorSettings(encrypted: false),
     )
   }
@@ -351,7 +351,7 @@ class UserModel {
 ```
 
 In this example, file encryption is enabled globally for all collections, but disabled
-specifically for the users collection.
+specifically for the users collection and its subcollections in the store.
 
 By default, the `FilePersistor` stores all data in a single  `__store__.json` persistence file.
 
@@ -414,7 +414,7 @@ class UserModel {
       settings: FilePersistorSettings(
         key: FilePersistor.keyBuilder((snap) {
           if (snap.data.age >= 18) {
-            return 'voting_users';
+            return 'adult_users';
           }
           return 'users';
         }),
@@ -428,7 +428,7 @@ class UserModel {
 loon >
   __store__.json
   users.json
-  voting_users.json
+  adult_users.json
 ```
 
 Now instead of storing all users in the `users.json` file, they will be distributed across multiple files based on the user's age. The key is recalculated

@@ -3,14 +3,21 @@ part of loon;
 class ObservableDocument<T> extends Document<T>
     with BroadcastObserver<DocumentSnapshot<T>?, DocumentChangeSnapshot<T>> {
   ObservableDocument(
-    super.parent,
-    super.id, {
-    super.fromJson,
-    super.toJson,
-    super.persistorSettings,
-    super.dependenciesBuilder,
+    String parent,
+    String id, {
+    FromJson<T>? fromJson,
+    ToJson<T>? toJson,
+    PersistorSettings? persistorSettings,
+    DependenciesBuilder<T>? dependenciesBuilder,
     required bool multicast,
-  }) {
+  }) : super(
+          parent,
+          id,
+          fromJson: fromJson,
+          toJson: toJson,
+          persistorSettings: persistorSettings,
+          dependenciesBuilder: dependenciesBuilder,
+        ) {
     _init(super.get(), multicast: multicast);
 
     _cacheDeps();
@@ -43,7 +50,7 @@ class ObservableDocument<T> extends Document<T>
 
     // 2.
     final isRemoved = Loon._instance.broadcastManager.eventStore
-            .findValue(path, BroadcastEvents.removed) !=
+            .getNearestMatch(path, BroadcastEvents.removed) !=
         null;
 
     if (event == null && isRemoved) {
@@ -87,7 +94,7 @@ class ObservableDocument<T> extends Document<T>
 
   @override
   get() {
-    if (!_hasValue) {
+    if (!isCached) {
       return _value = super.get();
     }
     return _value!;

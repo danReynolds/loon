@@ -4,7 +4,7 @@ import 'dart:isolate';
 import 'package:encrypt/encrypt.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:loon/loon.dart';
-import 'package:loon/persistor/file_persistor/extensions/document.dart';
+import 'package:loon/persistor/file_persistor/file_persist_document.dart';
 import 'package:loon/persistor/file_persistor/file_persistor_settings.dart';
 import 'package:loon/persistor/file_persistor/file_persistor_worker.dart';
 import 'package:loon/persistor/file_persistor/messages.dart';
@@ -31,26 +31,34 @@ class FilePersistor extends Persistor {
 
   late final Logger _logger;
 
+  @override
+  // ignore: overridden_fields
+  final FilePersistorSettings settings;
+
   FilePersistor({
-    FilePersistorSettings? settings,
     super.onPersist,
     super.onClear,
     super.onClearAll,
     super.onHydrate,
     this.onSync,
+    this.settings = const FilePersistorSettings(),
     this.persistenceThrottle = const Duration(milliseconds: 100),
-  }) : super(settings: settings ?? const FilePersistorSettings()) {
+  }) {
     _logger = Logger('FilePersistor', output: Loon.logger.log);
   }
 
-  static FilePersistorCollectionKeyBuilder<T> key<T>(String value) {
-    return FilePersistorCollectionKeyBuilder(value);
+  /// The name of the default [FileDataStore] key.
+  static final FilePersistorValueKey defaultKey =
+      FilePersistor.key('__store__');
+
+  static FilePersistorValueKey key<T>(String value) {
+    return FilePersistorValueKey(value);
   }
 
-  static FilePersistorDocumentKeyBuilder<T> keyBuilder<T>(
+  static FilePersistorBuilderKey keyBuilder<T>(
     String Function(DocumentSnapshot<T> snap) builder,
   ) {
-    return FilePersistorDocumentKeyBuilder<T>(builder);
+    return FilePersistorBuilderKey<T>(builder);
   }
 
   void _onMessage(dynamic message) {
@@ -134,6 +142,7 @@ class FilePersistor extends Persistor {
       directory: directory as Directory,
       encrypter: encrypter as Encrypter,
       persistenceThrottle: persistenceThrottle,
+      settings: settings,
     );
 
     final completer =
@@ -167,9 +176,94 @@ class FilePersistor extends Persistor {
 
   @override
   persist(docs) async {
-    // Marshall file persist documents to be sent to and persisted by the worker isolate.
-    final data = docs.map((doc) => doc.toPersistenceDoc()).toList();
-    await _sendMessage(PersistMessageRequest(data: data));
+    // The updated persistence keys for documents are built into a local resolver
+    // passed to the worker. This has two main benefits:
+    // 1. It pre-computes the resolved persistence keys across the document updates, eliminating conflicts.
+    //    Ex. If an update to users__1__friends__1 which resolves to persistence key "users" at resolver path "users"
+    //        is followed a subsequent update to users__1 that changes the persistence key at resolver path "users" to "other_users",
+    //        then the previous update to users__1__friends__1 would have an inaccurate persistence key.
+
+    //    Pre-computing the local resolver ensures that all documents can lookup accurate persistence keys.
+    //    were not pre-computed in this way, then there could be conflicts between the changes documents make
+    //
+    // 2. It de-duplicates persistence keys. If there are many documents that all roll up
+    //    to a given key, then the key is only specified once in the local resolver rather than
+    //    being duplicated and sent independently with each document.
+    final resolver = ValueStore<String>();
+    final List<FilePersistDocument> persistDocs = [];
+    final globalPersistorSettings = Loon.persistorSettings;
+
+    final defaultKey = switch (globalPersistorSettings) {
+      FilePersistorSettings(key: FilePersistorValueKey key) => key,
+      _ => FilePersistor.defaultKey,
+    };
+    resolver.write(ValueStore.root, defaultKey.value);
+
+    for (final doc in docs) {
+      bool encrypted = false;
+      final persistorSettings = doc.persistorSettings;
+
+      if (persistorSettings != null) {
+        final persistorDoc = persistorSettings.doc;
+        final docSettings = persistorSettings.settings;
+
+        encrypted =
+            docSettings is FilePersistorSettings && docSettings.encrypted;
+
+        switch (docSettings) {
+          case FilePersistorSettings(key: FilePersistorValueKey key):
+            String path;
+
+            /// A value key is stored at the parent path of the document unless it is a document
+            /// on the root collection via [Loon.doc], which should store keys under its own path.
+            if (persistorDoc.parent != Collection.root.path) {
+              path = persistorDoc.parent;
+            } else {
+              path = persistorDoc.path;
+            }
+
+            resolver.write(path, key.value);
+
+            break;
+          case FilePersistorSettings(key: FilePersistorBuilderKey keyBuilder):
+            final snap = persistorDoc.get();
+            final path = persistorDoc.path;
+
+            if (snap != null) {
+              resolver.write(path, (keyBuilder as dynamic)(snap));
+            }
+
+            break;
+        }
+      } else if (globalPersistorSettings is FilePersistorSettings) {
+        encrypted = globalPersistorSettings.encrypted;
+
+        switch (globalPersistorSettings) {
+          case FilePersistorSettings(key: FilePersistorBuilderKey keyBuilder):
+            final snap = doc.get();
+            final path = doc.path;
+
+            if (snap != null) {
+              resolver.write(path, (keyBuilder as dynamic)(snap));
+            }
+            break;
+          default:
+            break;
+        }
+      }
+
+      persistDocs.add(
+        FilePersistDocument(
+          path: doc.path,
+          data: doc.getSerialized(),
+          encrypted: encrypted,
+        ),
+      );
+    }
+
+    await _sendMessage(
+      PersistMessageRequest(resolver: resolver, docs: persistDocs),
+    );
   }
 
   @override

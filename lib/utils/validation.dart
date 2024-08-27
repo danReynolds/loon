@@ -1,26 +1,34 @@
 part of loon;
 
+bool _isSerializable(dynamic data) {
+  if (data == null || data is num || data is String || data is bool) {
+    return true;
+  }
+
+  if (data is Map) {
+    try {
+      jsonEncode(data);
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  return false;
+}
+
 /// In debug mode, assert that the data being written for a document is serializable.
 void _validateDataSerialization<T>({
   required Document<T> doc,
-  required bool persistenceEnabled,
   required ToJson<T>? toJson,
   required T? data,
 }) {
-  if (!persistenceEnabled || data == null || !kDebugMode) {
-    return;
-  }
-
-  if (toJson == null) {
-    try {
-      jsonEncode(data);
-    } catch (e) {
-      throw MissingSerializerException<T>(
-        doc,
-        data,
-        MissingSerializerEvents.write,
-      );
-    }
+  if (kDebugMode && !_isSerializable(data) && toJson == null) {
+    throw MissingSerializerException<T>(
+      doc,
+      data,
+      MissingSerializerEvents.write,
+    );
   }
 }
 
@@ -30,21 +38,21 @@ void _validateDataDeserialization<T>({
   required FromJson<T>? fromJson,
   required dynamic data,
 }) {
-  if (data == null || !kDebugMode) {
-    return;
-  }
-
-  try {
-    jsonEncode(data);
-  } catch (e) {
-    throw DocumentTypeMismatchException<T>(doc, data);
-  }
-
-  if (fromJson == null) {
-    throw MissingSerializerException<T>(
-      doc,
-      data,
-      MissingSerializerEvents.read,
-    );
+  if (kDebugMode) {
+    if (_isSerializable(data)) {
+      if (data is Json) {
+        if (fromJson == null && T is! Json) {
+          throw MissingSerializerException<T>(
+            doc,
+            data,
+            MissingSerializerEvents.read,
+          );
+        }
+      } else if (data is! T) {
+        throw DocumentTypeMismatchException<T>(doc, data);
+      }
+    } else {
+      throw DocumentTypeMismatchException<T>(doc, data);
+    }
   }
 }

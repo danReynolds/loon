@@ -89,7 +89,7 @@ class ObservableQuery<T> extends Query<T>
 
     // 1.  Any path along the query's collection path has been removed.
     if (Loon._instance.broadcastManager.eventStore
-            .findValue(path, BroadcastEvents.removed) !=
+            .getNearestMatch(path, BroadcastEvents.removed) !=
         null) {
       if (_controllerValue.isNotEmpty) {
         shouldRebroadcast = true;
@@ -272,7 +272,7 @@ class ObservableQuery<T> extends Query<T>
   get() {
     // If the query does not have an up to date cached value, then it recomputes its value
     // and records it in the cache.
-    if (!_hasValue) {
+    if (!isCached) {
       return _value = super.get();
     }
     return _value!;

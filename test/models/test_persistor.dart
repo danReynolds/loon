@@ -14,7 +14,7 @@ class TestPersistor extends Persistor {
     void Function(Set<Collection> collections)? onClear,
     void Function()? onClearAll,
     void Function(Json data)? onHydrate,
-    required this.seedData,
+    this.seedData = const [],
   }) : super(
           settings: const PersistorSettings(),
           onPersist: (docs) {
