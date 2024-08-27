@@ -125,7 +125,7 @@ class _MyHomePageState extends State<MyHomePage> {
                     style: Theme.of(context).textTheme.headlineSmall,
                   ),
                   const Padding(padding: EdgeInsets.only(top: 16)),
-                  QueryStreamBuilder<UserModel>(
+                  QueryStreamBuilder(
                     query: UserModel.store.where(
                       (userSnap) =>
                           userSnap.data.name.startsWith(_controller.text),
