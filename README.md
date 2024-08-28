@@ -87,7 +87,7 @@ UserModel.store.doc('1').create(
 ```dart
 final snap = UserModel.store.doc('1').get();
 
-if (snap != null && snap.name == 'John') {
+if (snap != null && snap.data.name == 'John') {
   print('Hi John!');
 }
 ```
