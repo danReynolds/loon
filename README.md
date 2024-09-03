@@ -198,10 +198,7 @@ The reading and writing of a document can be combined using the `modify` API. If
 
 ```dart
 UserModel.store.doc('1').modify((snap) {
-  if (snap == null) {
-    return null;
-  }
-  return snap.data.copyWith(name: 'John Smitherson');
+  return snap?.data.copyWith(name: 'John Smitherson');
 });
 ```
 
@@ -255,8 +252,6 @@ class PostModel {
 
 final posts = Loon.collection<PostModel>(
   'posts',
-  fromJson: PostModel.fromJson,
-  toJson: (post) => post.toJson(),
   dependenciesBuilder: (snap) {
     return {
       UserModel.store.doc(snap.data.userId),
@@ -285,8 +280,6 @@ A default file-based persistence option is available out of the box and can be c
 
 ```dart
 void main() {
-  WidgetsFlutterBinding.ensureInitialized();
-
   Loon.configure(persistor: FilePersistor());
 
   Loon.hydrate().then(() {
@@ -300,7 +293,7 @@ void main() {
 The call to `hydrate` returns a `Future` that resolves when the data has been hydrated from the persistence layer. By default, calling `hydrate()` will hydrate all persisted data. If only certain data should be hydrated, then it can be called with a list of documents and collections to hydrate. All subcollections of the specified paths are also hydrated.
 
 ```dart
-Loon.hydrate([
+await Loon.hydrate([
   Loon.doc('current_user_id'),
   Loon.collection('users'),
 ]);
@@ -313,8 +306,6 @@ Persistence options can be specified globally or on a per-collection basis.
 ```dart
 // main.dart
 void main() {
-  WidgetsFlutterBinding.ensureInitialized();
-
   // Globally enable encryption.
   Loon.configure(persistor: FilePersistor(encrypted: true));
 
