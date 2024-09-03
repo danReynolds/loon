@@ -133,7 +133,7 @@ Documents can be nested under subcollections. Documents in subcollections are un
 their document ID.
 
 ```dart
-final friendsCollection = UserModel.store.doc('1');.subcollection('friends');
+final friendsCollection = UserModel.store.doc('1').subcollection('friends');
 
 friendsCollection.doc('2').create(UserModel(name: 'Jack', age: 17));
 friendsCollection.doc('3').create(UserModel(name: 'Brenda', age: 40));
