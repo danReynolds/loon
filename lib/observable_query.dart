@@ -270,12 +270,7 @@ class ObservableQuery<T> extends Query<T>
 
   @override
   get() {
-    // If the query does not have an up to date cached value, then it recomputes its value
-    // and records it in the cache.
-    if (!isCached) {
-      return _value = super.get();
-    }
-    return _value!;
+    return _value ?? (_value = super.get());
   }
 
   Map inspect() {

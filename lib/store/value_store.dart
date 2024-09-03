@@ -157,12 +157,6 @@ class ValueStore<T> extends _BaseValueStore<T> {
     _delete(_store, _getSegments(path), 0, recursive);
   }
 
-  /// Returns whether the store has a value for the given path.
-  @override
-  bool hasValue(String path) {
-    return get(path) != null;
-  }
-
   /// Grafts the data under the given path from the other store into this store. Returns
   /// whether the other store's node can be deleted after grafted.
   bool _graft(Map node, Map? otherNode, List<String> segments, int index) {
@@ -235,9 +229,5 @@ class ValueStore<T> extends _BaseValueStore<T> {
     } else {
       _graft(_store, other._store, _getSegments(path), 0);
     }
-  }
-
-  Map toJson() {
-    return _store;
   }
 }

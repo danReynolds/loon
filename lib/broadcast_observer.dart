@@ -56,8 +56,6 @@ mixin BroadcastObserver<T, S> {
     Loon._instance.broadcastManager.removeObserver(this);
   }
 
-  T get();
-
   T add(T updatedValue) {
     Loon._instance.broadcastManager.observerValueStore
         .write(_observerId, updatedValue);
@@ -80,12 +78,6 @@ mixin BroadcastObserver<T, S> {
   set _value(T? value) {
     Loon._instance.broadcastManager.observerValueStore
         .write(_observerId, value);
-  }
-
-  /// Returns whether the observer has a cached value in the [BroadcastManager.observerValueStore].
-  bool get isCached {
-    return Loon._instance.broadcastManager.observerValueStore
-        .hasValue(_observerId);
   }
 
   /// Updates the observer's dependency graph given the change in its previous and updated set of dependencies.

@@ -265,4 +265,10 @@ abstract class _BaseValueStore<T> {
   Map inspect() {
     return _store;
   }
+
+  /// While unreferenced in the codebase, toJson is implemented so that the store can be serialized
+  /// using the default behavior of [jsonEncode] which is to attempt to call [toJson] on complex objects.
+  Map toJson() {
+    return inspect();
+  }
 }

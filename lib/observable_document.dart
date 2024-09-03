@@ -94,10 +94,7 @@ class ObservableDocument<T> extends Document<T>
 
   @override
   get() {
-    if (!isCached) {
-      return _value = super.get();
-    }
-    return _value!;
+    return _value ?? (_value = super.get());
   }
 
   Map inspect() {
