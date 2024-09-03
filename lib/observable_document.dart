@@ -86,6 +86,9 @@ class ObservableDocument<T> extends Document<T>
   }
 
   @override
+  get isDirty => _value == null && super.get() != null;
+
+  @override
   ObservableDocument<T> observe({
     bool multicast = false,
   }) {
@@ -94,7 +97,7 @@ class ObservableDocument<T> extends Document<T>
 
   @override
   get() {
-    return _value ?? (_value = super.get());
+    return isDirty ? (_value = super.get()) : _value;
   }
 
   Map inspect() {

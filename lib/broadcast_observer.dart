@@ -71,6 +71,8 @@ mixin BroadcastObserver<T, S> {
     return _changeController.stream;
   }
 
+  bool get isDirty;
+
   T? get _value {
     return Loon._instance.broadcastManager.observerValueStore.get(_observerId);
   }

@@ -111,7 +111,7 @@ class BroadcastManager {
     }
 
     final pendingEvent = eventStore.get(path);
-    // Ignore writing a duplicate events or overwriting a pending mutative event type with a touched event.
+    // Ignore writing a duplicate event or overwriting a pending mutative event type with a touched event.
     if (pendingEvent == null ||
         (event != pendingEvent && event != BroadcastEvents.touched)) {
       eventStore.write(path, event);
