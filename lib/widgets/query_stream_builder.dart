@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:loon/loon.dart';
 
 class QueryStreamBuilder<T> extends StatefulWidget {
-  final Query<T> query;
+  final Queryable<T> query;
   final Widget Function(BuildContext, List<DocumentSnapshot<T>>) builder;
 
   const QueryStreamBuilder({
@@ -16,7 +16,7 @@ class QueryStreamBuilder<T> extends StatefulWidget {
 }
 
 class QueryStreamBuilderState<T> extends State<QueryStreamBuilder<T>> {
-  late ObservableQuery<T> _observable = widget.query.observe();
+  late ObservableQuery<T> _observable = widget.query.toQuery().observe();
 
   @override
   void didUpdateWidget(covariant QueryStreamBuilder<T> oldWidget) {
@@ -24,7 +24,7 @@ class QueryStreamBuilderState<T> extends State<QueryStreamBuilder<T>> {
 
     if (oldWidget.query != widget.query) {
       _observable.dispose();
-      _observable = widget.query.observe();
+      _observable = widget.query.toQuery().observe();
     }
   }
 
