@@ -65,11 +65,12 @@ If the broadcast observer has changes, then it emits its updated data to its lis
 Documents can specify that they depend on other documents and that they should react to changes to those documents.
 
 ```dart
+
 Loon.collection(
   'posts',
   dependenciesBuilder: (postSnap) {
     return {
-      Loon.collection('users').doc(postSnap.data.userId)),
+      Loon.collection('users').doc(postSnap.data.userId),
     };
   },
 );
@@ -119,6 +120,12 @@ class UserModel {
 
   factory UserModel.fromJson(Json json) {
     return UserModel(name: json['name']);
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'name': name,
+    };
   }
 
   static Collection<UserModel> get store {
@@ -172,6 +179,12 @@ class UserModel {
     return UserModel(name: json['name']);
   }
 
+  Map<String, dynamic> toJson() {
+    return {
+      'name': name,
+    };
+  }
+
   static Collection<UserModel> get store {
     return Loon.collection<UserModel>(
       'users',
@@ -202,10 +215,16 @@ class UserModel {
     return UserModel(name: json['name']);
   }
 
+  Map<String, dynamic> toJson() {
+    return {
+      'name': name,
+    };
+  }
+
   static Collection<UserModel> get store {
-    return Loon.collection<TestUserModel>(
+    return Loon.collection<UserModel>(
       'users',
-      fromJson: TestUserModel.fromJson,
+      fromJson: UserModel.fromJson,
       toJson: (user) => user.toJson(),
       persistorSettings: FilePersistorSettings(
         key: FilePersistor.keyBuilder(
