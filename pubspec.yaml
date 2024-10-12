@@ -9,10 +9,10 @@ environment:
 
 dependencies:
   uuid: ^4.3.3
-  encrypt: ^5.0.1
+  encrypt: ^5.0.3
   flutter:
     sdk: flutter
-  flutter_secure_storage: ^8.0.0
+  flutter_secure_storage: ^9.2.2
   path: ^1.8.3
   path_provider: ^2.1.2
 
