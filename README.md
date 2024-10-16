@@ -452,6 +452,11 @@ class MyPersistor extends Persistor {
 
 * [Firestore](https://pub.dev/packages/cloud_firestore): The [loon_extension_firestore](https://github.com/danReynolds/loon_extension_firestore) package is used to sync documents fetched from Firestore into Loon.
 
+## Documents
+
+* [Architecture](./docs/architecture.md): An architecture doc that breaks down the inner workings of the library.
+* [Debugging](./docs/debug.md): A debugging doc that calls out any known issues or troubleshooting suggestions across different platforms.
+
 ## Happy coding
 
 That's all for now! Want a feature? Found a bug? Create an issue!
