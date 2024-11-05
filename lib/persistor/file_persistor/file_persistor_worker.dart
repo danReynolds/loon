@@ -3,9 +3,10 @@ import 'dart:io';
 import 'dart:isolate';
 import 'package:encrypt/encrypt.dart';
 import 'package:loon/loon.dart';
-import 'package:loon/persistor/file_persistor/file_data_store_manager.dart';
-import 'package:loon/persistor/file_persistor/file_persistor_settings.dart';
+import 'package:loon/persistor/data_store_manager.dart';
+import 'package:loon/persistor/file_persistor/file_data_store.dart';
 import 'package:loon/persistor/file_persistor/messages.dart';
+import 'package:path/path.dart' as path;
 
 /// The file persistor worker is run on a background isolate to manage file system operations
 /// like the persistence and hydration of documents.
@@ -16,7 +17,7 @@ class FilePersistorWorker {
   /// This worker's receive port.
   final receivePort = ReceivePort();
 
-  late final FileDataStoreManager manager;
+  late final DataStoreManager manager;
 
   static late final Logger logger;
 
@@ -25,17 +26,9 @@ class FilePersistorWorker {
     required Directory directory,
     required Encrypter encrypter,
     required Duration persistenceThrottle,
-    required FilePersistorSettings settings,
+    required PersistorSettings settings,
   }) {
     logger = Logger('Worker', output: _sendLogMessage);
-    manager = FileDataStoreManager(
-      directory: directory,
-      encrypter: encrypter,
-      persistenceThrottle: persistenceThrottle,
-      settings: settings,
-      onSync: _sendSyncMessage,
-      onLog: _sendLogMessage,
-    );
   }
 
   static init(InitMessageRequest request) {
@@ -82,7 +75,48 @@ class FilePersistorWorker {
   ///
 
   Future<void> _init(InitMessageRequest request) async {
-    await manager.init();
+    final directory = request.directory;
+    final encrypter = request.encrypter;
+
+    final Map<String, FileDataStore> index = {};
+    final files = directory
+        .listSync()
+        .whereType<File>()
+        .where((file) => fileRegex.hasMatch(path.basename(file.path)))
+        .toList();
+
+    for (final file in files) {
+      final match = fileRegex.firstMatch(path.basename(file.path));
+      final name = match!.group(1)!;
+
+      // De-dupe the plaintext/encrypted files for the same data store.
+      if (!index.containsKey(name)) {
+        index[name] = FileDataStore.parse(
+          name,
+          encrypter: request.encrypter,
+          directory: directory,
+        );
+      }
+    }
+
+    final resolver = FileDataStoreResolver(directory: directory);
+    await resolver.hydrate();
+
+    manager = DataStoreManager(
+      encrypter: request.encrypter,
+      persistenceThrottle: request.persistenceThrottle,
+      settings: request.settings,
+      onSync: _sendSyncMessage,
+      onLog: _sendLogMessage,
+      index: index,
+      resolver: resolver,
+      factory: (name) => FileDataStore(
+        name,
+        directory: directory,
+        encrypter: encrypter,
+        isHydrated: true,
+      ),
+    );
 
     // Start listening to messages from the persistor on the worker's receive port.
     receivePort.listen(_onMessage);

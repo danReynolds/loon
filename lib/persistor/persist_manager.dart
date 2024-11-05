@@ -38,7 +38,7 @@ class PersistManager {
           current.complete(null);
           break;
         case PersistOperation(batch: final docs):
-          await persistor.persist(docs.toList());
+          await persistor._persist(docs.toList());
           current.complete(docs);
           persistor.onPersist?.call(docs);
           break;

@@ -46,7 +46,7 @@ class TestPersistor extends Persistor {
   }
 
   @override
-  persist(docs) async {}
+  persist(resolver, docs) async {}
 
   @override
   clear(collection) async {}

@@ -1,6 +1,5 @@
 import 'package:encrypt/encrypt.dart';
 import 'package:loon/loon.dart';
-import 'package:loon/persistor/file_persistor/file_persistor_settings.dart';
 
 import '../utils.dart';
 
@@ -10,7 +9,7 @@ class TestFilePersistor extends FilePersistor {
   final encrypter = Encrypter(AES(testEncryptionKey, mode: AESMode.cbc));
 
   TestFilePersistor({
-    FilePersistorSettings? settings,
+    PersistorSettings? settings,
     void Function(Set<Document> batch)? onPersist,
     void Function(Set<Collection> collections)? onClear,
     void Function()? onClearAll,
@@ -20,7 +19,7 @@ class TestFilePersistor extends FilePersistor {
           // To make tests run faster, in the test environment the persistence throttle
           // is decreased to 1 millisecond.
           persistenceThrottle: const Duration(milliseconds: 1),
-          settings: settings ?? const FilePersistorSettings(),
+          settings: settings ?? const PersistorSettings(),
           onPersist: (docs) {
             onPersist?.call(docs);
             completer.persistComplete();

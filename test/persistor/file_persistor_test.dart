@@ -2,7 +2,6 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:loon/loon.dart';
-import 'package:loon/persistor/file_persistor/file_persistor_settings.dart';
 
 // ignore: depend_on_referenced_packages
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
@@ -293,7 +292,7 @@ void main() {
               toJson: (friend) => friend.toJson(),
               // Aggregate all the `friends` subcollections of users into the `friends` data store.
               persistorSettings:
-                  FilePersistorSettings(key: FilePersistor.key('friends')),
+                  PersistorSettings(key: Persistor.key('friends')),
             );
             friendsCollection.doc('1').create(friend1);
             friendsCollection.doc('2').create(friend2);
@@ -346,10 +345,10 @@ void main() {
               {
                 "__refs": {
                   "friends": 1,
-                  FilePersistor.defaultKey.value: 1,
+                  Persistor.defaultKey.value: 1,
                 },
                 "__values": {
-                  ValueStore.root: FilePersistor.defaultKey.value,
+                  ValueStore.root: Persistor.defaultKey.value,
                 },
                 "users": {
                   "__refs": {
@@ -395,10 +394,10 @@ void main() {
               {
                 "__refs": {
                   "friends": 1,
-                  FilePersistor.defaultKey.value: 1,
+                  Persistor.defaultKey.value: 1,
                 },
                 "__values": {
-                  ValueStore.root: FilePersistor.defaultKey.value,
+                  ValueStore.root: Persistor.defaultKey.value,
                 },
                 "users": {
                   "__refs": {
@@ -427,10 +426,10 @@ void main() {
               resolverJson,
               {
                 "__refs": {
-                  FilePersistor.defaultKey.value: 1,
+                  Persistor.defaultKey.value: 1,
                 },
                 "__values": {
-                  ValueStore.root: FilePersistor.defaultKey.value,
+                  ValueStore.root: Persistor.defaultKey.value,
                 },
               },
             );
@@ -444,8 +443,8 @@ void main() {
               'users',
               fromJson: TestUserModel.fromJson,
               toJson: (user) => user.toJson(),
-              persistorSettings: FilePersistorSettings(
-                key: FilePersistor.keyBuilder<TestUserModel>((snap) {
+              persistorSettings: PersistorSettings(
+                key: Persistor.keyBuilder<TestUserModel>((snap) {
                   if (snap.id == '1') {
                     return 'users';
                   }
@@ -501,10 +500,10 @@ void main() {
                 "__refs": {
                   "users": 1,
                   "other_users": 1,
-                  FilePersistor.defaultKey.value: 1,
+                  Persistor.defaultKey.value: 1,
                 },
                 "__values": {
-                  ValueStore.root: FilePersistor.defaultKey.value,
+                  ValueStore.root: Persistor.defaultKey.value,
                 },
                 "users": {
                   "__refs": {
@@ -543,10 +542,10 @@ void main() {
               {
                 "__refs": {
                   "other_users": 1,
-                  FilePersistor.defaultKey.value: 1,
+                  Persistor.defaultKey.value: 1,
                 },
                 "__values": {
-                  ValueStore.root: FilePersistor.defaultKey.value,
+                  ValueStore.root: Persistor.defaultKey.value,
                 },
                 "users": {
                   "__refs": {
@@ -570,10 +569,10 @@ void main() {
               resolverJson,
               {
                 "__refs": {
-                  FilePersistor.defaultKey.value: 1,
+                  Persistor.defaultKey.value: 1,
                 },
                 "__values": {
-                  ValueStore.root: FilePersistor.defaultKey.value,
+                  ValueStore.root: Persistor.defaultKey.value,
                 },
               },
             );
@@ -587,8 +586,8 @@ void main() {
               'users',
               fromJson: TestUserModel.fromJson,
               toJson: (user) => user.toJson(),
-              persistorSettings: FilePersistorSettings(
-                key: FilePersistor.key('users'),
+              persistorSettings: PersistorSettings(
+                key: Persistor.key('users'),
               ),
             );
 
@@ -651,10 +650,10 @@ void main() {
               {
                 "__refs": {
                   "users": 1,
-                  FilePersistor.defaultKey.value: 1,
+                  Persistor.defaultKey.value: 1,
                 },
                 "__values": {
-                  ValueStore.root: FilePersistor.defaultKey.value,
+                  ValueStore.root: Persistor.defaultKey.value,
                   "users": "users",
                 },
               },
@@ -669,8 +668,8 @@ void main() {
               'users',
               fromJson: TestUserModel.fromJson,
               toJson: (user) => user.toJson(),
-              persistorSettings: FilePersistorSettings(
-                key: FilePersistor.key('users'),
+              persistorSettings: PersistorSettings(
+                key: Persistor.key('users'),
               ),
             );
 
@@ -689,8 +688,8 @@ void main() {
               'friends',
               fromJson: TestUserModel.fromJson,
               toJson: (friend) => friend.toJson(),
-              persistorSettings: FilePersistorSettings(
-                key: FilePersistor.key('friends'),
+              persistorSettings: PersistorSettings(
+                key: Persistor.key('friends'),
               ),
             );
             friendsCollection.doc('1').create(friend1);
@@ -748,10 +747,10 @@ void main() {
                 "__refs": {
                   "users": 1,
                   "friends": 1,
-                  FilePersistor.defaultKey.value: 1,
+                  Persistor.defaultKey.value: 1,
                 },
                 "__values": {
-                  ValueStore.root: FilePersistor.defaultKey.value,
+                  ValueStore.root: Persistor.defaultKey.value,
                   "users": "users",
                 },
                 "users": {
@@ -779,8 +778,8 @@ void main() {
               'users',
               fromJson: TestUserModel.fromJson,
               toJson: (user) => user.toJson(),
-              persistorSettings: FilePersistorSettings(
-                key: FilePersistor.keyBuilder<TestUserModel>((snap) {
+              persistorSettings: PersistorSettings(
+                key: Persistor.keyBuilder<TestUserModel>((snap) {
                   return 'users_${snap.id}';
                 }),
               ),
@@ -865,12 +864,12 @@ void main() {
               resolverJson,
               {
                 "__refs": {
-                  FilePersistor.defaultKey.value: 1,
+                  Persistor.defaultKey.value: 1,
                   "users_1": 1,
                   "users_2": 1,
                 },
                 "__values": {
-                  ValueStore.root: FilePersistor.defaultKey.value,
+                  ValueStore.root: Persistor.defaultKey.value,
                 },
                 "users": {
                   "__refs": {
@@ -894,8 +893,8 @@ void main() {
               'users',
               fromJson: TestUserModel.fromJson,
               toJson: (user) => user.toJson(),
-              persistorSettings: FilePersistorSettings(
-                key: FilePersistor.keyBuilder<TestUserModel>((snap) {
+              persistorSettings: PersistorSettings(
+                key: Persistor.keyBuilder<TestUserModel>((snap) {
                   return 'users_${snap.id}';
                 }),
               ),
@@ -916,8 +915,8 @@ void main() {
               'friends',
               fromJson: TestUserModel.fromJson,
               toJson: (friend) => friend.toJson(),
-              persistorSettings: FilePersistorSettings(
-                key: FilePersistor.keyBuilder<TestUserModel>((snap) {
+              persistorSettings: PersistorSettings(
+                key: Persistor.keyBuilder<TestUserModel>((snap) {
                   return 'friends_${snap.id}';
                 }),
               ),
@@ -926,8 +925,8 @@ void main() {
               'friends',
               fromJson: TestUserModel.fromJson,
               toJson: (friend) => friend.toJson(),
-              persistorSettings: FilePersistorSettings(
-                key: FilePersistor.keyBuilder<TestUserModel>((snap) {
+              persistorSettings: PersistorSettings(
+                key: Persistor.keyBuilder<TestUserModel>((snap) {
                   return 'friends_${snap.id}';
                 }),
               ),
@@ -1018,10 +1017,10 @@ void main() {
                   "users_2": 1,
                   "friends_1": 1,
                   "friends_2": 1,
-                  FilePersistor.defaultKey.value: 1,
+                  Persistor.defaultKey.value: 1,
                 },
                 "__values": {
-                  ValueStore.root: FilePersistor.defaultKey.value,
+                  ValueStore.root: Persistor.defaultKey.value,
                 },
                 "users": {
                   "__refs": {
@@ -1073,8 +1072,8 @@ void main() {
               'users',
               fromJson: TestUserModel.fromJson,
               toJson: (user) => user.toJson(),
-              persistorSettings: FilePersistorSettings(
-                key: FilePersistor.key('users'),
+              persistorSettings: PersistorSettings(
+                key: Persistor.key('users'),
               ),
             );
 
@@ -1093,8 +1092,7 @@ void main() {
               'friends',
               fromJson: TestUserModel.fromJson,
               toJson: (friend) => friend.toJson(),
-              persistorSettings:
-                  FilePersistorSettings(key: FilePersistor.defaultKey),
+              persistorSettings: PersistorSettings(key: Persistor.defaultKey),
             );
             friendsCollection.doc('1').create(friend1);
             friendsCollection.doc('2').create(friend2);
@@ -1150,22 +1148,22 @@ void main() {
               {
                 "__refs": {
                   "users": 1,
-                  FilePersistor.defaultKey.value: 2,
+                  Persistor.defaultKey.value: 2,
                 },
                 "__values": {
-                  ValueStore.root: FilePersistor.defaultKey.value,
+                  ValueStore.root: Persistor.defaultKey.value,
                   "users": "users",
                 },
                 "users": {
                   "__refs": {
-                    FilePersistor.defaultKey.value: 1,
+                    Persistor.defaultKey.value: 1,
                   },
                   "2": {
                     "__refs": {
-                      FilePersistor.defaultKey.value: 1,
+                      Persistor.defaultKey.value: 1,
                     },
                     "__values": {
-                      "friends": FilePersistor.defaultKey.value,
+                      "friends": Persistor.defaultKey.value,
                     }
                   }
                 },
@@ -1203,8 +1201,8 @@ void main() {
                       'users',
                       fromJson: TestUserModel.fromJson,
                       toJson: (user) => user.toJson(),
-                      persistorSettings: FilePersistorSettings(
-                        key: FilePersistor.key('other_users'),
+                      persistorSettings: PersistorSettings(
+                        key: Persistor.key('other_users'),
                       ),
                     );
 
@@ -1292,11 +1290,11 @@ void main() {
                       {
                         "__refs": {
                           "other_users": 1,
-                          FilePersistor.defaultKey.value: 1,
+                          Persistor.defaultKey.value: 1,
                         },
                         "__values": {
                           "users": "other_users",
-                          ValueStore.root: FilePersistor.defaultKey.value,
+                          ValueStore.root: Persistor.defaultKey.value,
                         },
                       },
                     );
@@ -1322,8 +1320,8 @@ void main() {
                       'users',
                       fromJson: TestUserModel.fromJson,
                       toJson: (user) => user.toJson(),
-                      persistorSettings: FilePersistorSettings(
-                        key: FilePersistor.keyBuilder(
+                      persistorSettings: PersistorSettings(
+                        key: Persistor.keyBuilder(
                           (snap) => 'users_${snap.id}',
                         ),
                       ),
@@ -1422,11 +1420,11 @@ void main() {
                       resolverJson,
                       {
                         "__refs": {
-                          FilePersistor.defaultKey.value: 1,
+                          Persistor.defaultKey.value: 1,
                           "users_1": 1,
                         },
                         "__values": {
-                          ValueStore.root: FilePersistor.defaultKey.value,
+                          ValueStore.root: Persistor.defaultKey.value,
                         },
                         "users": {
                           "__refs": {
@@ -1454,8 +1452,8 @@ void main() {
                       'users',
                       fromJson: TestUserModel.fromJson,
                       toJson: (user) => user.toJson(),
-                      persistorSettings: FilePersistorSettings(
-                        key: FilePersistor.key('users'),
+                      persistorSettings: PersistorSettings(
+                        key: Persistor.key('users'),
                       ),
                     );
                     final usersCollection = Loon.collection<TestUserModel>(
@@ -1520,11 +1518,11 @@ void main() {
                       resolverJson,
                       {
                         "__refs": {
-                          FilePersistor.defaultKey.value: 1,
+                          Persistor.defaultKey.value: 1,
                           "users": 1,
                         },
                         "__values": {
-                          ValueStore.root: FilePersistor.defaultKey.value,
+                          ValueStore.root: Persistor.defaultKey.value,
                           "users": "users",
                         },
                       },
@@ -1566,10 +1564,10 @@ void main() {
                       resolverJson,
                       {
                         "__refs": {
-                          FilePersistor.defaultKey.value: 1,
+                          Persistor.defaultKey.value: 1,
                         },
                         "__values": {
-                          ValueStore.root: FilePersistor.defaultKey.value,
+                          ValueStore.root: Persistor.defaultKey.value,
                         },
                       },
                     );
@@ -1589,8 +1587,8 @@ void main() {
                       'users',
                       fromJson: TestUserModel.fromJson,
                       toJson: (user) => user.toJson(),
-                      persistorSettings: FilePersistorSettings(
-                        key: FilePersistor.keyBuilder(
+                      persistorSettings: PersistorSettings(
+                        key: Persistor.keyBuilder(
                           (snap) => "users_${snap.id}",
                         ),
                       ),
@@ -1673,12 +1671,12 @@ void main() {
                       resolverJson,
                       {
                         "__refs": {
-                          FilePersistor.defaultKey.value: 1,
+                          Persistor.defaultKey.value: 1,
                           "users_1": 1,
                           "users_2": 1,
                         },
                         "__values": {
-                          ValueStore.root: FilePersistor.defaultKey.value,
+                          ValueStore.root: Persistor.defaultKey.value,
                         },
                         "users": {
                           "__refs": {
@@ -1742,11 +1740,11 @@ void main() {
                       resolverJson,
                       {
                         "__refs": {
-                          FilePersistor.defaultKey.value: 1,
+                          Persistor.defaultKey.value: 1,
                           "users_2": 1,
                         },
                         "__values": {
-                          ValueStore.root: FilePersistor.defaultKey.value,
+                          ValueStore.root: Persistor.defaultKey.value,
                         },
                         "users": {
                           "__refs": {
@@ -1773,8 +1771,8 @@ void main() {
                       'users',
                       fromJson: TestUserModel.fromJson,
                       toJson: (user) => user.toJson(),
-                      persistorSettings: FilePersistorSettings(
-                        key: FilePersistor.key('users'),
+                      persistorSettings: PersistorSettings(
+                        key: Persistor.key('users'),
                       ),
                     );
                     final updatedUsersCollection =
@@ -1782,8 +1780,8 @@ void main() {
                       'users',
                       fromJson: TestUserModel.fromJson,
                       toJson: (user) => user.toJson(),
-                      persistorSettings: FilePersistorSettings(
-                        key: FilePersistor.key('updated_users'),
+                      persistorSettings: PersistorSettings(
+                        key: Persistor.key('updated_users'),
                       ),
                     );
 
@@ -1838,11 +1836,11 @@ void main() {
                       resolverJson,
                       {
                         "__refs": {
-                          FilePersistor.defaultKey.value: 1,
+                          Persistor.defaultKey.value: 1,
                           "users": 1,
                         },
                         "__values": {
-                          ValueStore.root: FilePersistor.defaultKey.value,
+                          ValueStore.root: Persistor.defaultKey.value,
                           "users": "users",
                         },
                       },
@@ -1890,11 +1888,11 @@ void main() {
                       resolverJson,
                       {
                         "__refs": {
-                          FilePersistor.defaultKey.value: 1,
+                          Persistor.defaultKey.value: 1,
                           "updated_users": 1,
                         },
                         "__values": {
-                          ValueStore.root: FilePersistor.defaultKey.value,
+                          ValueStore.root: Persistor.defaultKey.value,
                           "users": "updated_users",
                         },
                       },
@@ -1914,8 +1912,8 @@ void main() {
                       'users',
                       fromJson: TestUserModel.fromJson,
                       toJson: (user) => user.toJson(),
-                      persistorSettings: FilePersistorSettings(
-                        key: FilePersistor.keyBuilder<TestUserModel>(
+                      persistorSettings: PersistorSettings(
+                        key: Persistor.keyBuilder<TestUserModel>(
                           (snap) {
                             if (snap.data.name.endsWith('updated')) {
                               return 'updated_users';
@@ -1983,11 +1981,11 @@ void main() {
                       resolverJson,
                       {
                         "__refs": {
-                          FilePersistor.defaultKey.value: 1,
+                          Persistor.defaultKey.value: 1,
                           "users": 2,
                         },
                         "__values": {
-                          ValueStore.root: FilePersistor.defaultKey.value,
+                          ValueStore.root: Persistor.defaultKey.value,
                         },
                         "users": {
                           "__refs": {
@@ -2055,12 +2053,12 @@ void main() {
                       resolverJson,
                       {
                         "__refs": {
-                          FilePersistor.defaultKey.value: 1,
+                          Persistor.defaultKey.value: 1,
                           "users": 1,
                           "updated_users": 1,
                         },
                         "__values": {
-                          ValueStore.root: FilePersistor.defaultKey.value,
+                          ValueStore.root: Persistor.defaultKey.value,
                         },
                         "users": {
                           "__refs": {
@@ -2089,8 +2087,8 @@ void main() {
                       'users',
                       fromJson: TestUserModel.fromJson,
                       toJson: (user) => user.toJson(),
-                      persistorSettings: FilePersistorSettings(
-                        key: FilePersistor.key('users'),
+                      persistorSettings: PersistorSettings(
+                        key: Persistor.key('users'),
                       ),
                     );
 
@@ -2099,8 +2097,8 @@ void main() {
                       'users',
                       fromJson: TestUserModel.fromJson,
                       toJson: (user) => user.toJson(),
-                      persistorSettings: FilePersistorSettings(
-                        key: FilePersistor.keyBuilder(
+                      persistorSettings: PersistorSettings(
+                        key: Persistor.keyBuilder(
                           (snap) => "users_${snap.id}",
                         ),
                       ),
@@ -2135,11 +2133,11 @@ void main() {
                       resolverJson,
                       {
                         "__refs": {
-                          FilePersistor.defaultKey.value: 1,
+                          Persistor.defaultKey.value: 1,
                           "users": 1,
                         },
                         "__values": {
-                          ValueStore.root: FilePersistor.defaultKey.value,
+                          ValueStore.root: Persistor.defaultKey.value,
                           "users": "users",
                         },
                       },
@@ -2184,12 +2182,12 @@ void main() {
                       resolverJson,
                       {
                         "__refs": {
-                          FilePersistor.defaultKey.value: 1,
+                          Persistor.defaultKey.value: 1,
                           "users": 1,
                           "users_1": 1,
                         },
                         "__values": {
-                          ValueStore.root: FilePersistor.defaultKey.value,
+                          ValueStore.root: Persistor.defaultKey.value,
                           "users": "users",
                         },
                         "users": {
@@ -2217,8 +2215,8 @@ void main() {
                       'users',
                       fromJson: TestUserModel.fromJson,
                       toJson: (user) => user.toJson(),
-                      persistorSettings: FilePersistorSettings(
-                        key: FilePersistor.keyBuilder(
+                      persistorSettings: PersistorSettings(
+                        key: Persistor.keyBuilder(
                           (snap) => "users_${snap.id}",
                         ),
                       ),
@@ -2228,8 +2226,8 @@ void main() {
                       'users',
                       fromJson: TestUserModel.fromJson,
                       toJson: (user) => user.toJson(),
-                      persistorSettings: FilePersistorSettings(
-                        key: FilePersistor.key('users'),
+                      persistorSettings: PersistorSettings(
+                        key: Persistor.key('users'),
                       ),
                     );
 
@@ -2275,12 +2273,12 @@ void main() {
                       resolverJson,
                       {
                         "__refs": {
-                          FilePersistor.defaultKey.value: 1,
+                          Persistor.defaultKey.value: 1,
                           "users_1": 1,
                           "users_2": 1,
                         },
                         "__values": {
-                          ValueStore.root: FilePersistor.defaultKey.value,
+                          ValueStore.root: Persistor.defaultKey.value,
                         },
                         "users": {
                           "__refs": {
@@ -2332,12 +2330,12 @@ void main() {
                       resolverJson,
                       {
                         "__refs": {
-                          FilePersistor.defaultKey.value: 1,
+                          Persistor.defaultKey.value: 1,
                           "users": 1,
                           "users_2": 1,
                         },
                         "__values": {
-                          ValueStore.root: FilePersistor.defaultKey.value,
+                          ValueStore.root: Persistor.defaultKey.value,
                           "users": "users",
                         },
                         "users": {
@@ -2365,8 +2363,8 @@ void main() {
               () async {
                 Loon.configure(
                   persistor: TestFilePersistor(
-                    settings: FilePersistorSettings(
-                      key: FilePersistor.key('users'),
+                    settings: PersistorSettings(
+                      key: Persistor.key('users'),
                     ),
                   ),
                 );
@@ -2425,11 +2423,11 @@ void main() {
               () async {
                 Loon.configure(
                   persistor: TestFilePersistor(
-                    settings: FilePersistorSettings(
-                      key: FilePersistor.keyBuilder((snap) {
+                    settings: PersistorSettings(
+                      key: Persistor.keyBuilder((snap) {
                         return switch (snap.data) {
                           TestUserModel _ => 'users',
-                          _ => FilePersistor.defaultKey.value,
+                          _ => Persistor.defaultKey.value,
                         };
                       }),
                     ),
@@ -2500,10 +2498,10 @@ void main() {
                   {
                     "__refs": {
                       "users": 1,
-                      FilePersistor.defaultKey.value: 2,
+                      Persistor.defaultKey.value: 2,
                     },
                     "__values": {
-                      ValueStore.root: FilePersistor.defaultKey.value,
+                      ValueStore.root: Persistor.defaultKey.value,
                     },
                     "users": {
                       "__refs": {
@@ -2515,10 +2513,10 @@ void main() {
                     },
                     "posts": {
                       "__refs": {
-                        FilePersistor.defaultKey.value: 1,
+                        Persistor.defaultKey.value: 1,
                       },
                       "__values": {
-                        "1": FilePersistor.defaultKey.value,
+                        "1": Persistor.defaultKey.value,
                       },
                     },
                   },
@@ -2570,7 +2568,7 @@ void main() {
               'friends',
               fromJson: TestUserModel.fromJson,
               toJson: (user) => user.toJson(),
-              persistorSettings: const FilePersistorSettings(enabled: false),
+              persistorSettings: const PersistorSettings(enabled: false),
             );
 
             usersCollection.doc('1').create(TestUserModel('User 1'));
@@ -2611,15 +2609,14 @@ void main() {
           toJson: (user) => user.toJson(),
         );
 
-        final userFriendsCollection = Loon.collection('users')
-            .doc('1')
-            .subcollection<TestUserModel>(
-              'friends',
-              fromJson: TestUserModel.fromJson,
-              toJson: (user) => user.toJson(),
-              persistorSettings:
-                  FilePersistorSettings(key: FilePersistor.key('my_friends')),
-            );
+        final userFriendsCollection =
+            Loon.collection('users').doc('1').subcollection<TestUserModel>(
+                  'friends',
+                  fromJson: TestUserModel.fromJson,
+                  toJson: (user) => user.toJson(),
+                  persistorSettings:
+                      PersistorSettings(key: Persistor.key('my_friends')),
+                );
 
         userCollection.doc('1').create(TestUserModel('User 1'));
         userCollection.doc('2').create(TestUserModel('User 2'));
@@ -2683,11 +2680,11 @@ void main() {
 
         expect(resolverJson, {
           "__refs": {
-            FilePersistor.defaultKey.value: 1,
+            Persistor.defaultKey.value: 1,
             "my_friends": 1,
           },
           "__values": {
-            ValueStore.root: FilePersistor.defaultKey.value,
+            ValueStore.root: Persistor.defaultKey.value,
           },
           "users": {
             "__refs": {
@@ -2777,8 +2774,8 @@ void main() {
                     'friends',
                     fromJson: TestUserModel.fromJson,
                     toJson: (user) => user.toJson(),
-                    persistorSettings: FilePersistorSettings(
-                      key: FilePersistor.key('user_friends'),
+                    persistorSettings: PersistorSettings(
+                      key: Persistor.key('user_friends'),
                     ),
                   );
 
@@ -2837,11 +2834,11 @@ void main() {
 
           expect(resolverJson, {
             "__refs": {
-              FilePersistor.defaultKey.value: 1,
+              Persistor.defaultKey.value: 1,
               "user_friends": 1,
             },
             "__values": {
-              ValueStore.root: FilePersistor.defaultKey.value,
+              ValueStore.root: Persistor.defaultKey.value,
             },
             "users": {
               "__refs": {
@@ -3166,8 +3163,8 @@ void main() {
               'users',
               fromJson: TestUserModel.fromJson,
               toJson: (user) => user.toJson(),
-              persistorSettings: FilePersistorSettings(
-                key: FilePersistor.keyBuilder((snap) => 'users${snap.id}'),
+              persistorSettings: PersistorSettings(
+                key: Persistor.keyBuilder((snap) => 'users${snap.id}'),
               ),
             );
 
@@ -3207,8 +3204,8 @@ void main() {
                   'friends',
                   fromJson: TestUserModel.fromJson,
                   toJson: (user) => user.toJson(),
-                  persistorSettings: FilePersistorSettings(
-                    key: FilePersistor.key('friends'),
+                  persistorSettings: PersistorSettings(
+                    key: Persistor.key('friends'),
                   ),
                 );
 
@@ -3312,8 +3309,8 @@ void main() {
               'users',
               fromJson: TestUserModel.fromJson,
               toJson: (user) => user.toJson(),
-              persistorSettings: FilePersistorSettings(
-                key: FilePersistor.key('users'),
+              persistorSettings: PersistorSettings(
+                key: Persistor.key('users'),
               ),
             );
 

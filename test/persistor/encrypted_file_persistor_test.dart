@@ -2,7 +2,6 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:loon/loon.dart';
-import 'package:loon/persistor/file_persistor/file_persistor_settings.dart';
 import '../models/test_file_persistor.dart';
 import '../models/test_user_model.dart';
 import '../utils.dart';
@@ -38,7 +37,7 @@ void main() {
 
     completer = TestFilePersistor.completer = FilePersistorCompleter();
     persistor = TestFilePersistor(
-      settings: const FilePersistorSettings(encrypted: true),
+      settings: const PersistorSettings(encrypted: true),
     );
   });
 
@@ -60,13 +59,13 @@ void main() {
           'users',
           fromJson: TestUserModel.fromJson,
           toJson: (user) => user.toJson(),
-          persistorSettings: const FilePersistorSettings(encrypted: false),
+          persistorSettings: const PersistorSettings(encrypted: false),
         );
         final encryptedUsersCollection = Loon.collection<TestUserModel>(
           'users',
           fromJson: TestUserModel.fromJson,
           toJson: (user) => user.toJson(),
-          persistorSettings: const FilePersistorSettings(encrypted: true),
+          persistorSettings: const PersistorSettings(encrypted: true),
         );
 
         userCollection.doc('1').create(TestUserModel('User 1'));
@@ -106,7 +105,7 @@ void main() {
         // Reinitialize the persistor ahead of hydration.
         Loon.configure(
           persistor: TestFilePersistor(
-            settings: const FilePersistorSettings(encrypted: true),
+            settings: const PersistorSettings(encrypted: true),
           ),
         );
 
@@ -165,7 +164,7 @@ void main() {
 
         Loon.configure(
           persistor: TestFilePersistor(
-            settings: const FilePersistorSettings(encrypted: true),
+            settings: const PersistorSettings(encrypted: true),
           ),
         );
 
@@ -257,7 +256,7 @@ void main() {
       test('Encrypts data when enabled globally for all collections', () async {
         Loon.configure(
           persistor: TestFilePersistor(
-            settings: const FilePersistorSettings(encrypted: true),
+            settings: const PersistorSettings(encrypted: true),
           ),
         );
 
@@ -299,7 +298,7 @@ void main() {
       test('Encrypts data when explicitly enabled for a collection', () async {
         Loon.configure(
           persistor: TestFilePersistor(
-            settings: const FilePersistorSettings(encrypted: false),
+            settings: const PersistorSettings(encrypted: false),
           ),
         );
 
@@ -313,7 +312,7 @@ void main() {
           'users',
           fromJson: TestUserModel.fromJson,
           toJson: (user) => user.toJson(),
-          persistorSettings: const FilePersistorSettings(encrypted: true),
+          persistorSettings: const PersistorSettings(encrypted: true),
         );
 
         friendsCollection.doc('1').create(TestUserModel('Friend 1'));
@@ -359,7 +358,7 @@ void main() {
       test('Subcollections inherit parent encryption settings', () async {
         Loon.configure(
           persistor: TestFilePersistor(
-            settings: const FilePersistorSettings(encrypted: false),
+            settings: const PersistorSettings(encrypted: false),
           ),
         );
 
@@ -367,7 +366,7 @@ void main() {
           'users',
           fromJson: TestUserModel.fromJson,
           toJson: (user) => user.toJson(),
-          persistorSettings: const FilePersistorSettings(encrypted: true),
+          persistorSettings: const PersistorSettings(encrypted: true),
         );
 
         final user1FriendsCollection = usersCollection.doc('1').subcollection(
@@ -416,7 +415,7 @@ void main() {
       test('Subcollections can override parent encryption settings', () async {
         Loon.configure(
           persistor: TestFilePersistor(
-            settings: const FilePersistorSettings(encrypted: false),
+            settings: const PersistorSettings(encrypted: false),
           ),
         );
 
@@ -424,14 +423,14 @@ void main() {
           'users',
           fromJson: TestUserModel.fromJson,
           toJson: (user) => user.toJson(),
-          persistorSettings: const FilePersistorSettings(encrypted: true),
+          persistorSettings: const PersistorSettings(encrypted: true),
         );
 
         final user1FriendsCollection = usersCollection.doc('1').subcollection(
               'friends',
               fromJson: TestUserModel.fromJson,
               toJson: (friend) => friend.toJson(),
-              persistorSettings: const FilePersistorSettings(encrypted: false),
+              persistorSettings: const PersistorSettings(encrypted: false),
             );
 
         usersCollection.doc('1').create(TestUserModel('User 1'));
@@ -485,7 +484,7 @@ void main() {
           () async {
         Loon.configure(
           persistor: TestFilePersistor(
-            settings: const FilePersistorSettings(encrypted: true),
+            settings: const PersistorSettings(encrypted: true),
           ),
         );
 
@@ -493,7 +492,7 @@ void main() {
           'users',
           fromJson: TestUserModel.fromJson,
           toJson: (user) => user.toJson(),
-          persistorSettings: const FilePersistorSettings(encrypted: false),
+          persistorSettings: const PersistorSettings(encrypted: false),
         );
 
         usersCollection.doc('1').create(TestUserModel('User 1'));
