@@ -5,13 +5,11 @@ import 'dart:convert';
 import 'package:encrypt/encrypt.dart';
 import 'package:flutter/foundation.dart' hide Key;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-import 'package:loon/persistor/persistence_document.dart';
 import 'package:uuid/uuid.dart';
 import 'dart:collection';
 
 export 'widgets/query_stream_builder.dart';
 export 'widgets/document_stream_builder.dart';
-export 'persistor/file_persistor/file_persistor.dart';
 
 part 'store/base_value_store.dart';
 part 'store/path_ref_store.dart';

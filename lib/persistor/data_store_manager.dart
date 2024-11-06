@@ -2,9 +2,9 @@ import 'dart:async';
 import 'package:encrypt/encrypt.dart';
 import 'package:loon/loon.dart';
 import 'package:loon/persistor/data_store.dart';
+import 'package:loon/persistor/data_store_persistence_payload.dart';
 import 'package:loon/persistor/data_store_resolver.dart';
 import 'package:loon/persistor/lock.dart';
-import 'package:loon/persistor/persistence_document.dart';
 
 class DataStoreManager {
   final Encrypter encrypter;
@@ -156,14 +156,11 @@ class DataStoreManager {
     );
   }
 
-  Future<void> persist(
-    /// A local persistence key resolver derived from the set of updated documents.
-    ValueStore<String> localResolver,
-
-    /// The list of updated documents to persist.
-    List<PersistenceDocument> docs,
-  ) {
+  Future<void> persist(DataStorePersistencePayload payload) {
     return _syncLock.run(() async {
+      final localResolver = payload.resolver;
+      final docs = payload.persistenceDocs;
+
       Set<DataStore> dataStores = {};
       Map<String, List<DataStore>> pathDataStores = {};
 

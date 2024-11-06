@@ -5,6 +5,7 @@ import 'package:encrypt/encrypt.dart';
 import 'package:loon/loon.dart';
 import 'package:loon/persistor/data_store_manager.dart';
 import 'package:loon/persistor/file_persistor/file_data_store.dart';
+import 'package:loon/persistor/file_persistor/file_data_store_resolver.dart';
 import 'package:loon/persistor/file_persistor/messages.dart';
 import 'package:path/path.dart' as path;
 
@@ -139,8 +140,10 @@ class FilePersistorWorker {
   void _persist(PersistMessageRequest request) {
     logger.measure('Persist operation', () async {
       try {
-        logger.log('Persist operation batch size: ${request.docs.length}');
-        await manager.persist(request.resolver, request.docs);
+        logger.log(
+          'Persist operation batch size: ${request.payload.persistenceDocs.length}',
+        );
+        await manager.persist(request.payload);
         _sendMessage(request.success());
       } catch (e) {
         _sendMessage(request.error('Persist error'));

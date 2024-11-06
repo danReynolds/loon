@@ -3,7 +3,7 @@ import 'package:loon/loon.dart';
 abstract class DataStoreResolver {
   var store = ValueRefStore<String>();
 
-  static const name = '_store__';
+  static const name = '__resolver__';
 
   bool isDirty = false;
 
@@ -15,7 +15,7 @@ abstract class DataStoreResolver {
   }
 
   void writePath(String path, dynamic value) {
-    if (store.hasPath(path) != value) {
+    if (store.get(path) != value) {
       store.write(path, value);
       isDirty = true;
     }
@@ -47,11 +47,17 @@ abstract class DataStoreResolver {
     return store.get(path);
   }
 
+  Future<void> sync() async {
+    if (store.isEmpty) {
+      await delete();
+    } else if (isDirty) {
+      await persist();
+    }
+  }
+
   Future<void> hydrate();
 
   Future<void> persist();
-
-  Future<void> sync();
 
   Future<void> delete();
 }

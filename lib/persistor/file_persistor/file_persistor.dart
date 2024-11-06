@@ -3,9 +3,9 @@ import 'dart:io';
 import 'dart:isolate';
 import 'package:encrypt/encrypt.dart';
 import 'package:loon/loon.dart';
+import 'package:loon/persistor/data_store_persistence_payload.dart';
 import 'package:loon/persistor/file_persistor/file_persistor_worker.dart';
 import 'package:loon/persistor/file_persistor/messages.dart';
-import 'package:loon/persistor/persistence_document.dart';
 import 'package:path_provider/path_provider.dart';
 
 /// A worker abstraction that creates a background worker isolate to process file persistence/hydration.
@@ -123,99 +123,15 @@ class FilePersistor extends Persistor {
   @override
   hydrate([refs]) async {
     final response = await _sendMessage(
-      HydrateMessageRequest(refs?.map((entity) => entity.path).toList()),
+      HydrateMessageRequest(refs?.map((ref) => ref.path).toList()),
     );
     return response.data;
   }
 
   @override
   persist(docs) async {
-    // The updated persistence keys for documents are built into a local resolver
-    // passed to the worker. This has two main benefits:
-    // 1. It pre-computes the resolved persistence keys across the document updates, eliminating conflicts.
-    //    Ex. If an update to users__1__friends__1 which resolves to persistence key "users" at resolver path "users"
-    //        is followed by a subsequent update to users__1 that changes the persistence key at resolver path "users" to "other_users",
-    //        then the previous update to users__1__friends__1 would have an inaccurate persistence key.
-
-    //    Pre-computing the local resolver ensures that all documents can lookup accurate persistence keys.
-    //    were not pre-computed in this way, then there could be conflicts between the changes documents make
-    //
-    // 2. It de-duplicates persistence keys. If there are many documents that all roll up
-    //    to a given key, then the key is only specified once in the local resolver rather than
-    //    being duplicated and sent independently with each document.
-    final resolver = ValueStore<String>();
-    final List<PersistenceDocument> persistDocs = [];
-    final globalPersistorSettings = Loon.persistorSettings;
-
-    final defaultKey = switch (globalPersistorSettings) {
-      PersistorSettings(key: PersistorValueKey key) => key,
-      _ => Persistor.defaultKey,
-    };
-    resolver.write(ValueStore.root, defaultKey.value);
-
-    for (final doc in docs) {
-      bool encrypted = false;
-      final persistorSettings = doc.persistorSettings;
-
-      if (persistorSettings != null) {
-        final persistorDoc = persistorSettings.doc;
-        final docSettings = persistorSettings.settings;
-
-        encrypted = docSettings.encrypted;
-
-        switch (docSettings) {
-          case PersistorSettings(key: PersistorValueKey key):
-            String path;
-
-            /// A value key is stored at the parent path of the document unless it is a document
-            /// on the root collection via [Loon.doc], which should store keys under its own path.
-            if (persistorDoc.parent != Collection.root.path) {
-              path = persistorDoc.parent;
-            } else {
-              path = persistorDoc.path;
-            }
-
-            resolver.write(path, key.value);
-
-            break;
-          case PersistorSettings(key: PersistorBuilderKey keyBuilder):
-            final snap = persistorDoc.get();
-            final path = persistorDoc.path;
-
-            if (snap != null) {
-              resolver.write(path, (keyBuilder as dynamic)(snap));
-            }
-
-            break;
-        }
-      } else if (globalPersistorSettings is PersistorSettings) {
-        encrypted = globalPersistorSettings.encrypted;
-
-        switch (globalPersistorSettings) {
-          case PersistorSettings(key: PersistorBuilderKey keyBuilder):
-            final snap = doc.get();
-            final path = doc.path;
-
-            if (snap != null) {
-              resolver.write(path, (keyBuilder as dynamic)(snap));
-            }
-            break;
-          default:
-            break;
-        }
-      }
-
-      persistDocs.add(
-        PersistenceDocument(
-          path: doc.path,
-          data: doc.getSerialized(),
-          encrypted: encrypted,
-        ),
-      );
-    }
-
     await _sendMessage(
-      PersistMessageRequest(resolver: resolver, docs: persistDocs),
+      PersistMessageRequest(payload: DataStorePersistencePayload(docs)),
     );
   }
 

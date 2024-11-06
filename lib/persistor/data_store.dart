@@ -1,10 +1,18 @@
+import 'package:encrypt/encrypt.dart';
 import 'package:loon/loon.dart';
 
 class DataStoreValueStore extends ValueStore<ValueStore> {
   /// Whether the store has pending changes that should be persisted.
   bool isDirty = false;
 
-  bool encrypted;
+  final bool encrypted;
+
+  static const _plaintextKey = 'plaintext';
+  static const _encryptedKey = 'encrypted';
+
+  String get key {
+    return encrypted ? _encryptedKey : _plaintextKey;
+  }
 
   DataStoreValueStore(
     super.store, {
@@ -39,13 +47,29 @@ abstract class DataStore {
   /// The name of the file data store.
   final String name;
 
+  final Encrypter encrypter;
+
   /// Whether the data store has been hydrated yet from its persisted file.
   bool isHydrated;
 
   DataStore(
     this.name, {
+    required this.encrypter,
     this.isHydrated = false,
   });
+
+  String encrypt(String plainText) {
+    final iv = IV.fromSecureRandom(16);
+    return iv.base64 + encrypter.encrypt(plainText, iv: iv).base64;
+  }
+
+  String decrypt(String encrypted) {
+    final iv = IV.fromBase64(encrypted.substring(0, 24));
+    return encrypter.decrypt64(
+      encrypted.substring(24),
+      iv: iv,
+    );
+  }
 
   bool get isDirty {
     return plaintextStore.isDirty || encryptedStore.isDirty;

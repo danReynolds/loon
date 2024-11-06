@@ -1,5 +1,6 @@
 import 'package:encrypt/encrypt.dart';
 import 'package:loon/loon.dart';
+import 'package:loon/persistor/file_persistor/file_persistor.dart';
 
 import '../utils.dart';
 
@@ -46,7 +47,7 @@ class TestFilePersistor extends FilePersistor {
 
   /// Override the initialization of the encrypter to use a test key instead of accessing FlutterSecureStorage
   /// which is not available in the test environment.
-  Future<Encrypter?> initEncrypter() async {
+  initEncrypter() async {
     return encrypter;
   }
 

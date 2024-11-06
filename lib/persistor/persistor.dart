@@ -102,6 +102,7 @@ class PersistorSettings<T> {
 }
 
 class DocumentPersistorSettings extends PersistorSettings {
+  /// The document at which the persistor settings was specified.
   final Document doc;
   final PersistorSettings settings;
 
@@ -132,6 +133,7 @@ abstract class Persistor {
   final Duration persistenceThrottle;
 
   static const _secureStorageKey = 'loon_encrypted_file_persistor_key';
+  static const encryptedKey = 'encrypted';
 
   Persistor({
     this.onPersist,
