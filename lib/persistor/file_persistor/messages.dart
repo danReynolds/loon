@@ -1,7 +1,7 @@
 import 'dart:io';
 import 'dart:isolate';
-import 'package:encrypt/encrypt.dart';
 import 'package:loon/loon.dart';
+import 'package:loon/persistor/data_store_encrypter.dart';
 import 'package:loon/persistor/data_store_persistence_payload.dart';
 import 'package:uuid/uuid.dart';
 
@@ -30,7 +30,7 @@ abstract class MessageResponse extends Message {
 class InitMessageRequest extends MessageRequest<InitMessageResponse> {
   final SendPort sendPort;
   final Directory directory;
-  final Encrypter encrypter;
+  final DataStoreEncrypter encrypter;
   final Duration persistenceThrottle;
   final PersistorSettings settings;
 

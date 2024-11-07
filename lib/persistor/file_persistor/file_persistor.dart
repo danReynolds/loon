@@ -1,8 +1,8 @@
 import 'dart:async';
 import 'dart:io';
 import 'dart:isolate';
-import 'package:encrypt/encrypt.dart';
 import 'package:loon/loon.dart';
+import 'package:loon/persistor/data_store_encrypter.dart';
 import 'package:loon/persistor/data_store_persistence_payload.dart';
 import 'package:loon/persistor/file_persistor/file_persistor_worker.dart';
 import 'package:loon/persistor/file_persistor/messages.dart';
@@ -19,7 +19,8 @@ class FilePersistor extends Persistor {
   /// An index of task IDs to the task completer that is resolved when they are completed on the worker.
   final Map<String, Completer> _messageRequestIndex = {};
 
-  late final Logger _logger;
+  final Logger logger;
+  final DataStoreEncrypter encrypter;
 
   FilePersistor({
     super.onPersist,
@@ -29,14 +30,14 @@ class FilePersistor extends Persistor {
     super.onSync,
     super.settings = const PersistorSettings(),
     super.persistenceThrottle = const Duration(milliseconds: 100),
-  }) {
-    _logger = Logger('FilePersistor', output: Loon.logger.log);
-  }
+    DataStoreEncrypter? encrypter,
+  })  : encrypter = encrypter ?? DataStoreEncrypter(),
+        logger = Logger('FilePersistor', output: Loon.logger.log);
 
   void _onMessage(dynamic message) {
     switch (message) {
       case LogMessage message:
-        _logger.log(message.text);
+        logger.log(message.text);
         break;
       case SyncCompleteMessage _:
         onSync?.call();
@@ -48,7 +49,7 @@ class FilePersistor extends Persistor {
         // text message on the main isolate and complete any associated request completer like a failed
         // persist operation.
         if (messageResponse is ErrorMessageResponse) {
-          _logger.log(messageResponse.text);
+          logger.log(messageResponse.text);
           request?.completeError(Exception(messageResponse.text));
         } else {
           request?.complete(messageResponse);
@@ -71,17 +72,19 @@ class FilePersistor extends Persistor {
     final fileDirectory = Directory('${applicationDirectory.path}/loon');
     final directory = await fileDirectory.create();
 
-    _logger.log('Directory: ${directory.path}');
+    logger.log('Directory: ${directory.path}');
 
     return directory;
   }
 
   @override
   init() async {
-    final [encrypter, directory] = await Future.wait([
-      initEncrypter(),
+    final values = await Future.wait([
       initDirectory(),
+      encrypter.init(),
     ]);
+
+    final directory = values.first as Directory;
 
     // Create a receive port on the main isolate to receive messages from the worker.
     _receivePort = ReceivePort();
@@ -93,8 +96,8 @@ class FilePersistor extends Persistor {
     // 3. The encrypter used by file data stores that have encryption enabled.
     final initMessage = InitMessageRequest(
       sendPort: _receivePort.sendPort,
-      directory: directory as Directory,
-      encrypter: encrypter as Encrypter,
+      directory: directory,
+      encrypter: encrypter,
       persistenceThrottle: persistenceThrottle,
       settings: settings,
     );
@@ -103,7 +106,7 @@ class FilePersistor extends Persistor {
         _messageRequestIndex[initMessage.id] = Completer<InitMessageResponse>();
 
     try {
-      await _logger.measure('Worker spawn', () async {
+      await logger.measure('Worker spawn', () async {
         return Isolate.spawn(
           FilePersistorWorker.init,
           initMessage,
@@ -114,7 +117,7 @@ class FilePersistor extends Persistor {
       final response = await completer.future;
       _sendPort = response.sendPort;
     } catch (e) {
-      _logger.log("Worker initialization failed.");
+      logger.log("Worker initialization failed.");
       _receivePort.close();
       rethrow;
     }

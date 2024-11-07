@@ -2,9 +2,11 @@ import 'dart:async';
 import 'dart:js_interop';
 
 import 'package:loon/loon.dart';
+import 'package:loon/persistor/data_store.dart';
+import 'package:loon/persistor/data_store_encrypter.dart';
 import 'package:loon/persistor/data_store_manager.dart';
 import 'package:loon/persistor/data_store_persistence_payload.dart';
-import 'package:loon/persistor/indexed_db_persistor/indexed_db_data_store.dart';
+import 'package:loon/persistor/indexed_db_persistor/indexed_db_data_store_config.dart';
 import 'package:loon/persistor/indexed_db_persistor/indexed_db_data_store_resolver.dart';
 import 'package:web/web.dart';
 
@@ -31,7 +33,7 @@ class IndexedDBPersistor extends Persistor {
     super.onSync,
   });
 
-  Future<void> _openDB() async {
+  Future<void> _initDB() async {
     final completer = Completer<void>();
     final request = window.indexedDB.open(_dbName, _dbVersion);
     request.onupgradeneeded = ((_) {
@@ -74,27 +76,27 @@ class IndexedDBPersistor extends Persistor {
 
   @override
   Future<void> init() async {
-    final encrypter = await initEncrypter();
+    final encrypter = DataStoreEncrypter();
 
-    await _openDB();
+    await Future.wait([encrypter.init(), _initDB()]);
 
-    final Map<String, IndexedDBDataStore> index = {};
+    factory(name, encrypted) {
+      return DataStore(
+        IndexedDBDataStoreConfig(
+          encrypted ? '${name}_${DataStoreEncrypter.encryptedName}' : name,
+          encrypted: encrypted,
+          encrypter: encrypter,
+          runTransaction: _runTransaction,
+        ),
+      );
+    }
 
     final result = await _runTransaction('Init', (objectStore) {
       return objectStore.getAllKeys();
     });
-    final storeNames = List<String>.from(result);
-
-    for (final name in storeNames) {
-      // Only one store needs to be instantiated per plaintext/encrypted entry pair.
-      if (!name.endsWith(Persistor.encryptedKey)) {
-        index[name] = IndexedDBDataStore(
-          name,
-          runTransaction: _runTransaction,
-          encrypter: encrypter,
-        );
-      }
-    }
+    final initialStoreNames = List<String>.from(result)
+        .where((name) => !name.endsWith(DataStoreEncrypter.encryptedName))
+        .toSet();
 
     final resolver =
         IndexedDBDataStoreResolver(runTransaction: _runTransaction);
@@ -102,20 +104,13 @@ class IndexedDBPersistor extends Persistor {
     await resolver.hydrate();
 
     _manager = DataStoreManager(
-      encrypter: encrypter,
       persistenceThrottle: persistenceThrottle,
       onSync: onSync,
       onLog: _logger.log,
       settings: settings,
       resolver: resolver,
-      index: index,
-      factory: (name) {
-        return IndexedDBDataStore(
-          name,
-          runTransaction: _runTransaction,
-          encrypter: encrypter,
-        );
-      },
+      initialStoreNames: initialStoreNames,
+      factory: factory,
     );
   }
 

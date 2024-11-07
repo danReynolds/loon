@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'package:encrypt/encrypt.dart';
 import 'package:loon/loon.dart';
 import 'package:loon/persistor/data_store.dart';
 import 'package:loon/persistor/data_store_persistence_payload.dart';
@@ -7,8 +6,6 @@ import 'package:loon/persistor/data_store_resolver.dart';
 import 'package:loon/persistor/lock.dart';
 
 class DataStoreManager {
-  final Encrypter encrypter;
-
   /// The duration by which to throttle persistence changes to the file system.
   final Duration persistenceThrottle;
 
@@ -22,10 +19,10 @@ class DataStoreManager {
   /// the document is currently stored.
   final DataStoreResolver resolver;
 
-  /// The index of [DataStore] objects by store name.
-  final Map<String, DataStore> index;
+  /// The index of [DualDataStore] objects by store name.
+  final Map<String, DualDataStore> index = {};
 
-  final DataStore Function(String name) factory;
+  final DataStoreFactory factory;
 
   /// The sync lock is used to block operations from accessing the file system while there is an ongoing sync
   /// operation and conversely blocks a sync from starting until the ongoing operation holding the lock has finished.
@@ -40,15 +37,18 @@ class DataStoreManager {
   late final _logger = Logger('DataStoreManager', output: onLog);
 
   DataStoreManager({
-    required this.encrypter,
     required this.persistenceThrottle,
     required this.onSync,
     required this.onLog,
     required this.settings,
     required this.resolver,
-    required this.index,
     required this.factory,
-  });
+    required Set<String> initialStoreNames,
+  }) {
+    for (final name in initialStoreNames) {
+      index[name] = DualDataStore(name, factory: factory);
+    }
+  }
 
   void _cancelSync() {
     _syncTimer?.cancel();
@@ -92,7 +92,7 @@ class DataStoreManager {
   ///
   /// 1. The nearest data store for the resolver path going up the resolver tree.
   /// 2. The set of data stores that exist in the subtree of the resolver under the given path.
-  List<DataStore> _resolveDataStores(String path) {
+  List<DualDataStore> _resolveDataStores(String path) {
     final List<String> dataStoreNames = [];
 
     // 1.
@@ -106,7 +106,7 @@ class DataStoreManager {
 
     return dataStoreNames
         .map((dataStoreName) => index[dataStoreName])
-        .whereType<DataStore>()
+        .whereType<DualDataStore>()
         .toList();
   }
 
@@ -114,8 +114,8 @@ class DataStoreManager {
   Future<Map<String, dynamic>> hydrate(List<String>? paths) {
     return _syncLock.run(
       () async {
-        final Map<String, List<DataStore>> pathDataStores = {};
-        final Set<DataStore> dataStores = {};
+        final Map<String, List<DualDataStore>> pathDataStores = {};
+        final Set<DualDataStore> dataStores = {};
 
         // If the hydration operation is only for certain paths, then resolve all of the file data stores
         // reachable under the given paths and hydrate only those data stores.
@@ -161,8 +161,8 @@ class DataStoreManager {
       final localResolver = payload.resolver;
       final docs = payload.persistenceDocs;
 
-      Set<DataStore> dataStores = {};
-      Map<String, List<DataStore>> pathDataStores = {};
+      Set<DualDataStore> dataStores = {};
+      Map<String, List<DualDataStore>> pathDataStores = {};
 
       // Pre-calculate and hydrate all resolved file data stores relevant to the updated documents.
       for (final doc in docs) {
@@ -175,10 +175,14 @@ class DataStoreManager {
         } else {
           final prevDataStoreName = resolver.getNearest(docPath)!.$2;
           final nextDataStoreName = localResolver.getNearest(docPath)!.$2;
-          final prevDataStore =
-              index[prevDataStoreName] ??= factory(prevDataStoreName);
-          final nextDataStore =
-              index[nextDataStoreName] ??= factory(nextDataStoreName);
+          final prevDataStore = index[prevDataStoreName] ??= DualDataStore(
+            prevDataStoreName,
+            factory: factory,
+          );
+          final nextDataStore = index[nextDataStoreName] ??= DualDataStore(
+            prevDataStoreName,
+            factory: factory,
+          );
 
           dataStores.add(prevDataStore);
           dataStores.add(nextDataStore);
@@ -272,8 +276,8 @@ class DataStoreManager {
 
   Future<void> clear(List<String> paths) {
     return _syncLock.run(() async {
-      Set<DataStore> dataStores = {};
-      Map<String, List<DataStore>> pathDataStores = {};
+      Set<DualDataStore> dataStores = {};
+      Map<String, List<DualDataStore>> pathDataStores = {};
 
       for (final path in paths) {
         final stores = pathDataStores[path] = _resolveDataStores(path);

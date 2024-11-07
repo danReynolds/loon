@@ -1,10 +1,11 @@
 import 'dart:async';
 import 'dart:io';
 import 'dart:isolate';
-import 'package:encrypt/encrypt.dart';
 import 'package:loon/loon.dart';
+import 'package:loon/persistor/data_store.dart';
+import 'package:loon/persistor/data_store_encrypter.dart';
 import 'package:loon/persistor/data_store_manager.dart';
-import 'package:loon/persistor/file_persistor/file_data_store.dart';
+import 'package:loon/persistor/file_persistor/file_data_store_config.dart';
 import 'package:loon/persistor/file_persistor/file_data_store_resolver.dart';
 import 'package:loon/persistor/file_persistor/messages.dart';
 import 'package:path/path.dart' as path;
@@ -25,7 +26,7 @@ class FilePersistorWorker {
   FilePersistorWorker._({
     required this.sendPort,
     required Directory directory,
-    required Encrypter encrypter,
+    required DataStoreEncrypter encrypter,
     required Duration persistenceThrottle,
     required PersistorSettings settings,
   }) {
@@ -79,7 +80,25 @@ class FilePersistorWorker {
     final directory = request.directory;
     final encrypter = request.encrypter;
 
-    final Map<String, FileDataStore> index = {};
+    factory(name, encrypted) {
+      final fileName =
+          "${directory.path}/$name${encrypted ? '' : '.${DataStoreEncrypter.encryptedName}'}.json";
+
+      return DataStore(
+        FileDataStoreConfig(
+          name,
+          logger: Logger(
+            'FileDataStore:$name',
+            output: FilePersistorWorker.logger.log,
+          ),
+          file: File(fileName),
+          encrypted: encrypted,
+          encrypter: encrypter,
+        ),
+      );
+    }
+
+    final Set<String> initialStoreNames = {};
     final files = directory
         .listSync()
         .whereType<File>()
@@ -89,34 +108,20 @@ class FilePersistorWorker {
     for (final file in files) {
       final match = fileRegex.firstMatch(path.basename(file.path));
       final name = match!.group(1)!;
-
-      // De-dupe the plaintext/encrypted files for the same data store.
-      if (!index.containsKey(name)) {
-        index[name] = FileDataStore.parse(
-          name,
-          encrypter: request.encrypter,
-          directory: directory,
-        );
-      }
+      initialStoreNames.add(name);
     }
 
     final resolver = FileDataStoreResolver(directory: directory);
     await resolver.hydrate();
 
     manager = DataStoreManager(
-      encrypter: request.encrypter,
       persistenceThrottle: request.persistenceThrottle,
       settings: request.settings,
       onSync: _sendSyncMessage,
       onLog: _sendLogMessage,
-      index: index,
+      initialStoreNames: initialStoreNames,
       resolver: resolver,
-      factory: (name) => FileDataStore(
-        name,
-        directory: directory,
-        encrypter: encrypter,
-        isHydrated: true,
-      ),
+      factory: factory,
     );
 
     // Start listening to messages from the persistor on the worker's receive port.

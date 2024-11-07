@@ -89,7 +89,7 @@ void main() {
         final encryptedStoreFile =
             File('${testDirectory.path}/loon/__store__.encrypted.json');
         final encryptedStoreJson = jsonDecode(
-          persistor.decrypt(encryptedStoreFile.readAsStringSync()),
+          persistor.encrypter.decrypt(encryptedStoreFile.readAsStringSync()),
         );
 
         expect(encryptedStoreJson, {

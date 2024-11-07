@@ -132,9 +132,6 @@ abstract class Persistor {
   /// duration are batched together into a single persist operation.
   final Duration persistenceThrottle;
 
-  static const _secureStorageKey = 'loon_encrypted_file_persistor_key';
-  static const encryptedKey = 'encrypted';
-
   Persistor({
     this.onPersist,
     this.onClear,
@@ -156,24 +153,6 @@ abstract class Persistor {
     String Function(DocumentSnapshot<T> snap) builder,
   ) {
     return PersistorBuilderKey<T>(builder);
-  }
-
-  /// Initializes the encrypter used for encrypting files. This needs to be done on the main isolate
-  /// as opposed to the worker since it requires access to plugins that are not easily available in the worker
-  /// isolate context.
-  Future<Encrypter> initEncrypter() async {
-    const storage = FlutterSecureStorage();
-    final base64Key = await storage.read(key: _secureStorageKey);
-    Key key;
-
-    if (base64Key != null) {
-      key = Key.fromBase64(base64Key);
-    } else {
-      key = Key.fromSecureRandom(32);
-      await storage.write(key: _secureStorageKey, value: key.base64);
-    }
-
-    return Encrypter(AES(key, mode: AESMode.cbc));
   }
 
   ///

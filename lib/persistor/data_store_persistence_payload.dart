@@ -23,7 +23,7 @@ class DataStorePersistencePayload {
     // 2. It de-duplicates persistence keys. If there are many documents that all roll up
     //    to a given key, then the key is only specified once in the local resolver rather than
     //    being duplicated and sent independently with each document.
-    final resolver = ValueStore<String>();
+    resolver = ValueStore<String>();
     final globalPersistorSettings = Loon.persistorSettings;
 
     final defaultKey = switch (globalPersistorSettings) {
