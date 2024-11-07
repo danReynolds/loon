@@ -41,10 +41,10 @@ class DataStoreManager {
     required this.onSync,
     required this.onLog,
     required this.settings,
-    required this.resolver,
     required this.factory,
+    required DataStoreResolverConfig resolverConfig,
     required Set<String> initialStoreNames,
-  }) {
+  }) : resolver = DataStoreResolver(resolverConfig) {
     for (final name in initialStoreNames) {
       index[name] = DualDataStore(name, factory: factory);
     }
@@ -108,6 +108,10 @@ class DataStoreManager {
         .map((dataStoreName) => index[dataStoreName])
         .whereType<DualDataStore>()
         .toList();
+  }
+
+  Future<void> init() async {
+    await resolver.hydrate();
   }
 
   /// Hydrates the given paths and returns a map of document paths to their serialized data.

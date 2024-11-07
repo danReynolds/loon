@@ -3,7 +3,7 @@ import 'package:loon/persistor/data_store_encrypter.dart';
 
 typedef DataStoreFactory = DataStore Function(String name, bool encrypted);
 
-class DataStoreConfig {
+abstract class DataStoreConfig {
   final String name;
   final Logger logger;
   final Future<ValueStore<ValueStore>> Function() hydrate;
@@ -17,15 +17,14 @@ class DataStoreConfig {
     required this.delete,
     required bool encrypted,
     required DataStoreEncrypter encrypter,
-    Logger? logger,
-    // ignore: unnecessary_this
-  }) : this.logger = logger ?? Logger('DataStore:$name');
+    final Logger? logger,
+  }) : logger = logger ?? Logger('DataStore:$name');
 }
 
 class DataStore {
   final DataStoreConfig config;
 
-  var index = ValueStore<ValueStore>();
+  var _store = ValueStore<ValueStore>();
   bool isDirty = false;
   bool isHydrated = false;
 
@@ -36,7 +35,7 @@ class DataStore {
   }
 
   bool get isEmpty {
-    return index.isEmpty;
+    return _store.isEmpty;
   }
 
   /// Returns a map of the subset of documents in the store under the given path.
@@ -47,8 +46,8 @@ class DataStore {
   Map<String, dynamic> extract([String path = '']) {
     Map<String, dynamic> data = {};
 
-    final parentStores = index.extractParentPath(path).values;
-    final childStores = index.extractValues(path);
+    final parentStores = _store.extractParentPath(path).values;
+    final childStores = _store.extractValues(path);
 
     for (final parentStore in parentStores) {
       data.addAll(parentStore.extract(path));
@@ -64,7 +63,7 @@ class DataStore {
     String resolverPath,
     String path,
   ) {
-    final store = index.get(resolverPath);
+    final store = _store.get(resolverPath);
     if (store == null || !store.hasValue(path)) {
       return;
     }
@@ -73,20 +72,20 @@ class DataStore {
     store.delete(path, recursive: false);
 
     if (store.isEmpty) {
-      index.delete(resolverPath, recursive: false);
+      _store.delete(resolverPath, recursive: false);
     }
   }
 
   void _recursiveDelete(String path) {
     // 1. Delete the given path from the resolver, evicting all documents under that path that were stored in
     //    resolver paths at or under that path.
-    if (index.hasPath(path)) {
-      index.delete(path);
+    if (_store.hasPath(path)) {
+      _store.delete(path);
       isDirty = true;
     }
 
     // 2. Evict the given path from any parent stores above the given path.
-    final valueStores = index.extractParentPath(path);
+    final valueStores = _store.extractParentPath(path);
     for (final entry in valueStores.entries) {
       final resolverPath = entry.key;
       final valueStore = entry.value;
@@ -96,7 +95,7 @@ class DataStore {
         isDirty = true;
 
         if (valueStore.isEmpty) {
-          index.delete(resolverPath, recursive: false);
+          _store.delete(resolverPath, recursive: false);
         }
 
         // Data under the given path can only exist in one parent path store at a time, so deletion can exit early
@@ -112,43 +111,43 @@ class DataStore {
     String otherResolverPath,
     String? dataPath,
   ) {
-    final otherValueStore = otherStore.index.get(otherResolverPath);
+    final otherValueStore = otherStore._store.get(otherResolverPath);
     if (otherValueStore == null) {
       return;
     }
 
     final valueStore =
-        index.get(resolverPath) ?? index.write(resolverPath, ValueStore());
+        _store.get(resolverPath) ?? _store.write(resolverPath, ValueStore());
     valueStore.graft(otherValueStore, dataPath);
     isDirty = true;
 
     if (otherValueStore.isEmpty) {
-      otherStore.index.delete(otherResolverPath, recursive: false);
+      otherStore._store.delete(otherResolverPath, recursive: false);
     }
   }
 
   Future<void> hydrate() async {
     if (isHydrated) {
-      logger.log('Hydrate aborted. Already hydrated');
+      logger.log('Hydrate canceled. Already hydrated');
       return;
     }
 
-    index = await logger.measure('Hydrate', () => config.hydrate());
+    _store = await logger.measure('Hydrate', () => config.hydrate());
     isHydrated = true;
   }
 
   Future<void> persist() async {
     if (isEmpty) {
-      logger.log('Persist aborted. Empty store');
+      logger.log('Persist canceled. Empty store');
       return;
     }
 
     if (!isDirty) {
-      logger.log('Persist aborted. Clean store.');
+      logger.log('Persist canceled. Clean store.');
       return;
     }
 
-    await logger.measure('Persist', () => config.persist(index));
+    await logger.measure('Persist', () => config.persist(_store));
     isDirty = false;
   }
 
@@ -179,8 +178,8 @@ class DualDataStore {
   }
 
   dynamic get(String resolverPath, String path) {
-    return plaintextStore.index.get(resolverPath)?.get(path) ??
-        encryptedStore.index.get(resolverPath)?.get(path);
+    return plaintextStore._store.get(resolverPath)?.get(path) ??
+        encryptedStore._store.get(resolverPath)?.get(path);
   }
 
   bool hasValue(String resolverPath, String path) {
@@ -188,8 +187,8 @@ class DualDataStore {
   }
 
   bool hasPath(String resolverPath, String path) {
-    return plaintextStore.index.get(resolverPath)?.hasPath(path) ??
-        encryptedStore.index.get(resolverPath)?.hasPath(path) ??
+    return plaintextStore._store.get(resolverPath)?.hasPath(path) ??
+        encryptedStore._store.get(resolverPath)?.hasPath(path) ??
         false;
   }
 
@@ -221,8 +220,8 @@ class DualDataStore {
     otherStore._shallowDelete(resolverPath, path);
 
     store.isDirty = true;
-    final valueStore = store.index.get(resolverPath) ??
-        store.index.write(resolverPath, ValueStore());
+    final valueStore = store._store.get(resolverPath) ??
+        store._store.write(resolverPath, ValueStore());
     valueStore.write(path, value);
   }
 
@@ -275,8 +274,8 @@ class DualDataStore {
 
   Map inspect() {
     return {
-      "plaintext": plaintextStore.index.inspect(),
-      "encrypted": encryptedStore.index.inspect(),
+      "plaintext": plaintextStore._store.inspect(),
+      "encrypted": encryptedStore._store.inspect(),
     };
   }
 

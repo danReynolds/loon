@@ -7,7 +7,6 @@ import 'package:loon/persistor/data_store_encrypter.dart';
 import 'package:loon/persistor/data_store_manager.dart';
 import 'package:loon/persistor/data_store_persistence_payload.dart';
 import 'package:loon/persistor/indexed_db_persistor/indexed_db_data_store_config.dart';
-import 'package:loon/persistor/indexed_db_persistor/indexed_db_data_store_resolver.dart';
 import 'package:web/web.dart';
 
 typedef IndexedDBTransactionCallback = Future<T> Function<T>(
@@ -98,19 +97,16 @@ class IndexedDBPersistor extends Persistor {
         .where((name) => !name.endsWith(DataStoreEncrypter.encryptedName))
         .toSet();
 
-    final resolver =
-        IndexedDBDataStoreResolver(runTransaction: _runTransaction);
-
-    await resolver.hydrate();
-
     _manager = DataStoreManager(
       persistenceThrottle: persistenceThrottle,
       onSync: onSync,
       onLog: _logger.log,
       settings: settings,
-      resolver: resolver,
       initialStoreNames: initialStoreNames,
       factory: factory,
+      resolverConfig: IndexedDBDataStoreResolverConfig(
+        runTransaction: _runTransaction,
+      ),
     );
   }
 

@@ -5,10 +5,12 @@ import 'package:loon/loon.dart';
 import 'package:loon/persistor/data_store.dart';
 import 'package:loon/persistor/data_store_encrypter.dart';
 import 'package:loon/persistor/data_store_manager.dart';
+import 'package:loon/persistor/data_store_resolver.dart';
 import 'package:loon/persistor/file_persistor/file_data_store_config.dart';
-import 'package:loon/persistor/file_persistor/file_data_store_resolver.dart';
 import 'package:loon/persistor/file_persistor/messages.dart';
 import 'package:path/path.dart' as path;
+
+final fileRegex = RegExp(r'^(?!__resolver__)(\w+?)(?:.encrypted)?\.json$');
 
 /// The file persistor worker is run on a background isolate to manage file system operations
 /// like the persistence and hydration of documents.
@@ -111,18 +113,19 @@ class FilePersistorWorker {
       initialStoreNames.add(name);
     }
 
-    final resolver = FileDataStoreResolver(directory: directory);
-    await resolver.hydrate();
-
     manager = DataStoreManager(
       persistenceThrottle: request.persistenceThrottle,
       settings: request.settings,
       onSync: _sendSyncMessage,
       onLog: _sendLogMessage,
       initialStoreNames: initialStoreNames,
-      resolver: resolver,
       factory: factory,
+      resolverConfig: FileDataStoreResolverConfig(
+        file: File("${directory.path}/${DataStoreResolver.name}"),
+      ),
     );
+
+    await manager.init();
 
     // Start listening to messages from the persistor on the worker's receive port.
     receivePort.listen(_onMessage);

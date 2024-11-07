@@ -112,6 +112,7 @@ class ValueRefStore<T> extends _BaseValueStore<T> {
     return removedRefs;
   }
 
+  /// Returns a map of all values that exist under the given path to their ref count.
   Map<T, int>? getRefs([String path = '']) {
     if (_store.isEmpty) {
       return null;

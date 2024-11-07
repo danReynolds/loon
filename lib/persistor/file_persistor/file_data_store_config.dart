@@ -2,8 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:loon/loon.dart';
 import 'package:loon/persistor/data_store.dart';
-
-final fileRegex = RegExp(r'^(?!__resolver__)(\w+?)(?:.encrypted)?\.json$');
+import 'package:loon/persistor/data_store_resolver.dart';
 
 class FileDataStoreConfig extends DataStoreConfig {
   FileDataStoreConfig(
@@ -34,6 +33,17 @@ class FileDataStoreConfig extends DataStoreConfig {
               encrypted ? encrypter.encrypt(value) : value,
             );
           },
+          delete: () => file.delete(),
+        );
+}
+
+class FileDataStoreResolverConfig extends DataStoreResolverConfig {
+  FileDataStoreResolverConfig({
+    required File file,
+  }) : super(
+          hydrate: () async =>
+              ValueRefStore<String>(jsonDecode(await file.readAsString())),
+          persist: (store) => file.writeAsString(jsonEncode(store.extract())),
           delete: () => file.delete(),
         );
 }
