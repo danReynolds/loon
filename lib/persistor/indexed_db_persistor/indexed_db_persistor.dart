@@ -108,6 +108,8 @@ class IndexedDBPersistor extends Persistor {
         runTransaction: _runTransaction,
       ),
     );
+
+    await _manager.init();
   }
 
   @override

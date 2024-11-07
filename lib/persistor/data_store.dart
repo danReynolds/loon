@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:loon/loon.dart';
 import 'package:loon/persistor/data_store_encrypter.dart';
 
@@ -132,7 +134,11 @@ class DataStore {
       return;
     }
 
-    _store = await logger.measure('Hydrate', () => config.hydrate());
+    try {
+      _store = await logger.measure('Hydrate', () => config.hydrate());
+      // ignore: empty_catches
+    } on PathNotFoundException {}
+
     isHydrated = true;
   }
 
@@ -152,7 +158,11 @@ class DataStore {
   }
 
   Future<void> delete() async {
-    await logger.measure('Delete', () => config.delete());
+    try {
+      await logger.measure('Delete', () => config.delete());
+    } on PathNotFoundException {
+      return;
+    }
   }
 }
 

@@ -16,18 +16,18 @@ class FileDataStoreConfig extends DataStoreConfig {
             final value = await file.readAsString();
             final json =
                 jsonDecode(encrypted ? encrypter.decrypt(value) : value);
-            final index = ValueStore<ValueStore>();
+            final store = ValueStore<ValueStore>();
 
             for (final entry in json.entries) {
               final resolverPath = entry.key;
               final valueStore = ValueStore.fromJson(entry.value);
-              index.write(resolverPath, valueStore);
+              store.write(resolverPath, valueStore);
             }
 
-            return index;
+            return store;
           },
-          persist: (index) async {
-            final value = jsonEncode(index.extract());
+          persist: (store) async {
+            final value = jsonEncode(store.extract());
 
             await file.writeAsString(
               encrypted ? encrypter.encrypt(value) : value,

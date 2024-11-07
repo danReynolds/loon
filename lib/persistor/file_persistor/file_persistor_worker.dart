@@ -84,7 +84,7 @@ class FilePersistorWorker {
 
     factory(name, encrypted) {
       final fileName =
-          "${directory.path}/$name${encrypted ? '' : '.${DataStoreEncrypter.encryptedName}'}.json";
+          "${directory.path}/$name${encrypted ? '.${DataStoreEncrypter.encryptedName}' : ''}.json";
 
       return DataStore(
         FileDataStoreConfig(
@@ -121,7 +121,7 @@ class FilePersistorWorker {
       initialStoreNames: initialStoreNames,
       factory: factory,
       resolverConfig: FileDataStoreResolverConfig(
-        file: File("${directory.path}/${DataStoreResolver.name}"),
+        file: File("${directory.path}/${DataStoreResolver.name}.json"),
       ),
     );
 

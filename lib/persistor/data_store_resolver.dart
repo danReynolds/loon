@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:loon/loon.dart';
 
 class DataStoreResolverConfig {
@@ -86,7 +88,12 @@ class DataStoreResolver {
       return;
     }
 
-    _store = await logger.measure('Hydrate', () => config.hydrate());
+    try {
+      _store = await logger.measure('Hydrate', () => config.hydrate());
+      // ignore: empty_catches
+    } on PathNotFoundException {}
+
+    isHydrated = true;
   }
 
   Future<void> persist() async {
@@ -105,7 +112,10 @@ class DataStoreResolver {
   }
 
   Future<void> delete() async {
-    await logger.measure('Delete', () => config.delete());
+    try {
+      await logger.measure('Delete', () => config.delete());
+      // ignore: empty_catches
+    } on PathNotFoundException {}
 
     _store.clear();
     // Re-initialize the root of the store to the default persistor key.
