@@ -182,18 +182,25 @@ abstract class _BaseValueStore<T> {
     return get(path) != null;
   }
 
+  /// Returns whether the path exists in the store, either as a value or path to another descendant value.
   bool hasPath(String path) {
     if (path.isEmpty) {
       return true;
     }
 
-    return hasValue(path) || _getNode(_store, _getSegments(path), 0) != null;
+    final segments = _getSegments(path);
+    final lastSegment = segments.removeLast();
+
+    final parentNode = _getNode(_store, segments, 0);
+
+    return parentNode?[_values]?[lastSegment] != null ||
+        parentNode?[lastSegment] != null;
   }
 
   T write(String path, T value);
   void delete(String path, {bool recursive = true});
 
-  /// Extracts all values under the given path into a set of flat key-value pairs of paths to values.
+  /// Extracts all values under the given path into a map of flattened paths to values.
   Map<String, T> extract([String path = '']) {
     if (path.isEmpty) {
       return _extract(_store, {}, path);

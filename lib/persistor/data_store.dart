@@ -61,7 +61,7 @@ class DataStore {
     return data;
   }
 
-  void _shallowDelete(
+  void _deletePath(
     String resolverPath,
     String path,
   ) {
@@ -114,18 +114,24 @@ class DataStore {
     String? dataPath,
   ) {
     final otherValueStore = otherStore._store.get(otherResolverPath);
-    if (otherValueStore == null) {
+    if (otherValueStore == null ||
+        dataPath != null && !otherValueStore.hasPath(dataPath)) {
       return;
     }
 
     final valueStore =
         _store.get(resolverPath) ?? _store.write(resolverPath, ValueStore());
     valueStore.graft(otherValueStore, dataPath);
-    isDirty = true;
 
+    /// If the the value store at [resolverPath] in the other store is now empty after the graft,
+    /// then it is removed from the other store.
     if (otherValueStore.isEmpty) {
       otherStore._store.delete(otherResolverPath, recursive: false);
     }
+
+    // After the graft, both the data stores must be marked as dirty.
+    isDirty = true;
+    otherStore.isDirty = true;
   }
 
   Future<void> hydrate() async {
@@ -164,11 +170,21 @@ class DataStore {
       return;
     }
   }
+
+  Future<void> sync() async {
+    if (isEmpty) {
+      await delete();
+    } else if (isDirty) {
+      await persist();
+    }
+  }
 }
 
+/// Data can optionally be encrypted. Plaintext vs encrypted data is managed in two different stores, which
+/// is abstracted transparently to the data store manager through this implementation.
 class DualDataStore {
-  final DataStore plaintextStore;
-  final DataStore encryptedStore;
+  late final DataStore _plaintextStore;
+  late final DataStore _encryptedStore;
 
   /// The name of the file data store.
   final String name;
@@ -176,20 +192,20 @@ class DualDataStore {
   DualDataStore(
     this.name, {
     required DataStore Function(String name, bool encrypted) factory,
-  })  : plaintextStore = factory(name, false),
-        encryptedStore = factory(name, true);
+  })  : _plaintextStore = factory(name, false),
+        _encryptedStore = factory(name, true);
 
   bool get isDirty {
-    return plaintextStore.isDirty || encryptedStore.isDirty;
+    return _plaintextStore.isDirty || _encryptedStore.isDirty;
   }
 
   bool get isHydrated {
-    return plaintextStore.isHydrated && encryptedStore.isHydrated;
+    return _plaintextStore.isHydrated && _encryptedStore.isHydrated;
   }
 
   dynamic get(String resolverPath, String path) {
-    return plaintextStore._store.get(resolverPath)?.get(path) ??
-        encryptedStore._store.get(resolverPath)?.get(path);
+    return _plaintextStore._store.get(resolverPath)?.get(path) ??
+        _encryptedStore._store.get(resolverPath)?.get(path);
   }
 
   bool hasValue(String resolverPath, String path) {
@@ -197,8 +213,8 @@ class DualDataStore {
   }
 
   bool hasPath(String resolverPath, String path) {
-    return plaintextStore._store.get(resolverPath)?.hasPath(path) ??
-        encryptedStore._store.get(resolverPath)?.hasPath(path) ??
+    return _plaintextStore._store.get(resolverPath)?.hasPath(path) ??
+        _encryptedStore._store.get(resolverPath)?.hasPath(path) ??
         false;
   }
 
@@ -209,8 +225,8 @@ class DualDataStore {
   ///    path containing data for path users__1, users__1__friends__1, etc.
   Map<String, dynamic> extract([String path = '']) {
     return {
-      ...plaintextStore.extract(path),
-      ...encryptedStore.extract(path),
+      ..._plaintextStore.extract(path),
+      ..._encryptedStore.extract(path),
     };
   }
 
@@ -222,12 +238,12 @@ class DualDataStore {
   ) async {
     resolverPath ??= '';
 
-    final store = encrypted ? encryptedStore : plaintextStore;
-    final otherStore = encrypted ? plaintextStore : encryptedStore;
+    final store = encrypted ? _encryptedStore : _plaintextStore;
+    final otherStore = encrypted ? _plaintextStore : _encryptedStore;
 
     // If the document was previously not encrypted and now is or vice-versa, then it should be removed
     // from the other store.
-    otherStore._shallowDelete(resolverPath, path);
+    otherStore._deletePath(resolverPath, path);
 
     store.isDirty = true;
     final valueStore = store._store.get(resolverPath) ??
@@ -246,18 +262,12 @@ class DualDataStore {
   ///    Therefore to delete the remaining documents under the given path, each value store in the resolver above the given path is visited
   ///    and has the given path evicted from its store.
   void recursiveDelete(String path) {
-    plaintextStore._recursiveDelete(path);
-    encryptedStore._recursiveDelete(path);
-  }
-
-  /// Shallowly deletes the given path from the given resolver path store.
-  void shallowDelete(String resolverPath, String path) {
-    plaintextStore._shallowDelete(resolverPath, path);
-    encryptedStore._shallowDelete(resolverPath, path);
+    _plaintextStore._recursiveDelete(path);
+    _encryptedStore._recursiveDelete(path);
   }
 
   bool get isEmpty {
-    return plaintextStore.isEmpty && encryptedStore.isEmpty;
+    return _plaintextStore.isEmpty && _encryptedStore.isEmpty;
   }
 
   /// Grafts the data in the given [other] data store under resolver path [otherResolverPath] and data path [dataPath]
@@ -268,14 +278,14 @@ class DualDataStore {
     String? dataPath,
     DualDataStore other,
   ) {
-    plaintextStore._graft(
-      other.plaintextStore,
+    _plaintextStore._graft(
+      other._plaintextStore,
       resolverPath,
       otherResolverPath,
       dataPath,
     );
-    encryptedStore._graft(
-      other.encryptedStore,
+    _encryptedStore._graft(
+      other._encryptedStore,
       resolverPath,
       otherResolverPath,
       dataPath,
@@ -284,37 +294,36 @@ class DualDataStore {
 
   Map inspect() {
     return {
-      "plaintext": plaintextStore._store.inspect(),
-      "encrypted": encryptedStore._store.inspect(),
+      "plaintext": _plaintextStore._store.inspect(),
+      "encrypted": _encryptedStore._store.inspect(),
     };
   }
 
   Future<void> hydrate() async {
     await Future.wait([
-      plaintextStore.hydrate(),
-      encryptedStore.hydrate(),
+      _plaintextStore.hydrate(),
+      _encryptedStore.hydrate(),
     ]);
   }
 
   Future<void> persist() async {
     await Future.wait([
-      plaintextStore.persist(),
-      encryptedStore.persist(),
+      _plaintextStore.persist(),
+      _encryptedStore.persist(),
     ]);
   }
 
   Future<void> delete() async {
     await Future.wait([
-      plaintextStore.delete(),
-      encryptedStore.delete(),
+      _plaintextStore.delete(),
+      _encryptedStore.delete(),
     ]);
   }
 
   Future<void> sync() async {
-    if (isEmpty) {
-      await delete();
-    } else if (isDirty) {
-      await persist();
-    }
+    await Future.wait([
+      _plaintextStore.sync(),
+      _encryptedStore.sync(),
+    ]);
   }
 }

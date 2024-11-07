@@ -184,7 +184,7 @@ class DataStoreManager {
             factory: factory,
           );
           final nextDataStore = index[nextDataStoreName] ??= DualDataStore(
-            prevDataStoreName,
+            nextDataStoreName,
             factory: factory,
           );
 

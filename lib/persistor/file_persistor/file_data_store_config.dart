@@ -43,7 +43,7 @@ class FileDataStoreResolverConfig extends DataStoreResolverConfig {
   }) : super(
           hydrate: () async =>
               ValueRefStore<String>(jsonDecode(await file.readAsString())),
-          persist: (store) => file.writeAsString(jsonEncode(store.extract())),
+          persist: (store) => file.writeAsString(jsonEncode(store.inspect())),
           delete: () => file.delete(),
         );
 }

@@ -141,7 +141,7 @@ class ValueRefStore<T> extends _BaseValueStore<T> {
 
   @override
 
-  /// A [ValueRefStore] overrides the default [ValueStore.extractUniqueValues] behavior
+  /// A [ValueRefStore] overrides the default [ValueStore.extractValues] behavior
   /// since the values under a given path are pre-computed by the ref store.
   Set<T> extractValues([String path = '']) {
     return getRefs(path)?.keys.toSet() ?? {};
