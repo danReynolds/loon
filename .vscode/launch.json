@@ -8,20 +8,6 @@
       "name": "Launch example",
       "request": "launch",
       "type": "dart",
-    },
-    {
-      "name": "Debug native tests",
-      "request": "launch",
-      "type": "dart",
-    },
-    {
-      "name": "Debug web tests",
-      "request": "launch",
-      "type": "dart",
-      "args": [
-        "--platform",
-        "chrome"
-      ]
     }
   ]
 }
