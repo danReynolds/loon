@@ -6,15 +6,16 @@ import 'package:uuid/uuid.dart';
 
 const uuid = Uuid();
 
+final logger = Logger('Playground');
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   Loon.configure(
     persistor: Persistor.current(),
-    enableLogging: true,
   );
 
-  await Loon.hydrate();
+  await logger.measure('Hydrate', () => Loon.hydrate());
 
   runApp(const MyApp());
 }
@@ -130,40 +131,42 @@ class _MyHomePageState extends State<MyHomePage> {
                           userSnap.data.name.startsWith(_controller.text),
                     ),
                     builder: (context, usersSnap) {
-                      return ListView.builder(
-                        shrinkWrap: true,
-                        itemCount: usersSnap.length,
-                        itemBuilder: (context, index) {
-                          final userSnap = usersSnap[index];
-                          final user = userSnap.data;
+                      return Flexible(
+                        child: ListView.builder(
+                          shrinkWrap: true,
+                          itemCount: usersSnap.length,
+                          itemBuilder: (context, index) {
+                            final userSnap = usersSnap[index];
+                            final user = userSnap.data;
 
-                          return Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Text(user.name),
-                              TextButton(
-                                onPressed: () {
-                                  _showEditDialog(userSnap.doc);
-                                },
-                                child: const Text('Edit'),
-                              ),
-                              TextButton(
-                                onPressed: () {
-                                  UserModel.store.doc(userSnap.id).delete();
-                                },
-                                child: Text(
-                                  'Remove',
-                                  style: Theme.of(context)
-                                      .textTheme
-                                      .bodyMedium!
-                                      .copyWith(
-                                        color: Colors.red,
-                                      ),
+                            return Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Text(user.name),
+                                TextButton(
+                                  onPressed: () {
+                                    _showEditDialog(userSnap.doc);
+                                  },
+                                  child: const Text('Edit'),
                                 ),
-                              ),
-                            ],
-                          );
-                        },
+                                TextButton(
+                                  onPressed: () {
+                                    UserModel.store.doc(userSnap.id).delete();
+                                  },
+                                  child: Text(
+                                    'Remove',
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .bodyMedium!
+                                        .copyWith(
+                                          color: Colors.red,
+                                        ),
+                                  ),
+                                ),
+                              ],
+                            );
+                          },
+                        ),
                       );
                     },
                   ),
@@ -182,18 +185,24 @@ class _MyHomePageState extends State<MyHomePage> {
             FloatingActionButton(
               onPressed: () {
                 final id = uuid.v4();
-                final doc = UserModel.store.doc(id);
-
-                if (!doc.exists()) {
-                  UserModel.store.doc(id).create(UserModel(name: 'User $id'));
-                }
+                UserModel.store.doc(id).create(UserModel(name: 'User $id'));
               },
               child: const Icon(Icons.add),
             ),
             const SizedBox(width: 24),
+            FloatingActionButton.extended(
+              label: const Text('Load test (10000)'),
+              onPressed: () {
+                for (int i = 0; i < 10000; i++) {
+                  final id = uuid.v4();
+                  UserModel.store.doc(id).create(UserModel(name: 'User $id'));
+                }
+              },
+            ),
+            const SizedBox(width: 24),
             FloatingActionButton(
               onPressed: () {
-                UserModel.store.delete();
+                Loon.clearAll();
               },
               child: const Icon(Icons.delete),
             ),

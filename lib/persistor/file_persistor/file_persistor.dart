@@ -31,7 +31,7 @@ class FilePersistor extends Persistor {
     super.settings = const PersistorSettings(),
     super.persistenceThrottle = const Duration(milliseconds: 100),
     DataStoreEncrypter? encrypter,
-  })  : encrypter = encrypter ?? DataStoreEncrypter(),
+  })  : encrypter = encrypter = encrypter ?? DataStoreEncrypter(),
         logger = Logger('FilePersistor', output: Loon.logger.log);
 
   void _onMessage(dynamic message) {
@@ -110,7 +110,7 @@ class FilePersistor extends Persistor {
         return Isolate.spawn(
           FilePersistorWorker.init,
           initMessage,
-          debugName: 'Loon worker',
+          debugName: 'FilePersistorWorker',
         );
       });
 

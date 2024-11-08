@@ -301,7 +301,8 @@ The currently available persistence options are broken down by platform:
 
 ### Native
 
-* **FilePersistor**: The default file-based persistence implementation for native platforms. Documents are stored in one or more files based on the persistence configuration.
+* **SqlitePersistor**: A SQLite persistence implementation using [sqflite](https://pub.dev/packages/sqflite). Documents are distributed in rows based on their persistence configuration.
+* **FilePersistor**: A file-based persistence implementation for native platforms. Documents are stored in one or more files based on the persistence configuration.
 
 ### Web
 
