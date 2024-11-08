@@ -13,18 +13,22 @@ class FileDataStoreConfig extends DataStoreConfig {
     required super.logger,
   }) : super(
           hydrate: () async {
-            final value = await file.readAsString();
-            final json =
-                jsonDecode(encrypted ? encrypter.decrypt(value) : value);
-            final store = ValueStore<ValueStore>();
+            try {
+              final value = await file.readAsString();
+              final json =
+                  jsonDecode(encrypted ? encrypter.decrypt(value) : value);
+              final store = ValueStore<ValueStore>();
 
-            for (final entry in json.entries) {
-              final resolverPath = entry.key;
-              final valueStore = ValueStore.fromJson(entry.value);
-              store.write(resolverPath, valueStore);
+              for (final entry in json.entries) {
+                final resolverPath = entry.key;
+                final valueStore = ValueStore.fromJson(entry.value);
+                store.write(resolverPath, valueStore);
+              }
+
+              return store;
+            } on PathNotFoundException {
+              return null;
             }
-
-            return store;
           },
           persist: (store) async {
             final value = jsonEncode(store.extract());
@@ -33,7 +37,13 @@ class FileDataStoreConfig extends DataStoreConfig {
               encrypted ? encrypter.encrypt(value) : value,
             );
           },
-          delete: () => file.delete(),
+          delete: () async {
+            try {
+              await file.delete();
+            } on PathNotFoundException {
+              return;
+            }
+          },
         );
 }
 
@@ -41,9 +51,21 @@ class FileDataStoreResolverConfig extends DataStoreResolverConfig {
   FileDataStoreResolverConfig({
     required File file,
   }) : super(
-          hydrate: () async =>
-              ValueRefStore<String>(jsonDecode(await file.readAsString())),
+          hydrate: () async {
+            try {
+              return ValueRefStore<String>(
+                  jsonDecode(await file.readAsString()));
+            } on PathNotFoundException {
+              return null;
+            }
+          },
           persist: (store) => file.writeAsString(jsonEncode(store.inspect())),
-          delete: () => file.delete(),
+          delete: () async {
+            try {
+              await file.delete();
+            } on PathNotFoundException {
+              return;
+            }
+          },
         );
 }

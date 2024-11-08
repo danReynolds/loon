@@ -82,24 +82,6 @@ class FilePersistorWorker {
     final directory = request.directory;
     final encrypter = request.encrypter;
 
-    factory(name, encrypted) {
-      final fileName =
-          "${directory.path}/$name${encrypted ? '.${DataStoreEncrypter.encryptedName}' : ''}.json";
-
-      return DataStore(
-        FileDataStoreConfig(
-          name,
-          logger: Logger(
-            'FileDataStore:$name',
-            output: FilePersistorWorker.logger.log,
-          ),
-          file: File(fileName),
-          encrypted: encrypted,
-          encrypter: encrypter,
-        ),
-      );
-    }
-
     final Set<String> initialStoreNames = {};
     final files = directory
         .listSync()
@@ -119,7 +101,23 @@ class FilePersistorWorker {
       onSync: _sendSyncMessage,
       onLog: _sendLogMessage,
       initialStoreNames: initialStoreNames,
-      factory: factory,
+      factory: (name, encrypted) {
+        final fileName =
+            "${directory.path}/$name${encrypted ? '.${DataStoreEncrypter.encryptedName}' : ''}.json";
+
+        return DataStore(
+          FileDataStoreConfig(
+            name,
+            logger: Logger(
+              'FileDataStore:$name',
+              output: FilePersistorWorker.logger.log,
+            ),
+            file: File(fileName),
+            encrypted: encrypted,
+            encrypter: encrypter,
+          ),
+        );
+      },
       resolverConfig: FileDataStoreResolverConfig(
         file: File("${directory.path}/${DataStoreResolver.name}.json"),
       ),

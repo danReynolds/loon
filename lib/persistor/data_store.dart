@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:loon/loon.dart';
 import 'package:loon/persistor/data_store_encrypter.dart';
 
@@ -8,7 +6,7 @@ typedef DataStoreFactory = DataStore Function(String name, bool encrypted);
 abstract class DataStoreConfig {
   final String name;
   final Logger logger;
-  final Future<ValueStore<ValueStore>> Function() hydrate;
+  final Future<ValueStore<ValueStore>?> Function() hydrate;
   final Future<void> Function(ValueStore<ValueStore>) persist;
   final Future<void> Function() delete;
 
@@ -140,10 +138,12 @@ class DataStore {
       return;
     }
 
-    try {
-      _store = await logger.measure('Hydrate', () => config.hydrate());
-      // ignore: empty_catches
-    } on PathNotFoundException {}
+    final hydratedStore =
+        await logger.measure('Hydrate', () => config.hydrate());
+
+    if (hydratedStore != null) {
+      _store = hydratedStore;
+    }
 
     isHydrated = true;
   }
@@ -164,17 +164,17 @@ class DataStore {
   }
 
   Future<void> delete() async {
-    try {
-      await logger.measure('Delete', () => config.delete());
-    } on PathNotFoundException {
-      return;
-    }
+    return logger.measure('Delete', () => config.delete());
   }
 
   Future<void> sync() async {
+    if (!isDirty) {
+      return;
+    }
+
     if (isEmpty) {
       await delete();
-    } else if (isDirty) {
+    } else {
       await persist();
     }
   }

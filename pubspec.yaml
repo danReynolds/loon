@@ -14,13 +14,22 @@ dependencies:
     sdk: flutter
   flutter_secure_storage: ^9.2.2
   path: ^1.8.3
-  path_provider: ^2.1.2
+  path_provider: ^2.1.5
   web: ^1.1.0
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^2.0.0
+
+dependency_overrides:
+  # Temporary override for WASM support until this issue is addressed:
+  # https://github.com/mogol/flutter_secure_storage/issues/812 
+  flutter_secure_storage_web:
+    git:
+      url: https://github.com/mogol/flutter_secure_storage
+      path: flutter_secure_storage_web
+
 
 flutter:
   

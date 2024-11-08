@@ -3,7 +3,7 @@ import 'dart:io';
 import 'package:loon/loon.dart';
 
 class DataStoreResolverConfig {
-  final Future<ValueRefStore<String>> Function() hydrate;
+  final Future<ValueRefStore<String>?> Function() hydrate;
   final Future<void> Function(ValueRefStore<String>) persist;
   final Future<void> Function() delete;
   final Logger logger;
@@ -75,9 +75,13 @@ class DataStoreResolver {
   }
 
   Future<void> sync() async {
-    if (_store.isEmpty) {
+    if (!isDirty) {
+      return;
+    }
+
+    if (isEmpty) {
       await delete();
-    } else if (isDirty) {
+    } else {
       await persist();
     }
   }
@@ -88,10 +92,11 @@ class DataStoreResolver {
       return;
     }
 
-    try {
-      _store = await logger.measure('Hydrate', () => config.hydrate());
-      // ignore: empty_catches
-    } on PathNotFoundException {}
+    final hydratedStore =
+        await logger.measure('Hydrate', () => config.hydrate());
+    if (hydratedStore != null) {
+      _store = hydratedStore;
+    }
 
     isHydrated = true;
   }

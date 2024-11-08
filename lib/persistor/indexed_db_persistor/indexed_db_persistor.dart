@@ -11,22 +11,29 @@ import 'package:web/web.dart';
 
 typedef IndexedDBTransactionCallback = Future<T> Function<T>(
   String name,
-  IDBRequest? Function(IDBObjectStore objectStore) execute,
-);
+  IDBRequest? Function(IDBObjectStore objectStore) execute, [
+  IDBTransactionMode mode,
+]);
 
 class IndexedDBPersistor extends Persistor {
   static const _dbName = 'loon';
   static const _dbVersion = 1;
   static const _storeName = '__store__';
-  static const keyPath = 'key';
+  static const keyPath = 'id';
   static const valuePath = 'value';
 
   late final DataStoreManager _manager;
-  late final IDBDatabase _db;
+  late IDBDatabase _db;
+
+  bool _initialized = false;
 
   final _logger = Logger('IndexedDBPersistor');
 
   IndexedDBPersistor({
+    super.onPersist,
+    super.onClear,
+    super.onClearAll,
+    super.onHydrate,
     super.settings = const PersistorSettings(),
     super.persistenceThrottle = const Duration(milliseconds: 100),
     super.onSync,
@@ -35,7 +42,16 @@ class IndexedDBPersistor extends Persistor {
   Future<void> _initDB() async {
     final completer = Completer<void>();
     final request = window.indexedDB.open(_dbName, _dbVersion);
-    request.onupgradeneeded = ((_) {
+    request.onupgradeneeded = ((Event _) {
+      // If an upgrade is needed, then the DB can be set earlier in the request lifecycle
+      // when the upgrade is processed, otherwise it is set when the request completes below.
+      _db = request.result as IDBDatabase;
+
+      if (!_initialized) {
+        _db = request.result as IDBDatabase;
+        _initialized = true;
+      }
+
       if (_db.objectStoreNames.length == 0) {
         _db.createObjectStore(
           _storeName,
@@ -43,12 +59,13 @@ class IndexedDBPersistor extends Persistor {
         );
       }
     }).toJS;
-    request.onerror = ((error) {
+    request.onerror = ((ExternalDartReference error) {
       return completer.completeError(
         request.error?.message ?? 'unknown error initializing IndexedDB',
       );
     }).toJS;
-    request.onsuccess = ((_) => completer.complete()).toJS;
+    request.onsuccess =
+        ((ExternalDartReference _) => completer.complete()).toJS;
 
     await completer.future;
 
@@ -57,20 +74,23 @@ class IndexedDBPersistor extends Persistor {
 
   Future<T> _runTransaction<T>(
     String name,
-    IDBRequest? Function(IDBObjectStore objectStore) execute,
-  ) async {
+    IDBRequest? Function(IDBObjectStore objectStore) execute, [
+    IDBTransactionMode mode = 'readonly',
+  ]) async {
     final completer = Completer();
 
-    final transaction = _db.transaction(_storeName.toJS);
+    final transaction = _db.transaction(_storeName.toJS, mode);
     final objectStore = transaction.objectStore(_storeName);
-    transaction.oncomplete = ((_) => completer.complete()).toJS;
-    transaction.onerror = ((_) => completer.completeError('$name error')).toJS;
+    transaction.oncomplete =
+        ((ExternalDartReference _) => completer.complete()).toJS;
+    transaction.onerror = ((ExternalDartReference _) =>
+        completer.completeError('$name error')).toJS;
 
     final request = execute(objectStore);
 
     await _logger.measure(name, () => completer.future);
 
-    return request?.result as T;
+    return request?.result.dartify() as T;
   }
 
   @override
@@ -78,17 +98,6 @@ class IndexedDBPersistor extends Persistor {
     final encrypter = DataStoreEncrypter();
 
     await Future.wait([encrypter.init(), _initDB()]);
-
-    factory(name, encrypted) {
-      return DataStore(
-        IndexedDBDataStoreConfig(
-          encrypted ? '${name}_${DataStoreEncrypter.encryptedName}' : name,
-          encrypted: encrypted,
-          encrypter: encrypter,
-          runTransaction: _runTransaction,
-        ),
-      );
-    }
 
     final result = await _runTransaction('Init', (objectStore) {
       return objectStore.getAllKeys();
@@ -103,7 +112,14 @@ class IndexedDBPersistor extends Persistor {
       onLog: _logger.log,
       settings: settings,
       initialStoreNames: initialStoreNames,
-      factory: factory,
+      factory: (name, encrypted) => DataStore(
+        IndexedDBDataStoreConfig(
+          encrypted ? '${name}_${DataStoreEncrypter.encryptedName}' : name,
+          encrypted: encrypted,
+          encrypter: encrypter,
+          runTransaction: _runTransaction,
+        ),
+      ),
       resolverConfig: IndexedDBDataStoreResolverConfig(
         runTransaction: _runTransaction,
       ),
