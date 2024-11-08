@@ -31,10 +31,10 @@ class MockPathProvider extends Fake
 }
 
 void main() {
-  late FilePersistorCompleter completer;
+  late PersistorCompleter completer;
 
   setUp(() {
-    completer = TestFilePersistor.completer = FilePersistorCompleter();
+    completer = TestFilePersistor.completer = PersistorCompleter();
     testDirectory = Directory.systemTemp.createTempSync('test_dir');
     Directory("${testDirectory.path}/loon").createSync();
     final mockPathProvider = MockPathProvider();

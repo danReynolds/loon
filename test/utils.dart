@@ -32,6 +32,7 @@ class PersistorCompleter {
   final _onClearCompleter = ResetCompleter();
   final _onHydrateCompleter = ResetCompleter();
   final _onClearAllCompleter = ResetCompleter();
+  final _onSyncCompleter = ResetCompleter();
 
   void persistComplete() {
     _onPersistCompleter.complete();
@@ -49,6 +50,10 @@ class PersistorCompleter {
     _onHydrateCompleter.complete();
   }
 
+  void syncComplete() {
+    _onSyncCompleter.complete();
+  }
+
   Future<void> get onPersist {
     return _onPersistCompleter.future;
   }
@@ -63,14 +68,6 @@ class PersistorCompleter {
 
   Future<void> get onHydrate {
     return _onHydrateCompleter.future;
-  }
-}
-
-class FilePersistorCompleter extends PersistorCompleter {
-  final _onSyncCompleter = ResetCompleter();
-
-  void syncComplete() {
-    _onSyncCompleter.complete();
   }
 
   Future<void> get onSync {

@@ -145,27 +145,6 @@ abstract class Persistor {
   /// The name of the default [DataStore] key.
   static final PersistorValueKey defaultKey = Persistor.key('__store__');
 
-  /// Selects the persistor to use based on the current platform. By default, this is the
-  /// [FilePersistor] for non-web platforms and the [IndexedDBPersistor] for web.
-  static Persistor adaptive({
-    void Function(Set<Document> batch)? onPersist,
-    void Function(Set<Collection> collections)? onClear,
-    void Function()? onClearAll,
-    void Function(Json data)? onHydrate,
-    void Function()? onSync,
-    Duration persistenceThrottle = const Duration(milliseconds: 100),
-    PersistorSettings settings = const PersistorSettings(),
-  }) {
-    return PersistorExtensions.adaptive(
-      onPersist: onPersist,
-      onClear: onClear,
-      onClearAll: onClearAll,
-      onHydrate: onHydrate,
-      settings: settings,
-      persistenceThrottle: persistenceThrottle,
-    );
-  }
-
   static PersistorValueKey key<T>(String value) {
     return PersistorValueKey(value);
   }

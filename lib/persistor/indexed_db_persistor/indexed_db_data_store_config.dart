@@ -1,5 +1,5 @@
 import 'dart:convert';
-import 'dart:js_interop' if (dart.library.io) 'js_interop_stub.dart';
+import 'dart:js_interop';
 import 'package:loon/loon.dart';
 import 'package:loon/persistor/data_store.dart';
 import 'package:loon/persistor/data_store_resolver.dart';
@@ -24,11 +24,10 @@ class IndexedDBDataStoreConfig extends DataStoreConfig {
               return null;
             }
 
-            print(result);
-
             final value = result[IndexedDBPersistor.valuePath];
             final json =
                 jsonDecode(encrypted ? encrypter.decrypt(value) : value);
+
             final store = ValueStore<ValueStore>();
 
             for (final entry in json.entries) {
@@ -78,22 +77,22 @@ class IndexedDBDataStoreResolverConfig extends DataStoreResolverConfig {
 
             final json = jsonDecode(result[IndexedDBPersistor.valuePath]);
 
-            return ValueRefStore(json);
+            return ValueRefStore<String>(json);
           },
           persist: (store) => runTransaction(
             'Persist resolver',
             (objectStore) {
-              final value = jsonEncode(store.extract());
-
               return objectStore.put({
                 IndexedDBPersistor.keyPath: name,
-                IndexedDBPersistor.valuePath: value,
+                IndexedDBPersistor.valuePath: jsonEncode(store.inspect()),
               }.jsify());
             },
+            'readwrite',
           ),
           delete: () => runTransaction(
             'Delete resolver',
             (objectStore) => objectStore.delete(name.toJS),
+            'readwrite',
           ),
         );
 }

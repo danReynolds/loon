@@ -27,7 +27,7 @@ class MockPathProvider extends Fake
 }
 
 void main() {
-  late FilePersistorCompleter completer;
+  late PersistorCompleter completer;
   late TestFilePersistor persistor;
 
   setUp(() {
@@ -35,7 +35,7 @@ void main() {
     final mockPathProvider = MockPathProvider();
     PathProviderPlatform.instance = mockPathProvider;
 
-    completer = TestFilePersistor.completer = FilePersistorCompleter();
+    completer = TestFilePersistor.completer = PersistorCompleter();
     persistor = TestFilePersistor(
       settings: const PersistorSettings(encrypted: true),
     );
