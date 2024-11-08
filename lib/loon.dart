@@ -5,6 +5,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart' hide Key;
 import 'package:uuid/uuid.dart';
 import 'dart:collection';
+import 'persistor/platform_persistor/platform_persistor.dart';
 
 export 'widgets/query_stream_builder.dart';
 export 'widgets/document_stream_builder.dart';

@@ -2,7 +2,6 @@ import 'dart:async';
 import 'package:example/models/user.dart';
 import 'package:flutter/material.dart';
 import 'package:loon/loon.dart';
-import 'package:loon/persistor/platform_persistor/platform_persistor.dart';
 import 'package:uuid/uuid.dart';
 
 const uuid = Uuid();
@@ -11,7 +10,7 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   Loon.configure(
-    persistor: PlatformPersistor(),
+    persistor: Persistor.current(),
     enableLogging: true,
   );
 
