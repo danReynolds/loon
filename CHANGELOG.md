@@ -1,3 +1,8 @@
+## 5.0.0
+
+* Adds web persistence support using the IndexedDBPersistor.
+* Adds a SqlitePersistor for native platforms.
+
 ## 4.0.1
 
 * Bugfix for default file data store instantiation.
