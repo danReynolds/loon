@@ -306,6 +306,7 @@ The currently available persistence options are broken down by platform:
 ### Web
 
 * **IndexedDBPersistor**: The default persistence implementation for web platforms. Documents are stored in [IndexedDB](https://developer.mozilla.org/en-US/docs/Web/API/IndexedDB_API), a low-level API for web-based client-side storage.
+  * > Note: Encryption on web is experimental through [flutter_secure_storage](https://pub.dev/packages/flutter_secure_storage#configure-web-version). It is important to enable the correct headers in order to ensure security of encryption on web.
 
 ## ⚙️ Configuration
 
