@@ -22,10 +22,10 @@ jobs:
       run: flutter pub get
 
     - name: Run Core tests
-      run: flutter test test/loon_test.dart test/store test/persistor/persistor_test.dart
+      run: flutter test test/core
 
     - name: Run Native tests
-      run: flutter test test/persistor/file_persistor_test.dart test/persistor/encrypted_file_persistor_test.dart
+      run: flutter test test/native
 
     - name: Run Web tests
-      run: flutter test test/persistor/indexed_db_persistor_test.dart --platform chrome
+      run: flutter test test/web --platform chrome
