@@ -3,7 +3,7 @@ import 'dart:js_interop';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:loon/persistor/data_store_encrypter.dart';
-import 'package:loon/persistor/indexed_db_persistor/indexed_db_persistor.dart';
+import 'package:loon/persistor/indexed_db_persistor/web_indexed_db_persistor.dart';
 import '../core/persistor/persistor_test_runner.dart';
 
 void main() {

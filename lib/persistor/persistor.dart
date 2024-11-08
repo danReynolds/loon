@@ -156,7 +156,18 @@ abstract class Persistor {
     Duration persistenceThrottle = const Duration(milliseconds: 100),
     PersistorSettings settings = const PersistorSettings(),
   }) {
-    return PlatformPersistor(
+    if (kIsWeb) {
+      return IndexedDBPersistor(
+        onPersist: onPersist,
+        onClear: onClear,
+        onClearAll: onClearAll,
+        onHydrate: onHydrate,
+        settings: settings,
+        persistenceThrottle: persistenceThrottle,
+      );
+    }
+
+    return FilePersistor(
       onPersist: onPersist,
       onClear: onClear,
       onClearAll: onClearAll,
