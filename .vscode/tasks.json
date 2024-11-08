@@ -4,15 +4,10 @@
   "version": "2.0.0",
   "tasks": [
     {
-      "label": "Run native tests",
+      "label": "Core tests",
       "type": "shell",
       "command": "flutter",
-      "args": [
-        "test",
-        "test/persistor/indexed_db_persistor_test.dart",
-        "--platform",
-        "chrome"
-      ],
+      "args": ["test", "test/loon_test.dart", "test/store", "test/persistor/persistor_test.dart"],
       "group": {
         "kind": "build",
         "isDefault": true
@@ -21,7 +16,19 @@
       "detail": "Runs a specific Flutter test file on the Chrome platform."
     },
     {
-      "label": "Run web tests",
+      "label": "Native tests",
+      "type": "shell",
+      "command": "flutter",
+      "args": ["test", "test/persistor/file_persistor_test.dart", "test/persistor/encrypted_file_persistor_test.dart"],
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "problemMatcher": [],
+      "detail": "Runs a specific Flutter test file on the Chrome platform."
+    },
+    {
+      "label": "Web tests",
       "type": "shell",
       "command": "flutter",
       "args": [
