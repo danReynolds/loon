@@ -1,0 +1,31 @@
+name: Run Flutter Tests
+
+on:
+  pull_request:
+    branches:
+      - main  # Adjust the target branch as needed
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Set up Flutter
+      uses: subosito/flutter-action@v2
+      with:
+        flutter-version: '3.26.0-0.1.pre'
+
+    - name: Install dependencies
+      run: flutter pub get
+
+    - name: Run Core tests
+      run: flutter test test/loon_test.dart test/store test/persistor/persistor_test.dart
+
+    - name: Run Native tests
+      run: flutter test test/persistor/file_persistor_test.dart test/persistor/encrypted_file_persistor_test.dart
+
+    - name: Run Web tests
+      run: flutter test test/persistor/indexed_db_persistor_test.dart --platform chrome
