@@ -7,7 +7,7 @@
       "label": "Core tests",
       "type": "shell",
       "command": "flutter",
-      "args": ["test", "test/loon_test.dart", "test/store", "test/persistor/persistor_test.dart"],
+      "args": ["test", "test/core"],
       "group": {
         "kind": "build",
         "isDefault": true
@@ -19,7 +19,7 @@
       "label": "Native tests",
       "type": "shell",
       "command": "flutter",
-      "args": ["test", "test/persistor/file_persistor_test.dart", "test/persistor/encrypted_file_persistor_test.dart"],
+      "args": ["test", "test/native"],
       "group": {
         "kind": "build",
         "isDefault": true
@@ -33,7 +33,7 @@
       "command": "flutter",
       "args": [
         "test",
-        "test/persistor/indexed_db_persistor_test.dart",
+        "test/web",
         "--platform",
         "chrome"
       ],

@@ -50,6 +50,10 @@ class TestIndexedDBPersistor extends IndexedDBPersistor {
       return objectStore.get(storeName.toJS);
     });
 
+    if (result == null) {
+      return null;
+    }
+
     final value = result[IndexedDBPersistor.valuePath];
 
     return jsonDecode(encrypted ? encrypter.decrypt(value) : value);

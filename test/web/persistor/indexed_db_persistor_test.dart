@@ -1,9 +1,9 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:loon/loon.dart';
 
-import '../models/test_indexed_db_persistor.dart';
-import '../models/test_user_model.dart';
-import '../utils.dart';
+import '../../models/test_indexed_db_persistor.dart';
+import '../../models/test_user_model.dart';
+import '../../utils.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -222,5 +222,130 @@ void main() {
         );
       });
     });
+
+    group(
+      'clear',
+      () {
+        test(
+          "Deletes collections and their subcollections",
+          () async {
+            final userCollection = Loon.collection(
+              'users',
+              fromJson: TestUserModel.fromJson,
+              toJson: (user) => user.toJson(),
+            );
+            final friendsCollection = userCollection.doc('1').subcollection(
+                  'friends',
+                  fromJson: TestUserModel.fromJson,
+                  toJson: (user) => user.toJson(),
+                  persistorSettings: PersistorSettings(
+                    key: Persistor.key('friends'),
+                  ),
+                );
+
+            userCollection.doc('1').create(TestUserModel('User 1'));
+            userCollection.doc('2').create(TestUserModel('User 2'));
+            friendsCollection.doc('1').create(TestUserModel('Friend 1'));
+
+            await completer.onSync;
+
+            expect(
+              await persistor.getStore('__store__'),
+              {
+                "": {
+                  "users": {
+                    "__values": {
+                      "1": {'name': 'User 1'},
+                      "2": {'name': 'User 2'},
+                    }
+                  }
+                }
+              },
+            );
+
+            expect(
+              await persistor.getStore('friends'),
+              {
+                "users__1__friends": {
+                  "users": {
+                    "1": {
+                      "friends": {
+                        "__values": {
+                          "1": {'name': 'Friend 1'},
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+            );
+
+            userCollection.delete();
+
+            await completer.onSync;
+
+            expect(
+              await persistor.getStore('__store__'),
+              null,
+            );
+
+            expect(
+              await persistor.getStore('friends'),
+              null,
+            );
+          },
+        );
+      },
+    );
+
+    group(
+      'clearAll',
+      () {
+        test(
+          "Deletes all file data stores",
+          () async {
+            final userCollection = Loon.collection(
+              'users',
+              fromJson: TestUserModel.fromJson,
+              toJson: (user) => user.toJson(),
+              persistorSettings: PersistorSettings(
+                key: Persistor.key('users'),
+              ),
+            );
+
+            userCollection.doc('1').create(TestUserModel('User 1'));
+            userCollection.doc('2').create(TestUserModel('User 2'));
+
+            await completer.onSync;
+
+            expect(await persistor.getStore('users'), {
+              "users": {
+                "users": {
+                  "__values": {
+                    "1": {'name': 'User 1'},
+                    "2": {'name': 'User 2'},
+                  }
+                }
+              }
+            });
+            expect(await persistor.getStore('__resolver__'), {
+              "__refs": {
+                Persistor.defaultKey.value: 1,
+                "users": 1,
+              },
+              "__values": {
+                ValueStore.root: Persistor.defaultKey.value,
+                "users": "users",
+              },
+            });
+
+            await Loon.clearAll();
+
+            expect(await persistor.getStore('users'), null);
+            expect(await persistor.getStore('__resolver__'), null);
+          },
+        );
+      },
+    );
   });
 }
