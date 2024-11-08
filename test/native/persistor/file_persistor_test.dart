@@ -48,7 +48,7 @@ void main() {
     await Loon.clearAll();
   });
 
-  group('Plaintext FilePersistor', () {
+  group('FilePersistor', () {
     group(
       'persist',
       () {

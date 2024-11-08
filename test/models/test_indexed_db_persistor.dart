@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:js_interop';
 
 import 'package:loon/loon.dart';
+import 'package:loon/persistor/data_store_encrypter.dart';
 import 'package:loon/persistor/indexed_db_persistor/indexed_db_persistor.dart';
 
 import '../utils.dart';
@@ -45,9 +46,16 @@ class TestIndexedDBPersistor extends IndexedDBPersistor {
           },
         );
 
-  Future<Map?> getStore(String storeName, [bool encrypted = false]) async {
+  Future<Map?> getStore(
+    String storeName, {
+    bool encrypted = false,
+  }) async {
     final result = await runTransaction('Get', (objectStore) {
-      return objectStore.get(storeName.toJS);
+      final objectStoreName = encrypted
+          ? '$storeName:${DataStoreEncrypter.encryptedName}'
+          : storeName;
+
+      return objectStore.get(objectStoreName.toJS);
     });
 
     if (result == null) {

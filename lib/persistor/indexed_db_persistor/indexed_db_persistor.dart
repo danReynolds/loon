@@ -103,9 +103,9 @@ class IndexedDBPersistor extends Persistor {
       return objectStore.getAllKeys();
     });
     final initialStoreNames = List<String>.from(result)
-        .where((name) =>
-            name != DataStoreResolver.name &&
-            !name.endsWith(DataStoreEncrypter.encryptedName))
+        .where((name) => name != DataStoreResolver.name)
+        .map((name) =>
+            name.replaceAll(':${DataStoreEncrypter.encryptedName}', ''))
         .toSet();
 
     _manager = DataStoreManager(
@@ -116,7 +116,7 @@ class IndexedDBPersistor extends Persistor {
       initialStoreNames: initialStoreNames,
       factory: (name, encrypted) => DataStore(
         IndexedDBDataStoreConfig(
-          encrypted ? '${name}_${DataStoreEncrypter.encryptedName}' : name,
+          encrypted ? '$name:${DataStoreEncrypter.encryptedName}' : name,
           encrypted: encrypted,
           encrypter: encrypter,
           runTransaction: runTransaction,

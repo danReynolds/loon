@@ -174,10 +174,10 @@ void main() {
         Loon.configure(persistor: null);
         await Loon.clearAll();
 
-        expect(userCollection.get().isEmpty, true);
-        expect(friendsCollection.get().isEmpty, true);
-        expect(userFriendsCollection.get().isEmpty, true);
-        expect(currentUserDoc.get(), null);
+        expect(userCollection.exists(), false);
+        expect(friendsCollection.exists(), false);
+        expect(userFriendsCollection.exists(), false);
+        expect(currentUserDoc.exists(), false);
 
         // Then reinitialize a new persistor so that it reads the persisted data on hydration.
         Loon.configure(persistor: TestIndexedDBPersistor());
