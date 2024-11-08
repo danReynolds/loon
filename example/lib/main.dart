@@ -10,9 +10,7 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   Loon.configure(
-    persistor: Persistor.current(
-      settings: const PersistorSettings(encrypted: true),
-    ),
+    persistor: Persistor.current(settings: const PersistorSettings()),
     enableLogging: true,
   );
 
