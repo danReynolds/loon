@@ -3,13 +3,14 @@ import 'package:loon/persistor/data_store.dart';
 import 'package:loon/persistor/data_store_encrypter.dart';
 import 'package:loon/persistor/data_store_manager.dart';
 import 'package:loon/persistor/data_store_persistence_payload.dart';
+import 'package:loon/persistor/data_store_resolver.dart';
 import 'package:loon/persistor/sqlite_persistor/sqlite_data_store_config.dart';
 import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
 
 class SqlitePersistor extends Persistor {
-  static const _dbName = 'loon.db';
-  static const _dbVersion = 1;
+  static const dbName = 'loon.db';
+  static const dbVersion = 1;
 
   static const tableName = 'store';
   static const keyColumn = 'key';
@@ -19,7 +20,7 @@ class SqlitePersistor extends Persistor {
 
   late final DataStoreManager _manager;
   final DataStoreEncrypter encrypter;
-  late final Database _db;
+  late final Database db;
 
   SqlitePersistor({
     super.onPersist,
@@ -34,11 +35,11 @@ class SqlitePersistor extends Persistor {
 
   Future<void> _initDB() async {
     final databasesPath = await getDatabasesPath();
-    String path = join(databasesPath, _dbName);
+    String path = join(databasesPath, dbName);
 
-    _db = await openDatabase(
+    db = await openDatabase(
       path,
-      version: _dbVersion,
+      version: dbVersion,
       onCreate: (db, version) async {
         await db.execute(
           '''
@@ -56,13 +57,14 @@ class SqlitePersistor extends Persistor {
   Future<void> init() async {
     await Future.wait([encrypter.init(), _initDB()]);
 
-    final rows = await _db.query(
+    final records = await db.query(
       tableName,
       columns: [keyColumn],
     );
-    final initialStoreNames = rows
-        .map((row) => (row[keyColumn] as String)
+    final initialStoreNames = records
+        .map((record) => (record[keyColumn] as String)
             .replaceAll(':${DataStoreEncrypter.encryptedName}', ''))
+        .where((name) => name != DataStoreResolver.name)
         .toSet();
 
     _manager = DataStoreManager(
@@ -73,14 +75,14 @@ class SqlitePersistor extends Persistor {
       initialStoreNames: initialStoreNames,
       factory: (name, encrypted) => DataStore(
         SqliteDataStoreConfig(
-          db: _db,
+          db: db,
           encrypted ? '$name:${DataStoreEncrypter.encryptedName}' : name,
           encrypted: encrypted,
           encrypter: encrypter,
           logger: _logger,
         ),
       ),
-      resolverConfig: SqliteDataStoreResolverConfig(db: _db),
+      resolverConfig: SqliteDataStoreResolverConfig(db: db),
     );
 
     await _manager.init();

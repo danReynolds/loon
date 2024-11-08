@@ -1,13 +1,13 @@
 import 'package:loon/loon.dart';
-import '../utils.dart';
+import 'test_persistor_completer.dart';
 import 'test_user_model.dart';
 
 /// A dummy persistor used in the test environment that doesn't actually engage with any persistence storage
 /// mechanism (file system, etc) and is just used to test the base [Persistor] batching and de-duping.
 class TestPersistor extends Persistor {
-  static final completer = PersistorCompleter();
-
   final List<DocumentSnapshot<TestUserModel>> seedData;
+
+  static final completer = TestPersistCompleter();
 
   TestPersistor({
     void Function(Set<Document> batch)? onPersist,

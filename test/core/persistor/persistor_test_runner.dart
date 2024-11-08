@@ -1,54 +1,89 @@
-import 'dart:convert';
-import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:loon/loon.dart';
+import 'package:loon/persistor/data_store_encrypter.dart';
 
-// ignore: depend_on_referenced_packages
-import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
-// ignore: depend_on_referenced_packages
-import 'package:plugin_platform_interface/plugin_platform_interface.dart';
-
-import '../../models/test_file_persistor.dart';
-import '../../models/test_large_model.dart';
+import '../../models/test_data_store_encrypter.dart';
+import '../../models/test_persistor.dart';
+import '../../models/test_persistor_completer.dart';
 import '../../models/test_user_model.dart';
-import '../../utils.dart';
 
-late Directory testDirectory;
+typedef PersistorFactory<T> = T Function({
+  void Function(Set<Document> batch)? onPersist,
+  void Function(Set<Collection> collections)? onClear,
+  void Function()? onClearAll,
+  void Function(Json data)? onHydrate,
+  void Function()? onSync,
+  PersistorSettings settings,
+  Duration persistenceThrottle,
+  DataStoreEncrypter? encrypter,
+});
 
-final logger = Logger('FilePersistorTest');
+/// Test runner for running the full suite of persistor tests against a persistor implementation
+/// including [FilePersistor], [IndexedDBPersistor], etc.
+void persistorTestRunner<T extends Persistor>({
+  required PersistorFactory<T> factory,
+  required Future<Map?> Function(
+    T persistor,
+    String storeName, {
+    bool encrypted,
+  }) getStore,
+}) {
+  late T persistor;
+  late TestPersistCompleter completer;
 
-class MockPathProvider extends Fake
-    with MockPlatformInterfaceMixin
-    implements PathProviderPlatform {
-  getApplicationDocumentsDirectory() {
-    return testDirectory;
+  Future<Map?> get(
+    String store, {
+    bool encrypted = false,
+  }) async {
+    return getStore(persistor, store, encrypted: encrypted);
   }
 
-  @override
-  getApplicationDocumentsPath() async {
-    return testDirectory.path;
+  Future<bool> exists(
+    String storeName, {
+    bool encrypted = false,
+  }) async {
+    final result = await get(storeName, encrypted: encrypted);
+    return result != null;
   }
-}
 
-void main() {
-  late PersistorCompleter completer;
+  void configure({
+    PersistorSettings settings = const PersistorSettings(),
+  }) {
+    completer = TestPersistCompleter();
+    persistor = factory(
+      persistenceThrottle: const Duration(milliseconds: 1),
+      settings: settings,
+      encrypter: TestDataStoreEncrypter(),
+      onPersist: (docs) {
+        completer.persistComplete();
+      },
+      onHydrate: (refs) {
+        completer.hydrateComplete();
+      },
+      onClear: (collections) {
+        completer.clearComplete();
+      },
+      onClearAll: () {
+        completer.clearAllComplete();
+      },
+      onSync: () {
+        completer.syncComplete();
+      },
+    );
 
-  setUp(() {
-    completer = TestFilePersistor.completer = PersistorCompleter();
-    testDirectory = Directory.systemTemp.createTempSync('test_dir');
-    Directory("${testDirectory.path}/loon").createSync();
-    final mockPathProvider = MockPathProvider();
-    PathProviderPlatform.instance = mockPathProvider;
+    Loon.configure(persistor: persistor);
+  }
 
-    Loon.configure(persistor: TestFilePersistor());
-  });
+  group('Persistor Test Runner', () {
+    setUp(() async {
+      await Loon.clearAll();
+      configure();
+    });
 
-  tearDown(() async {
-    testDirectory.deleteSync(recursive: true);
-    await Loon.clearAll();
-  });
+    tearDown(() async {
+      await Loon.clearAll();
+    });
 
-  group('FilePersistor', () {
     group(
       'persist',
       () {
@@ -80,11 +115,8 @@ void main() {
 
             await completer.onSync;
 
-            final file = File('${testDirectory.path}/loon/__store__.json');
-            final json = jsonDecode(file.readAsStringSync());
-
             expect(
-              json,
+              await get('__store__'),
               {
                 "": {
                   "users": {
@@ -105,9 +137,7 @@ void main() {
             );
 
             // The resolver is not necessary for data only persisted in the root data store.
-            final resolverFile =
-                File('${testDirectory.path}/loon/__resolver__.json');
-            expect(resolverFile.existsSync(), false);
+            expect(await exists('__resolver__'), false);
           },
         );
 
@@ -129,11 +159,8 @@ void main() {
 
             await completer.onSync;
 
-            final file = File('${testDirectory.path}/loon/__store__.json');
-            final json = jsonDecode(file.readAsStringSync());
-
             expect(
-              json,
+              await get('__store__'),
               {
                 "": {
                   "users": {
@@ -162,11 +189,8 @@ void main() {
 
             await completer.onSync;
 
-            final file = File('${testDirectory.path}/loon/__store__.json');
-            final json = jsonDecode(file.readAsStringSync());
-
             expect(
-              json,
+              await get('__store__'),
               {
                 "": {
                   "users": {
@@ -199,11 +223,8 @@ void main() {
 
             await completer.onSync;
 
-            var file = File('${testDirectory.path}/loon/__store__.json');
-            var json = jsonDecode(file.readAsStringSync());
-
             expect(
-              json,
+              await get('__store__'),
               {
                 "": {
                   "users": {
@@ -220,11 +241,8 @@ void main() {
 
             await completer.onSync;
 
-            file = File('${testDirectory.path}/loon/__store__.json');
-            json = jsonDecode(file.readAsStringSync());
-
             expect(
-              json,
+              await get('__store__'),
               {
                 "": {
                   "users": {
@@ -250,11 +268,9 @@ void main() {
             userCollection.doc('1').create(TestUserModel('User 1'));
             userCollection.doc('2').create(TestUserModel('User 2'));
 
-            final file = File('${testDirectory.path}/loon/__store__.json');
-
             await completer.onSync;
 
-            expect(file.existsSync(), true);
+            expect(await exists('__store__'), true);
 
             // If all documents of a file are deleted, the file itself should be deleted.
             userCollection.doc('1').delete();
@@ -262,7 +278,7 @@ void main() {
 
             await completer.onSync;
 
-            expect(file.existsSync(), false);
+            expect(await exists('__store__'), false);
           },
         );
 
@@ -299,13 +315,8 @@ void main() {
 
             await completer.onSync;
 
-            final storeFile = File('${testDirectory.path}/loon/__store__.json');
-            final friendsFile = File('${testDirectory.path}/loon/friends.json');
-            var storeJson = jsonDecode(storeFile.readAsStringSync());
-            var friendsJson = jsonDecode(friendsFile.readAsStringSync());
-
             expect(
-              storeJson,
+              await get('__store__'),
               {
                 ValueStore.root: {
                   "users": {
@@ -319,7 +330,7 @@ void main() {
             );
 
             expect(
-              friendsJson,
+              await get('friends'),
               {
                 "users__2__friends": {
                   "users": {
@@ -336,12 +347,8 @@ void main() {
               },
             );
 
-            final resolverFile =
-                File('${testDirectory.path}/loon/__resolver__.json');
-            var resolverJson = jsonDecode(resolverFile.readAsStringSync());
-
             expect(
-              resolverJson,
+              await get('__resolver__'),
               {
                 "__refs": {
                   "friends": 1,
@@ -370,9 +377,8 @@ void main() {
 
             await completer.onSync;
 
-            friendsJson = jsonDecode(friendsFile.readAsStringSync());
             expect(
-              friendsJson,
+              await get('friends'),
               {
                 "users__2__friends": {
                   "users": {
@@ -388,9 +394,8 @@ void main() {
               },
             );
 
-            resolverJson = jsonDecode(resolverFile.readAsStringSync());
             expect(
-              resolverJson,
+              await get('__resolver__'),
               {
                 "__refs": {
                   "friends": 1,
@@ -419,11 +424,10 @@ void main() {
 
             await completer.onSync;
 
-            expect(friendsFile.existsSync(), false);
+            expect(await exists('friends'), false);
 
-            resolverJson = jsonDecode(resolverFile.readAsStringSync());
             expect(
-              resolverJson,
+              await get('__resolver__'),
               {
                 "__refs": {
                   Persistor.defaultKey.value: 1,
@@ -458,14 +462,8 @@ void main() {
 
             await completer.onSync;
 
-            final usersFile = File('${testDirectory.path}/loon/users.json');
-            final otherUsersFile =
-                File('${testDirectory.path}/loon/other_users.json');
-            var usersJson = jsonDecode(usersFile.readAsStringSync());
-            var otherUsersJson = jsonDecode(otherUsersFile.readAsStringSync());
-
             expect(
-              usersJson,
+              await get('users'),
               {
                 "users__1": {
                   "users": {
@@ -478,7 +476,7 @@ void main() {
             );
 
             expect(
-              otherUsersJson,
+              await get('other_users'),
               {
                 "users__2": {
                   "users": {
@@ -490,12 +488,8 @@ void main() {
               },
             );
 
-            final resolverFile =
-                File('${testDirectory.path}/loon/__resolver__.json');
-            var resolverJson = jsonDecode(resolverFile.readAsStringSync());
-
             expect(
-              resolverJson,
+              await get('__resolver__'),
               {
                 "__refs": {
                   "users": 1,
@@ -522,9 +516,9 @@ void main() {
 
             await completer.onSync;
 
-            expect(usersFile.existsSync(), false);
+            expect(await exists('users'), false);
             expect(
-              otherUsersJson,
+              await get('other_users'),
               {
                 "users__2": {
                   "users": {
@@ -536,9 +530,8 @@ void main() {
               },
             );
 
-            resolverJson = jsonDecode(resolverFile.readAsStringSync());
             expect(
-              resolverJson,
+              await get('__resolver__'),
               {
                 "__refs": {
                   "other_users": 1,
@@ -562,11 +555,10 @@ void main() {
 
             await completer.onSync;
 
-            expect(otherUsersFile.existsSync(), false);
+            expect(await exists('other_users'), false);
 
-            resolverJson = jsonDecode(resolverFile.readAsStringSync());
             expect(
-              resolverJson,
+              await get('__resolver__'),
               {
                 "__refs": {
                   Persistor.defaultKey.value: 1,
@@ -612,15 +604,11 @@ void main() {
 
             await completer.onSync;
 
-            final storeFile = File('${testDirectory.path}/loon/__store__.json');
-            final usersFile = File('${testDirectory.path}/loon/users.json');
-            final usersJson = jsonDecode(usersFile.readAsStringSync());
-
             // All data is stored in the users.json
-            expect(storeFile.existsSync(), false);
+            expect(await exists('__store__'), false);
 
             expect(
-              usersJson,
+              await get('users'),
               {
                 "users": {
                   "users": {
@@ -641,12 +629,8 @@ void main() {
               },
             );
 
-            final resolverFile =
-                File('${testDirectory.path}/loon/__resolver__.json');
-            final resolverJson = jsonDecode(resolverFile.readAsStringSync());
-
             expect(
-              resolverJson,
+              await get('__resolver__'),
               {
                 "__refs": {
                   "users": 1,
@@ -697,13 +681,8 @@ void main() {
 
             await completer.onSync;
 
-            final usersFile = File('${testDirectory.path}/loon/users.json');
-            final friendsFile = File('${testDirectory.path}/loon/friends.json');
-            final usersJson = jsonDecode(usersFile.readAsStringSync());
-            final friendsJson = jsonDecode(friendsFile.readAsStringSync());
-
             expect(
-              usersJson,
+              await get('users'),
               {
                 "users": {
                   "users": {
@@ -717,7 +696,7 @@ void main() {
             );
 
             expect(
-              friendsJson,
+              await get('friends'),
               {
                 "users__2__friends": {
                   "users": {
@@ -734,15 +713,11 @@ void main() {
               },
             );
 
-            final resolverFile =
-                File('${testDirectory.path}/loon/__resolver__.json');
-            final resolverJson = jsonDecode(resolverFile.readAsStringSync());
-
             // Since the friends collection under users__2 specifies a "friends" key,
             // this overrides the parent path's "users" key on the users collection and
             // therefore resolves the friends documents to the "friends" data store.
             expect(
-              resolverJson,
+              await get('__resolver__'),
               {
                 "__refs": {
                   "users": 1,
@@ -811,13 +786,8 @@ void main() {
 
             await completer.onSync;
 
-            final users1File = File('${testDirectory.path}/loon/users_1.json');
-            final users2File = File('${testDirectory.path}/loon/users_2.json');
-            final users1Json = jsonDecode(users1File.readAsStringSync());
-            final users2Json = jsonDecode(users2File.readAsStringSync());
-
             expect(
-              users1Json,
+              await get('users_1'),
               {
                 "users__1": {
                   "users": {
@@ -837,7 +807,7 @@ void main() {
             );
 
             expect(
-              users2Json,
+              await get('users_2'),
               {
                 "users__2": {
                   "users": {
@@ -856,12 +826,8 @@ void main() {
               },
             );
 
-            final resolverFile =
-                File('${testDirectory.path}/loon/__resolver__.json');
-            final resolverJson = jsonDecode(resolverFile.readAsStringSync());
-
             expect(
-              resolverJson,
+              await get('__resolver__'),
               {
                 "__refs": {
                   Persistor.defaultKey.value: 1,
@@ -936,19 +902,8 @@ void main() {
 
             await completer.onSync;
 
-            final users1File = File('${testDirectory.path}/loon/users_1.json');
-            final users2File = File('${testDirectory.path}/loon/users_2.json');
-            final users1Json = jsonDecode(users1File.readAsStringSync());
-            final users2Json = jsonDecode(users2File.readAsStringSync());
-            final friends1File =
-                File('${testDirectory.path}/loon/friends_1.json');
-            final friends2File =
-                File('${testDirectory.path}/loon/friends_2.json');
-            final friends1Json = jsonDecode(friends1File.readAsStringSync());
-            final friends2Json = jsonDecode(friends2File.readAsStringSync());
-
             expect(
-              users1Json,
+              await get('users_1'),
               {
                 "users__1": {
                   "users": {
@@ -960,7 +915,7 @@ void main() {
               },
             );
             expect(
-              friends1Json,
+              await get('friends_1'),
               {
                 "users__1__friends__1": {
                   "users": {
@@ -977,7 +932,7 @@ void main() {
             );
 
             expect(
-              users2Json,
+              await get('users_2'),
               {
                 "users__2": {
                   "users": {
@@ -989,7 +944,7 @@ void main() {
               },
             );
             expect(
-              friends2Json,
+              await get('friends_2'),
               {
                 "users__2__friends__2": {
                   "users": {
@@ -1005,12 +960,8 @@ void main() {
               },
             );
 
-            final resolverFile =
-                File('${testDirectory.path}/loon/__resolver__.json');
-            final resolverJson = jsonDecode(resolverFile.readAsStringSync());
-
             expect(
-              resolverJson,
+              await get('__resolver__'),
               {
                 "__refs": {
                   "users_1": 1,
@@ -1099,13 +1050,8 @@ void main() {
 
             await completer.onSync;
 
-            final usersFile = File('${testDirectory.path}/loon/users.json');
-            final storeFile = File('${testDirectory.path}/loon/__store__.json');
-            final usersJson = jsonDecode(usersFile.readAsStringSync());
-            final storeJson = jsonDecode(storeFile.readAsStringSync());
-
             expect(
-              usersJson,
+              await get('users'),
               {
                 "users": {
                   "users": {
@@ -1119,7 +1065,7 @@ void main() {
             );
 
             expect(
-              storeJson,
+              await get('__store__'),
               {
                 "users__2__friends": {
                   "users": {
@@ -1136,15 +1082,11 @@ void main() {
               },
             );
 
-            final resolverFile =
-                File('${testDirectory.path}/loon/__resolver__.json');
-            final resolverJson = jsonDecode(resolverFile.readAsStringSync());
-
             // Since the friends collection under users__2 specifies a "friends" key,
             // this overrides the parent path's "users" key on the users collection and
             // therefore resolves the friends documents to the "friends" data store.
             expect(
-              resolverJson,
+              await get('__resolver__'),
               {
                 "__refs": {
                   "users": 1,
@@ -1220,12 +1162,8 @@ void main() {
 
                     await completer.onSync;
 
-                    final storeFile =
-                        File('${testDirectory.path}/loon/__store__.json');
-                    var storeJson = jsonDecode(storeFile.readAsStringSync());
-
                     expect(
-                      storeJson,
+                      await get('__store__'),
                       {
                         ValueStore.root: {
                           "users": {
@@ -1245,9 +1183,7 @@ void main() {
                       },
                     );
 
-                    final resolverFile =
-                        File('${testDirectory.path}/loon/__resolver__.json');
-                    expect(resolverFile.existsSync(), false);
+                    expect(await exists('__resolver__'), false);
 
                     updatedUsersCollection
                         .doc('1')
@@ -1255,15 +1191,10 @@ void main() {
 
                     await completer.onSync;
 
-                    final otherUsersFile =
-                        File('${testDirectory.path}/loon/other_users.json');
-                    var otherUsersJson =
-                        jsonDecode(otherUsersFile.readAsStringSync());
-
-                    expect(storeFile.existsSync(), false);
+                    expect(await exists('__store__'), false);
 
                     expect(
-                      otherUsersJson,
+                      await get('other_users'),
                       {
                         "users": {
                           "users": {
@@ -1283,10 +1214,8 @@ void main() {
                       },
                     );
 
-                    final resolverJson =
-                        jsonDecode(resolverFile.readAsStringSync());
                     expect(
-                      resolverJson,
+                      await get('__resolver__'),
                       {
                         "__refs": {
                           "other_users": 1,
@@ -1341,12 +1270,8 @@ void main() {
 
                     await completer.onSync;
 
-                    final storeFile =
-                        File('${testDirectory.path}/loon/__store__.json');
-                    var storeJson = jsonDecode(storeFile.readAsStringSync());
-
                     expect(
-                      storeJson,
+                      await get('__store__'),
                       {
                         ValueStore.root: {
                           "users": {
@@ -1366,9 +1291,7 @@ void main() {
                       },
                     );
 
-                    final resolverFile =
-                        File('${testDirectory.path}/loon/__resolver__.json');
-                    expect(resolverFile.existsSync(), false);
+                    expect(await exists('__resolver__'), false);
 
                     updatedUsersCollection
                         .doc('1')
@@ -1376,9 +1299,8 @@ void main() {
 
                     await completer.onSync;
 
-                    storeJson = jsonDecode(storeFile.readAsStringSync());
                     expect(
-                      storeJson,
+                      await get('__store__'),
                       {
                         ValueStore.root: {
                           "users": {
@@ -1390,12 +1312,8 @@ void main() {
                       },
                     );
 
-                    final users1File =
-                        File('${testDirectory.path}/loon/users_1.json');
-                    var users1Json = jsonDecode(users1File.readAsStringSync());
-
                     expect(
-                      users1Json,
+                      await get('users_1'),
                       {
                         "users__1": {
                           "users": {
@@ -1414,10 +1332,8 @@ void main() {
                       },
                     );
 
-                    var resolverJson =
-                        jsonDecode(resolverFile.readAsStringSync());
                     expect(
-                      resolverJson,
+                      await get('__resolver__'),
                       {
                         "__refs": {
                           Persistor.defaultKey.value: 1,
@@ -1480,16 +1396,8 @@ void main() {
 
                     await completer.onSync;
 
-                    final storeFile =
-                        File('${testDirectory.path}/loon/__store__.json');
-                    expect(storeFile.existsSync(), false);
-
-                    final usersFile =
-                        File('${testDirectory.path}/loon/users.json');
-                    var usersJson = jsonDecode(usersFile.readAsStringSync());
-
                     expect(
-                      usersJson,
+                      await get('users'),
                       {
                         "users": {
                           "users": {
@@ -1509,13 +1417,8 @@ void main() {
                       },
                     );
 
-                    final resolverFile =
-                        File('${testDirectory.path}/loon/__resolver__.json');
-                    var resolverJson =
-                        jsonDecode(resolverFile.readAsStringSync());
-
                     expect(
-                      resolverJson,
+                      await get('__resolver__'),
                       {
                         "__refs": {
                           Persistor.defaultKey.value: 1,
@@ -1534,10 +1437,8 @@ void main() {
 
                     await completer.onSync;
 
-                    var storeJson = jsonDecode(storeFile.readAsStringSync());
-
                     expect(
-                      storeJson,
+                      await get('__store__'),
                       {
                         ValueStore.root: {
                           "users": {
@@ -1557,11 +1458,10 @@ void main() {
                       },
                     );
 
-                    expect(usersFile.existsSync(), false);
+                    expect(await exists('users'), false);
 
-                    resolverJson = jsonDecode(resolverFile.readAsStringSync());
                     expect(
-                      resolverJson,
+                      await get('__resolver__'),
                       {
                         "__refs": {
                           Persistor.defaultKey.value: 1,
@@ -1617,16 +1517,8 @@ void main() {
 
                     await completer.onSync;
 
-                    final storeFile =
-                        File('${testDirectory.path}/loon/__store__.json');
-                    expect(storeFile.existsSync(), false);
-
-                    final users1File =
-                        File('${testDirectory.path}/loon/users_1.json');
-                    var users1Json = jsonDecode(users1File.readAsStringSync());
-
                     expect(
-                      users1Json,
+                      await get('users_1'),
                       {
                         "users__1": {
                           "users": {
@@ -1645,12 +1537,8 @@ void main() {
                       },
                     );
 
-                    final users2File =
-                        File('${testDirectory.path}/loon/users_2.json');
-                    var users2Json = jsonDecode(users2File.readAsStringSync());
-
                     expect(
-                      users2Json,
+                      await get('users_2'),
                       {
                         "users__2": {
                           "users": {
@@ -1662,13 +1550,8 @@ void main() {
                       },
                     );
 
-                    final resolverFile =
-                        File('${testDirectory.path}/loon/__resolver__.json');
-                    var resolverJson =
-                        jsonDecode(resolverFile.readAsStringSync());
-
                     expect(
-                      resolverJson,
+                      await get('__resolver__'),
                       {
                         "__refs": {
                           Persistor.defaultKey.value: 1,
@@ -1697,10 +1580,8 @@ void main() {
 
                     await completer.onSync;
 
-                    var storeJson = jsonDecode(storeFile.readAsStringSync());
-
                     expect(
-                      storeJson,
+                      await get('__store__'),
                       {
                         ValueStore.root: {
                           "users": {
@@ -1719,11 +1600,10 @@ void main() {
                       },
                     );
 
-                    expect(users1File.existsSync(), false);
+                    expect(await exists('users_1'), false);
 
-                    users2Json = jsonDecode(users2File.readAsStringSync());
                     expect(
-                      users2Json,
+                      await get('users_2'),
                       {
                         "users__2": {
                           "users": {
@@ -1735,9 +1615,8 @@ void main() {
                       },
                     );
 
-                    resolverJson = jsonDecode(resolverFile.readAsStringSync());
                     expect(
-                      resolverJson,
+                      await get('__resolver__'),
                       {
                         "__refs": {
                           Persistor.defaultKey.value: 1,
@@ -1802,12 +1681,8 @@ void main() {
 
                     await completer.onSync;
 
-                    final usersFile =
-                        File('${testDirectory.path}/loon/users.json');
-                    var usersJson = jsonDecode(usersFile.readAsStringSync());
-
                     expect(
-                      usersJson,
+                      await get('users'),
                       {
                         "users": {
                           "users": {
@@ -1827,13 +1702,8 @@ void main() {
                       },
                     );
 
-                    var resolverFile =
-                        File('${testDirectory.path}/loon/__resolver__.json');
-                    var resolverJson =
-                        jsonDecode(resolverFile.readAsStringSync());
-
                     expect(
-                      resolverJson,
+                      await get('__resolver__'),
                       {
                         "__refs": {
                           Persistor.defaultKey.value: 1,
@@ -1852,15 +1722,10 @@ void main() {
 
                     await completer.onSync;
 
-                    expect(usersFile.existsSync(), false);
-
-                    final updatedUsersFile =
-                        File('${testDirectory.path}/loon/updated_users.json');
-                    final updatedUsersJson =
-                        jsonDecode(updatedUsersFile.readAsStringSync());
+                    expect(await exists('users'), false);
 
                     expect(
-                      updatedUsersJson,
+                      await get('updated_users'),
                       {
                         "users": {
                           "users": {
@@ -1880,12 +1745,8 @@ void main() {
                       },
                     );
 
-                    resolverFile =
-                        File('${testDirectory.path}/loon/__resolver__.json');
-                    resolverJson = jsonDecode(resolverFile.readAsStringSync());
-
                     expect(
-                      resolverJson,
+                      await get('__resolver__'),
                       {
                         "__refs": {
                           Persistor.defaultKey.value: 1,
@@ -1941,12 +1802,8 @@ void main() {
 
                     await completer.onSync;
 
-                    final usersFile =
-                        File('${testDirectory.path}/loon/users.json');
-                    var usersJson = jsonDecode(usersFile.readAsStringSync());
-
                     expect(
-                      usersJson,
+                      await get('users'),
                       {
                         "users__1": {
                           "users": {
@@ -1972,13 +1829,8 @@ void main() {
                       },
                     );
 
-                    var resolverFile =
-                        File('${testDirectory.path}/loon/__resolver__.json');
-                    var resolverJson =
-                        jsonDecode(resolverFile.readAsStringSync());
-
                     expect(
-                      resolverJson,
+                      await get('__resolver__'),
                       {
                         "__refs": {
                           Persistor.defaultKey.value: 1,
@@ -2005,9 +1857,8 @@ void main() {
 
                     await completer.onSync;
 
-                    usersJson = jsonDecode(usersFile.readAsStringSync());
                     expect(
-                      usersJson,
+                      await get('users'),
                       {
                         "users__1": {
                           "users": {
@@ -2019,14 +1870,9 @@ void main() {
                       },
                     );
 
-                    final updatedUsersFile =
-                        File('${testDirectory.path}/loon/updated_users.json');
-                    final updatedUsersJson =
-                        jsonDecode(updatedUsersFile.readAsStringSync());
-
                     // Both `users__2` and its subcollections should have been moved to the `updated_users` data store.
                     expect(
-                      updatedUsersJson,
+                      await get('updated_users'),
                       {
                         "users__2": {
                           "users": {
@@ -2045,12 +1891,8 @@ void main() {
                       },
                     );
 
-                    resolverFile =
-                        File('${testDirectory.path}/loon/__resolver__.json');
-                    resolverJson = jsonDecode(resolverFile.readAsStringSync());
-
                     expect(
-                      resolverJson,
+                      await get('__resolver__'),
                       {
                         "__refs": {
                           Persistor.defaultKey.value: 1,
@@ -2109,11 +1951,7 @@ void main() {
 
                     await completer.onSync;
 
-                    final usersFile =
-                        File('${testDirectory.path}/loon/users.json');
-                    var usersJson = jsonDecode(usersFile.readAsStringSync());
-
-                    expect(usersJson, {
+                    expect(await get('users'), {
                       "users": {
                         "users": {
                           "__values": {
@@ -2124,13 +1962,8 @@ void main() {
                       }
                     });
 
-                    final resolverFile =
-                        File('${testDirectory.path}/loon/__resolver__.json');
-                    var resolverJson =
-                        jsonDecode(resolverFile.readAsStringSync());
-
                     expect(
-                      resolverJson,
+                      await get('__resolver__'),
                       {
                         "__refs": {
                           Persistor.defaultKey.value: 1,
@@ -2149,8 +1982,7 @@ void main() {
 
                     await completer.onSync;
 
-                    usersJson = jsonDecode(usersFile.readAsStringSync());
-                    expect(usersJson, {
+                    expect(await get('users'), {
                       "users": {
                         "users": {
                           "__values": {
@@ -2160,12 +1992,8 @@ void main() {
                       }
                     });
 
-                    final users1File =
-                        File('${testDirectory.path}/loon/users_1.json');
-                    var users1Json = jsonDecode(users1File.readAsStringSync());
-
                     expect(
-                      users1Json,
+                      await get('users_1'),
                       {
                         "users__1": {
                           "users": {
@@ -2177,9 +2005,8 @@ void main() {
                       },
                     );
 
-                    resolverJson = jsonDecode(resolverFile.readAsStringSync());
                     expect(
-                      resolverJson,
+                      await get('__resolver__'),
                       {
                         "__refs": {
                           Persistor.defaultKey.value: 1,
@@ -2236,11 +2063,7 @@ void main() {
 
                     await completer.onSync;
 
-                    final users1File =
-                        File('${testDirectory.path}/loon/users_1.json');
-                    var users1Json = jsonDecode(users1File.readAsStringSync());
-
-                    expect(users1Json, {
+                    expect(await get('users_1'), {
                       "users__1": {
                         "users": {
                           "__values": {
@@ -2250,11 +2073,7 @@ void main() {
                       }
                     });
 
-                    final users2File =
-                        File('${testDirectory.path}/loon/users_2.json');
-                    var users2Json = jsonDecode(users2File.readAsStringSync());
-
-                    expect(users2Json, {
+                    expect(await get('users_2'), {
                       "users__2": {
                         "users": {
                           "__values": {
@@ -2264,13 +2083,8 @@ void main() {
                       }
                     });
 
-                    final resolverFile =
-                        File('${testDirectory.path}/loon/__resolver__.json');
-                    var resolverJson =
-                        jsonDecode(resolverFile.readAsStringSync());
-
                     expect(
-                      resolverJson,
+                      await get('__resolver__'),
                       {
                         "__refs": {
                           Persistor.defaultKey.value: 1,
@@ -2299,10 +2113,7 @@ void main() {
 
                     await completer.onSync;
 
-                    final usersFile =
-                        File('${testDirectory.path}/loon/users.json');
-                    final usersJson = jsonDecode(usersFile.readAsStringSync());
-                    expect(usersJson, {
+                    expect(await get('users'), {
                       "users": {
                         "users": {
                           "__values": {
@@ -2312,10 +2123,8 @@ void main() {
                       }
                     });
 
-                    expect(users1File.existsSync(), false);
-
-                    users2Json = jsonDecode(users2File.readAsStringSync());
-                    expect(users2Json, {
+                    expect(await exists('users_1'), false);
+                    expect(await get('users_2'), {
                       "users__2": {
                         "users": {
                           "__values": {
@@ -2325,9 +2134,8 @@ void main() {
                       }
                     });
 
-                    resolverJson = jsonDecode(resolverFile.readAsStringSync());
                     expect(
-                      resolverJson,
+                      await get('__resolver__'),
                       {
                         "__refs": {
                           Persistor.defaultKey.value: 1,
@@ -2361,11 +2169,9 @@ void main() {
             test(
               'Stores documents under the given value key',
               () async {
-                Loon.configure(
-                  persistor: TestFilePersistor(
-                    settings: PersistorSettings(
-                      key: Persistor.key('users'),
-                    ),
+                configure(
+                  settings: PersistorSettings(
+                    key: Persistor.key('users'),
                   ),
                 );
 
@@ -2381,11 +2187,8 @@ void main() {
 
                 await completer.onSync;
 
-                final usersFile = File('${testDirectory.path}/loon/users.json');
-                final usersJson = jsonDecode(usersFile.readAsStringSync());
-
                 expect(
-                  usersJson,
+                  await get('users'),
                   {
                     "": {
                       "users": {
@@ -2399,13 +2202,8 @@ void main() {
                   },
                 );
 
-                final resolverFile =
-                    File('${testDirectory.path}/loon/__resolver__.json');
-                final resolverJson =
-                    jsonDecode(resolverFile.readAsStringSync());
-
                 expect(
-                  resolverJson,
+                  await get('__resolver__'),
                   {
                     "__refs": {
                       "users": 1,
@@ -2421,16 +2219,14 @@ void main() {
             test(
               'Stores documents using the given key builder',
               () async {
-                Loon.configure(
-                  persistor: TestFilePersistor(
-                    settings: PersistorSettings(
-                      key: Persistor.keyBuilder((snap) {
-                        return switch (snap.data) {
-                          TestUserModel _ => 'users',
-                          _ => Persistor.defaultKey.value,
-                        };
-                      }),
-                    ),
+                configure(
+                  settings: PersistorSettings(
+                    key: Persistor.keyBuilder((snap) {
+                      return switch (snap.data) {
+                        TestUserModel _ => 'users',
+                        _ => Persistor.defaultKey.value,
+                      };
+                    }),
                   ),
                 );
 
@@ -2450,11 +2246,8 @@ void main() {
 
                 await completer.onSync;
 
-                final usersFile = File('${testDirectory.path}/loon/users.json');
-                final usersJson = jsonDecode(usersFile.readAsStringSync());
-
                 expect(
-                  usersJson,
+                  await get('users'),
                   {
                     "users__1": {
                       "users": {
@@ -2468,12 +2261,8 @@ void main() {
                   },
                 );
 
-                final storeFile =
-                    File('${testDirectory.path}/loon/__store__.json');
-                final storeJson = jsonDecode(storeFile.readAsStringSync());
-
                 expect(
-                  storeJson,
+                  await get('__store__'),
                   {
                     "posts__1": {
                       "posts": {
@@ -2488,13 +2277,8 @@ void main() {
                   },
                 );
 
-                final resolverFile =
-                    File('${testDirectory.path}/loon/__resolver__.json');
-                final resolverJson =
-                    jsonDecode(resolverFile.readAsStringSync());
-
                 expect(
-                  resolverJson,
+                  await get('__resolver__'),
                   {
                     "__refs": {
                       "users": 1,
@@ -2537,11 +2321,8 @@ void main() {
 
             await completer.onSync;
 
-            final file = File('${testDirectory.path}/loon/__store__.json');
-            final json = jsonDecode(file.readAsStringSync());
-
             expect(
-              json,
+              await get('__store__'),
               {
                 "": {
                   "root": {
@@ -2576,11 +2357,8 @@ void main() {
 
             await completer.onSync;
 
-            final file = File('${testDirectory.path}/loon/__store__.json');
-            final json = jsonDecode(file.readAsStringSync());
-
             expect(
-              json,
+              await get('__store__'),
               {
                 "": {
                   "users": {
@@ -2631,10 +2409,7 @@ void main() {
 
         await completer.onSync;
 
-        final storeFile = File('${testDirectory.path}/loon/__store__.json');
-        final storeJson = jsonDecode(storeFile.readAsStringSync());
-
-        expect(storeJson, {
+        expect(await get('__store__'), {
           "": {
             "users": {
               "__values": {
@@ -2656,11 +2431,7 @@ void main() {
           },
         });
 
-        final myFriendsFile =
-            File('${testDirectory.path}/loon/my_friends.json');
-        final myFriendsJson = jsonDecode(myFriendsFile.readAsStringSync());
-
-        expect(myFriendsJson, {
+        expect(await get('my_friends'), {
           "users__1__friends": {
             "users": {
               "1": {
@@ -2674,11 +2445,7 @@ void main() {
           }
         });
 
-        final resolverFile =
-            File('${testDirectory.path}/loon/__resolver__.json');
-        final resolverJson = jsonDecode(resolverFile.readAsStringSync());
-
-        expect(resolverJson, {
+        expect(await get('__resolver__'), {
           "__refs": {
             Persistor.defaultKey.value: 1,
             "my_friends": 1,
@@ -2701,19 +2468,13 @@ void main() {
           }
         });
 
+        Loon.configure(persistor: null);
         await Loon.clearAll();
+        configure();
 
-        expect(storeFile.existsSync(), false);
-        expect(myFriendsFile.existsSync(), false);
-        expect(resolverFile.existsSync(), false);
-
-        storeFile.writeAsStringSync(jsonEncode(storeJson));
-        myFriendsFile.writeAsStringSync(jsonEncode(myFriendsJson));
-        resolverFile.writeAsStringSync(jsonEncode(resolverJson));
-
-        // After clearing the data and reinitializing it from disk to verify with hydration,
-        // the persistor needs to be re-created so that it re-reads all data stores from disk.
-        Loon.configure(persistor: TestFilePersistor());
+        expect(userCollection.exists(), false);
+        expect(friendsCollection.exists(), false);
+        expect(userFriendsCollection.exists(), false);
 
         await Loon.hydrate();
 
@@ -2789,10 +2550,7 @@ void main() {
 
           await completer.onSync;
 
-          final storeFile = File('${testDirectory.path}/loon/__store__.json');
-          final storeJson = jsonDecode(storeFile.readAsStringSync());
-
-          expect(storeJson, {
+          expect(await get('__store__'), {
             "": {
               "users": {
                 "__values": {
@@ -2809,12 +2567,7 @@ void main() {
             }
           });
 
-          final userFriendsFile =
-              File('${testDirectory.path}/loon/user_friends.json');
-          final userFriendsJson =
-              jsonDecode(userFriendsFile.readAsStringSync());
-
-          expect(userFriendsJson, {
+          expect(await get('user_friends'), {
             "users__1__friends": {
               "users": {
                 "1": {
@@ -2828,11 +2581,7 @@ void main() {
             }
           });
 
-          final resolverFile =
-              File('${testDirectory.path}/loon/__resolver__.json');
-          final resolverJson = jsonDecode(resolverFile.readAsStringSync());
-
-          expect(resolverJson, {
+          expect(await get('__resolver__'), {
             "__refs": {
               Persistor.defaultKey.value: 1,
               "user_friends": 1,
@@ -2855,15 +2604,13 @@ void main() {
             }
           });
 
+          Loon.configure(persistor: null);
           await Loon.clearAll();
+          configure();
 
-          storeFile.writeAsStringSync(jsonEncode(storeJson));
-          userFriendsFile.writeAsStringSync(jsonEncode(userFriendsJson));
-          resolverFile.writeAsStringSync(jsonEncode(resolverJson));
-
-          // After clearing the data and reinitializing it from disk to verify with hydration,
-          // the persistor needs to be recreated so that it re-reads all data stores from disk.
-          Loon.configure(persistor: TestFilePersistor());
+          expect(userCollection.exists(), false);
+          expect(friendsCollection.exists(), false);
+          expect(userFriendsCollection.exists(), false);
 
           await Loon.hydrate([userCollection]);
 
@@ -2911,52 +2658,6 @@ void main() {
         },
       );
 
-      test('Hydrates large persistence files', () async {
-        int size = 20000;
-
-        final store = ValueStore<Json>();
-        List<TestLargeModel> models =
-            List.generate(size, (_) => generateRandomModel());
-
-        for (final model in models) {
-          store.write('users__${model.id}', model.toJson());
-        }
-
-        final file = File('${testDirectory.path}/loon/users.json');
-        file.writeAsStringSync(jsonEncode({
-          ValueStore.root: store.inspect(),
-        }));
-
-        await Loon.hydrate();
-
-        final largeModelCollection = Loon.collection(
-          'users',
-          fromJson: TestLargeModel.fromJson,
-          toJson: (user) => user.toJson(),
-        );
-
-        final queryResponseSize = await logger.measure(
-          'Lazy parse large collection query',
-          () async {
-            return largeModelCollection.get().length;
-          },
-        );
-
-        // The second query should be significantly faster, since it does not need to lazily
-        // parse each of the documents from their JSON representation.
-        await logger.measure(
-          'Already parsed collection query',
-          () async {
-            return largeModelCollection.get().length;
-          },
-        );
-
-        expect(
-          queryResponseSize,
-          size,
-        );
-      });
-
       test(
         "Hydrates root documents into the root collection",
         () async {
@@ -2970,11 +2671,8 @@ void main() {
 
           await completer.onSync;
 
-          final file = File('${testDirectory.path}/loon/__store__.json');
-          final json = jsonDecode(file.readAsStringSync());
-
           expect(
-            json,
+            await get('__store__'),
             {
               "": {
                 "root": {
@@ -2986,11 +2684,9 @@ void main() {
             },
           );
 
+          Loon.configure(persistor: null);
           await Loon.clearAll();
-
-          Loon.configure(persistor: TestFilePersistor());
-
-          file.writeAsStringSync(jsonEncode(json));
+          configure();
 
           await Loon.hydrate();
 
@@ -3023,11 +2719,8 @@ void main() {
 
           await completer.onSync;
 
-          final file = File('${testDirectory.path}/loon/__store__.json');
-          final json = jsonDecode(file.readAsStringSync());
-
           expect(
-            json,
+            await get('__store__'),
             {
               "": {
                 "root": {
@@ -3044,11 +2737,9 @@ void main() {
             },
           );
 
+          Loon.configure(persistor: null);
           await Loon.clearAll();
-
-          file.writeAsStringSync(jsonEncode(json));
-
-          Loon.configure(persistor: TestFilePersistor());
+          configure();
 
           await Loon.hydrate([currentUserDoc]);
 
@@ -3060,7 +2751,7 @@ void main() {
             ),
           );
 
-          expect(userCollection.get(), []);
+          expect(userCollection.exists(), false);
         },
       );
 
@@ -3083,11 +2774,8 @@ void main() {
 
           await completer.onSync;
 
-          final file = File('${testDirectory.path}/loon/__store__.json');
-          final json = jsonDecode(file.readAsStringSync());
-
           expect(
-            json,
+            await get('__store__'),
             {
               "": {
                 "root": {
@@ -3104,11 +2792,9 @@ void main() {
             },
           );
 
+          Loon.configure(persistor: null);
           await Loon.clearAll();
-
-          file.writeAsStringSync(jsonEncode(json));
-
-          Loon.configure(persistor: TestFilePersistor());
+          configure();
 
           await Loon.hydrate([Collection.root]);
 
@@ -3120,7 +2806,7 @@ void main() {
             ),
           );
 
-          expect(userCollection.get(), []);
+          expect(userCollection.exists(), false);
         },
       );
     });
@@ -3140,17 +2826,15 @@ void main() {
             userCollection.doc('1').create(TestUserModel('User 1'));
             userCollection.doc('2').create(TestUserModel('User 2'));
 
-            final file = File('${testDirectory.path}/loon/__store__.json');
-
             await completer.onSync;
 
-            expect(file.existsSync(), true);
+            expect(await exists('__store__'), true);
 
             userCollection.delete();
 
             await completer.onSync;
 
-            expect(file.existsSync(), false);
+            expect(await exists('__store__'), false);
           },
         );
 
@@ -3164,7 +2848,7 @@ void main() {
               fromJson: TestUserModel.fromJson,
               toJson: (user) => user.toJson(),
               persistorSettings: PersistorSettings(
-                key: Persistor.keyBuilder((snap) => 'users${snap.id}'),
+                key: Persistor.keyBuilder((snap) => 'users_${snap.id}'),
               ),
             );
 
@@ -3172,23 +2856,19 @@ void main() {
             userCollection.doc('2').create(TestUserModel('User 2'));
             userCollection.doc('3').create(TestUserModel('User 3'));
 
-            final file1 = File('${testDirectory.path}/loon/users1.json');
-            final file2 = File('${testDirectory.path}/loon/users2.json');
-            final file3 = File('${testDirectory.path}/loon/users3.json');
-
             await completer.onSync;
 
-            expect(file1.existsSync(), true);
-            expect(file2.existsSync(), true);
-            expect(file3.existsSync(), true);
+            expect(await exists('users_1'), true);
+            expect(await exists('users_2'), true);
+            expect(await exists('users_3'), true);
 
             userCollection.delete();
 
             await completer.onSync;
 
-            expect(file1.existsSync(), false);
-            expect(file2.existsSync(), false);
-            expect(file3.existsSync(), false);
+            expect(await exists('users_1'), false);
+            expect(await exists('users_2'), false);
+            expect(await exists('users_3'), false);
           },
         );
 
@@ -3213,20 +2893,17 @@ void main() {
             userCollection.doc('2').create(TestUserModel('User 2'));
             friendsCollection.doc('1').create(TestUserModel('Friend 1'));
 
-            final storeFile = File('${testDirectory.path}/loon/__store__.json');
-            final friendsFile = File('${testDirectory.path}/loon/friends.json');
-
             await completer.onSync;
 
-            expect(storeFile.existsSync(), true);
-            expect(friendsFile.existsSync(), true);
+            expect(await exists('__store__'), true);
+            expect(await exists('friends'), true);
 
             userCollection.delete();
 
             await completer.onSync;
 
-            expect(storeFile.existsSync(), false);
-            expect(friendsFile.existsSync(), false);
+            expect(await exists('__store__'), false);
+            expect(await exists('friends'), false);
           },
         );
 
@@ -3251,13 +2928,10 @@ void main() {
             friendsCollection.doc('1').create(TestUserModel('Friend 1'));
             friendsCollection.doc('2').create(TestUserModel('Friend 2'));
 
-            final file = File('${testDirectory.path}/loon/__store__.json');
-
             await completer.onSync;
 
-            Json json = jsonDecode(file.readAsStringSync());
             expect(
-              json,
+              await get('__store__'),
               {
                 "": {
                   "users": {
@@ -3280,9 +2954,8 @@ void main() {
 
             await completer.onSync;
 
-            json = jsonDecode(file.readAsStringSync());
             expect(
-              json,
+              await get('__store__'),
               {
                 "": {
                   "friends": {
@@ -3317,19 +2990,15 @@ void main() {
             userCollection.doc('1').create(TestUserModel('User 1'));
             userCollection.doc('2').create(TestUserModel('User 2'));
 
-            final file = File('${testDirectory.path}/loon/users.json');
-            final resolverFile =
-                File('${testDirectory.path}/loon/__resolver__.json');
-
             await completer.onSync;
 
-            expect(file.existsSync(), true);
-            expect(resolverFile.existsSync(), true);
+            expect(await exists('users'), true);
+            expect(await exists('__resolver__'), true);
 
             await Loon.clearAll();
 
-            expect(file.existsSync(), false);
-            expect(resolverFile.existsSync(), false);
+            expect(await exists('users'), false);
+            expect(await exists('__resolver__'), false);
           },
         );
       },
@@ -3338,7 +3007,7 @@ void main() {
     test('Sequences operations correctly', () async {
       final List<String> operations = [];
       Loon.configure(
-        persistor: TestFilePersistor(
+        persistor: TestPersistor(
           onClear: (_) {
             operations.add('clear');
           },
@@ -3387,4 +3056,428 @@ void main() {
       );
     });
   });
+
+  group(
+    'Encrypted Persistor Test Runner',
+    () {
+      const encryptedSettings = PersistorSettings(encrypted: true);
+
+      setUp(() {
+        configure(settings: encryptedSettings);
+      });
+
+      tearDown(() async {
+        await Loon.clearAll();
+      });
+
+      group('hydrate', () {
+        test(
+          'Merges data from plaintext and encrypted persistence files into collections',
+          () async {
+            final userCollection = Loon.collection<TestUserModel>(
+              'users',
+              fromJson: TestUserModel.fromJson,
+              toJson: (user) => user.toJson(),
+              persistorSettings: const PersistorSettings(encrypted: false),
+            );
+            final encryptedUsersCollection = Loon.collection<TestUserModel>(
+              'users',
+              fromJson: TestUserModel.fromJson,
+              toJson: (user) => user.toJson(),
+              persistorSettings: const PersistorSettings(encrypted: true),
+            );
+
+            userCollection.doc('1').create(TestUserModel('User 1'));
+            encryptedUsersCollection.doc('2').create(TestUserModel('User 2'));
+
+            await completer.onSync;
+
+            expect(await get('__store__'), {
+              "": {
+                "users": {
+                  "__values": {
+                    '1': {'name': 'User 1'},
+                  },
+                },
+              }
+            });
+
+            expect(await get('__store__', encrypted: true), {
+              "": {
+                "users": {
+                  "__values": {
+                    '2': {'name': 'User 2'},
+                  },
+                },
+              }
+            });
+
+            Loon.configure(persistor: null);
+            await Loon.clearAll();
+            configure(settings: encryptedSettings);
+
+            expect(userCollection.exists(), false);
+
+            await Loon.hydrate();
+
+            expect(
+              userCollection.get(),
+              [
+                DocumentSnapshot(
+                  doc: userCollection.doc('1'),
+                  data: TestUserModel('User 1'),
+                ),
+                DocumentSnapshot(
+                  doc: userCollection.doc('2'),
+                  data: TestUserModel('User 2'),
+                ),
+              ],
+            );
+          },
+        );
+
+        // This scenario takes a bit of a description. In the situation where a file for a collection is unencrypted,
+        // but encryption settings now specify that the collection should be encrypted, then the unencrypted file should
+        // be hydrated into memory, but any subsequent persistence calls for that collection should move the updated data
+        // from the unencrypted data store to the encrypted data store. Once all the data has been moved, the unencrypted
+        // file should be deleted.
+        test('Encrypts collections hydrated from unencrypted files', () async {
+          configure(settings: const PersistorSettings());
+
+          final usersCollection = Loon.collection(
+            'users',
+            fromJson: TestUserModel.fromJson,
+            toJson: (user) => user.toJson(),
+          );
+
+          usersCollection.doc('1').create(TestUserModel('User 1'));
+          usersCollection.doc('2').create(TestUserModel('User 2'));
+
+          await completer.onSync;
+
+          expect(
+            await get('__store__'),
+            {
+              "": {
+                "users": {
+                  "__values": {
+                    "1": {"name": "User 1"},
+                    "2": {"name": "User 2"},
+                  }
+                }
+              }
+            },
+          );
+
+          Loon.configure(persistor: null);
+          await Loon.clearAll();
+          configure(settings: encryptedSettings);
+
+          await Loon.hydrate();
+
+          expect(
+            usersCollection.get(),
+            [
+              DocumentSnapshot(
+                doc: usersCollection.doc('1'),
+                data: TestUserModel('User 1'),
+              ),
+              DocumentSnapshot(
+                doc: usersCollection.doc('2'),
+                data: TestUserModel('User 2'),
+              ),
+            ],
+          );
+
+          usersCollection.doc('3').create(TestUserModel('User 3'));
+
+          await completer.onSync;
+
+          // The new user should have been written to the encrypted store file, since the persistor was configured with encryption
+          // enabled globally.
+          expect(
+            await get('__store__', encrypted: true),
+            {
+              "": {
+                "users": {
+                  "__values": {
+                    "3": {'name': 'User 3'},
+                  }
+                },
+              }
+            },
+          );
+
+          // The existing hydrated data should still be unencrypted, as the documents are not moved until they are updated.
+          expect(
+            await get('__store__'),
+            {
+              "": {
+                "users": {
+                  "__values": {
+                    "1": {"name": "User 1"},
+                    "2": {"name": "User 2"},
+                  }
+                }
+              }
+            },
+          );
+
+          usersCollection.doc('1').update(TestUserModel('User 1 updated'));
+          usersCollection.doc('2').update(TestUserModel('User 2 updated'));
+
+          await completer.onSync;
+
+          // The documents should now have been updated to exist in the encrypted store file.
+          expect(
+            await get('__store__', encrypted: true),
+            {
+              "": {
+                "users": {
+                  "__values": {
+                    "1": {'name': 'User 1 updated'},
+                    "2": {'name': 'User 2 updated'},
+                    "3": {"name": "User 3"},
+                  },
+                },
+              }
+            },
+          );
+
+          // The now empty plaintext root file should have been deleted.
+          expect(await exists('__store__'), false);
+        });
+      });
+
+      group(
+        'persist',
+        () {
+          test('Encrypts data when enabled globally for all collections',
+              () async {
+            final userCollection = Loon.collection(
+              'users',
+              fromJson: TestUserModel.fromJson,
+              toJson: (user) => user.toJson(),
+            );
+
+            final user1 = TestUserModel('User 1');
+            final userDoc1 = userCollection.doc('1');
+            final user2 = TestUserModel('User 2');
+            final userDoc2 = userCollection.doc('2');
+
+            userDoc1.create(user1);
+            userDoc2.create(user2);
+
+            await completer.onSync;
+
+            expect(
+              await get('__store__', encrypted: true),
+              {
+                "": {
+                  "users": {
+                    "__values": {
+                      "1": {'name': 'User 1'},
+                      "2": {'name': 'User 2'},
+                    }
+                  }
+                }
+              },
+            );
+          });
+
+          test('Encrypts data when explicitly enabled for a collection',
+              () async {
+            configure(settings: const PersistorSettings());
+
+            final friendsCollection = Loon.collection<TestUserModel>(
+              'friends',
+              fromJson: TestUserModel.fromJson,
+              toJson: (user) => user.toJson(),
+            );
+
+            final usersCollection = Loon.collection<TestUserModel>(
+              'users',
+              fromJson: TestUserModel.fromJson,
+              toJson: (user) => user.toJson(),
+              persistorSettings: const PersistorSettings(encrypted: true),
+            );
+
+            friendsCollection.doc('1').create(TestUserModel('Friend 1'));
+            usersCollection.doc('1').create(TestUserModel('User 1'));
+            usersCollection.doc('2').create(TestUserModel('User 2'));
+
+            await completer.onSync;
+
+            expect(
+              await get('__store__'),
+              {
+                "": {
+                  "friends": {
+                    "__values": {
+                      "1": {'name': 'Friend 1'},
+                    }
+                  },
+                }
+              },
+            );
+
+            expect(
+              await get('__store__', encrypted: true),
+              {
+                "": {
+                  "users": {
+                    "__values": {
+                      "1": {'name': 'User 1'},
+                      "2": {'name': 'User 2'},
+                    }
+                  },
+                }
+              },
+            );
+          });
+          test('Subcollections inherit parent encryption settings', () async {
+            configure(settings: const PersistorSettings());
+
+            final usersCollection = Loon.collection<TestUserModel>(
+              'users',
+              fromJson: TestUserModel.fromJson,
+              toJson: (user) => user.toJson(),
+              persistorSettings: const PersistorSettings(encrypted: true),
+            );
+
+            final user1FriendsCollection =
+                usersCollection.doc('1').subcollection(
+                      'friends',
+                      fromJson: TestUserModel.fromJson,
+                      toJson: (friend) => friend.toJson(),
+                    );
+
+            usersCollection.doc('1').create(TestUserModel('User 1'));
+            usersCollection.doc('2').create(TestUserModel('User 2'));
+            user1FriendsCollection.doc('1').create(TestUserModel('Friend 1'));
+
+            await completer.onSync;
+
+            expect(await exists('__store__'), false);
+
+            expect(
+              await get('__store__', encrypted: true),
+              {
+                "": {
+                  "users": {
+                    "__values": {
+                      "1": {'name': 'User 1'},
+                      "2": {'name': 'User 2'},
+                    },
+                    "1": {
+                      "friends": {
+                        "__values": {
+                          "1": {
+                            "name": "Friend 1",
+                          }
+                        }
+                      }
+                    }
+                  },
+                }
+              },
+            );
+          });
+
+          test('Subcollections can override parent encryption settings',
+              () async {
+            configure(settings: const PersistorSettings());
+
+            final usersCollection = Loon.collection<TestUserModel>(
+              'users',
+              fromJson: TestUserModel.fromJson,
+              toJson: (user) => user.toJson(),
+              persistorSettings: const PersistorSettings(encrypted: true),
+            );
+
+            final user1FriendsCollection = usersCollection
+                .doc('1')
+                .subcollection(
+                  'friends',
+                  fromJson: TestUserModel.fromJson,
+                  toJson: (friend) => friend.toJson(),
+                  persistorSettings: const PersistorSettings(encrypted: false),
+                );
+
+            usersCollection.doc('1').create(TestUserModel('User 1'));
+            usersCollection.doc('2').create(TestUserModel('User 2'));
+            user1FriendsCollection.doc('1').create(TestUserModel('Friend 1'));
+
+            await completer.onSync;
+
+            expect(
+              await get('__store__'),
+              {
+                "": {
+                  "users": {
+                    "1": {
+                      "friends": {
+                        "__values": {
+                          "1": {
+                            "name": "Friend 1",
+                          }
+                        }
+                      }
+                    }
+                  },
+                }
+              },
+            );
+
+            expect(
+              await get('__store__', encrypted: true),
+              {
+                "": {
+                  "users": {
+                    "__values": {
+                      "1": {'name': 'User 1'},
+                      "2": {'name': 'User 2'},
+                    },
+                  },
+                }
+              },
+            );
+          });
+
+          test(
+            'Does not encrypt data when explicitly disabled for a collection',
+            () async {
+              final usersCollection = Loon.collection<TestUserModel>(
+                'users',
+                fromJson: TestUserModel.fromJson,
+                toJson: (user) => user.toJson(),
+                persistorSettings: const PersistorSettings(encrypted: false),
+              );
+
+              usersCollection.doc('1').create(TestUserModel('User 1'));
+              usersCollection.doc('2').create(TestUserModel('User 2'));
+
+              await completer.onSync;
+
+              expect(
+                await get('__store__'),
+                {
+                  "": {
+                    "users": {
+                      "__values": {
+                        "1": {'name': 'User 1'},
+                        "2": {'name': 'User 2'},
+                      }
+                    },
+                  }
+                },
+              );
+
+              expect(await exists('__store__', encrypted: true), false);
+            },
+          );
+        },
+      );
+    },
+  );
 }

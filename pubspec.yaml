@@ -22,6 +22,7 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^2.0.0
+  sqflite_common_ffi: ^2.3.4
 
 dependency_overrides:
   # Temporary override for WASM support until this issue is addressed:

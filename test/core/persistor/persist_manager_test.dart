@@ -9,7 +9,9 @@ void main() {
     Loon.clearAll();
   });
 
-  group('Persistor', () {
+  /// Tests the behavior of the [PersistManager] to check that it properly batches
+  /// and sequences persistence operations.
+  group('Persist Manager', () {
     test(
       'Batches contiguous persistence operations',
       () async {

@@ -202,8 +202,6 @@ void main() {
               });
 
               test('Returns serializable persisted document snapshots', () {
-                Loon.configure(persistor: TestPersistor());
-
                 final userDoc = TestUserModel.store.doc('1');
                 final userDoc2 = Loon.collection('users').doc('2');
                 final userDoc3 = Loon.collection('users').doc('3');
