@@ -9,3 +9,6 @@ path_provider_android=/Users/dan/.pub-cache/hosted/pub.dev/path_provider_android
 path_provider_foundation=/Users/dan/.pub-cache/hosted/pub.dev/path_provider_foundation-2.3.2/
 path_provider_linux=/Users/dan/.pub-cache/hosted/pub.dev/path_provider_linux-2.2.1/
 path_provider_windows=/Users/dan/.pub-cache/hosted/pub.dev/path_provider_windows-2.2.1/
+sqflite=/Users/dan/.pub-cache/hosted/pub.dev/sqflite-2.4.1/
+sqflite_android=/Users/dan/.pub-cache/hosted/pub.dev/sqflite_android-2.4.0/
+sqflite_darwin=/Users/dan/.pub-cache/hosted/pub.dev/sqflite_darwin-2.4.1/

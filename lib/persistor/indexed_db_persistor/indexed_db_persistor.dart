@@ -19,7 +19,7 @@ class IndexedDBPersistor extends Persistor {
   static const _dbName = 'loon';
   static const _dbVersion = 1;
   static const _storeName = 'store';
-  static const keyPath = 'id';
+  static const keyPath = 'key';
   static const valuePath = 'value';
 
   late final DataStoreManager _manager;

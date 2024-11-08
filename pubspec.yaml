@@ -16,6 +16,7 @@ dependencies:
   path: ^1.8.3
   path_provider: ^2.1.5
   web: ^1.1.0
+  sqflite: ^2.4.1
 
 dev_dependencies:
   flutter_test:
