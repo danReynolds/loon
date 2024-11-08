@@ -12,9 +12,9 @@ void main() {
 
   setUp(() {
     completer = TestIndexedDBPersistor.completer = PersistorCompleter();
-    persistor = TestIndexedDBPersistor(
-      settings: const PersistorSettings(encrypted: true),
-    );
+    persistor = TestIndexedDBPersistor();
+
+    Loon.configure(persistor: persistor);
   });
 
   tearDown(() async {
