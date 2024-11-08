@@ -121,6 +121,13 @@ class FilePersistorWorker {
       resolverConfig: FileDataStoreResolverConfig(
         file: File("${directory.path}/${DataStoreResolver.name}.json"),
       ),
+      clearAll: () async {
+        try {
+          await directory.delete(recursive: true);
+        } on PathNotFoundException {
+          return;
+        }
+      },
     );
 
     await manager.init();

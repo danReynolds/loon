@@ -9,24 +9,24 @@ class DataStoreManager {
   /// The duration by which to throttle persistence changes to the file system.
   final Duration persistenceThrottle;
 
+  /// The global persistor settings.
   final PersistorSettings settings;
 
   final void Function()? onSync;
 
   final void Function(String text) onLog;
 
-  /// The resolver that contains a mapping of documents to the file data store in which
-  /// the document is currently stored.
-  final DataStoreResolver resolver;
-
-  /// The index of [DualDataStore] objects by store name.
-  final Map<String, DualDataStore> index = {};
-
   final DataStoreFactory factory;
+
+  final Future<void> Function() _clearAll;
+
+  final DataStoreResolverConfig resolverConfig;
 
   /// The sync lock is used to block operations from accessing the file system while there is an ongoing sync
   /// operation and conversely blocks a sync from starting until the ongoing operation holding the lock has finished.
   final _syncLock = Lock();
+
+  late final _logger = Logger('DataStoreManager', output: onLog);
 
   /// The sync timer is used to throttle syncing changes to the file system using
   /// the given [persistenceThrottle]. After an that mutates the file system operation runs, it schedules
@@ -34,7 +34,12 @@ class DataStoreManager {
   /// from being processed until the sync completes.
   Timer? _syncTimer;
 
-  late final _logger = Logger('DataStoreManager', output: onLog);
+  /// The resolver that contains a mapping of documents to the file data store in which
+  /// the document is currently stored.
+  DataStoreResolver resolver;
+
+  /// The index of [DualDataStore] objects by store name.
+  Map<String, DualDataStore> index = {};
 
   DataStoreManager({
     required this.persistenceThrottle,
@@ -42,9 +47,11 @@ class DataStoreManager {
     required this.onLog,
     required this.settings,
     required this.factory,
-    required DataStoreResolverConfig resolverConfig,
+    required this.resolverConfig,
     required Set<String> initialStoreNames,
-  }) : resolver = DataStoreResolver(resolverConfig) {
+    required Future<void> Function() clearAll,
+  })  : _clearAll = clearAll,
+        resolver = DataStoreResolver(resolverConfig) {
     for (final name in initialStoreNames) {
       index[name] = DualDataStore(name, factory: factory);
     }
@@ -311,12 +318,11 @@ class DataStoreManager {
       // Cancel any pending sync, since all data stores are being cleared immediately.
       _cancelSync();
 
-      await Future.wait([
-        ...index.values.map((dataStore) => dataStore.delete()),
-        resolver.delete(),
-      ]);
+      await _clearAll();
 
-      index.clear();
+      // Reset the data store index and resolver.
+      index = {};
+      resolver = DataStoreResolver(resolverConfig);
     });
   }
 }

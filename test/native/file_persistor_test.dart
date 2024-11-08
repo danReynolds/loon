@@ -50,7 +50,8 @@ void main() {
         final value = await file.readAsString();
 
         return jsonDecode(
-            encrypted ? persistor.encrypter.decrypt(value) : value);
+          encrypted ? persistor.encrypter.decrypt(value) : value,
+        );
       },
       factory: FilePersistor.new,
     );

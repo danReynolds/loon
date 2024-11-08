@@ -125,6 +125,11 @@ class IndexedDBPersistor extends Persistor {
       resolverConfig: IndexedDBDataStoreResolverConfig(
         runTransaction: runTransaction,
       ),
+      clearAll: () => runTransaction(
+        'clearAll',
+        (objectStore) => objectStore.clear(),
+        'readwrite',
+      ),
     );
 
     await _manager.init();

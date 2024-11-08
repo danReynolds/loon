@@ -76,7 +76,6 @@ void persistorTestRunner<T extends Persistor>({
 
   group('Persistor Test Runner', () {
     setUp(() async {
-      await Loon.clearAll();
       configure();
     });
 

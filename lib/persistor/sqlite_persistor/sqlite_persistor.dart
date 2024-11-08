@@ -83,6 +83,7 @@ class SqlitePersistor extends Persistor {
         ),
       ),
       resolverConfig: SqliteDataStoreResolverConfig(db: db),
+      clearAll: () => db.delete(tableName),
     );
 
     await _manager.init();
