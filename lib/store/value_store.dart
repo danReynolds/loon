@@ -86,6 +86,8 @@ class ValueStore<T> extends _BaseValueStore<T> {
     return value;
   }
 
+  /// Deletes all data under the given path delimited into segments. Returns whether
+  /// the current node can be deleted as well as a result of the deleted path.
   bool _delete(
     Map node,
     List<String> segments,

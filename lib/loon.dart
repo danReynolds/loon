@@ -2,13 +2,13 @@ library loon;
 
 import 'dart:async';
 import 'dart:convert';
-import 'package:flutter/foundation.dart';
+import 'package:flutter/foundation.dart' hide Key;
 import 'package:uuid/uuid.dart';
 import 'dart:collection';
+import 'persistor/platform_persistor/platform_persistor.dart';
 
 export 'widgets/query_stream_builder.dart';
 export 'widgets/document_stream_builder.dart';
-export 'persistor/file_persistor/file_persistor.dart';
 
 part 'store/base_value_store.dart';
 part 'store/path_ref_store.dart';

@@ -1,13 +1,17 @@
+import 'dart:convert';
+import 'dart:js_interop';
+
 import 'package:loon/loon.dart';
-import 'package:loon/persistor/file_persistor/file_persistor.dart';
+import 'package:loon/persistor/data_store_encrypter.dart';
+import 'package:loon/persistor/indexed_db_persistor/indexed_db_persistor.dart';
 
 import '../utils.dart';
 import 'test_data_store_encrypter.dart';
 
-class TestFilePersistor extends FilePersistor {
+class TestIndexedDBPersistor extends IndexedDBPersistor {
   static var completer = PersistorCompleter();
 
-  TestFilePersistor({
+  TestIndexedDBPersistor({
     PersistorSettings? settings,
     void Function(Set<Document> batch)? onPersist,
     void Function(Set<Collection> collections)? onClear,
@@ -41,4 +45,25 @@ class TestFilePersistor extends FilePersistor {
             completer.syncComplete();
           },
         );
+
+  Future<Map?> getStore(
+    String storeName, {
+    bool encrypted = false,
+  }) async {
+    final result = await runTransaction('Get', (objectStore) {
+      final objectStoreName = encrypted
+          ? '$storeName:${DataStoreEncrypter.encryptedName}'
+          : storeName;
+
+      return objectStore.get(objectStoreName.toJS);
+    });
+
+    if (result == null) {
+      return null;
+    }
+
+    final value = result[IndexedDBPersistor.valuePath];
+
+    return jsonDecode(encrypted ? encrypter.decrypt(value) : value);
+  }
 }

@@ -1,8 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:loon/loon.dart';
 
-import '../models/test_persistor.dart';
-import '../models/test_user_model.dart';
+import '../../models/test_persistor.dart';
+import '../../models/test_user_model.dart';
 
 void main() {
   tearDown(() {

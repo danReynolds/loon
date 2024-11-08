@@ -78,6 +78,21 @@ void main() {
       });
     });
 
+    group('hasPath', () {
+      test('Returns whether a given path exists in the store.', () {
+        final store = ValueStore<String>();
+        store.write('users__1__friends__1', 'Test');
+
+        expect(store.hasPath(''), true);
+        expect(store.hasPath('users'), true);
+        expect(store.hasPath('users__1'), true);
+        expect(store.hasPath('users__1__friends'), true);
+        expect(store.hasPath('users__1__friends__1'), true);
+        expect(store.hasPath('users__1__friends__2'), false);
+        expect(store.hasPath('users__2'), false);
+      });
+    });
+
     group('delete', () {
       group(
         "when recursive",

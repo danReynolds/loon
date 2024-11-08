@@ -1,34 +1,28 @@
 import 'dart:async';
-import 'dart:io';
-import 'package:encrypt/encrypt.dart';
 import 'package:loon/loon.dart';
-import 'package:loon/persistor/file_persistor/file_data_store.dart';
-import 'package:loon/persistor/file_persistor/file_persist_document.dart';
-import 'package:loon/persistor/file_persistor/file_persistor_settings.dart';
-import 'package:loon/persistor/file_persistor/lock.dart';
-import 'package:path/path.dart' as path;
+import 'package:loon/persistor/data_store.dart';
+import 'package:loon/persistor/data_store_persistence_payload.dart';
+import 'package:loon/persistor/data_store_resolver.dart';
+import 'package:loon/persistor/lock.dart';
 
-class FileDataStoreManager {
-  final Encrypter encrypter;
-
-  /// The directory in which a file data store is persisted.
-  final Directory directory;
-
+class DataStoreManager {
   /// The duration by which to throttle persistence changes to the file system.
   final Duration persistenceThrottle;
 
-  final FilePersistorSettings settings;
+  final PersistorSettings settings;
 
-  final void Function() onSync;
+  final void Function()? onSync;
 
   final void Function(String text) onLog;
 
   /// The resolver that contains a mapping of documents to the file data store in which
   /// the document is currently stored.
-  late final FileDataStoreResolver _resolver;
+  final DataStoreResolver resolver;
 
-  /// The index of [FileDataStore] objects by name.
-  final Map<String, DualFileDataStore> _index = {};
+  /// The index of [DualDataStore] objects by store name.
+  final Map<String, DualDataStore> index = {};
+
+  final DataStoreFactory factory;
 
   /// The sync lock is used to block operations from accessing the file system while there is an ongoing sync
   /// operation and conversely blocks a sync from starting until the ongoing operation holding the lock has finished.
@@ -40,16 +34,21 @@ class FileDataStoreManager {
   /// from being processed until the sync completes.
   Timer? _syncTimer;
 
-  late final _logger = Logger('FileDataStoreManager', output: onLog);
+  late final _logger = Logger('DataStoreManager', output: onLog);
 
-  FileDataStoreManager({
-    required this.directory,
-    required this.encrypter,
+  DataStoreManager({
     required this.persistenceThrottle,
     required this.onSync,
     required this.onLog,
     required this.settings,
-  });
+    required this.factory,
+    required DataStoreResolverConfig resolverConfig,
+    required Set<String> initialStoreNames,
+  }) : resolver = DataStoreResolver(resolverConfig) {
+    for (final name in initialStoreNames) {
+      index[name] = DualDataStore(name, factory: factory);
+    }
+  }
 
   void _cancelSync() {
     _syncTimer?.cancel();
@@ -60,13 +59,12 @@ class FileDataStoreManager {
     _syncTimer ??= Timer(persistenceThrottle, _sync);
   }
 
-  /// Syncs all file data stores to the file system, persisting dirty ones and deleting
-  /// ones that can now be removed.
+  /// Syncs all data stores, persisting dirty ones and deleting ones that can now be removed.
   Future<void> _sync() {
     return _syncLock.run(() {
-      return _logger.measure('File Sync', () async {
+      return _logger.measure('Sync', () async {
         final dirtyStores =
-            _index.values.where((dataStore) => dataStore.isDirty);
+            index.values.where((dataStore) => dataStore.isDirty);
 
         if (dirtyStores.isEmpty) {
           return;
@@ -74,16 +72,16 @@ class FileDataStoreManager {
 
         await Future.wait([
           ...dirtyStores.map((store) => store.sync()),
-          if (_resolver.isDirty) _resolver.sync(),
+          if (resolver.isDirty) resolver.sync(),
         ]);
 
         for (final store in dirtyStores.toList()) {
           if (store.isEmpty) {
-            _index.remove(store.name);
+            index.remove(store.name);
           }
         }
 
-        onSync();
+        onSync?.call();
         _syncTimer = null;
       });
     });
@@ -94,56 +92,34 @@ class FileDataStoreManager {
   ///
   /// 1. The nearest data store for the resolver path going up the resolver tree.
   /// 2. The set of data stores that exist in the subtree of the resolver under the given path.
-  List<DualFileDataStore> _resolveDataStores(String path) {
+  List<DualDataStore> _resolveDataStores(String path) {
     final List<String> dataStoreNames = [];
 
     // 1.
-    final nearestDataStoreName = _resolver.getNearest(path)?.$2;
+    final nearestDataStoreName = resolver.getNearest(path)?.$2;
     if (nearestDataStoreName != null) {
       dataStoreNames.add(nearestDataStoreName);
     }
 
     // 2.
-    dataStoreNames.addAll(_resolver.extractValues(path));
+    dataStoreNames.addAll(resolver.extractValues(path));
 
     return dataStoreNames
-        .map((dataStoreName) => _index[dataStoreName])
-        .whereType<DualFileDataStore>()
+        .map((dataStoreName) => index[dataStoreName])
+        .whereType<DualDataStore>()
         .toList();
   }
 
   Future<void> init() async {
-    // Initialize all file data stores.
-    final files = directory
-        .listSync()
-        .whereType<File>()
-        .where((file) => fileRegex.hasMatch(path.basename(file.path)))
-        .toList();
-    for (final file in files) {
-      final dataStore = DualFileDataStore.parse(
-        file,
-        encrypter: encrypter,
-        directory: directory,
-      );
-      final dataStoreName = dataStore.name;
-
-      if (!_index.containsKey(dataStoreName)) {
-        _index[dataStoreName] = dataStore;
-      }
-    }
-
-    // Initialize and immediately hydrate the resolver data, since it is required
-    // for processing subsequent data store hydrate/persist operations.
-    _resolver = FileDataStoreResolver(directory: directory);
-    await _resolver.hydrate();
+    await resolver.hydrate();
   }
 
   /// Hydrates the given paths and returns a map of document paths to their serialized data.
   Future<Map<String, dynamic>> hydrate(List<String>? paths) {
     return _syncLock.run(
       () async {
-        final Map<String, List<DualFileDataStore>> pathDataStores = {};
-        final Set<DualFileDataStore> dataStores = {};
+        final Map<String, List<DualDataStore>> pathDataStores = {};
+        final Set<DualDataStore> dataStores = {};
 
         // If the hydration operation is only for certain paths, then resolve all of the file data stores
         // reachable under the given paths and hydrate only those data stores.
@@ -154,7 +130,7 @@ class FileDataStoreManager {
           }
         } else {
           // If no specific collections have been specified, then hydrate all file data stores.
-          dataStores.addAll(_index.values);
+          dataStores.addAll(index.values);
         }
 
         await Future.wait(dataStores.map((store) => store.hydrate()));
@@ -174,7 +150,7 @@ class FileDataStoreManager {
             }
           }
         } else {
-          for (final dataStore in _index.values) {
+          for (final dataStore in index.values) {
             data.addAll(dataStore.extract());
           }
         }
@@ -184,16 +160,13 @@ class FileDataStoreManager {
     );
   }
 
-  Future<void> persist(
-    /// A local persistence key resolver derived from the set of updated documents.
-    ValueStore<String> localResolver,
-
-    /// The list of updated documents to persist.
-    List<FilePersistDocument> docs,
-  ) {
+  Future<void> persist(DataStorePersistencePayload payload) {
     return _syncLock.run(() async {
-      Set<DualFileDataStore> dataStores = {};
-      Map<String, List<DualFileDataStore>> pathDataStores = {};
+      final localResolver = payload.resolver;
+      final docs = payload.persistenceDocs;
+
+      Set<DualDataStore> dataStores = {};
+      Map<String, List<DualDataStore>> pathDataStores = {};
 
       // Pre-calculate and hydrate all resolved file data stores relevant to the updated documents.
       for (final doc in docs) {
@@ -204,20 +177,17 @@ class FileDataStoreManager {
           final stores = pathDataStores[docPath] = _resolveDataStores(docPath);
           dataStores.addAll(stores);
         } else {
-          final prevDataStoreName = _resolver.getNearest(docPath)!.$2;
+          final prevDataStoreName = resolver.getNearest(docPath)!.$2;
           final nextDataStoreName = localResolver.getNearest(docPath)!.$2;
-          final prevDataStore = _index[prevDataStoreName] ??= DualFileDataStore(
-            name: prevDataStoreName,
-            encrypter: encrypter,
-            directory: directory,
-            isHydrated: true,
+          final prevDataStore = index[prevDataStoreName] ??= DualDataStore(
+            prevDataStoreName,
+            factory: factory,
           );
-          final nextDataStore = _index[nextDataStoreName] ??= DualFileDataStore(
-            name: nextDataStoreName,
-            encrypter: encrypter,
-            directory: directory,
-            isHydrated: true,
+          final nextDataStore = index[nextDataStoreName] ??= DualDataStore(
+            nextDataStoreName,
+            factory: factory,
           );
+
           dataStores.add(prevDataStore);
           dataStores.add(nextDataStore);
         }
@@ -233,13 +203,13 @@ class FileDataStoreManager {
         // If the document has been deleted, then clear its data recursively from each of its
         // resolved data stores.
         if (docData == null) {
-          _resolver.deletePath(docPath);
+          resolver.deletePath(docPath);
           for (final dataStore in pathDataStores[docPath]!) {
             dataStore.recursiveDelete(docPath);
           }
           // Otherwise, write its associated data store with the updated document data.
         } else {
-          final prevResult = _resolver.getNearest(docPath)!;
+          final prevResult = resolver.getNearest(docPath)!;
           final prevResolverPath = prevResult.$1;
           final prevResolverValue = prevResult.$2;
 
@@ -248,12 +218,12 @@ class FileDataStoreManager {
           final nextResolverValue = nextResult.$2;
 
           final prevDataStoreName = prevResolverValue;
-          final prevDataStore = _index[prevDataStoreName]!;
+          final prevDataStore = index[prevDataStoreName]!;
 
           final dataStoreName = nextResolverValue;
-          final dataStore = _index[dataStoreName]!;
+          final dataStore = index[dataStoreName]!;
 
-          _resolver.writePath(nextResolverPath, nextResolverValue);
+          resolver.writePath(nextResolverPath, nextResolverValue);
 
           // Scenario 1: A document's resolver value changes and its path stays the same.
           //
@@ -286,7 +256,7 @@ class FileDataStoreManager {
           // When a document is updated from previous resolver path a__b__c__d to resolver path a__b__c,
           // then *all* data in resolver path a__b__c__d of the previous store should be grafted into the next store with resolver path a__b__c.
           if (nextResolverPath.length < prevResolverPath.length) {
-            _resolver.deletePath(prevResolverPath, recursive: false);
+            resolver.deletePath(prevResolverPath, recursive: false);
             dataStore.graft(
               nextResolverPath,
               prevResolverPath,
@@ -310,8 +280,8 @@ class FileDataStoreManager {
 
   Future<void> clear(List<String> paths) {
     return _syncLock.run(() async {
-      Set<DualFileDataStore> dataStores = {};
-      Map<String, List<DualFileDataStore>> pathDataStores = {};
+      Set<DualDataStore> dataStores = {};
+      Map<String, List<DualDataStore>> pathDataStores = {};
 
       for (final path in paths) {
         final stores = pathDataStores[path] = _resolveDataStores(path);
@@ -329,7 +299,7 @@ class FileDataStoreManager {
           dataStore.recursiveDelete(path);
         }
 
-        _resolver.deletePath(path);
+        resolver.deletePath(path);
       }
 
       _scheduleSync();
@@ -342,11 +312,11 @@ class FileDataStoreManager {
       _cancelSync();
 
       await Future.wait([
-        ..._index.values.map((dataStore) => dataStore.delete()),
-        _resolver.delete(),
+        ...index.values.map((dataStore) => dataStore.delete()),
+        resolver.delete(),
       ]);
 
-      _index.clear();
+      index.clear();
     });
   }
 }

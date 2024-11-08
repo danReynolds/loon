@@ -2,10 +2,10 @@
 flutter_secure_storage=/Users/dan/.pub-cache/hosted/pub.dev/flutter_secure_storage-9.2.2/
 flutter_secure_storage_linux=/Users/dan/.pub-cache/hosted/pub.dev/flutter_secure_storage_linux-1.2.1/
 flutter_secure_storage_macos=/Users/dan/.pub-cache/hosted/pub.dev/flutter_secure_storage_macos-3.1.2/
-flutter_secure_storage_web=/Users/dan/.pub-cache/hosted/pub.dev/flutter_secure_storage_web-1.2.1/
+flutter_secure_storage_web=/Users/dan/.pub-cache/git/flutter_secure_storage-5a5692b609b3886cdd49b2ed06b9c079ecdff996/flutter_secure_storage_web/
 flutter_secure_storage_windows=/Users/dan/.pub-cache/hosted/pub.dev/flutter_secure_storage_windows-3.1.2/
-path_provider=/Users/dan/.pub-cache/hosted/pub.dev/path_provider-2.1.2/
-path_provider_android=/Users/dan/.pub-cache/hosted/pub.dev/path_provider_android-2.2.2/
+path_provider=/Users/dan/.pub-cache/hosted/pub.dev/path_provider-2.1.5/
+path_provider_android=/Users/dan/.pub-cache/hosted/pub.dev/path_provider_android-2.2.12/
 path_provider_foundation=/Users/dan/.pub-cache/hosted/pub.dev/path_provider_foundation-2.3.2/
 path_provider_linux=/Users/dan/.pub-cache/hosted/pub.dev/path_provider_linux-2.2.1/
 path_provider_windows=/Users/dan/.pub-cache/hosted/pub.dev/path_provider_windows-2.2.1/

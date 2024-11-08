@@ -112,6 +112,7 @@ class ValueRefStore<T> extends _BaseValueStore<T> {
     return removedRefs;
   }
 
+  /// Returns a map of all values that exist under the given path to their ref count.
   Map<T, int>? getRefs([String path = '']) {
     if (_store.isEmpty) {
       return null;
@@ -140,7 +141,7 @@ class ValueRefStore<T> extends _BaseValueStore<T> {
 
   @override
 
-  /// A [ValueRefStore] overrides the default [ValueStore.extractUniqueValues] behavior
+  /// A [ValueRefStore] overrides the default [ValueStore.extractValues] behavior
   /// since the values under a given path are pre-computed by the ref store.
   Set<T> extractValues([String path = '']) {
     return getRefs(path)?.keys.toSet() ?? {};

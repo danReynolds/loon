@@ -4,6 +4,23 @@
 <br />
 <br />
 
+<table border="1">
+  <tr>
+    <th>Android</th>
+    <th>iOS</th>
+    <th>Web</th>
+    <th>macOS</th>
+  </tr>
+  <tr>
+    <td>✅</td>
+    <td>✅</td>
+    <td>✅</td>
+    <td>✅</td>
+  </tr>
+</table>
+
+<br />
+
 Loon is a reactive document data store for Flutter.
 
 ## Features
@@ -276,11 +293,29 @@ Loon.doc('current_user_id').create('1');
 
 ## 🗄️ Data Persistence
 
-A default file-based persistence option is available out of the box and can be configured on app start.
+Persistence is supported on both web and native platforms. It works out of the box and can be configured on app start.
+
+*Native* platforms (iOS, Android, macOS) use a default file-based persistence implementation, while *web* persists data to IndexedDB.
+
+The currently available persistence options are broken down by platform:
+
+### Native
+
+* **FilePersistor**: The default file-based persistence implementation for native platforms. Documents are stored in one or more files based on the persistence configuration.
+
+### Web
+
+* **IndexedDBPersistor**: The default persistence implementation for web platforms. Documents are stored in [IndexedDB](https://developer.mozilla.org/en-US/docs/Web/API/IndexedDB_API), a low-level API for web-based client-side storage.
+  * > Note: Encryption on web is experimental through [flutter_secure_storage](https://pub.dev/packages/flutter_secure_storage#configure-web-version). It is important to enable the correct headers in order to ensure security of encryption on web.
+
+## ⚙️ Configuration
+
+A persistor can be specified explicitly on startup, or `Persistor.current()` can be used to dynamically select the default persistence implementation for the current platform.
+
 
 ```dart
 void main() {
-  Loon.configure(persistor: FilePersistor());
+  Loon.configure(persistor: Persistor.current());
 
   Loon.hydrate().then(() {
     print('Hydration complete');
@@ -299,9 +334,9 @@ await Loon.hydrate([
 ]);
 ```
 
-## ⚙️ Persistence options
+## ⚙️ Dynamic options
 
-Persistence options can be specified globally or on a per-collection basis.
+Persistence options can be specified both globally as well as on a per-collection basis.
 
 ```dart
 // main.dart
@@ -422,7 +457,7 @@ whenever a document's data changes and if its associated key is updated, then th
 
 ## 🎨 Custom persistence
 
-If you would prefer to persist data using an alternative implementation than the default `FilePersistor`, you just need to implement the persistence interface:
+If you would prefer to persist data using an alternative implementation than the default persistors, you can implement the persistence interface:
 
 ```dart
 import 'package:loon/loon.dart';

@@ -1,0 +1,48 @@
+{
+  // See https://go.microsoft.com/fwlink/?LinkId=733558
+  // for the documentation about the tasks.json format
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Core tests",
+      "type": "shell",
+      "command": "flutter",
+      "args": ["test", "test/core"],
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "problemMatcher": [],
+      "detail": "Runs a specific Flutter test file on the Chrome platform."
+    },
+    {
+      "label": "Native tests",
+      "type": "shell",
+      "command": "flutter",
+      "args": ["test", "test/native"],
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "problemMatcher": [],
+      "detail": "Runs a specific Flutter test file on the Chrome platform."
+    },
+    {
+      "label": "Web tests",
+      "type": "shell",
+      "command": "flutter",
+      "args": [
+        "test",
+        "test/web",
+        "--platform",
+        "chrome"
+      ],
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "problemMatcher": [],
+      "detail": "Runs a specific Flutter test file on the Chrome platform."
+    }
+  ]
+}
