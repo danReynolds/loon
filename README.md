@@ -343,7 +343,7 @@ Persistence options can be specified both globally as well as on a per-collectio
 // main.dart
 void main() {
   // Globally enable encryption.
-  Loon.configure(persistor: FilePersistor(encrypted: true));
+  Loon.configure(persistor: FilePersistor(settings: PersistorSettings(encrypted: true));
 
   Loon.hydrate().then(() {
     print('Hydration complete');
@@ -366,7 +366,7 @@ class UserModel {
       fromJson: UserModel.fromJson,
       toJson: (user) => user.toJson(),
       // Disable encryption specifically for this collection and its subcollections.
-      settings: FilePersistorSettings(encrypted: false),
+      settings: PersistorSettings(encrypted: false),
     )
   }
 }
@@ -375,7 +375,7 @@ class UserModel {
 In this example, file encryption is enabled globally for all collections, but disabled
 specifically for the users collection and its subcollections in the store.
 
-By default, the `FilePersistor` stores all data in a single  `__store__.json` persistence file.
+By default all data in a single  `__store__.json` persistence file.
 
 ```
 loon >
@@ -400,8 +400,8 @@ class UserModel {
       'users',
       fromJson: UserModel.fromJson,
       toJson: (user) => user.toJson(),
-      settings: FilePersistorSettings(
-        key: FilePersistor.key('users'),
+      settings: PersistorSettings(
+        key: Persistor.key('users'),
       ),
     )
   }
@@ -416,7 +416,7 @@ loon >
   users.json
 ```
 
-If documents need to be stored in different files based on their data, then a `FilePersistor.keyBuilder` can be used:
+If documents need to be stored in different files based on their data, then a `Persistor.keyBuilder` can be used:
 
 ```dart
 class UserModel {
@@ -433,8 +433,8 @@ class UserModel {
       'users',
       fromJson: UserModel.fromJson,
       toJson: (user) => user.toJson(),
-      settings: FilePersistorSettings(
-        key: FilePersistor.keyBuilder((snap) {
+      settings: PersistorSettings(
+        key: Persistor.keyBuilder((snap) {
           if (snap.data.age >= 18) {
             return 'adult_users';
           }
