@@ -193,7 +193,8 @@ class DualDataStore {
     this.name, {
     required DataStore Function(String name, bool encrypted) factory,
   })  : _plaintextStore = factory(name, false),
-        _encryptedStore = factory(name, true);
+        _encryptedStore =
+            factory('$name.${DataStoreEncrypter.encryptedName}', true);
 
   bool get isDirty {
     return _plaintextStore.isDirty || _encryptedStore.isDirty;

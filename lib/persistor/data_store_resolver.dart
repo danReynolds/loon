@@ -16,6 +16,8 @@ class DataStoreResolverConfig {
   }) : logger = logger ?? Logger('DataStoreResolver');
 }
 
+/// The data store resolver is persisted alongside the existing data stores and is used to
+/// maintain the resolution of documents to their associated data store.
 class DataStoreResolver {
   var _store = ValueRefStore<String>();
 

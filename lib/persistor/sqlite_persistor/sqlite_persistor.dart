@@ -3,7 +3,6 @@ import 'package:loon/persistor/data_store.dart';
 import 'package:loon/persistor/data_store_encrypter.dart';
 import 'package:loon/persistor/data_store_manager.dart';
 import 'package:loon/persistor/data_store_persistence_payload.dart';
-import 'package:loon/persistor/data_store_resolver.dart';
 import 'package:loon/persistor/sqlite_persistor/sqlite_data_store_config.dart';
 import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
@@ -57,26 +56,15 @@ class SqlitePersistor extends Persistor {
   Future<void> init() async {
     await Future.wait([encrypter.init(), _initDB()]);
 
-    final records = await db.query(
-      tableName,
-      columns: [keyColumn],
-    );
-    final initialStoreNames = records
-        .map((record) => (record[keyColumn] as String)
-            .replaceAll(':${DataStoreEncrypter.encryptedName}', ''))
-        .where((name) => name != DataStoreResolver.name)
-        .toSet();
-
     _manager = DataStoreManager(
       persistenceThrottle: persistenceThrottle,
       onSync: onSync,
       onLog: _logger.log,
       settings: settings,
-      initialStoreNames: initialStoreNames,
       factory: (name, encrypted) => DataStore(
         SqliteDataStoreConfig(
           db: db,
-          encrypted ? '$name:${DataStoreEncrypter.encryptedName}' : name,
+          name,
           encrypted: encrypted,
           encrypter: encrypter,
           logger: _logger,
@@ -84,6 +72,10 @@ class SqlitePersistor extends Persistor {
       ),
       resolverConfig: SqliteDataStoreResolverConfig(db: db),
       clearAll: () => db.delete(tableName),
+      getAll: () async {
+        final records = await db.query(tableName, columns: [keyColumn]);
+        return records.map((record) => (record[keyColumn] as String)).toList();
+      },
     );
 
     await _manager.init();

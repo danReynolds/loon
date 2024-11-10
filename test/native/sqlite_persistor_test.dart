@@ -1,6 +1,5 @@
 import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:loon/persistor/data_store_encrypter.dart';
 import 'package:loon/persistor/sqlite_persistor/sqlite_persistor.dart';
 import '../core/persistor/persistor_test_runner.dart';
 
@@ -18,15 +17,11 @@ void main() {
         storeName, {
         bool encrypted = false,
       }) async {
-        final key = encrypted
-            ? '$storeName:${DataStoreEncrypter.encryptedName}'
-            : storeName;
-
         final records = await persistor.db.query(
           SqlitePersistor.tableName,
           columns: [SqlitePersistor.valueColumn],
           where: '${SqlitePersistor.keyColumn} = ?',
-          whereArgs: [key],
+          whereArgs: [storeName],
         );
 
         if (records.isEmpty) {

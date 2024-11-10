@@ -5,7 +5,6 @@ import 'package:loon/persistor/data_store.dart';
 import 'package:loon/persistor/data_store_encrypter.dart';
 import 'package:loon/persistor/data_store_manager.dart';
 import 'package:loon/persistor/data_store_persistence_payload.dart';
-import 'package:loon/persistor/data_store_resolver.dart';
 import 'package:loon/persistor/indexed_db_persistor/indexed_db_data_store_config.dart';
 import 'package:web/web.dart';
 
@@ -99,24 +98,14 @@ class IndexedDBPersistor extends Persistor {
   Future<void> init() async {
     await Future.wait([encrypter.init(), _initDB()]);
 
-    final result = await runTransaction('Init', (objectStore) {
-      return objectStore.getAllKeys();
-    });
-    final initialStoreNames = List<String>.from(result)
-        .where((name) => name != DataStoreResolver.name)
-        .map((name) =>
-            name.replaceAll(':${DataStoreEncrypter.encryptedName}', ''))
-        .toSet();
-
     _manager = DataStoreManager(
       persistenceThrottle: persistenceThrottle,
       onSync: onSync,
       onLog: _logger.log,
       settings: settings,
-      initialStoreNames: initialStoreNames,
       factory: (name, encrypted) => DataStore(
         IndexedDBDataStoreConfig(
-          encrypted ? '$name:${DataStoreEncrypter.encryptedName}' : name,
+          name,
           encrypted: encrypted,
           encrypter: encrypter,
           runTransaction: runTransaction,
@@ -130,6 +119,13 @@ class IndexedDBPersistor extends Persistor {
         (objectStore) => objectStore.clear(),
         'readwrite',
       ),
+      getAll: () async {
+        final result = await runTransaction(
+          'GetAll',
+          (objectStore) => objectStore.getAllKeys(),
+        );
+        return List<String>.from(result);
+      },
     );
 
     await _manager.init();
