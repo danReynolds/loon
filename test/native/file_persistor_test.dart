@@ -1,7 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:loon/persistor/data_store_encrypter.dart';
 import 'package:loon/persistor/file_persistor/file_persistor.dart';
 
 // ignore: depend_on_referenced_packages
@@ -38,9 +37,7 @@ void main() {
         name, {
         bool encrypted = false,
       }) async {
-        final storeName =
-            encrypted ? '$name.${DataStoreEncrypter.encryptedName}' : name;
-        final file = File('${testDirectory.path}/loon/$storeName.json');
+        final file = File('${testDirectory.path}/loon/$name.json');
 
         final exists = await file.exists();
         if (!exists) {

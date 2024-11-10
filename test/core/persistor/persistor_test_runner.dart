@@ -35,7 +35,11 @@ void persistorTestRunner<T extends Persistor>({
     String store, {
     bool encrypted = false,
   }) async {
-    return getStore(persistor, store, encrypted: encrypted);
+    return getStore(
+      persistor,
+      encrypted ? '$store.${DataStoreEncrypter.encryptedName}' : store,
+      encrypted: encrypted,
+    );
   }
 
   Future<bool> exists(

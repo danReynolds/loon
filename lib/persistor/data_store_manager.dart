@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:loon/loon.dart';
 import 'package:loon/persistor/data_store.dart';
+import 'package:loon/persistor/data_store_encrypter.dart';
 import 'package:loon/persistor/data_store_persistence_payload.dart';
 import 'package:loon/persistor/data_store_resolver.dart';
 import 'package:loon/persistor/lock.dart';
@@ -18,7 +19,13 @@ class DataStoreManager {
 
   final DataStoreFactory factory;
 
+  /// Persistors generally have more optimal ways of clearing all stores at once than just iterating
+  /// through each of them and calling [DataStore.delete], so instead a persistor specifies how all of them can
+  /// be cleared at once to the manager.
   final Future<void> Function() _clearAll;
+
+  /// Returns a list of data store names to be indexed and initialized by the manager.
+  final Future<List<String>> Function() _getAll;
 
   final DataStoreResolverConfig resolverConfig;
 
@@ -48,14 +55,11 @@ class DataStoreManager {
     required this.settings,
     required this.factory,
     required this.resolverConfig,
-    required Set<String> initialStoreNames,
     required Future<void> Function() clearAll,
+    required Future<List<String>> Function() getAll,
   })  : _clearAll = clearAll,
-        resolver = DataStoreResolver(resolverConfig) {
-    for (final name in initialStoreNames) {
-      index[name] = DualDataStore(name, factory: factory);
-    }
-  }
+        _getAll = getAll,
+        resolver = DataStoreResolver(resolverConfig);
 
   void _cancelSync() {
     _syncTimer?.cancel();
@@ -118,6 +122,21 @@ class DataStoreManager {
   }
 
   Future<void> init() async {
+    final storeNames = await _getAll();
+
+    // 1. The resolver is a special store that is not indexed along-side the other data stores.
+    // 2. The separate plaintext vs encrypted data stores for the same store name do not need to be indexed
+    //    separately and are represented by a single [DualDataStore].
+    final indexNames = storeNames
+        .where((name) => name != DataStoreResolver.name)
+        .map((name) =>
+            name.replaceAll('.${DataStoreEncrypter.encryptedName}', ''))
+        .toSet();
+
+    for (final name in indexNames) {
+      index[name] = DualDataStore(name, factory: factory);
+    }
+
     await resolver.hydrate();
   }
 

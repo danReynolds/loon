@@ -82,42 +82,23 @@ class FilePersistorWorker {
     final directory = request.directory;
     final encrypter = request.encrypter;
 
-    final Set<String> initialStoreNames = {};
-    final files = directory
-        .listSync()
-        .whereType<File>()
-        .where((file) => fileRegex.hasMatch(path.basename(file.path)))
-        .toList();
-
-    for (final file in files) {
-      final match = fileRegex.firstMatch(path.basename(file.path));
-      final name = match!.group(1)!;
-      initialStoreNames.add(name);
-    }
-
     manager = DataStoreManager(
       persistenceThrottle: request.persistenceThrottle,
       settings: request.settings,
       onSync: _sendSyncMessage,
       onLog: _sendLogMessage,
-      initialStoreNames: initialStoreNames,
-      factory: (name, encrypted) {
-        final fileName =
-            "${directory.path}/$name${encrypted ? '.${DataStoreEncrypter.encryptedName}' : ''}.json";
-
-        return DataStore(
-          FileDataStoreConfig(
-            name,
-            logger: Logger(
-              'FileDataStore:$name',
-              output: FilePersistorWorker.logger.log,
-            ),
-            file: File(fileName),
-            encrypted: encrypted,
-            encrypter: encrypter,
+      factory: (name, encrypted) => DataStore(
+        FileDataStoreConfig(
+          name,
+          logger: Logger(
+            'FileDataStore:$name',
+            output: FilePersistorWorker.logger.log,
           ),
-        );
-      },
+          file: File('${directory.path}/$name.json'),
+          encrypted: encrypted,
+          encrypter: encrypter,
+        ),
+      ),
       resolverConfig: FileDataStoreResolverConfig(
         file: File("${directory.path}/${DataStoreResolver.name}.json"),
       ),
@@ -127,6 +108,18 @@ class FilePersistorWorker {
         } on PathNotFoundException {
           return;
         }
+      },
+      getAll: () async {
+        final files = directory
+            .listSync()
+            .whereType<File>()
+            .where((file) => fileRegex.hasMatch(path.basename(file.path)))
+            .toList();
+
+        return files.map((file) {
+          final match = fileRegex.firstMatch(path.basename(file.path));
+          return match!.group(1)!;
+        }).toList();
       },
     );
 
