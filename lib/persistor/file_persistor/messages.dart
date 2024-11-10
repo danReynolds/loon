@@ -33,6 +33,7 @@ class InitMessageRequest extends MessageRequest<InitMessageResponse> {
   final DataStoreEncrypter encrypter;
   final Duration persistenceThrottle;
   final PersistorSettings settings;
+  final bool enableLogging;
 
   InitMessageRequest({
     required this.sendPort,
@@ -40,6 +41,7 @@ class InitMessageRequest extends MessageRequest<InitMessageResponse> {
     required this.encrypter,
     required this.persistenceThrottle,
     required this.settings,
+    required this.enableLogging,
   });
 
   InitMessageResponse success(SendPort sendPort) {

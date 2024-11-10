@@ -15,8 +15,7 @@ class DataStoreManager {
 
   final void Function()? onSync;
 
-  final void Function(String text) onLog;
-
+  final Logger logger;
   final DataStoreFactory factory;
 
   /// Persistors generally have more optimal ways of clearing all stores at once than just iterating
@@ -32,8 +31,6 @@ class DataStoreManager {
   /// The sync lock is used to block operations from accessing the file system while there is an ongoing sync
   /// operation and conversely blocks a sync from starting until the ongoing operation holding the lock has finished.
   final _syncLock = Lock();
-
-  late final _logger = Logger('DataStoreManager', output: onLog);
 
   /// The sync timer is used to throttle syncing changes to the file system using
   /// the given [persistenceThrottle]. After an that mutates the file system operation runs, it schedules
@@ -51,15 +48,16 @@ class DataStoreManager {
   DataStoreManager({
     required this.persistenceThrottle,
     required this.onSync,
-    required this.onLog,
     required this.settings,
     required this.factory,
     required this.resolverConfig,
     required Future<void> Function() clearAll,
     required Future<List<String>> Function() getAll,
+    required Logger logger,
   })  : _clearAll = clearAll,
         _getAll = getAll,
-        resolver = DataStoreResolver(resolverConfig);
+        logger = logger.child('DataStoreManager'),
+        resolver = DataStoreResolver(resolverConfig)..logger = logger;
 
   void _cancelSync() {
     _syncTimer?.cancel();
@@ -73,7 +71,7 @@ class DataStoreManager {
   /// Syncs all data stores, persisting dirty ones and deleting ones that can now be removed.
   Future<void> _sync() {
     return _syncLock.run(() {
-      return _logger.measure('Sync', () async {
+      return logger.measure('Sync', () async {
         final dirtyStores =
             index.values.where((dataStore) => dataStore.isDirty);
 

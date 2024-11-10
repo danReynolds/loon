@@ -1,6 +1,5 @@
 import 'package:encrypt/encrypt.dart';
 import 'package:loon/persistor/data_store_encrypter.dart';
-
 import '../utils.dart';
 
 class TestDataStoreEncrypter extends DataStoreEncrypter {

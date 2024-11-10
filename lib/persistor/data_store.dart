@@ -17,8 +17,8 @@ abstract class DataStoreConfig {
     required this.delete,
     required bool encrypted,
     required DataStoreEncrypter encrypter,
-    final Logger? logger,
-  }) : logger = logger ?? Logger('DataStore:$name');
+    required Logger logger,
+  }) : logger = logger.child('DataStore:$name');
 }
 
 class DataStore {

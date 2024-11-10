@@ -38,14 +38,9 @@ part 'extensions/iterable.dart';
 class Loon {
   static final Loon _instance = Loon._();
 
-  Loon._() {
-    _logger = Logger('Loon', output: (message) {
-      if (_isLoggingEnabled && kDebugMode) {
-        // ignore: avoid_print
-        print(message);
-      }
-    });
-  }
+  Loon._();
+
+  static final Logger logger = Logger('Loon');
 
   /// The store of document snapshots indexed by document path.
   final documentStore = ValueStore<DocumentSnapshot>();
@@ -55,10 +50,6 @@ class Loon {
   final dependencyManager = DependencyManager();
 
   PersistManager? persistManager;
-
-  late final Logger _logger;
-
-  bool _isLoggingEnabled = false;
 
   bool get _isGlobalPersistenceEnabled {
     return persistManager?.settings.enabled ?? false;
@@ -222,7 +213,7 @@ class Loon {
     Persistor? persistor,
     bool enableLogging = false,
   }) {
-    _instance._isLoggingEnabled = enableLogging;
+    logger.enabled = enableLogging;
 
     if (persistor != null) {
       _instance.persistManager = PersistManager(persistor: persistor);
@@ -316,10 +307,6 @@ class Loon {
   /// Unsubscribes all active observers of the store, disposing their stream resources.
   static void unsubscribe() {
     _instance.broadcastManager.unsubscribe();
-  }
-
-  static Logger get logger {
-    return _instance._logger;
   }
 
   static PersistorSettings? get persistorSettings {

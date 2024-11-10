@@ -1,16 +1,43 @@
 part of loon;
 
 class Logger {
-  final String name;
+  final String _name;
+  bool? _enabled;
+  final Logger? parent;
   final void Function(String message)? output;
 
   Logger(
-    this.name, {
+    this._name, {
+    this.parent,
     this.output,
-  });
+    bool? enabled,
+  }) : _enabled = enabled;
+
+  Logger child(
+    String name, {
+    void Function(String message)? output,
+    bool? enabled,
+  }) {
+    return Logger(name, output: output ?? this.output, parent: this);
+  }
+
+  String get name {
+    if (parent != null) {
+      return "${parent!.name} -> $_name";
+    }
+    return _name;
+  }
+
+  bool get enabled {
+    return _enabled ?? parent?.enabled ?? false;
+  }
+
+  set enabled(bool enabled) {
+    _enabled = enabled;
+  }
 
   void log(String message) {
-    final formattedMessage = '$name->$message';
+    final formattedMessage = '$name -> $message';
 
     if (output != null) {
       output!(formattedMessage);

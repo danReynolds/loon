@@ -10,6 +10,7 @@ class IndexedDBDataStoreConfig extends DataStoreConfig {
     super.name, {
     required super.encrypted,
     required super.encrypter,
+    required super.logger,
     required IndexedDBTransactionCallback runTransaction,
   }) : super(
           hydrate: () async {

@@ -27,7 +27,7 @@ class IndexedDBPersistor extends Persistor {
 
   bool _initialized = false;
 
-  final _logger = Logger('IndexedDBPersistor');
+  final _logger = Loon.logger.child('IndexedDBPersistor');
 
   IndexedDBPersistor({
     super.onPersist,
@@ -101,11 +101,12 @@ class IndexedDBPersistor extends Persistor {
     _manager = DataStoreManager(
       persistenceThrottle: persistenceThrottle,
       onSync: onSync,
-      onLog: _logger.log,
+      logger: _logger,
       settings: settings,
       factory: (name, encrypted) => DataStore(
         IndexedDBDataStoreConfig(
           name,
+          logger: _logger,
           encrypted: encrypted,
           encrypter: encrypter,
           runTransaction: runTransaction,

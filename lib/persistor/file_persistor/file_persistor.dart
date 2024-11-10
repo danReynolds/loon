@@ -32,7 +32,7 @@ class FilePersistor extends Persistor {
     super.persistenceThrottle = const Duration(milliseconds: 100),
     DataStoreEncrypter? encrypter,
   })  : encrypter = encrypter = encrypter ?? DataStoreEncrypter(),
-        logger = Logger('FilePersistor', output: Loon.logger.log);
+        logger = Loon.logger.child('FilePersistor');
 
   void _onMessage(dynamic message) {
     switch (message) {
@@ -100,6 +100,7 @@ class FilePersistor extends Persistor {
       encrypter: encrypter,
       persistenceThrottle: persistenceThrottle,
       settings: settings,
+      enableLogging: logger.enabled,
     );
 
     final completer =

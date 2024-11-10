@@ -15,7 +15,7 @@ class SqlitePersistor extends Persistor {
   static const keyColumn = 'key';
   static const valueColumn = 'value';
 
-  final _logger = Logger('SqlitePersistor');
+  final _logger = Loon.logger.child('SqlitePersistor');
 
   late final DataStoreManager _manager;
   final DataStoreEncrypter encrypter;
@@ -59,7 +59,7 @@ class SqlitePersistor extends Persistor {
     _manager = DataStoreManager(
       persistenceThrottle: persistenceThrottle,
       onSync: onSync,
-      onLog: _logger.log,
+      logger: _logger,
       settings: settings,
       factory: (name, encrypted) => DataStore(
         SqliteDataStoreConfig(
@@ -83,9 +83,8 @@ class SqlitePersistor extends Persistor {
 
   @override
   clear(List<Collection> collections) {
-    return _manager.clear(
-      collections.map((collection) => collection.path).toList(),
-    );
+    return _manager
+        .clear(collections.map((collection) => collection.path).toList());
   }
 
   @override

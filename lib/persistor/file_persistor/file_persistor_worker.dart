@@ -22,8 +22,7 @@ class FilePersistorWorker {
   final receivePort = ReceivePort();
 
   late final DataStoreManager manager;
-
-  static late final Logger logger;
+  late final Logger logger;
 
   FilePersistorWorker._({
     required this.sendPort,
@@ -31,8 +30,9 @@ class FilePersistorWorker {
     required DataStoreEncrypter encrypter,
     required Duration persistenceThrottle,
     required PersistorSettings settings,
+    required bool enableLogging,
   }) {
-    logger = Logger('Worker', output: _sendLogMessage);
+    logger = Logger('Worker', output: _sendLogMessage, enabled: enableLogging);
   }
 
   static init(InitMessageRequest request) {
@@ -42,6 +42,7 @@ class FilePersistorWorker {
       encrypter: request.encrypter,
       persistenceThrottle: request.persistenceThrottle,
       settings: request.settings,
+      enableLogging: request.enableLogging,
     )._onMessage(request);
   }
 
@@ -85,15 +86,12 @@ class FilePersistorWorker {
     manager = DataStoreManager(
       persistenceThrottle: request.persistenceThrottle,
       settings: request.settings,
+      logger: logger,
       onSync: _sendSyncMessage,
-      onLog: _sendLogMessage,
       factory: (name, encrypted) => DataStore(
         FileDataStoreConfig(
           name,
-          logger: Logger(
-            'FileDataStore:$name',
-            output: FilePersistorWorker.logger.log,
-          ),
+          logger: logger,
           file: File('${directory.path}/$name.json'),
           encrypted: encrypted,
           encrypter: encrypter,

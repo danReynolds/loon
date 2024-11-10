@@ -13,6 +13,7 @@ void main() async {
 
   Loon.configure(
     persistor: Persistor.current(),
+    enableLogging: true,
   );
 
   await logger.measure('Hydrate', () => Loon.hydrate());
