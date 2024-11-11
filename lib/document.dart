@@ -6,7 +6,8 @@ class Document<T> implements StoreReference {
   final FromJson<T>? fromJson;
   final ToJson<T>? toJson;
   final DependenciesBuilder<T>? dependenciesBuilder;
-  late final DocumentPersistorSettings? persistorSettings;
+
+  late final PathPersistorSettings? persistorSettings;
 
   Document(
     this.parent,
@@ -17,10 +18,12 @@ class Document<T> implements StoreReference {
     PersistorSettings? persistorSettings,
   }) {
     this.persistorSettings = switch (persistorSettings) {
-      DocumentPersistorSettings _ => persistorSettings,
+      PathPersistorSettings _ => persistorSettings,
+      // If the persistor settings are not yet associated with a path, then the settings
+      // are updated to having been applied at the document's path.
       PersistorSettings _ =>
-        DocumentPersistorSettings(settings: persistorSettings, doc: this),
-      _ => null,
+        PathPersistorSettings(settings: persistorSettings, ref: this),
+      _ => persistorSettings,
     };
   }
 

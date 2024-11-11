@@ -5,6 +5,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart' hide Key;
 import 'package:loon/persistor/file_persistor/file_persistor.dart';
 import 'package:loon/persistor/indexed_db_persistor/indexed_db_persistor.dart';
+import 'package:loon/persistor/sqlite_persistor/sqlite_persistor.dart';
 import 'package:uuid/uuid.dart';
 import 'dart:collection';
 
@@ -213,7 +214,7 @@ class Loon {
     Persistor? persistor,
     bool enableLogging = false,
   }) {
-    logger.enabled = enableLogging;
+    logger.enabled = kDebugMode && enableLogging;
 
     if (persistor != null) {
       _instance.persistManager = PersistManager(persistor: persistor);

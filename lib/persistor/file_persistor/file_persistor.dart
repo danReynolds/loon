@@ -1,26 +1,22 @@
 import 'dart:async';
 import 'dart:io';
-import 'dart:isolate';
 import 'package:loon/loon.dart';
+import 'package:loon/persistor/data_store.dart';
 import 'package:loon/persistor/data_store_encrypter.dart';
-import 'package:loon/persistor/data_store_persistence_payload.dart';
-import 'package:loon/persistor/file_persistor/file_persistor_worker.dart';
-import 'package:loon/persistor/file_persistor/messages.dart';
+import 'package:loon/persistor/data_store_manager.dart';
+import 'package:loon/persistor/data_store_resolver.dart';
+import 'package:loon/persistor/file_persistor/file_data_store_config.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:path/path.dart' as path;
 
 /// A worker abstraction that creates a background worker isolate to process file persistence/hydration.
 class FilePersistor extends Persistor {
-  /// This persistor's receive port
-  late final ReceivePort _receivePort;
-
-  /// The worker's send port
-  late final SendPort _sendPort;
-
-  /// An index of task IDs to the task completer that is resolved when they are completed on the worker.
-  final Map<String, Completer> _messageRequestIndex = {};
-
   final Logger logger;
   final DataStoreEncrypter encrypter;
+
+  late final DataStoreManager _manager;
+
+  final _fileRegex = RegExp(r'^(?!__resolver__)(\w+?)(?:.encrypted)?\.json$');
 
   FilePersistor({
     super.onPersist,
@@ -34,40 +30,10 @@ class FilePersistor extends Persistor {
   })  : encrypter = encrypter = encrypter ?? DataStoreEncrypter(),
         logger = Loon.logger.child('FilePersistor');
 
-  void _onMessage(dynamic message) {
-    switch (message) {
-      case LogMessage message:
-        logger.log(message.text);
-        break;
-      case SyncCompleteMessage _:
-        onSync?.call();
-        break;
-      case MessageResponse messageResponse:
-        final request = _messageRequestIndex[messageResponse.id];
-
-        // In the case of receiving an error message from the worker, print the error
-        // text message on the main isolate and complete any associated request completer like a failed
-        // persist operation.
-        if (messageResponse is ErrorMessageResponse) {
-          logger.log(messageResponse.text);
-          request?.completeError(Exception(messageResponse.text));
-        } else {
-          request?.complete(messageResponse);
-        }
-        break;
-    }
-  }
-
-  Future<T> _sendMessage<T extends MessageResponse>(MessageRequest<T> message) {
-    final completer = _messageRequestIndex[message.id] = Completer<T>();
-    _sendPort.send(message);
-    return completer.future;
-  }
-
   /// Initializes the directory in which files are persisted. This needs to be done on the main isolate
   /// as opposed to the worker since it requires access to plugins that are not easily available in the worker
   /// isolate context.
-  Future<Directory> initDirectory() async {
+  Future<Directory> _initDirectory() async {
     final applicationDirectory = await getApplicationDocumentsDirectory();
     final fileDirectory = Directory('${applicationDirectory.path}/loon');
     final directory = await fileDirectory.create();
@@ -80,76 +46,70 @@ class FilePersistor extends Persistor {
   @override
   init() async {
     final values = await Future.wait([
-      initDirectory(),
+      _initDirectory(),
       encrypter.init(),
     ]);
-
     final directory = values.first as Directory;
 
-    // Create a receive port on the main isolate to receive messages from the worker.
-    _receivePort = ReceivePort();
-    _receivePort.listen(_onMessage);
-
-    // The initial message request to the worker contains three necessary values:
-    // 1. The persistor's send port that will allow for message passing from the worker.
-    // 2. The directory that the worker uses to persist file data stores.
-    // 3. The encrypter used by file data stores that have encryption enabled.
-    final initMessage = InitMessageRequest(
-      sendPort: _receivePort.sendPort,
-      directory: directory,
-      encrypter: encrypter,
+    _manager = DataStoreManager(
       persistenceThrottle: persistenceThrottle,
       settings: settings,
-      enableLogging: logger.enabled,
-    );
-
-    final completer =
-        _messageRequestIndex[initMessage.id] = Completer<InitMessageResponse>();
-
-    try {
-      await logger.measure('Worker spawn', () async {
-        return Isolate.spawn(
-          FilePersistorWorker.init,
-          initMessage,
-          debugName: 'FilePersistorWorker',
-        );
-      });
-
-      final response = await completer.future;
-      _sendPort = response.sendPort;
-    } catch (e) {
-      logger.log("Worker initialization failed.");
-      _receivePort.close();
-      rethrow;
-    }
-  }
-
-  @override
-  hydrate([refs]) async {
-    final response = await _sendMessage(
-      HydrateMessageRequest(refs?.map((ref) => ref.path).toList()),
-    );
-    return response.data;
-  }
-
-  @override
-  persist(docs) async {
-    await _sendMessage(
-      PersistMessageRequest(payload: DataStorePersistencePayload(docs)),
-    );
-  }
-
-  @override
-  clear(collections) async {
-    await _sendMessage(
-      ClearMessageRequest(
-        paths: collections.map((collection) => collection.path).toList(),
+      logger: logger,
+      onSync: onSync,
+      factory: (name, encrypted) => DataStore(
+        FileDataStoreConfig(
+          name,
+          logger: logger,
+          file: File('${directory.path}/$name.json'),
+          encrypted: encrypted,
+          encrypter: encrypter,
+        ),
       ),
+      resolverConfig: FileDataStoreResolverConfig(
+        file: File("${directory.path}/${DataStoreResolver.name}.json"),
+      ),
+      clearAll: () async {
+        try {
+          await directory.delete(recursive: true);
+        } on PathNotFoundException {
+          return;
+        }
+      },
+      getAll: () async {
+        final files = directory
+            .listSync()
+            .whereType<File>()
+            .where((file) => _fileRegex.hasMatch(path.basename(file.path)))
+            .toList();
+
+        return files.map((file) {
+          final match = _fileRegex.firstMatch(path.basename(file.path));
+          return match!.group(1)!;
+        }).toList();
+      },
     );
+
+    await _manager.init();
   }
 
   @override
-  clearAll() async {
-    await _sendMessage(ClearAllMessageRequest());
+  clear(List<Collection> collections) {
+    return _manager
+        .clear(collections.map((collection) => collection.path).toList());
+  }
+
+  @override
+  clearAll() {
+    return _manager.clearAll();
+  }
+
+  @override
+  hydrate([refs]) {
+    return _manager.hydrate(refs?.map((ref) => ref.path).toList());
+  }
+
+  @override
+  persist(docs) {
+    return _manager.persist(docs);
   }
 }

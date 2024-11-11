@@ -2,7 +2,6 @@ import 'dart:io';
 import 'dart:isolate';
 import 'package:loon/loon.dart';
 import 'package:loon/persistor/data_store_encrypter.dart';
-import 'package:loon/persistor/data_store_persistence_payload.dart';
 import 'package:uuid/uuid.dart';
 
 const uuid = Uuid();
@@ -82,10 +81,10 @@ class HydrateMessageResponse extends MessageResponse {
 }
 
 class PersistMessageRequest extends MessageRequest<PersistMessageResponse> {
-  final DataStorePersistencePayload payload;
+  final List<Document> docs;
 
   PersistMessageRequest({
-    required this.payload,
+    required this.docs,
   });
 
   PersistMessageResponse success() {

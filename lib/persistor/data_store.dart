@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:loon/loon.dart';
 import 'package:loon/persistor/data_store_encrypter.dart';
 
@@ -36,6 +38,10 @@ class DataStore {
 
   bool get isEmpty {
     return _store.isEmpty;
+  }
+
+  int get size {
+    return (utf8.encode(jsonEncode(_store.inspect())).length / 1000).round();
   }
 
   /// Returns a map of the subset of documents in the store under the given path.
@@ -143,6 +149,10 @@ class DataStore {
 
     if (hydratedStore != null) {
       _store = hydratedStore;
+
+      if (logger.enabled) {
+        logger.log('Hydrated ${size}KB');
+      }
     }
 
     isHydrated = true;

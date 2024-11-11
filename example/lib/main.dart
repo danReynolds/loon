@@ -2,6 +2,8 @@ import 'dart:async';
 import 'package:example/models/user.dart';
 import 'package:flutter/material.dart';
 import 'package:loon/loon.dart';
+import 'package:loon/persistor/file_persistor/file_persistor.dart';
+import 'package:loon/persistor/sqlite_persistor/sqlite_persistor.dart';
 import 'package:uuid/uuid.dart';
 
 const uuid = Uuid();
@@ -12,7 +14,7 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   Loon.configure(
-    persistor: Persistor.current(),
+    persistor: SqlitePersistor(),
     enableLogging: true,
   );
 
@@ -192,9 +194,9 @@ class _MyHomePageState extends State<MyHomePage> {
             ),
             const SizedBox(width: 24),
             FloatingActionButton.extended(
-              label: const Text('Load test (10000)'),
+              label: const Text('Load test (50000)'),
               onPressed: () {
-                for (int i = 0; i < 10000; i++) {
+                for (int i = 0; i < 50000; i++) {
                   final id = uuid.v4();
                   UserModel.store.doc(id).create(UserModel(name: 'User $id'));
                 }

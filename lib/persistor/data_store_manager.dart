@@ -2,7 +2,6 @@ import 'dart:async';
 import 'package:loon/loon.dart';
 import 'package:loon/persistor/data_store.dart';
 import 'package:loon/persistor/data_store_encrypter.dart';
-import 'package:loon/persistor/data_store_persistence_payload.dart';
 import 'package:loon/persistor/data_store_resolver.dart';
 import 'package:loon/persistor/lock.dart';
 
@@ -66,6 +65,65 @@ class DataStoreManager {
 
   void _scheduleSync() {
     _syncTimer ??= Timer(persistenceThrottle, _sync);
+  }
+
+  // Builds a local resolver for the set of documents being persisted in the current batch.
+  // Constructing a local resolver ensures that all documents in the batch can lookup accurate persistence keys.
+  //
+  // Ex. If an update to users__1__friends__1 which resolves to persistence key "users" at resolver path "users"
+  //     is made redundant by a subsequent update to document users__1 that specifies that the persistence key at
+  //     resolver path "users" is now "other_users", then the previous update to users__1__friends__1 is incorrect.
+  ValueStore<String> _buildLocalResolver(List<Document> docs) {
+    final resolver = ValueStore<String>();
+    final globalPersistorSettings = Loon.persistorSettings;
+
+    final defaultKey = switch (globalPersistorSettings) {
+      PersistorSettings(key: PersistorValueKey key) => key,
+      _ => Persistor.defaultKey,
+    };
+    resolver.write(ValueStore.root, defaultKey.value);
+
+    for (final doc in docs) {
+      final pathSettings = doc.persistorSettings;
+
+      if (pathSettings != null) {
+        switch (pathSettings) {
+          case PathPersistorSettings(
+              ref: final ref,
+              key: PersistorValueKey key
+            ):
+            resolver.write(ref.path, key.value);
+            break;
+          case PathPersistorSettings(
+              ref: Document doc,
+              key: PersistorBuilderKey keyBuilder,
+            ):
+            final path = doc.path;
+            final snap = doc.get();
+
+            if (snap != null) {
+              resolver.write(path, (keyBuilder as dynamic)(snap));
+            }
+
+            break;
+        }
+      } else if (globalPersistorSettings is PersistorSettings) {
+        switch (globalPersistorSettings) {
+          case PersistorSettings(key: PersistorBuilderKey keyBuilder):
+            final path = doc.path;
+            final snap = doc.get();
+
+            if (snap != null) {
+              resolver.write(path, (keyBuilder as dynamic)(snap));
+            }
+            break;
+          default:
+            break;
+        }
+      }
+    }
+
+    return resolver;
   }
 
   /// Syncs all data stores, persisting dirty ones and deleting ones that can now be removed.
@@ -184,20 +242,18 @@ class DataStoreManager {
     );
   }
 
-  Future<void> persist(DataStorePersistencePayload payload) {
+  Future<void> persist(List<Document> docs) {
     return _syncLock.run(() async {
-      final localResolver = payload.resolver;
-      final docs = payload.persistenceDocs;
-
       Set<DualDataStore> dataStores = {};
       Map<String, List<DualDataStore>> pathDataStores = {};
+
+      final localResolver = _buildLocalResolver(docs);
 
       // Pre-calculate and hydrate all resolved file data stores relevant to the updated documents.
       for (final doc in docs) {
         final docPath = doc.path;
-        final docData = doc.data;
 
-        if (docData == null) {
+        if (!doc.exists()) {
           final stores = pathDataStores[docPath] = _resolveDataStores(docPath);
           dataStores.addAll(stores);
         } else {
@@ -221,8 +277,10 @@ class DataStoreManager {
 
       for (final doc in docs) {
         final docPath = doc.path;
-        final docData = doc.data;
-        final encrypted = doc.encrypted;
+        final docData = doc.getSerialized();
+        final encrypted = doc.persistorSettings?.encrypted ??
+            Loon.persistorSettings?.encrypted ??
+            false;
 
         // If the document has been deleted, then clear its data recursively from each of its
         // resolved data stores.

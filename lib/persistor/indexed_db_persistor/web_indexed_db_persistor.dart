@@ -4,7 +4,6 @@ import 'package:loon/loon.dart';
 import 'package:loon/persistor/data_store.dart';
 import 'package:loon/persistor/data_store_encrypter.dart';
 import 'package:loon/persistor/data_store_manager.dart';
-import 'package:loon/persistor/data_store_persistence_payload.dart';
 import 'package:loon/persistor/indexed_db_persistor/indexed_db_data_store_config.dart';
 import 'package:web/web.dart';
 
@@ -151,6 +150,6 @@ class IndexedDBPersistor extends Persistor {
 
   @override
   persist(docs) {
-    return _manager.persist(DataStorePersistencePayload(docs));
+    return _manager.persist(docs);
   }
 }
