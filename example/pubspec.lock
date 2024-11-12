@@ -238,7 +238,7 @@ packages:
       path: ".."
       relative: true
     source: path
-    version: "4.0.1"
+    version: "5.0.0"
   matcher:
     dependency: transitive
     description:
@@ -396,6 +396,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.5.4+5"
+  sqflite_common_ffi:
+    dependency: transitive
+    description:
+      name: sqflite_common_ffi
+      sha256: d316908f1537725427ff2827a5c5f3b2c1bc311caed985fe3c9b10939c9e11ca
+      url: "https://pub.dev"
+    source: hosted
+    version: "2.3.4"
   sqflite_darwin:
     dependency: transitive
     description:
@@ -412,6 +420,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.4.0"
+  sqlite3:
+    dependency: transitive
+    description:
+      name: sqlite3
+      sha256: "45f168ae2213201b54e09429ed0c593dc2c88c924a1488d6f9c523a255d567cb"
+      url: "https://pub.dev"
+    source: hosted
+    version: "2.4.6"
   stack_trace:
     dependency: transitive
     description:

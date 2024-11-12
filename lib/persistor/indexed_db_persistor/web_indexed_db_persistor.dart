@@ -2,15 +2,14 @@ import 'dart:async';
 import 'dart:js_interop';
 import 'package:loon/loon.dart';
 import 'package:loon/persistor/data_store.dart';
-import 'package:loon/persistor/data_store_encrypter.dart';
 import 'package:loon/persistor/data_store_manager.dart';
-import 'package:loon/persistor/data_store_persistence_payload.dart';
+import 'package:loon/persistor/persist_payload.dart';
 import 'package:loon/persistor/indexed_db_persistor/indexed_db_data_store_config.dart';
 import 'package:web/web.dart';
 
 typedef IndexedDBTransactionCallback = Future<T> Function<T>(
   String name,
-  IDBRequest? Function(IDBObjectStore objectStore) execute, [
+  Future<IDBRequest>? Function(IDBObjectStore objectStore) execute, [
   IDBTransactionMode mode,
 ]);
 
@@ -21,24 +20,21 @@ class IndexedDBPersistor extends Persistor {
   static const keyPath = 'key';
   static const valuePath = 'value';
 
-  late final DataStoreManager _manager;
-  final DataStoreEncrypter encrypter;
   late IDBDatabase _db;
+  late final DataStoreManager _manager;
 
   bool _initialized = false;
-
-  final _logger = Logger('IndexedDBPersistor');
 
   IndexedDBPersistor({
     super.onPersist,
     super.onClear,
     super.onClearAll,
     super.onHydrate,
+    super.encrypter,
     super.settings = const PersistorSettings(),
     super.persistenceThrottle = const Duration(milliseconds: 100),
     super.onSync,
-    DataStoreEncrypter? encrypter,
-  }) : encrypter = encrypter ?? DataStoreEncrypter();
+  }) : super(logger: Loon.logger.child('IndexedDBPersistor'));
 
   Future<void> _initDB() async {
     final completer = Completer<void>();
@@ -75,7 +71,7 @@ class IndexedDBPersistor extends Persistor {
 
   Future<T> runTransaction<T>(
     String name,
-    IDBRequest? Function(IDBObjectStore objectStore) execute, [
+    Future<IDBRequest>? Function(IDBObjectStore objectStore) execute, [
     IDBTransactionMode mode = 'readonly',
   ]) async {
     final completer = Completer();
@@ -87,25 +83,27 @@ class IndexedDBPersistor extends Persistor {
     transaction.onerror = ((ExternalDartReference _) =>
         completer.completeError('$name error')).toJS;
 
-    final request = execute(objectStore);
+    final request = await execute(objectStore);
 
-    await _logger.measure(name, () => completer.future);
+    await logger.measure(name, () => completer.future);
 
     return request?.result.dartify() as T;
   }
 
   @override
   Future<void> init() async {
-    await Future.wait([encrypter.init(), _initDB()]);
+    await _initDB();
 
     _manager = DataStoreManager(
       persistenceThrottle: persistenceThrottle,
       onSync: onSync,
-      onLog: _logger.log,
+      logger: logger,
       settings: settings,
-      factory: (name, encrypted) => DataStore(
+      encrypter: encrypter,
+      factory: (name, encrypted, encrypter) => DataStore(
         IndexedDBDataStoreConfig(
           name,
+          logger: logger,
           encrypted: encrypted,
           encrypter: encrypter,
           runTransaction: runTransaction,
@@ -116,13 +114,13 @@ class IndexedDBPersistor extends Persistor {
       ),
       clearAll: () => runTransaction(
         'clearAll',
-        (objectStore) => objectStore.clear(),
+        (objectStore) async => objectStore.clear(),
         'readwrite',
       ),
       getAll: () async {
         final result = await runTransaction(
           'GetAll',
-          (objectStore) => objectStore.getAllKeys(),
+          (objectStore) async => objectStore.getAllKeys(),
         );
         return List<String>.from(result);
       },
@@ -150,6 +148,6 @@ class IndexedDBPersistor extends Persistor {
 
   @override
   persist(docs) {
-    return _manager.persist(DataStorePersistencePayload(docs));
+    return _manager.persist(PersistPayload(docs));
   }
 }

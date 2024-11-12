@@ -17,6 +17,7 @@ class TestPersistor extends Persistor {
     this.seedData = const [],
   }) : super(
           settings: const PersistorSettings(),
+          logger: Logger('TestPersistor'),
           onPersist: (docs) {
             completer.persistComplete();
             onPersist?.call(docs);

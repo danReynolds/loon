@@ -1,8 +1,5 @@
-import 'dart:io';
 import 'dart:isolate';
-import 'package:loon/loon.dart';
-import 'package:loon/persistor/data_store_encrypter.dart';
-import 'package:loon/persistor/data_store_persistence_payload.dart';
+import 'package:loon/persistor/persist_payload.dart';
 import 'package:uuid/uuid.dart';
 
 const uuid = Uuid();
@@ -29,17 +26,9 @@ abstract class MessageResponse extends Message {
 
 class InitMessageRequest extends MessageRequest<InitMessageResponse> {
   final SendPort sendPort;
-  final Directory directory;
-  final DataStoreEncrypter encrypter;
-  final Duration persistenceThrottle;
-  final PersistorSettings settings;
 
   InitMessageRequest({
     required this.sendPort,
-    required this.directory,
-    required this.encrypter,
-    required this.persistenceThrottle,
-    required this.settings,
   });
 
   InitMessageResponse success(SendPort sendPort) {
@@ -80,7 +69,7 @@ class HydrateMessageResponse extends MessageResponse {
 }
 
 class PersistMessageRequest extends MessageRequest<PersistMessageResponse> {
-  final DataStorePersistencePayload payload;
+  final PersistPayload payload;
 
   PersistMessageRequest({
     required this.payload,

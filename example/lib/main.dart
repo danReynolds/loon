@@ -11,9 +11,7 @@ final logger = Logger('Playground');
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  Loon.configure(
-    persistor: Persistor.current(),
-  );
+  Loon.configure(persistor: Persistor.current(), enableLogging: true);
 
   await logger.measure('Hydrate', () => Loon.hydrate());
 

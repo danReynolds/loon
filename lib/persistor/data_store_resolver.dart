@@ -6,14 +6,12 @@ class DataStoreResolverConfig {
   final Future<ValueRefStore<String>?> Function() hydrate;
   final Future<void> Function(ValueRefStore<String>) persist;
   final Future<void> Function() delete;
-  final Logger logger;
 
   DataStoreResolverConfig({
     required this.hydrate,
     required this.persist,
     required this.delete,
-    Logger? logger,
-  }) : logger = logger ?? Logger('DataStoreResolver');
+  });
 }
 
 /// The data store resolver is persisted alongside the existing data stores and is used to
@@ -28,15 +26,13 @@ class DataStoreResolver {
 
   final DataStoreResolverConfig config;
 
+  late Logger logger;
+
   DataStoreResolver(this.config) {
     // Initialize the root of the resolver with the default file data store key.
     // This ensures that all lookups of values in the resolver by parent path roll up
     // to the default store as a fallback if no other value exists for a given path in the resolver.
     _store.write(ValueStore.root, Persistor.defaultKey.value);
-  }
-
-  Logger get logger {
-    return config.logger;
   }
 
   bool get isEmpty {

@@ -9,7 +9,7 @@ class IndexedDBPersistor extends Persistor {
     super.onSync,
     super.persistenceThrottle,
     super.settings,
-  });
+  }) : super(logger: Logger('IndexedDBStubPersistor'));
 
   @override
   Future<void> clear(List<Collection> collections) {

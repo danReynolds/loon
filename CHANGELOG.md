@@ -1,3 +1,9 @@
+## 5.1.0
+
+* Creates generic persistor worker isolate interface.
+* Move SQLite operations to a worker isolate using new interface.
+* Refactor logging for global enable/disable support.
+
 ## 5.0.0
 
 * Adds web persistence support using the IndexedDBPersistor.

@@ -2,7 +2,7 @@ import 'dart:async';
 import 'package:loon/loon.dart';
 import 'package:loon/persistor/data_store.dart';
 import 'package:loon/persistor/data_store_encrypter.dart';
-import 'package:loon/persistor/data_store_persistence_payload.dart';
+import 'package:loon/persistor/persist_payload.dart';
 import 'package:loon/persistor/data_store_resolver.dart';
 import 'package:loon/persistor/lock.dart';
 
@@ -15,8 +15,7 @@ class DataStoreManager {
 
   final void Function()? onSync;
 
-  final void Function(String text) onLog;
-
+  final Logger logger;
   final DataStoreFactory factory;
 
   /// Persistors generally have more optimal ways of clearing all stores at once than just iterating
@@ -33,7 +32,7 @@ class DataStoreManager {
   /// operation and conversely blocks a sync from starting until the ongoing operation holding the lock has finished.
   final _syncLock = Lock();
 
-  late final _logger = Logger('DataStoreManager', output: onLog);
+  final DataStoreEncrypter encrypter;
 
   /// The sync timer is used to throttle syncing changes to the file system using
   /// the given [persistenceThrottle]. After an that mutates the file system operation runs, it schedules
@@ -51,15 +50,17 @@ class DataStoreManager {
   DataStoreManager({
     required this.persistenceThrottle,
     required this.onSync,
-    required this.onLog,
     required this.settings,
     required this.factory,
     required this.resolverConfig,
+    required this.encrypter,
     required Future<void> Function() clearAll,
     required Future<List<String>> Function() getAll,
+    required Logger logger,
   })  : _clearAll = clearAll,
         _getAll = getAll,
-        resolver = DataStoreResolver(resolverConfig);
+        logger = logger.child('DataStoreManager'),
+        resolver = DataStoreResolver(resolverConfig)..logger = logger;
 
   void _cancelSync() {
     _syncTimer?.cancel();
@@ -73,7 +74,7 @@ class DataStoreManager {
   /// Syncs all data stores, persisting dirty ones and deleting ones that can now be removed.
   Future<void> _sync() {
     return _syncLock.run(() {
-      return _logger.measure('Sync', () async {
+      return logger.measure('Sync', () async {
         final dirtyStores =
             index.values.where((dataStore) => dataStore.isDirty);
 
@@ -134,7 +135,7 @@ class DataStoreManager {
         .toSet();
 
     for (final name in indexNames) {
-      index[name] = DualDataStore(name, factory: factory);
+      index[name] = DualDataStore(name, factory: factory, encrypter: encrypter);
     }
 
     await resolver.hydrate();
@@ -186,7 +187,7 @@ class DataStoreManager {
     );
   }
 
-  Future<void> persist(DataStorePersistencePayload payload) {
+  Future<void> persist(PersistPayload payload) {
     return _syncLock.run(() async {
       final localResolver = payload.resolver;
       final docs = payload.persistenceDocs;
@@ -208,10 +209,12 @@ class DataStoreManager {
           final prevDataStore = index[prevDataStoreName] ??= DualDataStore(
             prevDataStoreName,
             factory: factory,
+            encrypter: encrypter,
           );
           final nextDataStore = index[nextDataStoreName] ??= DualDataStore(
             nextDataStoreName,
             factory: factory,
+            encrypter: encrypter,
           );
 
           dataStores.add(prevDataStore);

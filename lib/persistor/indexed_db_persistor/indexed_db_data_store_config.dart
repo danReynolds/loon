@@ -10,12 +10,13 @@ class IndexedDBDataStoreConfig extends DataStoreConfig {
     super.name, {
     required super.encrypted,
     required super.encrypter,
+    required super.logger,
     required IndexedDBTransactionCallback runTransaction,
   }) : super(
           hydrate: () async {
             final result = await runTransaction(
               'Hydrate store: $name',
-              (objectStore) {
+              (objectStore) async {
                 return objectStore.get(name.toJS);
               },
             );
@@ -26,7 +27,7 @@ class IndexedDBDataStoreConfig extends DataStoreConfig {
 
             final value = result[IndexedDBPersistor.valuePath];
             final json =
-                jsonDecode(encrypted ? encrypter.decrypt(value) : value);
+                jsonDecode(encrypted ? await encrypter.decrypt(value) : value);
 
             final store = ValueStore<ValueStore>();
 
@@ -40,20 +41,20 @@ class IndexedDBDataStoreConfig extends DataStoreConfig {
           },
           persist: (store) => runTransaction(
             'Persist store: $name',
-            (objectStore) {
+            (objectStore) async {
               final value = jsonEncode(store.extract());
 
               return objectStore.put({
                 IndexedDBPersistor.keyPath: name,
                 IndexedDBPersistor.valuePath:
-                    encrypted ? encrypter.encrypt(value) : value,
+                    encrypted ? await encrypter.encrypt(value) : value,
               }.jsify());
             },
             'readwrite',
           ),
           delete: () => runTransaction(
             'Delete store: $name',
-            (objectStore) => objectStore.delete(name.toJS),
+            (objectStore) async => objectStore.delete(name.toJS),
             'readwrite',
           ),
         );
@@ -67,7 +68,7 @@ class IndexedDBDataStoreResolverConfig extends DataStoreResolverConfig {
   }) : super(
           hydrate: () async {
             final result =
-                await runTransaction('Hydrate resolver', (objectStore) {
+                await runTransaction('Hydrate resolver', (objectStore) async {
               return objectStore.get(name.toJS);
             });
 
@@ -81,7 +82,7 @@ class IndexedDBDataStoreResolverConfig extends DataStoreResolverConfig {
           },
           persist: (store) => runTransaction(
             'Persist resolver',
-            (objectStore) {
+            (objectStore) async {
               return objectStore.put({
                 IndexedDBPersistor.keyPath: name,
                 IndexedDBPersistor.valuePath: jsonEncode(store.inspect()),
@@ -91,7 +92,7 @@ class IndexedDBDataStoreResolverConfig extends DataStoreResolverConfig {
           ),
           delete: () => runTransaction(
             'Delete resolver',
-            (objectStore) => objectStore.delete(name.toJS),
+            (objectStore) async => objectStore.delete(name.toJS),
             'readwrite',
           ),
         );
