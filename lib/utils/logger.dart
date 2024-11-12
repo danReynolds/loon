@@ -16,7 +16,6 @@ class Logger {
   Logger child(
     String name, {
     void Function(String message)? output,
-    bool? enabled,
   }) {
     return Logger(name, output: output ?? this.output, parent: this);
   }
@@ -29,7 +28,7 @@ class Logger {
   }
 
   bool get enabled {
-    return _enabled ?? parent?.enabled ?? false;
+    return _enabled ?? parent?.enabled ?? kDebugMode;
   }
 
   set enabled(bool enabled) {
@@ -37,6 +36,10 @@ class Logger {
   }
 
   void log(String message) {
+    if (!enabled) {
+      return;
+    }
+
     final formattedMessage = '$name -> $message';
 
     if (output != null) {

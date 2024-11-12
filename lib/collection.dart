@@ -14,7 +14,7 @@ class Collection<T> implements Queryable<T>, StoreReference {
   final String name;
   final FromJson<T>? fromJson;
   final ToJson<T>? toJson;
-  final PersistorSettings? persistorSettings;
+  late final PersistorSettings? persistorSettings;
 
   /// Returns the set of documents that the document associated with the given
   /// [DocumentSnapshot] is dependent on.
@@ -28,8 +28,17 @@ class Collection<T> implements Queryable<T>, StoreReference {
     this.fromJson,
     this.toJson,
     this.dependenciesBuilder,
-    this.persistorSettings,
-  });
+    PersistorSettings? persistorSettings,
+  }) {
+    this.persistorSettings = switch (persistorSettings) {
+      PathPersistorSettings _ => persistorSettings,
+      // If the persistor settings are not yet associated with a path, then if a value key
+      // is provided, then the settings are updated to having been applied at the collection's path.
+      PersistorSettings(key: final PersistorValueKey _) =>
+        PathPersistorSettings(settings: persistorSettings, ref: this),
+      _ => persistorSettings,
+    };
+  }
 
   static Collection<S> fromPath<S>(
     String path, {

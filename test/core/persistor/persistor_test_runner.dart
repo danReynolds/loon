@@ -1,8 +1,8 @@
+import 'package:encrypt/encrypt.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:loon/loon.dart';
 import 'package:loon/persistor/data_store_encrypter.dart';
 
-import '../../models/test_data_store_encrypter.dart';
 import '../../models/test_persistor.dart';
 import '../../models/test_persistor_completer.dart';
 import '../../models/test_user_model.dart';
@@ -13,8 +13,8 @@ typedef PersistorFactory<T> = T Function({
   void Function()? onClearAll,
   void Function(Json data)? onHydrate,
   void Function()? onSync,
-  PersistorSettings settings,
-  Duration persistenceThrottle,
+  required PersistorSettings settings,
+  required Duration persistenceThrottle,
   DataStoreEncrypter? encrypter,
 });
 
@@ -25,11 +25,18 @@ void persistorTestRunner<T extends Persistor>({
   required Future<Map?> Function(
     T persistor,
     String storeName, {
-    bool encrypted,
+    required bool encrypted,
   }) getStore,
+  bool enableLogging = false,
 }) {
   late T persistor;
   late TestPersistCompleter completer;
+
+  // A custom encrypter is used in the test environment since FlutterSecureStorage
+  // with not work in tests.
+  final encrypter = DataStoreEncrypter(
+    Encrypter(AES(Key.fromSecureRandom(32), mode: AESMode.cbc)),
+  );
 
   Future<Map?> get(
     String store, {
@@ -56,8 +63,8 @@ void persistorTestRunner<T extends Persistor>({
     completer = TestPersistCompleter();
     persistor = factory(
       persistenceThrottle: const Duration(milliseconds: 1),
+      encrypter: encrypter,
       settings: settings,
-      encrypter: TestDataStoreEncrypter(),
       onPersist: (docs) {
         completer.persistComplete();
       },
@@ -75,7 +82,7 @@ void persistorTestRunner<T extends Persistor>({
       },
     );
 
-    Loon.configure(persistor: persistor);
+    Loon.configure(persistor: persistor, enableLogging: enableLogging);
   }
 
   group('Persistor Test Runner', () {

@@ -2,7 +2,7 @@ import 'dart:async';
 import 'package:loon/loon.dart';
 import 'package:loon/persistor/data_store.dart';
 import 'package:loon/persistor/data_store_encrypter.dart';
-import 'package:loon/persistor/data_store_persistence_payload.dart';
+import 'package:loon/persistor/persist_payload.dart';
 import 'package:loon/persistor/data_store_resolver.dart';
 import 'package:loon/persistor/lock.dart';
 
@@ -32,6 +32,8 @@ class DataStoreManager {
   /// operation and conversely blocks a sync from starting until the ongoing operation holding the lock has finished.
   final _syncLock = Lock();
 
+  final DataStoreEncrypter encrypter;
+
   /// The sync timer is used to throttle syncing changes to the file system using
   /// the given [persistenceThrottle]. After an that mutates the file system operation runs, it schedules
   /// a sync to run on a timer. When the sync runs, it acquires the [_syncLock], blocking any operations
@@ -51,6 +53,7 @@ class DataStoreManager {
     required this.settings,
     required this.factory,
     required this.resolverConfig,
+    required this.encrypter,
     required Future<void> Function() clearAll,
     required Future<List<String>> Function() getAll,
     required Logger logger,
@@ -132,7 +135,7 @@ class DataStoreManager {
         .toSet();
 
     for (final name in indexNames) {
-      index[name] = DualDataStore(name, factory: factory);
+      index[name] = DualDataStore(name, factory: factory, encrypter: encrypter);
     }
 
     await resolver.hydrate();
@@ -184,7 +187,7 @@ class DataStoreManager {
     );
   }
 
-  Future<void> persist(DataStorePersistencePayload payload) {
+  Future<void> persist(PersistPayload payload) {
     return _syncLock.run(() async {
       final localResolver = payload.resolver;
       final docs = payload.persistenceDocs;
@@ -206,10 +209,12 @@ class DataStoreManager {
           final prevDataStore = index[prevDataStoreName] ??= DualDataStore(
             prevDataStoreName,
             factory: factory,
+            encrypter: encrypter,
           );
           final nextDataStore = index[nextDataStoreName] ??= DualDataStore(
             nextDataStoreName,
             factory: factory,
+            encrypter: encrypter,
           );
 
           dataStores.add(prevDataStore);

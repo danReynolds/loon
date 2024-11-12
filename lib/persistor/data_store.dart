@@ -1,7 +1,11 @@
 import 'package:loon/loon.dart';
 import 'package:loon/persistor/data_store_encrypter.dart';
 
-typedef DataStoreFactory = DataStore Function(String name, bool encrypted);
+typedef DataStoreFactory = DataStore Function(
+  String name,
+  bool encrypted,
+  DataStoreEncrypter encrypter,
+);
 
 abstract class DataStoreConfig {
   final String name;
@@ -191,10 +195,14 @@ class DualDataStore {
 
   DualDataStore(
     this.name, {
-    required DataStore Function(String name, bool encrypted) factory,
-  })  : _plaintextStore = factory(name, false),
-        _encryptedStore =
-            factory('$name.${DataStoreEncrypter.encryptedName}', true);
+    required DataStoreFactory factory,
+    required DataStoreEncrypter encrypter,
+  })  : _plaintextStore = factory(name, false, encrypter),
+        _encryptedStore = factory(
+          '$name.${DataStoreEncrypter.encryptedName}',
+          true,
+          encrypter,
+        );
 
   bool get isDirty {
     return _plaintextStore.isDirty || _encryptedStore.isDirty;

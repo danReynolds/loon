@@ -35,7 +35,7 @@ void main() {
       getStore: (
         persistor,
         name, {
-        bool encrypted = false,
+        required encrypted,
       }) async {
         final file = File('${testDirectory.path}/loon/$name.json');
 
@@ -47,7 +47,7 @@ void main() {
         final value = await file.readAsString();
 
         return jsonDecode(
-          encrypted ? persistor.encrypter.decrypt(value) : value,
+          encrypted ? await persistor.encrypter.decrypt(value) : value,
         );
       },
       factory: FilePersistor.new,

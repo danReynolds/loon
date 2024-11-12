@@ -31,46 +31,48 @@ class PersistManager {
     await Future.delayed(const Duration(milliseconds: 1));
     _operationQueue.removeAt(0);
 
-    try {
-      switch (current) {
-        case InitOperation():
-          await persistor.init();
-          current.complete(null);
-          break;
-        case PersistOperation(batch: final docs):
-          await persistor.persist(docs.toList());
-          current.complete(docs);
-          persistor.onPersist?.call(docs);
-          break;
-        case ClearOperation(batch: final collections):
-          await persistor.clear(collections.toList());
-          current.complete(collections);
-          persistor.onClear?.call(collections);
-          break;
-        case HydrateOperation(batch: final refs):
-          final data = await persistor.hydrate(refs.toList());
-          current.complete(data);
-          persistor.onHydrate?.call(data);
-          break;
-        case HydrateAllOperation():
-          final data = await persistor.hydrate();
-          current.complete(data);
-          persistor.onHydrate?.call(data);
-          break;
-        case ClearAllOperation():
-          await persistor.clearAll();
-          current.complete(null);
-          persistor.onClearAll?.call();
-          break;
+    await _logger.measure(current.runtimeType.toString(), () async {
+      try {
+        switch (current) {
+          case InitOperation():
+            await persistor.init();
+            current.complete(null);
+            break;
+          case PersistOperation(batch: final docs):
+            await persistor.persist(docs.toList());
+            current.complete(docs);
+            persistor.onPersist?.call(docs);
+            break;
+          case ClearOperation(batch: final collections):
+            await persistor.clear(collections.toList());
+            current.complete(collections);
+            persistor.onClear?.call(collections);
+            break;
+          case HydrateOperation(batch: final refs):
+            final data = await persistor.hydrate(refs.toList());
+            current.complete(data);
+            persistor.onHydrate?.call(data);
+            break;
+          case HydrateAllOperation():
+            final data = await persistor.hydrate();
+            current.complete(data);
+            persistor.onHydrate?.call(data);
+            break;
+          case ClearAllOperation():
+            await persistor.clearAll();
+            current.complete(null);
+            persistor.onClearAll?.call();
+            break;
+        }
+      } catch (e) {
+        current.error(e);
+      } finally {
+        _isBusy = false;
+        if (_operationQueue.isNotEmpty) {
+          _next();
+        }
       }
-    } catch (e) {
-      current.error(e);
-    } finally {
-      _isBusy = false;
-      if (_operationQueue.isNotEmpty) {
-        _next();
-      }
-    }
+    });
   }
 
   Future<T> _enqueue<T>(PersistorOperation<T> operation) {

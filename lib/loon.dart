@@ -3,6 +3,7 @@ library loon;
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart' hide Key;
+import 'package:loon/persistor/data_store_encrypter.dart';
 import 'package:loon/persistor/file_persistor/file_persistor.dart';
 import 'package:loon/persistor/indexed_db_persistor/indexed_db_persistor.dart';
 import 'package:uuid/uuid.dart';
@@ -38,9 +39,9 @@ part 'extensions/iterable.dart';
 class Loon {
   static final Loon _instance = Loon._();
 
-  Loon._();
-
   static final Logger logger = Logger('Loon');
+
+  Loon._();
 
   /// The store of document snapshots indexed by document path.
   final documentStore = ValueStore<DocumentSnapshot>();

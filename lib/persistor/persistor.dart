@@ -53,7 +53,7 @@ class PersistorBuilderKey<T> extends PersistorKey {
   }
 }
 
-class PersistorSettings<T> {
+class PersistorSettings {
   /// The persistence key to use for this collection. The key corresponds to the name of the file
   /// that the collection's data and all of the data of its subcollections (that don't specify their own custom key)
   /// is stored in.
@@ -101,19 +101,29 @@ class PersistorSettings<T> {
   });
 }
 
-class DocumentPersistorSettings extends PersistorSettings {
-  /// The document at which the persistor settings was specified.
-  final Document doc;
-  final PersistorSettings settings;
+class PathPersistorSettings<T extends StoreReference>
+    implements PersistorSettings {
+  final T ref;
+  final PersistorSettings _settings;
 
-  const DocumentPersistorSettings({
-    required this.settings,
-    required this.doc,
-  });
+  const PathPersistorSettings({
+    required this.ref,
+    required PersistorSettings settings,
+  }) : _settings = settings;
 
   @override
   get enabled {
-    return settings.enabled;
+    return _settings.enabled;
+  }
+
+  @override
+  get encrypted {
+    return _settings.encrypted;
+  }
+
+  @override
+  get key {
+    return _settings.key;
   }
 }
 
@@ -132,7 +142,11 @@ abstract class Persistor {
   /// duration are batched together into a single persist operation.
   final Duration persistenceThrottle;
 
+  final Logger logger;
+  final DataStoreEncrypter encrypter;
+
   Persistor({
+    required this.logger,
     this.onPersist,
     this.onClear,
     this.onClearAll,
@@ -140,7 +154,8 @@ abstract class Persistor {
     this.onSync,
     this.settings = const PersistorSettings(),
     this.persistenceThrottle = const Duration(milliseconds: 100),
-  });
+    DataStoreEncrypter? encrypter,
+  }) : encrypter = encrypter ?? DataStoreEncrypter();
 
   /// The name of the default [DataStore] key.
   static final PersistorValueKey defaultKey = Persistor.key('__store__');

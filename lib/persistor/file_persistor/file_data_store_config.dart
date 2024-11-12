@@ -8,15 +8,16 @@ class FileDataStoreConfig extends DataStoreConfig {
   FileDataStoreConfig(
     super.name, {
     required File file,
-    required super.encrypted,
     required super.encrypter,
+    required super.encrypted,
     required super.logger,
   }) : super(
           hydrate: () async {
             try {
               final value = await file.readAsString();
-              final json =
-                  jsonDecode(encrypted ? encrypter.decrypt(value) : value);
+              final json = jsonDecode(
+                encrypted ? await encrypter.decrypt(value) : value,
+              );
               final store = ValueStore<ValueStore>();
 
               for (final entry in json.entries) {
@@ -34,7 +35,7 @@ class FileDataStoreConfig extends DataStoreConfig {
             final value = jsonEncode(store.extract());
 
             await file.writeAsString(
-              encrypted ? encrypter.encrypt(value) : value,
+              encrypted ? await encrypter.encrypt(value) : value,
             );
           },
           delete: () async {

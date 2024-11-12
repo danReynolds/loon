@@ -12,7 +12,7 @@ void main() {
     getStore: (
       persistor,
       storeName, {
-      bool encrypted = false,
+      required encrypted,
     }) async {
       final result = await persistor.runTransaction('Get', (objectStore) {
         return objectStore.get(storeName.toJS);
