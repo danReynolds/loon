@@ -14,7 +14,7 @@ void main() {
       storeName, {
       required encrypted,
     }) async {
-      final result = await persistor.runTransaction('Get', (objectStore) {
+      final result = await persistor.runTransaction('Get', (objectStore) async {
         return objectStore.get(storeName.toJS);
       });
 
@@ -24,7 +24,9 @@ void main() {
 
       final value = result[IndexedDBPersistor.valuePath];
 
-      return jsonDecode(encrypted ? persistor.encrypter.decrypt(value) : value);
+      return jsonDecode(
+        encrypted ? await persistor.encrypter.decrypt(value) : value,
+      );
     },
     factory: IndexedDBPersistor.new,
   );

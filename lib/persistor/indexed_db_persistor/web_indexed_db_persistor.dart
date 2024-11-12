@@ -9,7 +9,7 @@ import 'package:web/web.dart';
 
 typedef IndexedDBTransactionCallback = Future<T> Function<T>(
   String name,
-  IDBRequest? Function(IDBObjectStore objectStore) execute, [
+  Future<IDBRequest>? Function(IDBObjectStore objectStore) execute, [
   IDBTransactionMode mode,
 ]);
 
@@ -71,7 +71,7 @@ class IndexedDBPersistor extends Persistor {
 
   Future<T> runTransaction<T>(
     String name,
-    IDBRequest? Function(IDBObjectStore objectStore) execute, [
+    Future<IDBRequest>? Function(IDBObjectStore objectStore) execute, [
     IDBTransactionMode mode = 'readonly',
   ]) async {
     final completer = Completer();
@@ -83,7 +83,7 @@ class IndexedDBPersistor extends Persistor {
     transaction.onerror = ((ExternalDartReference _) =>
         completer.completeError('$name error')).toJS;
 
-    final request = execute(objectStore);
+    final request = await execute(objectStore);
 
     await logger.measure(name, () => completer.future);
 
@@ -114,13 +114,13 @@ class IndexedDBPersistor extends Persistor {
       ),
       clearAll: () => runTransaction(
         'clearAll',
-        (objectStore) => objectStore.clear(),
+        (objectStore) async => objectStore.clear(),
         'readwrite',
       ),
       getAll: () async {
         final result = await runTransaction(
           'GetAll',
-          (objectStore) => objectStore.getAllKeys(),
+          (objectStore) async => objectStore.getAllKeys(),
         );
         return List<String>.from(result);
       },
