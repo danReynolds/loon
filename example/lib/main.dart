@@ -11,9 +11,16 @@ final logger = Logger('Playground');
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  Loon.configure(persistor: Persistor.current(), enableLogging: true);
+  Loon.configure(
+    persistor: Persistor.current(
+      settings: const PersistorSettings(encrypted: true),
+    ),
+    enableLogging: true,
+  );
 
   await logger.measure('Hydrate', () => Loon.hydrate());
+
+  logger.log('User count: ${UserModel.store.get().length}');
 
   runApp(const MyApp());
 }
@@ -131,6 +138,7 @@ class _MyHomePageState extends State<MyHomePage> {
                     builder: (context, usersSnap) {
                       return Flexible(
                         child: ListView.builder(
+                          padding: const EdgeInsets.symmetric(horizontal: 12),
                           shrinkWrap: true,
                           itemCount: usersSnap.length,
                           itemBuilder: (context, index) {
@@ -140,7 +148,7 @@ class _MyHomePageState extends State<MyHomePage> {
                             return Row(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                Text(user.name),
+                                Flexible(child: Text(user.name)),
                                 TextButton(
                                   onPressed: () {
                                     _showEditDialog(userSnap.doc);

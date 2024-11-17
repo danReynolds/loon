@@ -51,6 +51,7 @@ class FileDataStoreConfig extends DataStoreConfig {
 class FileDataStoreResolverConfig extends DataStoreResolverConfig {
   FileDataStoreResolverConfig({
     required File file,
+    required super.logger,
   }) : super(
           hydrate: () async {
             try {

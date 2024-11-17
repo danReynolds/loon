@@ -110,6 +110,7 @@ class IndexedDBPersistor extends Persistor {
         ),
       ),
       resolverConfig: IndexedDBDataStoreResolverConfig(
+        logger: logger,
         runTransaction: runTransaction,
       ),
       clearAll: () => runTransaction(
