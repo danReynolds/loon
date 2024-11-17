@@ -65,6 +65,7 @@ class IndexedDBDataStoreResolverConfig extends DataStoreResolverConfig {
 
   IndexedDBDataStoreResolverConfig({
     required IndexedDBTransactionCallback runTransaction,
+    required super.logger,
   }) : super(
           hydrate: () async {
             final result =

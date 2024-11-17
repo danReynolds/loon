@@ -6,11 +6,13 @@ class DataStoreResolverConfig {
   final Future<ValueRefStore<String>?> Function() hydrate;
   final Future<void> Function(ValueRefStore<String>) persist;
   final Future<void> Function() delete;
+  final Logger logger;
 
   DataStoreResolverConfig({
     required this.hydrate,
     required this.persist,
     required this.delete,
+    required this.logger,
   });
 }
 
@@ -26,7 +28,7 @@ class DataStoreResolver {
 
   final DataStoreResolverConfig config;
 
-  late Logger logger;
+  late Logger logger = config.logger.child('DataStoreResolver');
 
   DataStoreResolver(this.config) {
     // Initialize the root of the resolver with the default file data store key.
@@ -92,6 +94,7 @@ class DataStoreResolver {
 
     final hydratedStore =
         await logger.measure('Hydrate', () => config.hydrate());
+
     if (hydratedStore != null) {
       _store = hydratedStore;
     }
@@ -115,10 +118,7 @@ class DataStoreResolver {
   }
 
   Future<void> delete() async {
-    try {
-      await logger.measure('Delete', () => config.delete());
-      // ignore: empty_catches
-    } on PathNotFoundException {}
+    await logger.measure('Delete', () => config.delete());
 
     _store.clear();
     // Re-initialize the root of the store to the default persistor key.

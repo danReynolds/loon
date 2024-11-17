@@ -71,6 +71,7 @@ class SqliteDataStoreResolverConfig extends DataStoreResolverConfig {
 
   SqliteDataStoreResolverConfig({
     required Database db,
+    required super.logger,
   }) : super(
           hydrate: () async {
             final rows = await db.query(

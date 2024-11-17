@@ -57,7 +57,7 @@ class SqlitePersistorWorker
           logger: logger,
         ),
       ),
-      resolverConfig: SqliteDataStoreResolverConfig(db: db),
+      resolverConfig: SqliteDataStoreResolverConfig(db: db, logger: logger),
       clearAll: () => db.delete(SqlitePersistor.tableName),
       getAll: () async {
         final records = await db.query(

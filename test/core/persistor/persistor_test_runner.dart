@@ -267,7 +267,7 @@ void persistorTestRunner<T extends Persistor>({
         );
 
         test(
-          'Deletes empty files',
+          'Deletes empty data stores',
           () async {
             final userCollection = Loon.collection(
               'users',
@@ -282,7 +282,7 @@ void persistorTestRunner<T extends Persistor>({
 
             expect(await exists('__store__'), true);
 
-            // If all documents of a file are deleted, the file itself should be deleted.
+            // If all documents in a data store are deleted, the store itself should be deleted.
             userCollection.doc('1').delete();
             userCollection.doc('2').delete();
 
@@ -2385,7 +2385,7 @@ void persistorTestRunner<T extends Persistor>({
     );
 
     group('hydrate', () {
-      test('Hydrates all data from persistence files by default', () async {
+      test('Hydrates all data from persisted stores by default', () async {
         final userCollection = Loon.collection(
           'users',
           fromJson: TestUserModel.fromJson,
@@ -2917,8 +2917,8 @@ void persistorTestRunner<T extends Persistor>({
           },
         );
 
-        // In this scenario, multiple collections share a file data store and therefore
-        // the file should not be deleted since it still has documents from another collection.
+        // In this scenario, multiple collections share a data store and therefore
+        // the store should not be deleted since it still has documents from another collection.
         test(
           'Retains data stores that still contain other collections',
           () async {
@@ -2986,7 +2986,7 @@ void persistorTestRunner<T extends Persistor>({
       'clearAll',
       () {
         test(
-          "Deletes all file data stores",
+          "Deletes all data stores",
           () async {
             final userCollection = Loon.collection(
               'users',
@@ -2997,8 +2997,13 @@ void persistorTestRunner<T extends Persistor>({
               ),
             );
 
-            userCollection.doc('1').create(TestUserModel('User 1'));
-            userCollection.doc('2').create(TestUserModel('User 2'));
+            final userDoc = userCollection.doc('1');
+            final userDoc2 = userCollection.doc('2');
+            final user = TestUserModel('User 1');
+            final user2 = TestUserModel('User 2');
+
+            userDoc.create(user);
+            userDoc2.create(user2);
 
             await completer.onSync;
 
@@ -3009,6 +3014,13 @@ void persistorTestRunner<T extends Persistor>({
 
             expect(await exists('users'), false);
             expect(await exists('__resolver__'), false);
+
+            userDoc.create(user);
+            userDoc2.create(user2);
+
+            await completer.onSync;
+
+            expect(await exists('users'), true);
           },
         );
       },
@@ -3082,7 +3094,7 @@ void persistorTestRunner<T extends Persistor>({
 
       group('hydrate', () {
         test(
-          'Merges data from plaintext and encrypted persistence files into collections',
+          'Merges data from plaintext and encrypted persistence stores into collections',
           () async {
             final userCollection = Loon.collection<TestUserModel>(
               'users',
@@ -3146,12 +3158,12 @@ void persistorTestRunner<T extends Persistor>({
           },
         );
 
-        // This scenario takes a bit of a description. In the situation where a file for a collection is unencrypted,
-        // but encryption settings now specify that the collection should be encrypted, then the unencrypted file should
+        // This scenario takes a bit of a description. In the situation where a data store for a collection is unencrypted,
+        // but encryption settings now specify that the collection should be encrypted, then the unencrypted store should
         // be hydrated into memory, but any subsequent persistence calls for that collection should move the updated data
         // from the unencrypted data store to the encrypted data store. Once all the data has been moved, the unencrypted
-        // file should be deleted.
-        test('Encrypts collections hydrated from unencrypted files', () async {
+        // store should be deleted.
+        test('Encrypts collections hydrated from unencrypted stores', () async {
           configure(settings: const PersistorSettings());
 
           final usersCollection = Loon.collection(
@@ -3203,7 +3215,7 @@ void persistorTestRunner<T extends Persistor>({
 
           await completer.onSync;
 
-          // The new user should have been written to the encrypted store file, since the persistor was configured with encryption
+          // The new user should have been written to the encrypted data store, since the persistor was configured with encryption
           // enabled globally.
           expect(
             await get('__store__', encrypted: true),
@@ -3238,7 +3250,7 @@ void persistorTestRunner<T extends Persistor>({
 
           await completer.onSync;
 
-          // The documents should now have been updated to exist in the encrypted store file.
+          // The documents should now have been updated to exist in the encrypted store.
           expect(
             await get('__store__', encrypted: true),
             {
@@ -3254,7 +3266,7 @@ void persistorTestRunner<T extends Persistor>({
             },
           );
 
-          // The now empty plaintext root file should have been deleted.
+          // The now empty plaintext root data store should have been deleted.
           expect(await exists('__store__'), false);
         });
       });

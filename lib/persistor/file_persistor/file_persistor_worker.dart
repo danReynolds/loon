@@ -39,11 +39,13 @@ class FilePersistorWorker extends PersistorWorker<FilePersistorWorkerConfig> {
       ),
     ),
     resolverConfig: FileDataStoreResolverConfig(
+      logger: logger,
       file: File("${config.directory.path}/${DataStoreResolver.name}.json"),
     ),
     clearAll: () async {
       try {
         await config.directory.delete(recursive: true);
+        await config.directory.create();
       } on PathNotFoundException {
         return;
       }

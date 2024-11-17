@@ -1,3 +1,7 @@
+## 5.1.1
+
+* Fix bug with file data store clear.
+
 ## 5.1.0
 
 * Creates generic persistor worker isolate interface.
