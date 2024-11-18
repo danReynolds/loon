@@ -3,7 +3,7 @@ import 'dart:js_interop';
 import 'package:loon/loon.dart';
 import 'package:loon/persistor/data_store.dart';
 import 'package:loon/persistor/data_store_resolver.dart';
-import 'package:loon/persistor/indexed_db_persistor/web_indexed_db_persistor.dart';
+import 'package:loon/persistor/indexed_db_persistor/indexed_db_persistor.dart';
 
 class IndexedDBDataStoreConfig extends DataStoreConfig {
   IndexedDBDataStoreConfig(

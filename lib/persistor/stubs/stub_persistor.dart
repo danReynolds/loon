@@ -1,7 +1,7 @@
 import 'package:loon/loon.dart';
 
-class IndexedDBPersistor extends Persistor {
-  IndexedDBPersistor({
+class StubPersistor extends Persistor {
+  StubPersistor({
     super.onClear,
     super.onClearAll,
     super.onHydrate,
@@ -9,7 +9,7 @@ class IndexedDBPersistor extends Persistor {
     super.onSync,
     super.persistenceThrottle,
     super.settings,
-  }) : super(logger: Logger('IndexedDBStubPersistor'));
+  }) : super(logger: Logger('StubPersistor'));
 
   @override
   Future<void> clear(List<Collection> collections) {

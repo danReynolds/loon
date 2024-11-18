@@ -4,10 +4,9 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart' hide Key;
 import 'package:loon/persistor/data_store_encrypter.dart';
-import 'package:loon/persistor/file_persistor/file_persistor.dart';
-import 'package:loon/persistor/indexed_db_persistor/indexed_db_persistor.dart';
 import 'package:uuid/uuid.dart';
 import 'dart:collection';
+import 'persistor/index.dart';
 
 export 'widgets/query_stream_builder.dart';
 export 'widgets/document_stream_builder.dart';
