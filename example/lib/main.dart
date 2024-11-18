@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:example/models/user.dart';
+import 'package:example/random_operation_runner.dart';
 import 'package:flutter/material.dart';
 import 'package:loon/loon.dart';
 import 'package:uuid/uuid.dart';
@@ -7,6 +8,8 @@ import 'package:uuid/uuid.dart';
 const uuid = Uuid();
 
 final logger = Logger('Playground');
+
+void randomOperation() {}
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -19,8 +22,6 @@ void main() async {
   );
 
   await logger.measure('Hydrate', () => Loon.hydrate());
-
-  logger.log('User count: ${UserModel.store.get().length}');
 
   runApp(const MyApp());
 }
@@ -52,6 +53,7 @@ class MyHomePage extends StatefulWidget {
 
 class _MyHomePageState extends State<MyHomePage> {
   final _controller = TextEditingController();
+  final _randomRunner = RandomOperationRunner();
 
   @override
   initState() {
@@ -125,53 +127,62 @@ class _MyHomePageState extends State<MyHomePage> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Text(
-                    'Users',
-                    style: Theme.of(context).textTheme.headlineSmall,
-                  ),
-                  const Padding(padding: EdgeInsets.only(top: 16)),
                   QueryStreamBuilder(
                     query: UserModel.store.where(
-                      (userSnap) =>
-                          userSnap.data.name.startsWith(_controller.text),
+                      (usersSnap) =>
+                          usersSnap.data.name.startsWith(_controller.text),
                     ),
                     builder: (context, usersSnap) {
                       return Flexible(
-                        child: ListView.builder(
-                          padding: const EdgeInsets.symmetric(horizontal: 12),
-                          shrinkWrap: true,
-                          itemCount: usersSnap.length,
-                          itemBuilder: (context, index) {
-                            final userSnap = usersSnap[index];
-                            final user = userSnap.data;
+                        child: Column(
+                          children: [
+                            Text(
+                              '${usersSnap.length} Users',
+                              style: Theme.of(context).textTheme.headlineSmall,
+                            ),
+                            const Padding(padding: EdgeInsets.only(top: 16)),
+                            Flexible(
+                              child: ListView.builder(
+                                padding:
+                                    const EdgeInsets.symmetric(horizontal: 12),
+                                shrinkWrap: true,
+                                itemCount: usersSnap.length,
+                                itemBuilder: (context, index) {
+                                  final userSnap = usersSnap[index];
+                                  final user = userSnap.data;
 
-                            return Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Flexible(child: Text(user.name)),
-                                TextButton(
-                                  onPressed: () {
-                                    _showEditDialog(userSnap.doc);
-                                  },
-                                  child: const Text('Edit'),
-                                ),
-                                TextButton(
-                                  onPressed: () {
-                                    UserModel.store.doc(userSnap.id).delete();
-                                  },
-                                  child: Text(
-                                    'Remove',
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .bodyMedium!
-                                        .copyWith(
-                                          color: Colors.red,
+                                  return Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Flexible(child: Text(user.name)),
+                                      TextButton(
+                                        onPressed: () {
+                                          _showEditDialog(userSnap.doc);
+                                        },
+                                        child: const Text('Edit'),
+                                      ),
+                                      TextButton(
+                                        onPressed: () {
+                                          UserModel.store
+                                              .doc(userSnap.id)
+                                              .delete();
+                                        },
+                                        child: Text(
+                                          'Remove',
+                                          style: Theme.of(context)
+                                              .textTheme
+                                              .bodyMedium!
+                                              .copyWith(
+                                                color: Colors.red,
+                                              ),
                                         ),
-                                  ),
-                                ),
-                              ],
-                            );
-                          },
+                                      ),
+                                    ],
+                                  );
+                                },
+                              ),
+                            ),
+                          ],
                         ),
                       );
                     },
@@ -211,6 +222,19 @@ class _MyHomePageState extends State<MyHomePage> {
                 Loon.clearAll();
               },
               child: const Icon(Icons.delete),
+            ),
+            const SizedBox(width: 24),
+            FloatingActionButton(
+              onPressed: () {
+                if (_randomRunner.isRunning) {
+                  _randomRunner.stop();
+                } else {
+                  _randomRunner.run();
+                }
+                setState(() {});
+              },
+              child:
+                  Icon(_randomRunner.isRunning ? Icons.stop : Icons.play_arrow),
             ),
           ],
         ),
