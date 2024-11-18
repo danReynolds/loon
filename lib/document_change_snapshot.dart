@@ -1,4 +1,4 @@
-part of loon;
+part of 'loon.dart';
 
 class DocumentChangeSnapshot<T> extends DocumentSnapshot<T?> {
   final BroadcastEvents event;

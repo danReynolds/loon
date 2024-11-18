@@ -1,4 +1,4 @@
-part of loon;
+part of '../loon.dart';
 
 bool _isSerializable(dynamic data) {
   if (data == null || data is num || data is String || data is bool) {

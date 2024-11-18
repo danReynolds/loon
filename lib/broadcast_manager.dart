@@ -1,4 +1,4 @@
-part of loon;
+part of './loon.dart';
 
 enum BroadcastEvents {
   /// The document has been modified.

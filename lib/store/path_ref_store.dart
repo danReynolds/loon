@@ -1,4 +1,4 @@
-part of loon;
+part of '../loon.dart';
 
 /// The path ref store is a tree structure that maintains a ref count of the number of times a path has been added to the tree.
 ///

@@ -1,4 +1,4 @@
-part of loon;
+part of '../loon.dart';
 
 /// By default, documents are persisted to a global data store grouped by their top-level collection. For example,
 /// a document with path users__1 and users__1__posts__1 are both persisted to a users.json file, while

@@ -1,4 +1,4 @@
-part of loon;
+part of 'loon.dart';
 
 class DependencyManager {
   /// The store of dependencies of documents indexed by document path.

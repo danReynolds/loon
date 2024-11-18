@@ -1,4 +1,4 @@
-part of loon;
+part of '../loon.dart';
 
 class PersistManager {
   /// The operation queue is used to sequence persistor operations (init, hydrate, persist, clear, clearAll)

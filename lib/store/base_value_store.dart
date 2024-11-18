@@ -1,4 +1,4 @@
-part of loon;
+part of '../loon.dart';
 
 abstract class _BaseValueStore<T> {
   Map _store = {};

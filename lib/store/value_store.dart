@@ -1,4 +1,4 @@
-part of loon;
+part of '../loon.dart';
 
 /// A value store is a tree structure that takes a path and indexes its value into the tree as a
 /// key of its parent path, enabling efficient access to all values of the parent path.

@@ -1,4 +1,4 @@
-part of loon;
+part of '../loon.dart';
 
 class ValueRefStore<T> extends _BaseValueStore<T> {
   static const _refs = '__refs';

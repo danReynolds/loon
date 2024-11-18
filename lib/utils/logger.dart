@@ -1,4 +1,4 @@
-part of loon;
+part of '../loon.dart';
 
 class Logger {
   final String _name;

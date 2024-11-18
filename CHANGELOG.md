@@ -1,3 +1,7 @@
+## 5.1.2
+
+* Refactor stubs
+
 ## 5.1.1
 
 * Fix bug with file data store clear.

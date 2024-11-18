@@ -1,4 +1,4 @@
-part of loon;
+part of 'loon.dart';
 
 class ObservableQuery<T> extends Query<T>
     with

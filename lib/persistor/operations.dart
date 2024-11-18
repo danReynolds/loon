@@ -1,4 +1,4 @@
-part of loon;
+part of '../loon.dart';
 
 abstract class PersistorOperation<T> {
   final _completer = Completer<T>();

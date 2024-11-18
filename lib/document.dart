@@ -1,4 +1,4 @@
-part of loon;
+part of 'loon.dart';
 
 class Document<T> implements StoreReference {
   final String id;

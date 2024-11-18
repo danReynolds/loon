@@ -1,4 +1,4 @@
-part of loon;
+part of 'loon.dart';
 
 const _rootKey = 'root';
 

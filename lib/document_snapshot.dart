@@ -1,4 +1,4 @@
-part of loon;
+part of 'loon.dart';
 
 /// A snapshot of a document's data and dependencies at any given moment.
 class DocumentSnapshot<T> {

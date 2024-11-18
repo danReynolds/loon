@@ -1,4 +1,4 @@
-part of loon;
+part of '../loon.dart';
 
 class DocumentTypeMismatchException<T> implements Exception {
   final Document doc;

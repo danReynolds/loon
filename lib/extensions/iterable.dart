@@ -1,4 +1,4 @@
-part of loon;
+part of '../loon.dart';
 
 extension LoonIterableExtensions<T> on Iterable<T> {
   T? get tryLast {
