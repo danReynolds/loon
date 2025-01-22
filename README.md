@@ -29,8 +29,6 @@ Loon is a reactive document data store for Flutter.
 * Streaming of changes to documents and queries.
 * Out of the box persistence and encryption.
 
-You can get started by looking at the [example](./example/lib/main.dart).
-
 ## Install
 
 ```dart
@@ -382,8 +380,8 @@ loon >
   __store__.json
 ```
 
-If data needs to be persisted differently, either by merging data across collections into a single file or by breaking down a collection
-into multiple files, then a custom persistence key can be specified on the collection:
+If data needs to be persisted differently, either by merging data across collections into a single store or by breaking down a collection
+into multiple stores, then a custom persistence key can be specified on the collection:
 
 ```dart
 class UserModel {
@@ -408,7 +406,7 @@ class UserModel {
 }
 ```
 
-In the updated example, data from the users collection is now stored in a separate file:
+In the updated example, data from the users collection is now stored in a separate file store:
 
 ```dart
 loon >
