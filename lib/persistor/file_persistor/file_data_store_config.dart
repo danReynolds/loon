@@ -16,7 +16,7 @@ class FileDataStoreConfig extends DataStoreConfig {
             try {
               final value = await file.readAsString();
               final json = jsonDecode(
-                encrypted ? await encrypter.decrypt(value) : value,
+                encrypted ? encrypter.decrypt(value) : value,
               );
               final store = ValueStore<ValueStore>();
 
@@ -35,7 +35,7 @@ class FileDataStoreConfig extends DataStoreConfig {
             final value = jsonEncode(store.extract());
 
             await file.writeAsString(
-              encrypted ? await encrypter.encrypt(value) : value,
+              encrypted ? encrypter.encrypt(value) : value,
             );
           },
           delete: () async {

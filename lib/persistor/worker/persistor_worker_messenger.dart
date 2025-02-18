@@ -37,7 +37,7 @@ class PersistorWorkerMessenger {
         onSync?.call();
         break;
       case MessageResponse response:
-        final request = index[response.id];
+        final request = index.remove(response.id);
 
         if (response is InitMessageResponse) {
           sendPort = response.sendPort;

@@ -27,7 +27,7 @@ class IndexedDBDataStoreConfig extends DataStoreConfig {
 
             final value = result[IndexedDBPersistor.valuePath];
             final json =
-                jsonDecode(encrypted ? await encrypter.decrypt(value) : value);
+                jsonDecode(encrypted ? encrypter.decrypt(value) : value);
 
             final store = ValueStore<ValueStore>();
 
@@ -47,7 +47,7 @@ class IndexedDBDataStoreConfig extends DataStoreConfig {
               return objectStore.put({
                 IndexedDBPersistor.keyPath: name,
                 IndexedDBPersistor.valuePath:
-                    encrypted ? await encrypter.encrypt(value) : value,
+                    encrypted ? encrypter.encrypt(value) : value,
               }.jsify());
             },
             'readwrite',

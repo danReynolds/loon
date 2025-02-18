@@ -32,7 +32,7 @@ class SqliteDataStoreConfig extends DataStoreConfig {
             final value = rows.first[_valueColumn] as String;
 
             final json =
-                jsonDecode(encrypted ? await encrypter.decrypt(value) : value);
+                jsonDecode(encrypted ? encrypter.decrypt(value) : value);
             final store = ValueStore<ValueStore>();
 
             for (final entry in json.entries) {
@@ -50,8 +50,7 @@ class SqliteDataStoreConfig extends DataStoreConfig {
               _tableName,
               {
                 _keyColumn: name,
-                _valueColumn:
-                    encrypted ? await encrypter.encrypt(value) : value,
+                _valueColumn: encrypted ? encrypter.encrypt(value) : value,
               },
               conflictAlgorithm: ConflictAlgorithm.replace,
             );

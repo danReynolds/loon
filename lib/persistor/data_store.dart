@@ -1,3 +1,6 @@
+import 'dart:convert';
+import 'dart:typed_data';
+
 import 'package:loon/loon.dart';
 import 'package:loon/persistor/data_store_encrypter.dart';
 
@@ -40,6 +43,17 @@ class DataStore {
 
   bool get isEmpty {
     return _store.isEmpty;
+  }
+
+  /// Returns the size of the store in KB.
+  void _logSize() {
+    if (logger.enabled) {
+      final size =
+          (Uint8List.fromList(utf8.encode(jsonEncode(_store))).length / 1000)
+              .toInt();
+
+      logger.log('Size: ${size}KB');
+    }
   }
 
   /// Returns a map of the subset of documents in the store under the given path.
@@ -149,6 +163,8 @@ class DataStore {
       _store = hydratedStore;
     }
 
+    _logSize();
+
     isHydrated = true;
   }
 
@@ -162,6 +178,8 @@ class DataStore {
       logger.log('Persist canceled. Clean store.');
       return;
     }
+
+    _logSize();
 
     await logger.measure('Persist', () => config.persist(_store));
     isDirty = false;

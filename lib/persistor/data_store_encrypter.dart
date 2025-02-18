@@ -36,15 +36,15 @@ class DataStoreEncrypter {
     _isInitialized = true;
   }
 
-  Future<String> encrypt(String plainText) async {
-    await init();
+  String encrypt(String plainText) {
+    assert(_isInitialized, 'DataStoreEncrypter must be initialized before use');
 
     final iv = IV.fromSecureRandom(16);
     return iv.base64 + _encrypter.encrypt(plainText, iv: iv).base64;
   }
 
-  Future<String> decrypt(String encrypted) async {
-    await init();
+  String decrypt(String encrypted) {
+    assert(_isInitialized, 'DataStoreEncrypter must be initialized before use');
 
     final iv = IV.fromBase64(encrypted.substring(0, 24));
     return _encrypter.decrypt64(

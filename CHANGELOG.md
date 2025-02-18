@@ -1,3 +1,11 @@
+## 5.2.0
+
+* Refactor encrypter initialization.
+
+## 5.1.2
+
+* Fix bug in IndexedDB persistence.
+
 ## 5.1.1
 
 * Fix bug with file data store clear.

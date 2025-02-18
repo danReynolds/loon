@@ -138,7 +138,10 @@ class DataStoreManager {
       index[name] = DualDataStore(name, factory: factory, encrypter: encrypter);
     }
 
-    await resolver.hydrate();
+    await Future.wait([
+      resolver.hydrate(),
+      encrypter.init(),
+    ]);
   }
 
   /// Hydrates the given paths and returns a map of document paths to their serialized data.

@@ -37,7 +37,7 @@ class ObservableDocument<T> extends Document<T>
   /// since the last broadcast and determines if the document needs to rebroadcast to its listeners.
   ///
   /// There are three scenarios where a document needs to be rebroadcast:
-  /// 1. There is a broadcast event recorded for the document itself.
+  /// 1. There is a broadcast event recorded for the document.
   /// 2. There is a [BroadcastEvents.removed] event for any path above the document path.
   /// 3. The observable document itself has been touched for rebroadcast, such as in the case
   ///    of a dependency of the document having been removed.
@@ -58,10 +58,8 @@ class ObservableDocument<T> extends Document<T>
     }
 
     // 3.
-    final isTouched =
-        Loon._instance.broadcastManager.eventStore.hasValue(_observerId);
-
-    if (event == null && isTouched) {
+    if (event == null &&
+        Loon._instance.broadcastManager.eventStore.hasValue(_observerId)) {
       event = BroadcastEvents.touched;
     }
 
