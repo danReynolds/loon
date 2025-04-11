@@ -21,6 +21,14 @@ class TestUserModel {
     };
   }
 
+  TestUserModel copyWith({
+    String? name,
+  }) {
+    return TestUserModel(
+      name ?? this.name,
+    );
+  }
+
   @override
   bool operator ==(Object other) {
     if (identical(this, other)) {

@@ -465,6 +465,27 @@ void main() {
                   ),
                 );
               });
+
+              test(
+                'Does nothing if the document does not exist',
+                () {
+                  final newUser = TestUserModel('User 1');
+                  final userDoc = TestUserModel.store.doc('1');
+
+                  expect(
+                    userDoc.modify(
+                      (snap) => snap?.data.copyWith(name: 'User 1 updated'),
+                    ),
+                    null,
+                  );
+                  expect(
+                    userDoc.modify(
+                      (snap) => newUser,
+                    ),
+                    DocumentSnapshot(doc: userDoc, data: newUser),
+                  );
+                },
+              );
             },
           );
 

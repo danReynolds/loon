@@ -1,3 +1,7 @@
+## 5.2.1
+
+* Update document modify API to support nullable return values.
+
 ## 5.2.0
 
 * Refactor encrypter initialization.

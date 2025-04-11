@@ -144,11 +144,16 @@ class Document<T> implements StoreReference {
     return create(data, broadcast: broadcast, persist: persist);
   }
 
-  DocumentSnapshot<T> modify(
+  DocumentSnapshot<T>? modify(
     ModifyFn<T> modifyFn, {
     bool broadcast = true,
   }) {
-    return createOrUpdate(modifyFn(get()), broadcast: broadcast);
+    final value = modifyFn(get());
+    if (value == null) {
+      return null;
+    }
+
+    return createOrUpdate(value, broadcast: broadcast);
   }
 
   void delete() {
