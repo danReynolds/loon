@@ -1,3 +1,7 @@
+## 5.2.2
+
+* Fix bug where deletion of non-existent documents was not deleting nested path documents.
+
 ## 5.2.1
 
 * Update document modify API to support nullable return values.

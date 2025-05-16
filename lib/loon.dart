@@ -174,12 +174,12 @@ class Loon {
   }
 
   void deleteDocument<T>(Document<T> doc) {
-    if (!doc.exists()) {
+    if (!documentStore.hasPath(doc.path)) {
       return;
     }
 
-    broadcastManager.deleteDocument(doc);
     documentStore.delete(doc.path);
+    broadcastManager.deleteDocument(doc);
 
     if (doc.isPersistenceEnabled()) {
       persistManager?.persist(doc);

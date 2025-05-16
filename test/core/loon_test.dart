@@ -522,6 +522,55 @@ void main() {
                   {},
                 );
               });
+
+              test(
+                'Deletes subcollection documents',
+                () {
+                  final user = TestUserModel('User 1');
+                  final userDoc = TestUserModel.store.doc('1');
+
+                  final friend = TestUserModel('Friend 1');
+                  final friendDoc = userDoc.subcollection('friends').doc('1');
+
+                  userDoc.create(user);
+                  friendDoc.create(friend);
+
+                  expect(friendDoc.exists(), true);
+
+                  userDoc.delete();
+
+                  expect(friendDoc.exists(), false);
+
+                  expect(
+                    Loon.inspect()["store"],
+                    {},
+                  );
+                },
+              );
+
+              test(
+                'Deletes subcollection documents under a non-existent document',
+                () {
+                  final userDoc = TestUserModel.store.doc('1');
+                  final friend = TestUserModel('Friend 1');
+                  final friendDoc = userDoc.subcollection('friends').doc('1');
+
+                  friendDoc.create(friend);
+
+                  expect(friendDoc.exists(), true);
+
+                  // Even though the user does not exist, it should still delete all the existing
+                  // data under the user document path.
+                  userDoc.delete();
+
+                  expect(friendDoc.exists(), false);
+
+                  expect(
+                    Loon.inspect()["store"],
+                    {},
+                  );
+                },
+              );
             },
           );
 
