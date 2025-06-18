@@ -8,7 +8,7 @@ class DependencyManager {
   final _dependents = <Document, Set<Document>?>{};
 
   /// The cache of documents referenced as dependencies. A cache is used so that multiple documents
-  /// that share the same document dependency reference the same object.
+  /// that share the same dependency reference the same object.
   final _depCache = <Document>{};
 
   /// Updates the dependencies/dependents store for the given [DocumentSnapshot]
@@ -97,6 +97,10 @@ class DependencyManager {
     }
 
     return dependents;
+  }
+
+  void deleteDocument(Document doc) {
+    _dependencies.delete(doc.path);
   }
 
   void deleteCollection(Collection collection) {

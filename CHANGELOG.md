@@ -1,3 +1,7 @@
+## 5.2.3
+
+* Small bugfixes.
+
 ## 5.2.2
 
 * Fix bug where deletion of non-existent documents was not deleting nested path documents.

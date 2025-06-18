@@ -147,6 +147,10 @@ void main() {
           ),
         );
 
+        Loon.collection('users').doc('1').create(true);
+        Loon.collection('posts').doc('1').create(true);
+        Loon.collection('messages').doc('1').create(true);
+
         Loon.collection('users').delete();
         Loon.collection('posts').delete();
 
@@ -158,8 +162,10 @@ void main() {
 
         expect(batches.length, 2);
 
-        expect(batches.first,
-            [Loon.collection('users'), Loon.collection('posts')]);
+        expect(batches.first, [
+          Loon.collection('users'),
+          Loon.collection('posts'),
+        ]);
         expect(batches.last, [Loon.collection('messages')]);
       },
     );

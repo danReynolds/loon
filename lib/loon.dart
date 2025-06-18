@@ -180,6 +180,7 @@ class Loon {
 
     documentStore.delete(doc.path);
     broadcastManager.deleteDocument(doc);
+    dependencyManager.deleteDocument(doc);
 
     if (doc.isPersistenceEnabled()) {
       persistManager?.persist(doc);
@@ -188,6 +189,10 @@ class Loon {
 
   void deleteCollection(Collection collection) {
     final path = collection.path;
+    if (!documentStore.hasPath(path)) {
+      return;
+    }
+
     broadcastManager.deleteCollection(collection);
     dependencyManager.deleteCollection(collection);
     documentStore.delete(path);
