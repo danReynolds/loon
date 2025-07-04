@@ -7,8 +7,6 @@ import 'package:uuid/uuid.dart';
 
 const uuid = Uuid();
 
-final logger = Logger('Playground');
-
 void randomOperation() {}
 
 void main() async {
@@ -21,7 +19,7 @@ void main() async {
     enableLogging: true,
   );
 
-  await logger.measure('Hydrate', () => Loon.hydrate());
+  await Loon.logger.measure('Hydrate', () => Loon.hydrate());
 
   runApp(const MyApp());
 }

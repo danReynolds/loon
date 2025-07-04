@@ -26,19 +26,20 @@ part 'document_snapshot.dart';
 part 'document_change_snapshot.dart';
 part 'broadcast_manager.dart';
 part 'dependency_manager.dart';
-part 'utils/validation.dart';
-part 'utils/logger.dart';
-part 'store_reference.dart';
-part 'utils/exceptions.dart';
+part 'transaction_writer.dart';
 part 'persistor/persistor.dart';
 part 'persistor/operations.dart';
 part 'persistor/persist_manager.dart';
 part 'extensions/iterable.dart';
+part 'utils/validation.dart';
+part 'utils/logger.dart';
+part 'utils/exceptions.dart';
+part 'store_reference.dart';
 
 class Loon {
   static final Loon _instance = Loon._();
 
-  static final Logger logger = Logger('Loon');
+  static final logger = Logger('Loon');
 
   Loon._();
 
@@ -315,5 +316,20 @@ class Loon {
 
   static Persistor? get persistor {
     return _instance.persistManager?.persistor;
+  }
+
+  /// Provides a [TransactionWriter] for committing a set of document changes together and automatically
+  /// rolling them all back to their value before the transaction if it fails.
+  static Future<T> transaction<T>(
+    Future<T> Function(TransactionWriter writer) writeFn,
+  ) async {
+    final writer = TransactionWriter();
+    try {
+      final result = await writeFn(writer);
+      return result;
+    } catch (e) {
+      writer.rollback();
+      rethrow;
+    }
   }
 }

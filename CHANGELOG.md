@@ -1,3 +1,7 @@
+## 5.4.0
+
+* Add [TransactionWriter] API for writing multiple updates together and rolling back if they fail.
+
 ## 5.3.0
 
 * Add support for rebroadcasting from a [Document] and rebuilding a document's dependencies.

@@ -2562,6 +2562,70 @@ void main() {
           expect(Loon.inspect()['dependentsStore'], {});
         });
       });
+
+      group(
+        'Transaction',
+        () {
+          test(
+            'Writes all documents',
+            () async {
+              final userDoc = TestUserModel.store.doc('1');
+              final userDoc2 = TestUserModel.store.doc('2');
+              final userData = TestUserModel('User 1');
+              final userDataUpdated = TestUserModel('User 1 updated');
+              final userData2 = TestUserModel('User 2');
+
+              await Loon.transaction((writer) async {
+                writer.create(userDoc, userData);
+                writer.create(userDoc2, userData2);
+                writer.update(userDoc, userDataUpdated);
+              });
+
+              expect(
+                userDoc.get(),
+                DocumentSnapshot(doc: userDoc, data: userDataUpdated),
+              );
+              expect(
+                userDoc2.get(),
+                DocumentSnapshot(doc: userDoc2, data: userData2),
+              );
+            },
+          );
+
+          test(
+            'Automatically rolls back changes if the transaction fails',
+            () async {
+              final userDoc = TestUserModel.store.doc('1');
+              final userDoc2 = TestUserModel.store.doc('2');
+              final userData = TestUserModel('User 1');
+              final userDataUpdated = TestUserModel('User 1 updated');
+              final userData2 = TestUserModel('User 2');
+
+              userDoc.create(userData);
+              userDoc2.create(userData2);
+
+              try {
+                await Loon.transaction((writer) async {
+                  writer.update(userDoc, userDataUpdated);
+                  writer.delete(userDoc2);
+
+                  // Trying to recreate the existing user document throws an error.
+                  writer.create(userDoc, userDataUpdated);
+                });
+              } catch (e) {
+                expect(
+                  userDoc.get(),
+                  DocumentSnapshot(doc: userDoc, data: userData),
+                );
+                expect(
+                  userDoc2.get(),
+                  DocumentSnapshot(doc: userDoc2, data: userData2),
+                );
+              }
+            },
+          );
+        },
+      );
     },
   );
 }

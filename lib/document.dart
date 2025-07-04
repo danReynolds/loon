@@ -131,7 +131,7 @@ class Document<T> implements StoreReference {
 
   DocumentSnapshot<T> createOrUpdate(
     T data, {
-    bool broadcast = true,
+    bool? broadcast,
     bool persist = true,
   }) {
     if (exists()) {
@@ -141,19 +141,20 @@ class Document<T> implements StoreReference {
         persist: persist,
       );
     }
-    return create(data, broadcast: broadcast, persist: persist);
+    return create(data, broadcast: broadcast ?? true, persist: persist);
   }
 
   DocumentSnapshot<T>? modify(
     ModifyFn<T> modifyFn, {
-    bool broadcast = true,
+    bool? broadcast,
+    bool persist = true,
   }) {
     final value = modifyFn(get());
     if (value == null) {
       return null;
     }
 
-    return createOrUpdate(value, broadcast: broadcast);
+    return createOrUpdate(value, broadcast: broadcast, persist: persist);
   }
 
   void delete() {
