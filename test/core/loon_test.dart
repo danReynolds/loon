@@ -607,6 +607,96 @@ void main() {
               );
             });
           });
+
+          group(
+            'rebroadcast',
+            () {
+              test(
+                'rebroadcasts the document to its stream listeners',
+                () async {
+                  final usersCollection = Loon.collection('users');
+                  final userDoc = usersCollection.doc('1');
+
+                  final stream = userDoc.stream();
+
+                  userDoc.create('Test');
+
+                  await asyncEvent();
+
+                  userDoc.rebroadcast();
+
+                  expectLater(
+                    stream,
+                    emitsInOrder(
+                      [
+                        null,
+                        DocumentSnapshot(doc: userDoc, data: 'Test'),
+                        DocumentSnapshot(doc: userDoc, data: 'Test'),
+                      ],
+                    ),
+                  );
+                },
+              );
+            },
+          );
+
+          group(
+            'rebuildDependencies',
+            () {
+              test(
+                "Rebuilds the document's dependencies",
+                () async {
+                  bool hasDependencies = false;
+
+                  final usersCollection = Loon.collection<String>(
+                    'users',
+                    dependenciesBuilder: (snap) {
+                      if (hasDependencies) {
+                        return {
+                          Loon.collection('friends').doc(snap.id),
+                        };
+                      }
+
+                      return {};
+                    },
+                  );
+
+                  final userDoc = usersCollection.doc('1');
+                  userDoc.create('User 1');
+
+                  await asyncEvent();
+
+                  final stream = userDoc.stream();
+
+                  final friendDoc = Loon.collection('friends').doc(userDoc.id);
+                  // This event is ignored since the user does not yet depend on the friend document.
+                  friendDoc.create('Friend 1');
+
+                  userDoc.update('User 1 updated');
+
+                  await asyncEvent();
+
+                  hasDependencies = true;
+
+                  userDoc.rebuildDependencies();
+
+                  // This event causes a rebroadcast of the user, as they now depend on the friend document.
+                  friendDoc.update('Friend 1 updated');
+
+                  expect(
+                    stream,
+                    emitsInOrder(
+                      [
+                        DocumentSnapshot(doc: userDoc, data: 'User 1'),
+                        DocumentSnapshot(doc: userDoc, data: 'User 1 updated'),
+                        DocumentSnapshot(doc: userDoc, data: 'User 1 updated'),
+                      ],
+                    ),
+                  );
+                },
+              );
+            },
+          );
         },
       );
 

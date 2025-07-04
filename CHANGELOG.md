@@ -1,3 +1,8 @@
+## 5.3.0
+
+* Add support for rebroadcasting from a [Document] and rebuilding a document's dependencies.
+* Fixes bug in [PathRefStore.has] when traversing nested paths.
+
 ## 5.2.3
 
 * Small bugfixes.

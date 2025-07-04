@@ -221,4 +221,20 @@ class Document<T> implements StoreReference {
     }
     return data;
   }
+
+  /// Schedules a document to be rebroadcasted, updating all listeners that are subscribed to that document.
+  void rebroadcast() {
+    Loon._instance.broadcastManager
+        .writeDocument(this, BroadcastEvents.touched);
+  }
+
+  /// Rebuild the document's dependencies with the [dependenciesBuilder].
+  void rebuildDependencies() {
+    final snap = get();
+    if (snap == null) {
+      return;
+    }
+
+    Loon._instance.dependencyManager.updateDependencies(snap);
+  }
 }

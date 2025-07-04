@@ -135,7 +135,12 @@ class PathRefStore {
     }
 
     if (index < segments.length - 1) {
-      return _has(node[segment], segments, index + 1);
+      final child = node[segment];
+      if (child == null || child is! Map) {
+        return false;
+      }
+
+      return _has(child, segments, index + 1);
     }
 
     return node.containsKey(segment);

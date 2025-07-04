@@ -295,11 +295,6 @@ class Loon {
     return Loon._instance._clearAll(broadcast: broadcast);
   }
 
-  /// Schedules a document to be rebroadcasted, updating all listeners that are subscribed to that document.
-  static void rebroadcast(Document doc) {
-    _instance.broadcastManager.writeDocument(doc, BroadcastEvents.touched);
-  }
-
   /// Returns a Map of all of the data and metadata of the store for debugging and inspection purposes.
   static Json inspect() {
     return {

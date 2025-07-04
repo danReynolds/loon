@@ -133,6 +133,7 @@ void main() {
         expect(store.has('users__1'), true);
         expect(store.has('users__1__posts__1'), true);
         expect(store.has('users__2'), false);
+        expect(store.has('users__1__posts__1__reactions__1'), false);
       });
     });
   });
