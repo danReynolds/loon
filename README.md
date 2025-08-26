@@ -309,12 +309,14 @@ The currently available persistence options are broken down by platform:
 
 ## ⚙️ Configuration
 
-A persistor can be specified explicitly on startup, or `Persistor.current()` can be used to dynamically select the default persistence implementation for the current platform.
+Specify your preferred persistor on startup or use `Persistor.current()` to dynamically select the default persistence implementation for the current platform (`FilePersistor` on Android/iOS, `IndexedDBPersistor` on web).
 
 
 ```dart
 void main() {
   Loon.configure(persistor: Persistor.current());
+  // Loon.configure(persistor: FilePersistor());
+  // Loon.configure(persistor: SqlitePersistor());
 
   Loon.hydrate().then(() {
     print('Hydration complete');
