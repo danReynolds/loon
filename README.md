@@ -326,6 +326,8 @@ void main() {
 }
 ```
 
+No persisted data is available on startup until it is manually requested by calling `hydrate`.
+
 The call to `hydrate` returns a `Future` that resolves when the data has been hydrated from the persistence layer. By default, calling `hydrate()` will hydrate all persisted data. If only certain data should be hydrated, then it can be called with a list of documents and collections to hydrate. All subcollections of the specified paths are also hydrated.
 
 ```dart
