@@ -65,7 +65,7 @@ class Query<T> extends Queryable<T> {
 
   Query<T> sortBy(SortFn<T> sort) {
     return Query<T>(
-      this.collection,
+      collection,
       filters: filters,
       sort: sort,
     );
@@ -73,7 +73,7 @@ class Query<T> extends Queryable<T> {
 
   Query<T> where(FilterFn<T> filter) {
     return Query<T>(
-      this.collection,
+      collection,
       filters: [...filters, filter],
       sort: sort,
     );
