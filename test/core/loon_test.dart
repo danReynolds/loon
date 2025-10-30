@@ -393,6 +393,36 @@ void main() {
                   ),
                 );
               });
+
+              test('Skips broadcasting unchanged data by default', () async {
+                final userDoc = Loon.collection('users').doc('1');
+                final user = TestUserModel('User 1');
+                final updatedUser = TestUserModel('User 1 updated');
+
+                userDoc.create(user);
+
+                await asyncEvent();
+
+                final stream = userDoc.stream();
+
+                userDoc.update(user);
+
+                await asyncEvent();
+
+                userDoc.update(updatedUser);
+
+                await asyncEvent();
+
+                expectLater(
+                  stream,
+                  emitsInOrder(
+                    [
+                      DocumentSnapshot(doc: userDoc, data: user),
+                      DocumentSnapshot(doc: userDoc, data: updatedUser),
+                    ],
+                  ),
+                );
+              });
             },
           );
 

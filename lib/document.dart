@@ -123,7 +123,8 @@ class Document<T> implements StoreReference {
       // The document store is accessed directly here instead of going through the public [Document.get]
       // API since [get] checks for type compatibility of the existing value with the current document
       // and the update may be altering the type of the document.
-      broadcast: broadcast ?? Loon._instance.documentStore.get(path) != data,
+      broadcast:
+          broadcast ?? Loon._instance.documentStore.get(path)?.data != data,
       persist: persist,
       event: BroadcastEvents.modified,
     );
