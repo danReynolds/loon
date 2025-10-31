@@ -430,16 +430,19 @@ void main() {
             'modify',
             () {
               test(
-                'Creates the document if it does not exist',
+                'Modifies the document',
                 () {
-                  final newUser = TestUserModel('User 1');
                   final userDoc = TestUserModel.store.doc('1');
+                  final user = TestUserModel('User 1');
+                  final userUpdated = TestUserModel('User 1 updated');
+
+                  userDoc.create(user);
 
                   expect(
-                    userDoc.modify((_) => newUser),
+                    userDoc.modify((_) => userUpdated),
                     DocumentSnapshot(
                       doc: userDoc,
-                      data: newUser,
+                      data: userUpdated,
                     ),
                   );
                 },
@@ -483,6 +486,13 @@ void main() {
               test(
                   'Throws an error when modifying non-primitive documents without a serializer',
                   () {
+                Loon.collection(
+                  'users',
+                  persistorSettings: const PersistorSettings(),
+                  fromJson: TestUserModel.fromJson,
+                  toJson: (snap) => snap.toJson(),
+                ).doc('1').create(TestUserModel('1'));
+
                 expect(
                   () => Loon.collection(
                     'users',
@@ -497,25 +507,16 @@ void main() {
               });
 
               test(
-                'Does nothing if the document does not exist',
-                () {
-                  final newUser = TestUserModel('User 1');
-                  final userDoc = TestUserModel.store.doc('1');
+                  'Throws an error when modifying a document that does not exist',
+                  () {
+                final userDoc = TestUserModel.store.doc('1');
 
-                  expect(
-                    userDoc.modify(
-                      (snap) => snap?.data.copyWith(name: 'User 1 updated'),
-                    ),
-                    null,
-                  );
-                  expect(
-                    userDoc.modify(
-                      (snap) => newUser,
-                    ),
-                    DocumentSnapshot(doc: userDoc, data: newUser),
-                  );
-                },
-              );
+                expect(
+                  () => userDoc.modify(
+                      (snap) => snap.data.copyWith(name: 'Updated User 1')),
+                  throwsException,
+                );
+              });
             },
           );
 

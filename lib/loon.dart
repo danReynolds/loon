@@ -56,8 +56,7 @@ class Loon {
     return persistManager?.settings.enabled ?? false;
   }
 
-  // When a document is read, if it is still in JSON format from hydration and is now being accessed
-  // with a serializer, then it is de-serialized at time of access.
+  // Deserializes a document using its deserializer.
   DocumentSnapshot<T> parseSnap<T>(
     DocumentSnapshot snap, {
     required FromJson<T>? fromJson,
@@ -65,29 +64,25 @@ class Loon {
     required PersistorSettings? persistorSettings,
     required DependenciesBuilder<T>? dependenciesBuilder,
   }) {
-    if (snap is! DocumentSnapshot<T>) {
-      final doc = snap.doc;
-      final data = snap.data;
+    final doc = snap.doc;
+    final data = snap.data;
 
-      _validateDataDeserialization<T>(doc: doc, fromJson: fromJson, data: data);
+    _validateDataDeserialization<T>(doc: doc, fromJson: fromJson, data: data);
 
-      return writeDocument<T>(
-        Document<T>(
-          doc.parent,
-          doc.id,
-          fromJson: fromJson,
-          toJson: toJson,
-          persistorSettings: persistorSettings,
-          dependenciesBuilder: dependenciesBuilder,
-        ),
-        fromJson?.call(snap.data) ?? data as T,
-        event: BroadcastEvents.modified,
-        broadcast: false,
-        persist: false,
-      );
-    }
-
-    return snap;
+    return writeDocument<T>(
+      Document<T>(
+        doc.parent,
+        doc.id,
+        fromJson: fromJson,
+        toJson: toJson,
+        persistorSettings: persistorSettings,
+        dependenciesBuilder: dependenciesBuilder,
+      ),
+      fromJson?.call(snap.data) ?? data as T,
+      event: BroadcastEvents.modified,
+      broadcast: false,
+      persist: false,
+    );
   }
 
   bool existsSnap<T>(Document<T> doc) {
@@ -96,9 +91,8 @@ class Loon {
 
   DocumentSnapshot<T>? getSnapshot<T>(Document<T> doc) {
     final snap = documentStore.get(doc.path);
-
-    if (snap == null) {
-      return null;
+    if (snap is DocumentSnapshot<T>?) {
+      return snap;
     }
 
     return parseSnap(
@@ -111,19 +105,21 @@ class Loon {
   }
 
   List<DocumentSnapshot<T>> getSnapshots<T>(Collection<T> collection) {
-    final snaps = documentStore
-        .getChildValues(collection.path)
-        ?.values
-        .map(
-          (snap) => parseSnap(
-            snap,
-            fromJson: collection.fromJson,
-            toJson: collection.toJson,
-            persistorSettings: collection.persistorSettings,
-            dependenciesBuilder: collection.dependenciesBuilder,
-          ),
-        )
-        .toList();
+    final snaps = documentStore.getChildValues(collection.path)?.values.map(
+      (snap) {
+        if (snap is DocumentSnapshot<T>) {
+          return snap;
+        }
+
+        return parseSnap(
+          snap,
+          fromJson: collection.fromJson,
+          toJson: collection.toJson,
+          persistorSettings: collection.persistorSettings,
+          dependenciesBuilder: collection.dependenciesBuilder,
+        );
+      },
+    ).toList();
 
     return List<DocumentSnapshot<T>>.from(snaps ?? []);
   }

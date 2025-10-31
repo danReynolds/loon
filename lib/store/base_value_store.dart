@@ -17,17 +17,15 @@ abstract class _BaseValueStore<T> {
     return path.split(delimiter);
   }
 
-  Map? _getNode(Map? node, List<String> segments, int index) {
-    if (node == null || index == segments.length) {
-      return node;
+  Map? _getNode(Map? node, List<String> segments) {
+    for (int i = 0; i < segments.length; i++) {
+      if (node == null) {
+        break;
+      }
+      node = node[segments[i]];
     }
 
-    final segment = segments[index];
-    if (segment.isEmpty) {
-      return node;
-    }
-
-    return _getNode(node[segment], segments, index + 1);
+    return node;
   }
 
   (String, T)? _getNearest(
@@ -53,8 +51,11 @@ abstract class _BaseValueStore<T> {
       return (segments.sublist(0, index + 1).join(delimiter), nodeValue);
     }
 
-    final rootValue = _store[_values]?[root];
-    if (index == 0 && rootValue != null) {
+    if (index > 0) {
+      return null;
+    }
+
+    if (_store[_values]?[root] case T rootValue) {
       return (root, rootValue);
     }
 
@@ -86,21 +87,6 @@ abstract class _BaseValueStore<T> {
     }
 
     return values;
-  }
-
-  /// Writes an empty node at the given path if a node does not already exist.
-  Map _touch(Map node, List<String> segments, int index) {
-    if (segments.isEmpty) {
-      return node;
-    }
-
-    final child = node[segments[index]] ??= {};
-
-    if (index < segments.length - 1) {
-      return _touch(child, segments, index + 1);
-    }
-
-    return child;
   }
 
   Map<String, T> _extract(
@@ -150,21 +136,18 @@ abstract class _BaseValueStore<T> {
   }
 
   T? get(String path) {
-    if (_store.isEmpty) {
-      return null;
-    }
-
     final segments = _getSegments(path);
+    final last = segments.removeLast();
+
     return _getNode(
       _store,
-      segments.sublist(0, segments.length - 1),
-      0,
-    )?[_values]?[segments.last];
+      segments,
+    )?[_values]?[last];
   }
 
   /// Returns a map of all values that are immediate children of the given path.
   Map<String, T>? getChildValues(String path) {
-    return _getNode(_store, _getSegments(path), 0)?[_values];
+    return _getNode(_store, _getSegments(path))?[_values];
   }
 
   /// Returns the nearest path/value pair that has a value along the given path, beginning at the full path
@@ -191,7 +174,7 @@ abstract class _BaseValueStore<T> {
     final segments = _getSegments(path);
     final lastSegment = segments.removeLast();
 
-    final parentNode = _getNode(_store, segments, 0);
+    final parentNode = _getNode(_store, segments);
 
     return parentNode?[_values]?[lastSegment] != null ||
         parentNode?[lastSegment] != null;
@@ -210,7 +193,7 @@ abstract class _BaseValueStore<T> {
     final segments = _getSegments(path);
     final lastSegment = segments.removeLast();
 
-    final parentNode = _getNode(_store, segments, 0);
+    final parentNode = _getNode(_store, segments);
 
     if (parentNode == null) {
       return values;
@@ -240,7 +223,7 @@ abstract class _BaseValueStore<T> {
     final segments = _getSegments(path);
     final lastSegment = segments.removeLast();
 
-    final parentNode = _getNode(_store, segments, 0);
+    final parentNode = _getNode(_store, segments);
     if (parentNode == null) {
       return values;
     }
@@ -250,10 +233,6 @@ abstract class _BaseValueStore<T> {
     }
 
     return _extractValues(parentNode[lastSegment], values);
-  }
-
-  Map touch(String path) {
-    return _touch(_store, path.split(delimiter), 0);
   }
 
   bool get isEmpty {

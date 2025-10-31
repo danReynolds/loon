@@ -50,11 +50,17 @@ class Document<T> implements StoreReference {
     if (identical(this, other)) {
       return true;
     }
+
+    if (other is! Document) {
+      return false;
+    }
+
     // Documents are equivalent based on their ID and collection, however, observable documents
     // are not, since they have additional properties unique to their instance.
-    if (other is Document && this is! ObservableDocument) {
+    if (other is! ObservableDocument && this is! ObservableDocument) {
       return other.path == path;
     }
+
     return false;
   }
 
@@ -145,17 +151,21 @@ class Document<T> implements StoreReference {
     return create(data, broadcast: broadcast ?? true, persist: persist);
   }
 
-  DocumentSnapshot<T>? modify(
+  DocumentSnapshot<T> modify(
     ModifyFn<T> modifyFn, {
     bool? broadcast,
     bool persist = true,
   }) {
-    final value = modifyFn(get());
-    if (value == null) {
-      return null;
+    final value = get();
+    if (value is! DocumentSnapshot<T>) {
+      throw Exception('Missing document $path');
     }
 
-    return createOrUpdate(value, broadcast: broadcast, persist: persist);
+    return createOrUpdate(
+      modifyFn(value),
+      broadcast: broadcast,
+      persist: persist,
+    );
   }
 
   void delete() {

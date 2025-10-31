@@ -118,15 +118,18 @@ class ValueRefStore<T> extends _BaseValueStore<T> {
       return null;
     }
 
-    final segments = _getSegments(path);
-    final Map? node = _getNode(
-      _store,
-      segments.isEmpty ? segments : segments.sublist(0, segments.length),
-      0,
-    );
+    Map? node = _store;
 
-    if (node == null) {
-      return null;
+    if (path.isNotEmpty) {
+      final segments = _getSegments(path);
+      node = _getNode(
+        _store,
+        segments.isEmpty ? segments : segments.sublist(0, segments.length),
+      );
+
+      if (node == null) {
+        return null;
+      }
     }
 
     final refs = node[_refs];

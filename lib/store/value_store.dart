@@ -70,10 +70,9 @@ class ValueStore<T> extends _BaseValueStore<T> {
     return node;
   }
 
-  void _write(Map node, List<String> segments, int index, T value) {
-    if (index < segments.length - 1) {
-      final child = node[segments[index]] ??= {};
-      return _write(child, segments, index + 1, value);
+  void _write(Map node, List<String> segments, T value) {
+    for (int i = 0; i < segments.length - 1; i++) {
+      node = node[segments[i]] ??= {};
     }
 
     final values = node[_BaseValueStore._values] ??= <String, T>{};
@@ -82,7 +81,7 @@ class ValueStore<T> extends _BaseValueStore<T> {
 
   @override
   write(String path, T value) {
-    _write(_store, _getSegments(path), 0, value);
+    _write(_store, _getSegments(path), value);
     return value;
   }
 

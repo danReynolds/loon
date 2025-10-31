@@ -15,7 +15,13 @@ class DependencyManager {
   /// with the document's recalculated dependencies.
   void updateDependencies<T>(DocumentSnapshot<T> snap) {
     final doc = snap.doc;
-    final deps = doc.dependenciesBuilder?.call(snap)?.map((dep) {
+    final dependenciesBuilder = doc.dependenciesBuilder;
+
+    if (dependenciesBuilder == null) {
+      return;
+    }
+
+    final deps = dependenciesBuilder.call(snap)?.map((dep) {
       final cacheDoc = _depCache.lookup(dep);
       if (cacheDoc == null) {
         _depCache.add(dep);

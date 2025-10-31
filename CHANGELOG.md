@@ -1,3 +1,7 @@
+## 5.5.0
+
+* Core API audit/cleanup.
+
 ## 5.4.0
 
 * Add [TransactionWriter] API for writing multiple updates together and rolling back if they fail.

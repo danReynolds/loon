@@ -545,29 +545,6 @@ void main() {
       },
     );
 
-    group('touch', () {
-      test("Creates an empty node if necessary", () {
-        final store = ValueStore<String>();
-
-        store.write('users__1__messages__1', 'Hey');
-        store.touch('users__1');
-        store.touch('users__2');
-
-        expect(store.inspect(), {
-          "users": {
-            "1": {
-              "messages": {
-                "__values": {
-                  "1": "Hey",
-                },
-              },
-            },
-            "2": {},
-          },
-        });
-      });
-    });
-
     group('getNearest', () {
       test(
         'With no value, returns the nearest non-null node along the given path.',

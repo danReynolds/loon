@@ -102,6 +102,7 @@ class PersistManager {
         batch.remove(doc);
       }
       batch.add(doc);
+
       return lastOperation.onComplete;
     }
 
