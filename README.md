@@ -478,7 +478,7 @@ class MyPersistor extends Persistor {
   /// and under those paths.
   Future<Json> hydrate([Set<StoreReference>? refs]);
 
-  /// Clear function used to clear all documents under the given collections.
+  /// Clear function used to clear all documents under the given store paths.
   Future<void> clear(Set<StoreReference> refs);
 
   /// Clears all documents and removes all persisted data.
