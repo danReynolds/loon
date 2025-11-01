@@ -33,7 +33,8 @@ void main() {
           final value = records.first[SqlitePersistor.valueColumn] as String;
 
           return jsonDecode(
-              encrypted ? persistor.encrypter.decrypt(value) : value);
+            encrypted ? persistor.encrypter.decrypt(value) : value,
+          );
         },
         factory: ({
           encrypter,

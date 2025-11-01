@@ -133,7 +133,7 @@ class PathPersistorSettings<T extends StoreReference>
 abstract class Persistor {
   final PersistorSettings settings;
   final void Function(Set<Document> batch)? onPersist;
-  final void Function(Set<Collection> collections)? onClear;
+  final void Function(Set<StoreReference> references)? onClear;
   final void Function()? onClearAll;
   final void Function(Json data)? onHydrate;
   final void Function()? onSync;
@@ -164,7 +164,7 @@ abstract class Persistor {
   /// [FilePersistor] for non-web platforms and the [IndexedDBPersistor] for web.
   static Persistor current({
     void Function(Set<Document> batch)? onPersist,
-    void Function(Set<Collection> collections)? onClear,
+    void Function(Set<StoreReference> refs)? onClear,
     void Function()? onClearAll,
     void Function(Json data)? onHydrate,
     void Function()? onSync,
@@ -219,7 +219,7 @@ abstract class Persistor {
   Future<Json> hydrate([List<StoreReference>? refs]);
 
   /// Clear function used to clear all documents under the given collections.
-  Future<void> clear(List<Collection> collections);
+  Future<void> clear(List<StoreReference> references);
 
   /// Clears all documents and removes all persisted data.
   Future<void> clearAll();

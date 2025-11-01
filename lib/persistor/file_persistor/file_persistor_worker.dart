@@ -80,8 +80,8 @@ class FilePersistorWorker extends PersistorWorker<FilePersistorWorkerConfig> {
   }
 
   @override
-  clear(List<String> collections) {
-    return _manager.clear(collections);
+  clear(List<String> paths) {
+    return _manager.clear(paths);
   }
 
   @override

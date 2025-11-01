@@ -109,14 +109,14 @@ class PersistManager {
     return _enqueue(PersistOperation(LinkedHashSet.of([doc])));
   }
 
-  Future<void> clear(Collection collection) {
+  Future<void> clear(StoreReference ref) {
     final lastOperation = _operationQueue.tryLast;
     if (lastOperation is ClearOperation) {
-      lastOperation.batch.add(collection);
+      lastOperation.batch.add(ref);
       return lastOperation.onComplete;
     }
 
-    return _enqueue(ClearOperation(LinkedHashSet.of([collection])));
+    return _enqueue(ClearOperation(LinkedHashSet.of([ref])));
   }
 
   Future<void> clearAll() {

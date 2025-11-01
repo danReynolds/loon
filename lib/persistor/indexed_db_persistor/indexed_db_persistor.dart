@@ -131,9 +131,9 @@ class IndexedDBPersistor extends Persistor {
   }
 
   @override
-  clear(List<Collection> collections) {
+  clear(List<StoreReference> refs) {
     return _manager.clear(
-      collections.map((collection) => collection.path).toList(),
+      refs.map((refs) => refs.path).toList(),
     );
   }
 

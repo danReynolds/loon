@@ -9,7 +9,7 @@ import '../../models/test_user_model.dart';
 
 typedef PersistorFactory<T> = T Function({
   void Function(Set<Document> batch)? onPersist,
-  void Function(Set<Collection> collections)? onClear,
+  void Function(Set<StoreReference> refs)? onClear,
   void Function()? onClearAll,
   void Function(Json data)? onHydrate,
   void Function()? onSync,
@@ -71,7 +71,7 @@ void persistorTestRunner<T extends Persistor>({
       onHydrate: (refs) {
         completer.hydrateComplete();
       },
-      onClear: (collections) {
+      onClear: (refs) {
         completer.clearComplete();
       },
       onClearAll: () {

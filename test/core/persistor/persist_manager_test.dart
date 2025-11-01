@@ -136,13 +136,13 @@ void main() {
     test(
       'Batches clearing of collections',
       () async {
-        List<Set<Collection>> batches = [];
+        List<Set<StoreReference>> batches = [];
 
         Loon.configure(
           persistor: TestPersistor(
             seedData: [],
-            onClear: (collections) {
-              batches.add(collections);
+            onClear: (refs) {
+              batches.add(refs);
             },
           ),
         );

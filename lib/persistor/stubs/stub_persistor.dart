@@ -12,7 +12,7 @@ class StubPersistor extends Persistor {
   }) : super(logger: Logger('StubPersistor'));
 
   @override
-  Future<void> clear(List<Collection> collections) {
+  Future<void> clear(refs) {
     throw UnimplementedError();
   }
 
@@ -22,7 +22,7 @@ class StubPersistor extends Persistor {
   }
 
   @override
-  Future<Json> hydrate([List<StoreReference>? refs]) {
+  Future<Json> hydrate([refs]) {
     throw UnimplementedError();
   }
 
@@ -32,7 +32,7 @@ class StubPersistor extends Persistor {
   }
 
   @override
-  Future<void> persist(List<Document> docs) {
+  Future<void> persist(docs) {
     throw UnimplementedError();
   }
 }

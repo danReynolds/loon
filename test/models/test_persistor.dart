@@ -11,7 +11,7 @@ class TestPersistor extends Persistor {
 
   TestPersistor({
     void Function(Set<Document> batch)? onPersist,
-    void Function(Set<Collection> collections)? onClear,
+    void Function(Set<StoreReference> refs)? onClear,
     void Function()? onClearAll,
     void Function(Json data)? onHydrate,
     this.seedData = const [],
@@ -22,9 +22,9 @@ class TestPersistor extends Persistor {
             completer.persistComplete();
             onPersist?.call(docs);
           },
-          onClear: (collections) {
+          onClear: (refs) {
             completer.clearComplete();
-            onClear?.call(collections);
+            onClear?.call(refs);
           },
           onClearAll: () {
             completer.clearAllComplete();

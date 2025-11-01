@@ -242,12 +242,10 @@ class DataStoreManager {
           // Otherwise, write its associated data store with the updated document data.
         } else {
           final prevResult = resolver.getNearest(docPath)!;
-          final prevResolverPath = prevResult.$1;
-          final prevResolverValue = prevResult.$2;
+          final (prevResolverPath, prevResolverValue) = prevResult;
 
-          final nextResult = localResolver.getNearest(docPath)!;
-          final nextResolverPath = nextResult.$1;
-          final nextResolverValue = nextResult.$2;
+          final (nextResolverPath, nextResolverValue) =
+              localResolver.getNearest(docPath)!;
 
           final prevDataStoreName = prevResolverValue;
           final prevDataStore = index[prevDataStoreName]!;
@@ -257,7 +255,7 @@ class DataStoreManager {
 
           resolver.writePath(nextResolverPath, nextResolverValue);
 
-          // Scenario 1: A document's resolver value changes and its path stays the same.
+          // Scenario 1: A document's resolver value changes and its resolver path stays the same.
           //
           // When a document is written with the same resolver path a__b__c and updated resolver value 2 from 1,
           // then store 1 grafts *all* its data under resolver path a__b__c into store 2 at resolver path a__b__c.
@@ -327,11 +325,10 @@ class DataStoreManager {
       await Future.wait(dataStores.map((dataStore) => dataStore.hydrate()));
 
       for (final path in paths) {
+        resolver.deletePath(path);
         for (final dataStore in pathDataStores[path]!) {
           dataStore.recursiveDelete(path);
         }
-
-        resolver.deletePath(path);
       }
 
       _scheduleSync();

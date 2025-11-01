@@ -74,10 +74,10 @@ class PersistorWorkerMessenger {
     return response.data;
   }
 
-  Future<void> clear(List<Collection<dynamic>> collections) async {
+  Future<void> clear(List<StoreReference> refs) async {
     await _sendMessage(
       ClearMessageRequest(
-        paths: collections.map((collection) => collection.path).toList(),
+        paths: refs.map((ref) => ref.path).toList(),
       ),
     );
   }

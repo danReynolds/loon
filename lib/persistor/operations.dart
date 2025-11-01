@@ -29,8 +29,8 @@ class PersistOperation
   PersistOperation(super.batch);
 }
 
-class ClearOperation
-    extends PersistorBatchOperation<Collection, LinkedHashSet<Collection>> {
+class ClearOperation extends PersistorBatchOperation<StoreReference,
+    LinkedHashSet<StoreReference>> {
   ClearOperation(super.batch);
 }
 
