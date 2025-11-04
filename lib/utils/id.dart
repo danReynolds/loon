@@ -15,7 +15,7 @@ String generateId([int size = 21]) {
   var i = 0;
 
   while (i < size) {
-    int r = _rand.nextInt(_u32); // 32 random bits → 5×6-bit chars
+    int r = _rand.nextInt(_u32); // 5×6-bit chars (30 bits used, 2 bits unused)
 
     var k = 0;
     while (k < 5 && i < size) {
