@@ -3,6 +3,7 @@ import 'dart:math';
 
 import 'package:example/models/user.dart';
 import 'package:loon/loon.dart';
+import 'package:loon/utils/id.dart';
 
 enum Operations {
   hydrate,
@@ -24,7 +25,7 @@ class RandomOperationRunner {
       _logger.log('Persist $count');
 
       for (int i = 0; i < count; i++) {
-        final id = uuid.v4();
+        final id = generateId();
         UserModel.store.doc(id).create(UserModel(name: 'User $id'));
       }
     } else if (operationIndex >= 80 && operationIndex < 90) {

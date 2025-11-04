@@ -86,10 +86,10 @@ class Collection<T> implements Queryable<T>, StoreReference {
         Loon._instance._isGlobalPersistenceEnabled;
   }
 
-  Document<T> doc(String id) {
+  Document<T> doc([String? id]) {
     return Document<T>(
       path,
-      id,
+      id ?? generateId(),
       fromJson: fromJson,
       toJson: toJson,
       persistorSettings: persistorSettings,

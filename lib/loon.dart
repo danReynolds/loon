@@ -4,7 +4,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart' hide Key;
 import 'package:loon/persistor/data_store_encrypter.dart';
-import 'package:uuid/uuid.dart';
+import 'package:loon/utils/id.dart';
 import 'dart:collection';
 import 'persistor/index.dart';
 
@@ -121,7 +121,7 @@ class Loon {
       },
     ).toList();
 
-    return List<DocumentSnapshot<T>>.from(snaps ?? []);
+    return snaps ?? [];
   }
 
   DocumentSnapshot<T> writeDocument<T>(

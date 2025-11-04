@@ -2,9 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:encrypt/encrypt.dart';
 import 'package:loon/loon.dart';
-import 'package:uuid/uuid.dart';
 
-const uuid = Uuid();
 final testEncryptionKey = Key.fromSecureRandom(32);
 
 String encryptData(Json json) {
