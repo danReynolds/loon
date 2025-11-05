@@ -1,7 +1,5 @@
 part of './loon.dart';
 
-const uuid = Uuid();
-
 /// A mixin that provides an observable interface for the access and streaming of data broadcasted from the store.
 mixin BroadcastObserver<T, S> {
   late final StreamController<T> _controller;
@@ -45,7 +43,7 @@ mixin BroadcastObserver<T, S> {
     _controllerValue = initialValue;
     _controller.add(initialValue);
 
-    _observerId = "${path}__${uuid.v4()}";
+    _observerId = "${path}__${generateId()}";
 
     Loon._instance.broadcastManager.addObserver(this, initialValue);
   }

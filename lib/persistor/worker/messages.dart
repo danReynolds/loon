@@ -1,13 +1,11 @@
 import 'dart:isolate';
 import 'package:loon/persistor/persist_payload.dart';
-import 'package:uuid/uuid.dart';
-
-const uuid = Uuid();
+import 'package:loon/utils/id.dart';
 
 abstract class Message {}
 
 abstract class MessageRequest<T extends MessageResponse> extends Message {
-  final id = uuid.v4();
+  final id = generateId();
 
   MessageRequest();
 
