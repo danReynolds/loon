@@ -1,3 +1,7 @@
+## 5.6.0
+
+* Add support for document ID generation a la Firestore.
+
 ## 5.5.0
 
 * Core API audit/cleanup.
