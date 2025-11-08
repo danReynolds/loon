@@ -489,7 +489,7 @@ class MyPersistor extends Persistor {
 ## Extensions
 
 * [Firestore](https://pub.dev/packages/cloud_firestore): The [loon_extension_firestore](https://github.com/danReynolds/loon_extension_firestore) package is used to sync documents fetched from Firestore into Loon.
-* [Haste](https://github.com/danReynolds/haste/blob/main/packages/haste_loon/README.md) Provides a set of Flutter hooks for accessing `Loon` documents and queries in Flutter widgets.
+* [Haste](https://github.com/danReynolds/haste): The [haste_loon](https://github.com/danReynolds/haste/blob/main/packages/haste_loon/README.md) package provides a set of Flutter hooks for watching `Loon` documents and queries in Flutter widgets.
 
 ## Documents
 
