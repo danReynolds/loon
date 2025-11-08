@@ -209,11 +209,11 @@ final snap = doc.get();
 doc.update(snap.data.copyWith(name: 'John Smith'));
 ```
 
-The reading and writing of a document can be combined using the `modify` API. If the document does not yet exist, then its snapshot is `null`.
+The reading and writing of a document can be combined using the `modify` API.
 
 ```dart
 UserModel.store.doc('1').modify((snap) {
-  return snap?.data.copyWith(name: 'John Smitherson');
+  return snap.data.copyWith(name: 'John Smitherson');
 });
 ```
 
