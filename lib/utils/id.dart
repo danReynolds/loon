@@ -1,6 +1,7 @@
 import 'dart:math';
 import 'dart:typed_data';
 
+// 64-characters (2^6)
 const String _alphabet =
     '_-0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ';
 final Uint8List _alphabytes = Uint8List.fromList(_alphabet.codeUnits);
@@ -15,10 +16,11 @@ String generateId([int size = 21]) {
   var i = 0;
 
   while (i < size) {
-    int r = _rand.nextInt(_u32); // 5×6-bit chars (30 bits used, 2 bits unused)
+    int r = _rand.nextInt(_u32); // A u32 can sample 5-characters (2^6)*5, 2 bits leftover.
 
     var k = 0;
     while (k < 5 && i < size) {
+      // Sample a character randomly from the 64 characters.
       out[i++] = _alphabytes[r & 63];
       r >>= 6;
       k++;
