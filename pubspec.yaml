@@ -1,6 +1,6 @@
 name: loon
 description: Loon is a reactive collection data store for Dart & Flutter.
-version: 5.6.0
+version: 5.6.1
 homepage: https://github.com/danReynolds/loon
 
 environment:
@@ -11,7 +11,7 @@ dependencies:
   encrypt: ^5.0.3
   flutter:
     sdk: flutter
-  flutter_secure_storage: ^9.2.2
+  flutter_secure_storage: ^10.0.0
   path: ^1.8.3
   path_provider: ^2.1.5
   web: ^1.1.0
@@ -21,15 +21,7 @@ dependencies:
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  flutter_lints: ^2.0.0
-
-dependency_overrides:
-  # Temporary override for WASM support until this issue is addressed:
-  # https://github.com/mogol/flutter_secure_storage/issues/812 
-  flutter_secure_storage_web:
-    git:
-      url: https://github.com/mogol/flutter_secure_storage
-      path: flutter_secure_storage_web
+  flutter_lints: ^6.0.0
 
 
 flutter:
