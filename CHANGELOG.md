@@ -1,3 +1,11 @@
+## 5.6.1
+
+* Update `flutter_secure_storage` to v10.
+* Update web conditional import from `dart.library.html` to `dart.library.js_interop`.
+* Remove temporary `flutter_secure_storage_web` dependency override for WASM support.
+
+> **Note:** `flutter_secure_storage` v10 defaults to `useDataProtectionKeyChain: true` on macOS, which requires the `com.apple.security.keychain-access-groups` entitlement. See the [flutter_secure_storage migration guide](https://pub.dev/packages/flutter_secure_storage) for details.
+
 ## 5.6.0
 
 * Add support for document ID generation a la Firestore.
