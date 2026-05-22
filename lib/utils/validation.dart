@@ -41,7 +41,7 @@ void _validateDataDeserialization<T>({
   if (kDebugMode) {
     if (_isSerializable(data)) {
       if (data is Json) {
-        if (fromJson == null && T is! Json) {
+        if (fromJson == null && T != Json) {
           throw MissingSerializerException<T>(
             doc,
             data,

@@ -278,6 +278,24 @@ void main() {
                   );
                 },
               );
+
+              test(
+                'Reads a Json-typed collection without a fromJson serializer',
+                () {
+                  // Regression: a type-parameter `is`-check incorrectly treated
+                  // every T (including Json) as "not Json", so collections
+                  // typed <Json> without a fromJson threw a spurious
+                  // MissingSerializerException on read.
+                  final userData = {"name": "User 1"};
+
+                  Loon.collection('users').doc('1').create(userData);
+
+                  expect(
+                    Loon.collection<Json>('users').doc('1').get()?.data,
+                    userData,
+                  );
+                },
+              );
             },
           );
 
@@ -2653,6 +2671,29 @@ void main() {
                   DocumentSnapshot(doc: userDoc2, data: userData2),
                 );
               }
+            },
+          );
+
+          test(
+            'Rolls back to non-existence when a previously-missing document is '
+            'written more than once in the transaction',
+            () async {
+              final userDoc = TestUserModel.store.doc('1');
+              final userData = TestUserModel('User 1');
+              final userDataUpdated = TestUserModel('User 1 updated');
+
+              expect(userDoc.exists(), false);
+
+              try {
+                await Loon.transaction((writer) async {
+                  writer.create(userDoc, userData);
+                  writer.update(userDoc, userDataUpdated);
+                  throw 'fail';
+                });
+              } catch (_) {}
+
+              expect(userDoc.exists(), false);
+              expect(userDoc.get(), null);
             },
           );
         },
