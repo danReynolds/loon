@@ -61,6 +61,18 @@ class PersistorWorkerMessenger {
     return completer.future;
   }
 
+  /// Fails every pending request with [error]. Called when the worker isolate
+  /// errors or exits unexpectedly so that awaiters do not hang forever.
+  void failAll(Object error) {
+    final pending = index.values.toList();
+    index.clear();
+    for (final completer in pending) {
+      if (!completer.isCompleted) {
+        completer.completeError(error);
+      }
+    }
+  }
+
   Future<void> persist(List<Document<dynamic>> docs) async {
     await _sendMessage(
       PersistMessageRequest(payload: PersistPayload(docs)),

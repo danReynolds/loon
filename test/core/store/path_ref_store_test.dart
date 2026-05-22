@@ -136,5 +136,31 @@ void main() {
         expect(store.has('users__1__posts__1__reactions__1'), false);
       });
     });
+
+    group('dec on un-incremented paths', () {
+      // Regression: previously `dec` reached `node[_refKey]--` even when the
+      // path was never inc'd through that node, crashing with
+      // NoSuchMethodError: '-' called on null.
+
+      test('Single-segment dec on an empty store is a no-op', () {
+        final store = PathRefStore();
+        expect(() => store.dec('a'), returnsNormally);
+        expect(store.inspect(), {});
+      });
+
+      test('Deep dec on an empty store is a no-op', () {
+        final store = PathRefStore();
+        expect(() => store.dec('a__b__c'), returnsNormally);
+        expect(store.inspect(), {});
+      });
+
+      test('Decrementing past zero is a no-op', () {
+        final store = PathRefStore();
+        store.inc('a__b');
+        store.dec('a__b');
+        expect(() => store.dec('a__b'), returnsNormally);
+        expect(store.inspect(), {});
+      });
+    });
   });
 }

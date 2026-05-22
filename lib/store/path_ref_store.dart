@@ -85,6 +85,12 @@ class PathRefStore {
       return true;
     }
 
+    // The path was never inc'd through this node, so there is nothing to dec.
+    // Without this guard, `node[_refKey]--` below crashes on a null ref count.
+    if (node[_refKey] == null) {
+      return false;
+    }
+
     if (node[_refKey] == 1) {
       if (index == 0) {
         node.clear();

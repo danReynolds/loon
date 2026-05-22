@@ -753,6 +753,40 @@ void main() {
         'ObservableDocument',
         () {
           group(
+            'equality',
+            () {
+              test(
+                'Two ObservableDocuments at the same path have distinct '
+                'hashCodes consistent with their identity-based equality',
+                () {
+                  // Regression: ObservableDocument overrode == to be
+                  // identity-based but inherited a path-based hashCode from
+                  // Document. Two ObservableDocuments at the same path
+                  // collided in Set/Map buckets even though they were never
+                  // equal — making hashCode and equality inconsistent.
+                  final userDoc = TestUserModel.store.doc('1');
+                  final a = userDoc.observe();
+                  final b = userDoc.observe();
+                  addTearDown(() {
+                    a.dispose();
+                    b.dispose();
+                  });
+
+                  expect(a == b, false);
+                  expect(a.hashCode == b.hashCode, false);
+
+                  // Plain Documents at the same path remain equal and hash
+                  // the same, so the dependency tracker still dedupes them.
+                  final p1 = TestUserModel.store.doc('1');
+                  final p2 = TestUserModel.store.doc('1');
+                  expect(p1 == p2, true);
+                  expect(p1.hashCode, p2.hashCode);
+                },
+              );
+            },
+          );
+
+          group(
             'stream',
             () {
               test('Returns a stream of document snapshots', () async {
