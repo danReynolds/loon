@@ -16,9 +16,11 @@ jobs:
     - name: Set up Flutter
       uses: subosito/flutter-action@v2
       with:
-        # flutter_lints ^6.0.0 (bumped in #30) requires Dart SDK ^3.8.0,
-        # which ships with Flutter 3.32+.
-        flutter-version: '3.32.5'
+        # flutter_lints ^6.0.0 (bumped in #30) requires Dart SDK ^3.8.0
+        # for the package, and example/ depends on cupertino_icons ^1.0.9
+        # which requires Dart ^3.9.0. Flutter 3.44 ships Dart 3.12 which
+        # satisfies both.
+        flutter-version: '3.44.0'
 
     - name: Install dependencies
       run: flutter pub get
