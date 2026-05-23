@@ -138,10 +138,6 @@ void main() {
     });
 
     group('dec on un-incremented paths', () {
-      // Regression: previously `dec` reached `node[_refKey]--` even when the
-      // path was never inc'd through that node, crashing with
-      // NoSuchMethodError: '-' called on null.
-
       test('Single-segment dec on an empty store is a no-op', () {
         final store = PathRefStore();
         expect(() => store.dec('a'), returnsNormally);
@@ -163,9 +159,6 @@ void main() {
       });
 
       test('Dec of untracked sibling path leaves tracked paths intact', () {
-        // Previously, `dec('a__c')` after `inc('a__b')` hit the
-        // `node[_refKey] == 1` branch at the root and called `node.clear()`,
-        // wiping the entire store even though 'a__c' was never inc'd.
         final store = PathRefStore();
         store.inc('a__b');
 

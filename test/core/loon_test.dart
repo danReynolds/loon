@@ -282,10 +282,6 @@ void main() {
               test(
                 'Reads a Json-typed collection without a fromJson serializer',
                 () {
-                  // Regression: a type-parameter `is`-check incorrectly treated
-                  // every T (including Json) as "not Json", so collections
-                  // typed <Json> without a fromJson threw a spurious
-                  // MissingSerializerException on read.
                   final userData = {"name": "User 1"};
 
                   Loon.collection('users').doc('1').create(userData);
@@ -2017,9 +2013,6 @@ void main() {
           test(
             'Does not broadcast the clear to observers when broadcast: false',
             () async {
-              // Regression: clearAll accepted a `broadcast` parameter but
-              // never read it, so passing broadcast: false still emitted a
-              // removed event to every observer.
               final userDoc = TestUserModel.store.doc('1');
               final userData = TestUserModel('User 1');
 
@@ -2040,11 +2033,7 @@ void main() {
               await Loon.clearAll(broadcast: false);
               await asyncEvent();
 
-              // The store is still cleared.
               expect(Loon.inspect()['store'], {});
-
-              // But observers did not receive a removed event — only the
-              // initial null and the create snap.
               expect(docEvents, [
                 null,
                 DocumentSnapshot(doc: userDoc, data: userData),

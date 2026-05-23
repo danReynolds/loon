@@ -35,11 +35,9 @@ mixin PersistorWorkerMixin on Persistor {
     // then initialize it before spawning the worker.
     await encrypter.init();
 
-    // Wire up error/exit listeners so that an unexpected worker crash fails
-    // pending requests instead of hanging their awaiters forever.
     final errorPort = ReceivePort();
     errorPort.listen((message) {
-      // The onError port delivers a [errorString, stackTraceString] pair.
+      // onError delivers a [errorString, stackTraceString] pair.
       final description =
           message is List && message.isNotEmpty ? message.first : message;
       logger.log('Worker isolate error: $description');

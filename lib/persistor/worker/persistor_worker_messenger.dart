@@ -18,9 +18,9 @@ class PersistorWorkerMessenger {
   /// is sent back from the worker.
   final Map<String, Completer> index = {};
 
-  /// Set once the worker isolate has errored/exited. New requests sent after
-  /// this point would otherwise hang forever because `sendPort.send` to a dead
-  /// isolate is silently dropped and no response ever arrives.
+  /// Sends to a dead isolate are silently dropped, so once the worker errors
+  /// or exits this is set and further sends reject immediately rather than
+  /// installing completers that nothing will ever resolve.
   bool _dead = false;
   Object? _deathReason;
 
@@ -70,9 +70,8 @@ class PersistorWorkerMessenger {
     return completer.future;
   }
 
-  /// Fails every pending request with [error] and marks the messenger dead so
-  /// subsequent sends reject immediately. Called when the worker isolate
-  /// errors or exits unexpectedly so that awaiters do not hang forever.
+  /// Errors every pending request with [error] and marks the messenger dead
+  /// so subsequent sends reject immediately with the same error.
   void failAll(Object error) {
     _dead = true;
     _deathReason = error;

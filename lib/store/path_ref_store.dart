@@ -125,10 +125,9 @@ class PathRefStore {
 
   /// Decrements the ref count to the node at the given path, removing it if it was the last reference to the node.
   void dec(String path) {
-    // `_dec` assumes the path it walks was previously inc'd — every node it
-    // touches must already carry a `_refKey`. Without this guard, dec'ing an
-    // untracked path (e.g. dec('a__c') after only inc('a__b')) would still
-    // hit the root's `_refKey == 1` branch and wipe the entire store.
+    // `_dec` assumes every node it walks carries a `_refKey`; without this
+    // guard an untracked path would still decrement (and potentially clear)
+    // ancestors that share a prefix.
     if (!has(path)) {
       return;
     }

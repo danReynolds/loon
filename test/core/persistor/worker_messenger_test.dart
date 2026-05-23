@@ -5,11 +5,6 @@ import 'package:loon/persistor/worker/persistor_worker_messenger.dart';
 
 void main() {
   group('PersistorWorkerMessenger.failAll', () {
-    // Regression: a crashed or exited worker isolate previously left every
-    // pending request hanging forever because no one completed the completers
-    // in the index. failAll must error every pending awaiter and clear the
-    // index so the messenger doesn't leak completers across reconnects.
-
     PersistorWorkerMessenger newMessenger() {
       return PersistorWorkerMessenger(
         logger: Logger('test'),
@@ -58,15 +53,11 @@ void main() {
       c.complete();
       m.index['a'] = c;
 
-      // Must not throw "Future already completed".
       expect(() => m.failAll(Exception('boom')), returnsNormally);
       await expectLater(c.future, completes);
     });
 
     test('Rejects sends issued after the worker has died', () async {
-      // Without this, post-crash callers would create new completers, send to
-      // a dead isolate (silently dropped), and hang forever waiting for a
-      // response that never comes.
       final m = newMessenger();
       m.failAll(Exception('worker crashed'));
 

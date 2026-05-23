@@ -33,9 +33,6 @@ void main() {
     test(
       'Serializes multiple waiters that all queue on the same holder',
       () async {
-        // Regression: previously, multiple waiters all awaited the same
-        // completer, woke together on release, and each installed their own
-        // completer — letting all of them think they held the lock at once.
         final lock = Lock();
         int inFlight = 0;
         int maxInFlight = 0;
@@ -49,7 +46,6 @@ void main() {
           });
         }
 
-        // A holds. B and C both queue on A's completer.
         final a = work();
         await Future.delayed(Duration.zero);
         final b = work();
@@ -99,7 +95,6 @@ void main() {
           throwsA(isA<StateError>()),
         );
 
-        // The next acquire must complete; if the lock leaked, this hangs.
         var ran = false;
         await lock.run(() async {
           ran = true;

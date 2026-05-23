@@ -25,10 +25,9 @@ jobs:
     - name: Install dependencies
       run: flutter pub get
 
-    # `--concurrency=1` runs test files sequentially. The suite uses 1ms
-    # `Future.delayed` to await broadcast propagation, and under CPU
-    # contention from parallel isolates that timing assumption can race
-    # against the 0ms broadcast Timer, producing sporadic failures.
+    # --concurrency=1: the suite awaits broadcast propagation with a 1ms
+    # Future.delayed which can race the 0ms broadcast Timer under the CPU
+    # contention of parallel-isolate test runs.
     - name: Run Core tests
       run: flutter test test/core --concurrency=1
 
