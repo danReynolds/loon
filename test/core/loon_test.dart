@@ -278,6 +278,20 @@ void main() {
                   );
                 },
               );
+
+              test(
+                'Reads a Json-typed collection without a fromJson serializer',
+                () {
+                  final userData = {"name": "User 1"};
+
+                  Loon.collection('users').doc('1').create(userData);
+
+                  expect(
+                    Loon.collection<Json>('users').doc('1').get()?.data,
+                    userData,
+                  );
+                },
+              );
             },
           );
 
@@ -1995,6 +2009,41 @@ void main() {
               );
             },
           );
+
+          test(
+            'Does not broadcast the clear to observers when broadcast: false',
+            () async {
+              final userDoc = TestUserModel.store.doc('1');
+              final userData = TestUserModel('User 1');
+
+              final docEvents = <DocumentSnapshot<TestUserModel>?>[];
+              final collectionEvents =
+                  <List<DocumentSnapshot<TestUserModel>>>[];
+              final docSub = userDoc.stream().listen(docEvents.add);
+              final collectionSub =
+                  TestUserModel.store.stream().listen(collectionEvents.add);
+              addTearDown(() {
+                docSub.cancel();
+                collectionSub.cancel();
+              });
+
+              userDoc.create(userData);
+              await asyncEvent();
+
+              await Loon.clearAll(broadcast: false);
+              await asyncEvent();
+
+              expect(Loon.inspect()['store'], {});
+              expect(docEvents, [
+                null,
+                DocumentSnapshot(doc: userDoc, data: userData),
+              ]);
+              expect(collectionEvents, [
+                [],
+                [DocumentSnapshot(doc: userDoc, data: userData)],
+              ]);
+            },
+          );
         },
       );
 
@@ -2653,6 +2702,29 @@ void main() {
                   DocumentSnapshot(doc: userDoc2, data: userData2),
                 );
               }
+            },
+          );
+
+          test(
+            'Rolls back to non-existence when a previously-missing document is '
+            'written more than once in the transaction',
+            () async {
+              final userDoc = TestUserModel.store.doc('1');
+              final userData = TestUserModel('User 1');
+              final userDataUpdated = TestUserModel('User 1 updated');
+
+              expect(userDoc.exists(), false);
+
+              try {
+                await Loon.transaction((writer) async {
+                  writer.create(userDoc, userData);
+                  writer.update(userDoc, userDataUpdated);
+                  throw 'fail';
+                });
+              } catch (_) {}
+
+              expect(userDoc.exists(), false);
+              expect(userDoc.get(), null);
             },
           );
         },

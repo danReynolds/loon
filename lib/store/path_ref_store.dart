@@ -125,6 +125,12 @@ class PathRefStore {
 
   /// Decrements the ref count to the node at the given path, removing it if it was the last reference to the node.
   void dec(String path) {
+    // `_dec` assumes every node it walks carries a `_refKey`; without this
+    // guard an untracked path would still decrement (and potentially clear)
+    // ancestors that share a prefix.
+    if (!has(path)) {
+      return;
+    }
     _dec(_store, path.split(delimiter));
   }
 

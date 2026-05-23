@@ -16,16 +16,23 @@ jobs:
     - name: Set up Flutter
       uses: subosito/flutter-action@v2
       with:
-        flutter-version: '3.24.0'
+        # flutter_lints ^6.0.0 (bumped in #30) requires Dart SDK ^3.8.0
+        # for the package, and example/ depends on cupertino_icons ^1.0.9
+        # which requires Dart ^3.9.0. Flutter 3.44 ships Dart 3.12 which
+        # satisfies both.
+        flutter-version: '3.44.0'
 
     - name: Install dependencies
       run: flutter pub get
 
+    # --concurrency=1: the suite awaits broadcast propagation with a 1ms
+    # Future.delayed which can race the 0ms broadcast Timer under the CPU
+    # contention of parallel-isolate test runs.
     - name: Run Core tests
-      run: flutter test test/core
+      run: flutter test test/core --concurrency=1
 
     - name: Run Native tests
-      run: flutter test test/native
+      run: flutter test test/native --concurrency=1
 
     - name: Run Web tests
-      run: flutter test test/web --platform chrome
+      run: flutter test test/web --platform chrome --concurrency=1

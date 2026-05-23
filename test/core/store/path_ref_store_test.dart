@@ -136,5 +136,56 @@ void main() {
         expect(store.has('users__1__posts__1__reactions__1'), false);
       });
     });
+
+    group('dec on un-incremented paths', () {
+      test('Single-segment dec on an empty store is a no-op', () {
+        final store = PathRefStore();
+        expect(() => store.dec('a'), returnsNormally);
+        expect(store.inspect(), {});
+      });
+
+      test('Deep dec on an empty store is a no-op', () {
+        final store = PathRefStore();
+        expect(() => store.dec('a__b__c'), returnsNormally);
+        expect(store.inspect(), {});
+      });
+
+      test('Decrementing past zero is a no-op', () {
+        final store = PathRefStore();
+        store.inc('a__b');
+        store.dec('a__b');
+        expect(() => store.dec('a__b'), returnsNormally);
+        expect(store.inspect(), {});
+      });
+
+      test('Dec of untracked sibling path leaves tracked paths intact', () {
+        final store = PathRefStore();
+        store.inc('a__b');
+
+        store.dec('a__c');
+
+        expect(store.has('a__b'), true);
+        expect(store.inspect(), {
+          "__ref": 1,
+          "a": {"__ref": 1, "b": 1},
+        });
+      });
+
+      test('Dec of untracked deep path under a tracked node is a no-op', () {
+        final store = PathRefStore();
+        store.inc('a__b__c');
+
+        store.dec('a__b__d');
+
+        expect(store.has('a__b__c'), true);
+        expect(store.inspect(), {
+          "__ref": 1,
+          "a": {
+            "__ref": 1,
+            "b": {"__ref": 1, "c": 1},
+          },
+        });
+      });
+    });
   });
 }

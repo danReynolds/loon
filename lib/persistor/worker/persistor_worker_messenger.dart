@@ -18,6 +18,12 @@ class PersistorWorkerMessenger {
   /// is sent back from the worker.
   final Map<String, Completer> index = {};
 
+  /// Sends to a dead isolate are silently dropped, so once the worker errors
+  /// or exits this is set and further sends reject immediately rather than
+  /// installing completers that nothing will ever resolve.
+  bool _dead = false;
+  Object? _deathReason;
+
   final Logger logger;
   final void Function()? onSync;
 
@@ -56,9 +62,26 @@ class PersistorWorkerMessenger {
   }
 
   Future<T> _sendMessage<T extends MessageResponse>(MessageRequest<T> message) {
+    if (_dead) {
+      return Future.error(_deathReason!);
+    }
     final completer = index[message.id] = Completer<T>();
     sendPort.send(message);
     return completer.future;
+  }
+
+  /// Errors every pending request with [error] and marks the messenger dead
+  /// so subsequent sends reject immediately with the same error.
+  void failAll(Object error) {
+    _dead = true;
+    _deathReason = error;
+    final pending = index.values.toList();
+    index.clear();
+    for (final completer in pending) {
+      if (!completer.isCompleted) {
+        completer.completeError(error);
+      }
+    }
   }
 
   Future<void> persist(List<Document<dynamic>> docs) async {
