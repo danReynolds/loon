@@ -135,15 +135,17 @@ class BroadcastManager {
     _broadcastDependents(doc);
   }
 
-  void clear() {
+  void clear({bool broadcast = true}) {
     eventStore.clear();
     observerValueStore.clear();
 
-    for (final observer in _observers) {
-      eventStore.write(observer.path, BroadcastEvents.removed);
-    }
+    if (broadcast) {
+      for (final observer in _observers) {
+        eventStore.write(observer.path, BroadcastEvents.removed);
+      }
 
-    _scheduleBroadcast();
+      _scheduleBroadcast();
+    }
   }
 
   void addObserver<T, S>(BroadcastObserver<T, S> observer, T initialValue) {

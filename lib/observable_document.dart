@@ -33,16 +33,6 @@ class ObservableDocument<T> extends Document<T>
 
   Set<Document>? _depCache = {};
 
-  // ObservableDocument inherits a path-based hashCode from Document but
-  // overrides equality to be identity-based — two ObservableDocuments at the
-  // same path are never equal because each one has its own streams and
-  // subscriptions. Without overriding hashCode, the two land in the same bucket
-  // of a Set/Map and are distinguished only by equality, which is a sharp
-  // edge for callers that assume hashCode-equality consistency. Use the
-  // instance identity hash so unequal observables also have different hashes.
-  @override
-  int get hashCode => identityHashCode(this);
-
   /// On broadcast, the [ObservableDocument] examines the broadcast events that have occurred
   /// since the last broadcast and determines if the document needs to rebroadcast to its listeners.
   ///
