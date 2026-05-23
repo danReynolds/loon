@@ -85,12 +85,6 @@ class PathRefStore {
       return true;
     }
 
-    // The path was never inc'd through this node, so there is nothing to dec.
-    // Without this guard, `node[_refKey]--` below crashes on a null ref count.
-    if (node[_refKey] == null) {
-      return false;
-    }
-
     if (node[_refKey] == 1) {
       if (index == 0) {
         node.clear();
@@ -131,6 +125,13 @@ class PathRefStore {
 
   /// Decrements the ref count to the node at the given path, removing it if it was the last reference to the node.
   void dec(String path) {
+    // `_dec` assumes the path it walks was previously inc'd — every node it
+    // touches must already carry a `_refKey`. Without this guard, dec'ing an
+    // untracked path (e.g. dec('a__c') after only inc('a__b')) would still
+    // hit the root's `_refKey == 1` branch and wipe the entire store.
+    if (!has(path)) {
+      return;
+    }
     _dec(_store, path.split(delimiter));
   }
 

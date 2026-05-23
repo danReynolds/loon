@@ -161,6 +161,38 @@ void main() {
         expect(() => store.dec('a__b'), returnsNormally);
         expect(store.inspect(), {});
       });
+
+      test('Dec of untracked sibling path leaves tracked paths intact', () {
+        // Previously, `dec('a__c')` after `inc('a__b')` hit the
+        // `node[_refKey] == 1` branch at the root and called `node.clear()`,
+        // wiping the entire store even though 'a__c' was never inc'd.
+        final store = PathRefStore();
+        store.inc('a__b');
+
+        store.dec('a__c');
+
+        expect(store.has('a__b'), true);
+        expect(store.inspect(), {
+          "__ref": 1,
+          "a": {"__ref": 1, "b": 1},
+        });
+      });
+
+      test('Dec of untracked deep path under a tracked node is a no-op', () {
+        final store = PathRefStore();
+        store.inc('a__b__c');
+
+        store.dec('a__b__d');
+
+        expect(store.has('a__b__c'), true);
+        expect(store.inspect(), {
+          "__ref": 1,
+          "a": {
+            "__ref": 1,
+            "b": {"__ref": 1, "c": 1},
+          },
+        });
+      });
     });
   });
 }

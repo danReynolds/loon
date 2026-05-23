@@ -18,6 +18,12 @@ class PersistorWorkerMessenger {
   /// is sent back from the worker.
   final Map<String, Completer> index = {};
 
+  /// Set once the worker isolate has errored/exited. New requests sent after
+  /// this point would otherwise hang forever because `sendPort.send` to a dead
+  /// isolate is silently dropped and no response ever arrives.
+  bool _dead = false;
+  Object? _deathReason;
+
   final Logger logger;
   final void Function()? onSync;
 
@@ -56,14 +62,20 @@ class PersistorWorkerMessenger {
   }
 
   Future<T> _sendMessage<T extends MessageResponse>(MessageRequest<T> message) {
+    if (_dead) {
+      return Future.error(_deathReason!);
+    }
     final completer = index[message.id] = Completer<T>();
     sendPort.send(message);
     return completer.future;
   }
 
-  /// Fails every pending request with [error]. Called when the worker isolate
+  /// Fails every pending request with [error] and marks the messenger dead so
+  /// subsequent sends reject immediately. Called when the worker isolate
   /// errors or exits unexpectedly so that awaiters do not hang forever.
   void failAll(Object error) {
+    _dead = true;
+    _deathReason = error;
     final pending = index.values.toList();
     index.clear();
     for (final completer in pending) {

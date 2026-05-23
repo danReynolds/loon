@@ -62,5 +62,16 @@ void main() {
       expect(() => m.failAll(Exception('boom')), returnsNormally);
       await expectLater(c.future, completes);
     });
+
+    test('Rejects sends issued after the worker has died', () async {
+      // Without this, post-crash callers would create new completers, send to
+      // a dead isolate (silently dropped), and hang forever waiting for a
+      // response that never comes.
+      final m = newMessenger();
+      m.failAll(Exception('worker crashed'));
+
+      await expectLater(m.clearAll(), throwsA(isA<Exception>()));
+      expect(m.index, isEmpty);
+    });
   });
 }
