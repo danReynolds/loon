@@ -25,11 +25,15 @@ jobs:
     - name: Install dependencies
       run: flutter pub get
 
+    # `--concurrency=1` runs test files sequentially. The suite uses 1ms
+    # `Future.delayed` to await broadcast propagation, and under CPU
+    # contention from parallel isolates that timing assumption can race
+    # against the 0ms broadcast Timer, producing sporadic failures.
     - name: Run Core tests
-      run: flutter test test/core
+      run: flutter test test/core --concurrency=1
 
     - name: Run Native tests
-      run: flutter test test/native
+      run: flutter test test/native --concurrency=1
 
     - name: Run Web tests
-      run: flutter test test/web --platform chrome
+      run: flutter test test/web --platform chrome --concurrency=1
