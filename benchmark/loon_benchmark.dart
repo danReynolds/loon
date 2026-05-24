@@ -53,14 +53,42 @@ void main() {
     }
   });
 
-  test('ID generation (Random.secure)', () {
-    for (final n in [10000, 100000]) {
+  test('ID generation', () {
+    const n = 100000;
+    for (final entry in {
+      'generateId (secure)': generateId,
+      'generateInternalId': generateInternalId,
+    }.entries) {
+      final gen = entry.value;
       final sw = Stopwatch()..start();
       for (var i = 0; i < n; i++) {
-        generateId();
+        gen();
       }
       sw.stop();
-      _report('generateId', n, sw.elapsedMicroseconds);
+      _report(entry.key, n, sw.elapsedMicroseconds);
+    }
+  });
+
+  test('Subscription setup throughput', () async {
+    // Each observer creation generates an ID, opens two stream controllers,
+    // registers in the broadcast manager, and computes an initial value. The
+    // ID generator is the part this PR changes.
+    const n = 20000;
+    final col = Loon.collection<int>('sub');
+    for (var i = 0; i < n; i++) {
+      col.doc('doc_$i').create(i, broadcast: false, persist: false);
+    }
+
+    final subs = <dynamic>[];
+    final sw = Stopwatch()..start();
+    for (var i = 0; i < n; i++) {
+      subs.add(col.doc('doc_$i').observe().stream().listen((_) {}));
+    }
+    sw.stop();
+    _report('observe+listen', n, sw.elapsedMicroseconds);
+
+    for (final s in subs) {
+      await s.cancel();
     }
   });
 
