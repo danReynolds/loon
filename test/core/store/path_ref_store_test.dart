@@ -171,6 +171,29 @@ void main() {
         });
       });
 
+      test('Dec of a path that became transient removes it fully', () {
+        // Regression: inc'ing a path and a descendant, then dec'ing the
+        // descendant, leaves the path as a transient node. Dec'ing the path
+        // itself must remove it; previously the Map branch of `_dec` signalled
+        // removal via a return value that the top-level `dec` ignored, so the
+        // node lingered (has stayed true) and ref counts leaked. A second live
+        // path keeps the root ref count above 1 so the early return doesn't
+        // mask the bug.
+        final store = PathRefStore();
+        store.inc('c');
+        store.inc('c__c');
+        store.dec('c__c');
+        store.inc('a');
+
+        store.dec('c');
+
+        expect(store.has('c'), false);
+        expect(store.inspect(), {
+          "__ref": 1,
+          "a": 1,
+        });
+      });
+
       test('Dec of untracked deep path under a tracked node is a no-op', () {
         final store = PathRefStore();
         store.inc('a__b__c');

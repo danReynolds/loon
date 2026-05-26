@@ -109,12 +109,18 @@ class PathRefStore {
         node[segment]--;
       }
     } else if (node[segment] is Map) {
-      // If this is the last reference to the child node, then remove the ref key from the child,
-      // marking that it is now purely a transient node.
-      if (node[segment][_refKey] == 1) {
-        return true;
+      final Map child = node[segment];
+      if (child[_refKey] == 1) {
+        // Releasing the last reference to this node. If it has no descendants,
+        // remove it entirely; otherwise it still routes to live descendants, so
+        // drop only its ref key and keep it as a transient node.
+        if (child.length == 1) {
+          node.remove(segment);
+        } else {
+          child.remove(_refKey);
+        }
       } else {
-        node[segment][_refKey]--;
+        child[_refKey]--;
       }
     }
 
