@@ -1,4 +1,5 @@
 import 'dart:math';
+import 'package:fake_async/fake_async.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:loon/loon.dart';
 
@@ -24,11 +25,8 @@ import '../utils.dart';
 /// so it can be compared as an ordered list; the unsorted variant is compared
 /// as a set since its order is unspecified.
 ///
-/// Notes on determinism: a single long walk is used rather than many short
-/// trials because resetting the global store between trials schedules broadcasts
-/// that can race the next trial's observer. A 1ms settle (rather than a
-/// zero-duration one) guarantees the broadcast's zero-duration timer has fired
-/// and its microtask delivery completed before each comparison.
+/// Tests run under fake time so the broadcast timer and its stream delivery are
+/// flushed explicitly before each comparison.
 
 int _cmp(DocumentSnapshot<int> a, DocumentSnapshot<int> b) {
   final byValue = a.data.compareTo(b.data);
@@ -41,21 +39,22 @@ List<String> _ordered(List<DocumentSnapshot<int>> snaps) =>
 List<String> _asSet(List<DocumentSnapshot<int>> snaps) =>
     _ordered(snaps)..sort();
 
-Future<void> _reset() async {
+void _reset(FakeAsync async) {
   Loon.unsubscribe();
   // broadcast: false so the reset doesn't schedule a broadcast that could
   // race the next test's observer.
-  await Loon.clearAll(broadcast: false);
-  await asyncEvent();
+  Loon.clearAll(broadcast: false);
+  async.flushMicrotasks();
 }
 
-Future<void> _walk({
+void _walk({
+  required FakeAsync async,
   required bool sorted,
   required int seed,
   required int threshold,
   int rounds = 400,
-}) async {
-  await _reset();
+}) {
+  _reset(async);
 
   final r = Random(seed);
   final col = Loon.collection<int>('items');
@@ -66,7 +65,7 @@ Future<void> _walk({
 
   final emissions = <List<DocumentSnapshot<int>>>[];
   final sub = obs.stream().listen(emissions.add);
-  await asyncEvent();
+  flushBroadcasts(async);
 
   final present = <String>{};
   for (var round = 0; round < rounds; round++) {
@@ -83,7 +82,7 @@ Future<void> _walk({
       }
     }
 
-    await asyncEvent();
+    flushBroadcasts(async);
 
     final oracle =
         (sorted ? col.where(filter).sortBy(_cmp) : col.where(filter)).get();
@@ -97,33 +96,37 @@ Future<void> _walk({
     }
   }
 
-  await sub.cancel();
+  sub.cancel();
+  async.flushMicrotasks();
 }
 
 void main() {
-  tearDown(_reset);
+  tearDown(() {
+    Loon.unsubscribe();
+    Loon.clearAll(broadcast: false);
+  });
 
-  test('Coalesced delete and recreate evicts a cached query result', () async {
-    await _reset();
+  test('Coalesced delete and recreate evicts a cached query result', () {
+    fakeAsync((async) {
+      _reset(async);
 
-    final col = Loon.collection<int>('items');
-    final doc = col.doc('1');
-    doc.create(5);
-    await asyncEvent();
+      final col = Loon.collection<int>('items');
+      final doc = col.doc('1');
+      doc.create(5);
+      flushBroadcasts(async);
 
-    final query = col.where((snap) => snap.data >= 4).observe();
-    final emissions = <List<DocumentSnapshot<int>>>[];
-    final changes = <List<DocumentChangeSnapshot<int>>>[];
-    final valueSub = query.stream().listen(emissions.add);
-    final changeSub = query.streamChanges().listen(changes.add);
-    await asyncEvent();
+      final query = col.where((snap) => snap.data >= 4).observe();
+      final emissions = <List<DocumentSnapshot<int>>>[];
+      final changes = <List<DocumentChangeSnapshot<int>>>[];
+      final valueSub = query.stream().listen(emissions.add);
+      final changeSub = query.streamChanges().listen(changes.add);
+      flushBroadcasts(async);
 
-    try {
       expect(_ordered(emissions.last), ['1=5']);
 
       doc.delete();
       doc.create(0);
-      await asyncEvent();
+      flushBroadcasts(async);
 
       expect(_ordered(emissions.last), isEmpty);
       expect(changes, [
@@ -136,10 +139,10 @@ void main() {
           ),
         ],
       ]);
-    } finally {
-      await valueSub.cancel();
-      await changeSub.cancel();
-    }
+      valueSub.cancel();
+      changeSub.cancel();
+      async.flushMicrotasks();
+    });
   });
 
   group('ObservableQuery equivalence', () {
@@ -150,12 +153,15 @@ void main() {
         test(
           '${sorted ? 'sorted' : 'unsorted'} query, threshold $threshold '
           'matches a full recompute',
-          () async {
-            await _walk(
-              sorted: sorted,
-              seed: 1000 + threshold,
-              threshold: threshold,
-            );
+          () {
+            fakeAsync((async) {
+              _walk(
+                async: async,
+                sorted: sorted,
+                seed: 1000 + threshold,
+                threshold: threshold,
+              );
+            });
           },
         );
       }

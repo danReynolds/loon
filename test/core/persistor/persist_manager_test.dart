@@ -1,12 +1,20 @@
+import 'package:fake_async/fake_async.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:loon/loon.dart';
 
 import '../../models/test_persistor.dart';
 import '../../models/test_user_model.dart';
+import '../../utils.dart';
+
+void _flushPersistManagerOperation(FakeAsync async) {
+  elapseAndFlush(async, const Duration(milliseconds: 1));
+}
 
 void main() {
-  tearDown(() {
-    Loon.clearAll();
+  tearDown(() async {
+    Loon.configure(persistor: null);
+    Loon.unsubscribe();
+    await Loon.clearAll(broadcast: false);
   });
 
   /// Tests the behavior of the [PersistManager] to check that it properly batches
@@ -14,159 +22,172 @@ void main() {
   group('Persist Manager', () {
     test(
       'Batches contiguous persistence operations',
-      () async {
-        List<Set<Document>> batches = [];
+      () {
+        fakeAsync((async) {
+          final batches = <Set<Document>>[];
 
-        Loon.configure(
-          persistor: TestPersistor(
-            seedData: [],
-            onPersist: (docs) {
-              batches.add(docs);
+          Loon.configure(
+            persistor: TestPersistor(
+              seedData: [],
+              onPersist: (docs) {
+                batches.add(docs);
+              },
+            ),
+          );
+          _flushPersistManagerOperation(async);
+
+          final userCollection = Loon.collection(
+            'users',
+            fromJson: TestUserModel.fromJson,
+            toJson: (user) => user.toJson(),
+          );
+
+          userCollection.doc('1').create(TestUserModel('User 1'));
+          userCollection.doc('2').create(TestUserModel('User 2'));
+
+          _flushPersistManagerOperation(async);
+
+          userCollection.doc('3').create(TestUserModel('User 3'));
+
+          _flushPersistManagerOperation(async);
+
+          // There should be two persistence calls:
+          // 1. The first two writes should be grouped together into a single batch in the first 1ms throttle.
+          // 2. The third write is grouped into its own batch.
+          expect(batches.length, 2);
+          expect(
+            batches.first,
+            {
+              userCollection.doc('1'),
+              userCollection.doc('2'),
             },
-          ),
-        );
-
-        final userCollection = Loon.collection(
-          'users',
-          fromJson: TestUserModel.fromJson,
-          toJson: (user) => user.toJson(),
-        );
-
-        userCollection.doc('1').create(TestUserModel('User 1'));
-        userCollection.doc('2').create(TestUserModel('User 2'));
-
-        await TestPersistor.completer.onPersist;
-
-        userCollection.doc('3').create(TestUserModel('User 3'));
-
-        await TestPersistor.completer.onPersist;
-
-        // There should be two persistence calls:
-        // 1. The first two writes should be grouped together into a single batch in the first 1ms throttle.
-        // 2. The third write is grouped into its own batch.
-        expect(batches.length, 2);
-        expect(
-          batches.first,
-          {
-            userCollection.doc('1'),
-            userCollection.doc('2'),
-          },
-        );
-        expect(batches.last, {userCollection.doc('3')});
+          );
+          expect(batches.last, {userCollection.doc('3')});
+        });
       },
     );
 
     test(
       'Does not batch non-contiguous operations',
-      () async {
-        List<Set<Document>> batches = [];
+      () {
+        fakeAsync((async) {
+          final batches = <Set<Document>>[];
 
-        Loon.configure(
-          persistor: TestPersistor(
-            seedData: [],
-            onPersist: (docs) {
-              batches.add(docs);
-            },
-          ),
-        );
+          Loon.configure(
+            persistor: TestPersistor(
+              seedData: [],
+              onPersist: (docs) {
+                batches.add(docs);
+              },
+            ),
+          );
+          _flushPersistManagerOperation(async);
 
-        final userCollection = Loon.collection(
-          'users',
-          fromJson: TestUserModel.fromJson,
-          toJson: (user) => user.toJson(),
-        );
+          final userCollection = Loon.collection(
+            'users',
+            fromJson: TestUserModel.fromJson,
+            toJson: (user) => user.toJson(),
+          );
 
-        userCollection.doc('1').create(TestUserModel('User 1'));
-        userCollection.delete();
-        userCollection.doc('2').create(TestUserModel('User 2'));
+          userCollection.doc('1').create(TestUserModel('User 1'));
+          userCollection.delete();
+          userCollection.doc('2').create(TestUserModel('User 2'));
 
-        await TestPersistor.completer.onPersist;
-        await TestPersistor.completer.onClear;
-        await TestPersistor.completer.onPersist;
+          _flushPersistManagerOperation(async);
+          _flushPersistManagerOperation(async);
+          _flushPersistManagerOperation(async);
 
-        // There should be a separate persistence call for each document in this scenario since the operation
-        // order must be persist->clear->persist in order to ensure the correct sequencing of events.
-        expect(batches.length, 2);
-        expect(
-          batches.first,
-          {userCollection.doc('1')},
-        );
-        expect(batches.last, {userCollection.doc('2')});
+          // There should be a separate persistence call for each document in this scenario since the operation
+          // order must be persist->clear->persist in order to ensure the correct sequencing of events.
+          expect(batches.length, 2);
+          expect(
+            batches.first,
+            {userCollection.doc('1')},
+          );
+          expect(batches.last, {userCollection.doc('2')});
+        });
       },
     );
 
     test(
       'De-dupes persisting the same document',
-      () async {
-        List<Set<Document>> batches = [];
+      () {
+        fakeAsync((async) {
+          final batches = <Set<Document>>[];
 
-        Loon.configure(
-          persistor: TestPersistor(
-            seedData: [],
-            onPersist: (docs) {
-              batches.add(docs);
-            },
-          ),
-        );
+          Loon.configure(
+            persistor: TestPersistor(
+              seedData: [],
+              onPersist: (docs) {
+                batches.add(docs);
+              },
+            ),
+          );
+          _flushPersistManagerOperation(async);
 
-        final userCollection = Loon.collection(
-          'users',
-          fromJson: TestUserModel.fromJson,
-          toJson: (user) => user.toJson(),
-        );
+          final userCollection = Loon.collection(
+            'users',
+            fromJson: TestUserModel.fromJson,
+            toJson: (user) => user.toJson(),
+          );
 
-        userCollection.doc('1').create(TestUserModel('User 1'));
-        userCollection.doc('1').update(TestUserModel('User 1 updated'));
+          userCollection.doc('1').create(TestUserModel('User 1'));
+          userCollection.doc('1').update(TestUserModel('User 1 updated'));
 
-        await TestPersistor.completer.onPersist;
+          _flushPersistManagerOperation(async);
 
-        userCollection.doc('2').create(TestUserModel('User 2'));
+          userCollection.doc('2').create(TestUserModel('User 2'));
 
-        await TestPersistor.completer.onPersist;
+          _flushPersistManagerOperation(async);
 
-        expect(batches.length, 2);
+          expect(batches.length, 2);
 
-        // The multiple updates to user doc 1 are grouped and de-duped in the same batch. Persistors can read the current
-        // value of the documents in the batch so there is no need to include document updates again.
-        expect(batches.first, [userCollection.doc('1')]);
-        expect(batches.last, [userCollection.doc('2')]);
+          // The multiple updates to user doc 1 are grouped and de-duped in the same batch. Persistors can read the current
+          // value of the documents in the batch so there is no need to include document updates again.
+          expect(batches.first, [userCollection.doc('1')]);
+          expect(batches.last, [userCollection.doc('2')]);
+        });
       },
     );
 
     test(
       'Batches clearing of collections',
-      () async {
-        List<Set<StoreReference>> batches = [];
+      () {
+        fakeAsync((async) {
+          final batches = <Set<StoreReference>>[];
 
-        Loon.configure(
-          persistor: TestPersistor(
-            seedData: [],
-            onClear: (refs) {
-              batches.add(refs);
-            },
-          ),
-        );
+          Loon.configure(
+            persistor: TestPersistor(
+              seedData: [],
+              onClear: (refs) {
+                batches.add(refs);
+              },
+            ),
+          );
+          _flushPersistManagerOperation(async);
 
-        Loon.collection('users').doc('1').create(true);
-        Loon.collection('posts').doc('1').create(true);
-        Loon.collection('messages').doc('1').create(true);
+          Loon.collection('users').doc('1').create(true);
+          Loon.collection('posts').doc('1').create(true);
+          Loon.collection('messages').doc('1').create(true);
 
-        Loon.collection('users').delete();
-        Loon.collection('posts').delete();
+          Loon.collection('users').delete();
+          Loon.collection('posts').delete();
 
-        await TestPersistor.completer.onClear;
+          _flushPersistManagerOperation(async);
+          _flushPersistManagerOperation(async);
 
-        Loon.collection('messages').delete();
+          Loon.collection('messages').delete();
 
-        await TestPersistor.completer.onClear;
+          _flushPersistManagerOperation(async);
 
-        expect(batches.length, 2);
+          expect(batches.length, 2);
 
-        expect(batches.first, [
-          Loon.collection('users'),
-          Loon.collection('posts'),
-        ]);
-        expect(batches.last, [Loon.collection('messages')]);
+          expect(batches.first, [
+            Loon.collection('users'),
+            Loon.collection('posts'),
+          ]);
+          expect(batches.last, [Loon.collection('messages')]);
+        });
       },
     );
   });
