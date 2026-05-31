@@ -2,6 +2,8 @@ import 'dart:math';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:loon/loon.dart';
 
+import '../utils.dart';
+
 /// Equivalence fuzzer for [ObservableQuery].
 ///
 /// An observable query maintains its result incrementally: on each broadcast it
@@ -9,12 +11,12 @@ import 'package:loon/loon.dart';
 /// recomputing from scratch. The property under test is that this incremental
 /// result always equals a fresh full recompute of the same query
 /// (`Query.get()`), which filters and sorts the whole collection and is the
-/// obviously-correct oracle.
+/// simple oracle.
 ///
 /// Each test drives one long random walk of create/update/delete operations
-/// over a small id/value space — so documents repeatedly cross the filter
+/// over a small id/value space, so documents repeatedly cross the filter
 /// boundary, exercising the added/removed/modified transitions in
-/// `_onBroadcast` — and compares the value most recently emitted on the query's
+/// `_onBroadcast`, and compares the value most recently emitted on the query's
 /// stream against the oracle after every step. A failing case replays from its
 /// seed, sorted flag, and threshold.
 ///
@@ -39,14 +41,12 @@ List<String> _ordered(List<DocumentSnapshot<int>> snaps) =>
 List<String> _asSet(List<DocumentSnapshot<int>> snaps) =>
     _ordered(snaps)..sort();
 
-Future<void> _settle() => Future.delayed(const Duration(milliseconds: 1));
-
 Future<void> _reset() async {
   Loon.unsubscribe();
   // broadcast: false so the reset doesn't schedule a broadcast that could
   // race the next test's observer.
   await Loon.clearAll(broadcast: false);
-  await _settle();
+  await asyncEvent();
 }
 
 Future<void> _walk({
@@ -66,7 +66,7 @@ Future<void> _walk({
 
   final emissions = <List<DocumentSnapshot<int>>>[];
   final sub = obs.stream().listen(emissions.add);
-  await _settle();
+  await asyncEvent();
 
   final present = <String>{};
   for (var round = 0; round < rounds; round++) {
@@ -83,7 +83,7 @@ Future<void> _walk({
       }
     }
 
-    await _settle();
+    await asyncEvent();
 
     final oracle =
         (sorted ? col.where(filter).sortBy(_cmp) : col.where(filter)).get();
@@ -103,15 +103,61 @@ Future<void> _walk({
 void main() {
   tearDown(_reset);
 
+  test('Coalesced delete and recreate evicts a cached query result', () async {
+    await _reset();
+
+    final col = Loon.collection<int>('items');
+    final doc = col.doc('1');
+    doc.create(5);
+    await asyncEvent();
+
+    final query = col.where((snap) => snap.data >= 4).observe();
+    final emissions = <List<DocumentSnapshot<int>>>[];
+    final changes = <List<DocumentChangeSnapshot<int>>>[];
+    final valueSub = query.stream().listen(emissions.add);
+    final changeSub = query.streamChanges().listen(changes.add);
+    await asyncEvent();
+
+    try {
+      expect(_ordered(emissions.last), ['1=5']);
+
+      doc.delete();
+      doc.create(0);
+      await asyncEvent();
+
+      expect(_ordered(emissions.last), isEmpty);
+      expect(changes, [
+        [
+          DocumentChangeSnapshot<int>(
+            doc: doc,
+            data: null,
+            event: BroadcastEvents.removed,
+            prevData: 5,
+          ),
+        ],
+      ]);
+    } finally {
+      await valueSub.cancel();
+      await changeSub.cancel();
+    }
+  });
+
   group('ObservableQuery equivalence', () {
     // A spread of selectivities: low threshold (most docs pass), middle, and
     // high (most fail), for both sorted and unsorted queries.
     for (final sorted in [true, false]) {
       for (final threshold in [1, 4, 8]) {
-        test('${sorted ? 'sorted' : 'unsorted'} query, threshold $threshold '
-            'matches a full recompute', () async {
-          await _walk(sorted: sorted, seed: 1000 + threshold, threshold: threshold);
-        });
+        test(
+          '${sorted ? 'sorted' : 'unsorted'} query, threshold $threshold '
+          'matches a full recompute',
+          () async {
+            await _walk(
+              sorted: sorted,
+              seed: 1000 + threshold,
+              threshold: threshold,
+            );
+          },
+        );
       }
     }
   });
