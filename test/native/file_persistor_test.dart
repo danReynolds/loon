@@ -20,7 +20,7 @@ late Directory testDirectory;
 class MockPathProvider extends Fake
     with MockPlatformInterfaceMixin
     implements PathProviderPlatform {
-  getApplicationDocumentsDirectory() {
+  Directory getApplicationDocumentsDirectory() {
     return testDirectory;
   }
 
