@@ -1,9 +1,10 @@
 import 'dart:math';
 import 'dart:typed_data';
 
-// 64-characters (2^6)
+// 64 characters (2^6). This intentionally excludes "_" because Loon paths use
+// "__" as their segment delimiter.
 const String _alphabet =
-    '_-0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    '-0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ~';
 final Uint8List _alphabytes = Uint8List.fromList(_alphabet.codeUnits);
 const int _u32 = 0x100000000; // 2^32
 
