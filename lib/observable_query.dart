@@ -143,6 +143,24 @@ class ObservableQuery<T> extends Query<T>
                   ),
                 );
               }
+            } else if (_snapCache.containsKey(doc)) {
+              // The document was in the result set but a delete + recreate that
+              // coalesced into a single added event (or a re-add) now fails the
+              // filter, so the stale entry must be evicted.
+              _evictDoc(doc);
+
+              shouldRebroadcast = true;
+
+              if (hasChangeListener) {
+                changeSnaps.add(
+                  DocumentChangeSnapshot(
+                    doc: doc,
+                    event: BroadcastEvents.removed,
+                    prevData: prevSnap?.data,
+                    data: null,
+                  ),
+                );
+              }
             }
             break;
           case BroadcastEvents.removed:
