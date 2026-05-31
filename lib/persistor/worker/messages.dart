@@ -5,7 +5,7 @@ import 'package:loon/utils/id.dart';
 abstract class Message {}
 
 abstract class MessageRequest<T extends MessageResponse> extends Message {
-  final id = generateInternalId();
+  final id = generateProcessLocalId();
 
   MessageRequest();
 

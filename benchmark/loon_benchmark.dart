@@ -56,8 +56,8 @@ void main() {
   test('ID generation', () {
     const n = 100000;
     for (final entry in {
-      'generateId (secure)': generateId,
-      'generateInternalId': generateInternalId,
+      'generateSecureId': generateSecureId,
+      'generateProcessLocalId': generateProcessLocalId,
     }.entries) {
       final gen = entry.value;
       final sw = Stopwatch()..start();

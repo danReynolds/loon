@@ -7,15 +7,16 @@ const String _alphabet =
 final Uint8List _alphabytes = Uint8List.fromList(_alphabet.codeUnits);
 const int _u32 = 0x100000000; // 2^32
 
-final Random _secureRand = Random.secure();
-final Random _fastRand = Random();
+final Random _secureRandom = Random.secure();
+final Random _processLocalRandom = Random();
 
-String _generate(Random rand, int size) {
+String _generateRandomId(Random random, int size) {
   final out = Uint8List(size);
   var i = 0;
 
   while (i < size) {
-    int r = rand.nextInt(_u32); // A u32 can sample 5-characters (2^6)*5, 2 bits leftover.
+    // A u32 can sample 5 characters ((2^6) * 5), with 2 bits leftover.
+    int r = random.nextInt(_u32);
 
     var k = 0;
     while (k < 5 && i < size) {
@@ -31,9 +32,14 @@ String _generate(Random rand, int size) {
 
 /// Generates a cryptographically secure, URL-safe random ID.
 /// Default: 21 chars ≈ 126 bits of entropy.
-String generateId([int size = 21]) => _generate(_secureRand, size);
+String generateSecureId([int size = 21]) =>
+    _generateRandomId(_secureRandom, size);
+
+/// Backward-compatible alias for [generateSecureId].
+String generateId([int size = 21]) => generateSecureId(size);
 
 /// Generates a URL-safe random ID from a non-cryptographic PRNG, for internal
-/// identifiers that only need process-local uniqueness (e.g. observer IDs).
-/// Drawing from the OS CSPRNG via [generateId] is needless overhead there.
-String generateInternalId([int size = 21]) => _generate(_fastRand, size);
+/// identifiers that only need process-local uniqueness.
+/// Drawing from the OS CSPRNG via [generateSecureId] is needless overhead there.
+String generateProcessLocalId([int size = 21]) =>
+    _generateRandomId(_processLocalRandom, size);
