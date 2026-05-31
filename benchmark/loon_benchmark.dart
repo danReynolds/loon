@@ -1,5 +1,7 @@
 // ignore_for_file: avoid_print
 
+import 'dart:async';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:loon/loon.dart';
 import 'package:loon/utils/id.dart';
@@ -13,18 +15,16 @@ import 'package:loon/utils/id.dart';
 /// current machine and only meaningful relative to each other / across runs.
 void main() {
   setUp(() async {
-    await Loon.clearAll();
-    Loon.unsubscribe();
+    await _resetStore();
   });
 
   tearDownAll(() async {
-    await Loon.clearAll();
-    Loon.unsubscribe();
+    await _resetStore();
   });
 
-  test('Write throughput (broadcast off)', () {
+  test('Write throughput (broadcast off)', () async {
     for (final n in [1000, 10000, 50000]) {
-      Loon.clearAll();
+      await _resetStore();
       final col = Loon.collection<int>('bench');
       final sw = Stopwatch()..start();
       for (var i = 0; i < n; i++) {
@@ -79,7 +79,7 @@ void main() {
       col.doc('doc_$i').create(i, broadcast: false, persist: false);
     }
 
-    final subs = <dynamic>[];
+    final subs = <StreamSubscription<DocumentSnapshot<int>?>>[];
     final sw = Stopwatch()..start();
     for (var i = 0; i < n; i++) {
       subs.add(col.doc('doc_$i').observe().stream().listen((_) {}));
@@ -103,8 +103,7 @@ void main() {
     print('  ${'N observers'.padRight(14)} ${'µs/broadcast'.padLeft(14)}');
 
     for (final n in [0, 100, 1000, 5000]) {
-      await Loon.clearAll();
-      Loon.unsubscribe();
+      await _resetStore();
 
       final col = Loon.collection<int>('obs');
 
@@ -141,7 +140,8 @@ void main() {
       }
 
       final perBroadcast = sw.elapsedMicroseconds / rounds;
-      print('  ${n.toString().padRight(14)} ${perBroadcast.toStringAsFixed(1).padLeft(14)}');
+      print(
+          '  ${n.toString().padRight(14)} ${perBroadcast.toStringAsFixed(1).padLeft(14)}');
     }
   });
 
@@ -155,8 +155,7 @@ void main() {
     print('  ${'M docs'.padRight(14)} ${'µs/update'.padLeft(14)}');
 
     for (final m in [100, 1000, 10000]) {
-      await Loon.clearAll();
-      Loon.unsubscribe();
+      await _resetStore();
 
       final col = Loon.collection<int>('q');
       for (var i = 0; i < m; i++) {
@@ -182,9 +181,15 @@ void main() {
       await sub.cancel();
 
       final perUpdate = sw.elapsedMicroseconds / rounds;
-      print('  ${m.toString().padRight(14)} ${perUpdate.toStringAsFixed(1).padLeft(14)}');
+      print(
+          '  ${m.toString().padRight(14)} ${perUpdate.toStringAsFixed(1).padLeft(14)}');
     }
   });
+}
+
+Future<void> _resetStore() async {
+  Loon.unsubscribe();
+  await Loon.clearAll(broadcast: false);
 }
 
 void _report(String name, int ops, int micros) {
