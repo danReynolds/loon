@@ -171,14 +171,9 @@ void main() {
         });
       });
 
-      test('Dec of a path that became transient removes it fully', () {
-        // Regression: inc'ing a path and a descendant, then dec'ing the
-        // descendant, leaves the path as a transient node. Dec'ing the path
-        // itself must remove it; previously the Map branch of `_dec` signalled
-        // removal via a return value that the top-level `dec` ignored, so the
-        // node lingered (has stayed true) and ref counts leaked. A second live
-        // path keeps the root ref count above 1 so the early return doesn't
-        // mask the bug.
+      test('Dec of a map-backed path removes the empty node', () {
+        // The extra live sibling keeps the root ref count above 1 so this
+        // exercises the child-map branch rather than the root clear path.
         final store = PathRefStore();
         store.inc('c');
         store.inc('c__c');
