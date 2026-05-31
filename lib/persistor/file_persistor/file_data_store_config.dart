@@ -14,9 +14,16 @@ import 'package:loon/persistor/data_store_resolver.dart';
 ///
 /// The `.tmp` suffix is deliberately not matched by the data store file listing
 /// (`fileRegex` in the worker), so a temp file orphaned by an interrupted write
-/// is ignored and overwritten on the next write rather than loaded as a store.
+/// is ignored and deleted before the next write to the same target rather than
+/// loaded as a store.
 Future<void> _writeFileAtomic(File file, String contents) async {
   final tmpFile = File('${file.path}.tmp');
+
+  try {
+    await tmpFile.delete();
+  } on PathNotFoundException {
+    // No stale temp file from a previous interrupted write.
+  }
 
   try {
     final raf = await tmpFile.open(mode: FileMode.writeOnly);
@@ -32,7 +39,7 @@ Future<void> _writeFileAtomic(File file, String contents) async {
     await tmpFile.rename(file.path);
   } catch (_) {
     // Best-effort cleanup for normal write failures. This will not run after a
-    // process crash; startup cleanup in the file worker handles those leftovers.
+    // process crash; the next write to this target removes the stale temp file.
     try {
       await tmpFile.delete();
     } on FileSystemException {

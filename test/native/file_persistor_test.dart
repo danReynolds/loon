@@ -105,16 +105,31 @@ void main() {
       expect(fileRegex.hasMatch('__store__.json.tmp'), false);
     });
 
-    test('Cleans orphaned .tmp files on startup', () async {
-      final orphanedStoreTmp = File('${loonDir.path}/users.json.tmp');
+    test('Cleans orphaned .tmp files before rewriting their targets', () async {
+      final orphanedStoreTmp = File('${loonDir.path}/custom_store.json.tmp');
       final orphanedResolverTmp = File('${loonDir.path}/__resolver__.json.tmp');
       await orphanedStoreTmp.writeAsString('partial store write');
       await orphanedResolverTmp.writeAsString('partial resolver write');
 
+      final synced = Completer<void>();
       Loon.configure(
-        persistor: FilePersistor(encrypter: encrypter),
+        persistor: FilePersistor(
+          persistenceThrottle: const Duration(milliseconds: 1),
+          encrypter: encrypter,
+          onSync: () {
+            if (!synced.isCompleted) synced.complete();
+          },
+        ),
       );
-      await Loon.hydrate();
+
+      final users = Loon.collection<Json>(
+        'users',
+        persistorSettings: PersistorSettings(
+          key: Persistor.key('custom_store'),
+        ),
+      );
+      users.doc('1').create({'name': 'User 1'});
+      await synced.future;
 
       expect(await orphanedStoreTmp.exists(), false);
       expect(await orphanedResolverTmp.exists(), false);

@@ -9,26 +9,6 @@ import 'package:path/path.dart' as path;
 
 final fileRegex = RegExp(r'^(?!__resolver__)(\w+?)(?:.encrypted)?\.json$');
 
-Future<void> _deleteTempFiles(Directory directory) async {
-  try {
-    final tmpFiles = directory
-        .listSync()
-        .whereType<File>()
-        .where((file) => path.basename(file.path).endsWith('.tmp'));
-
-    await Future.wait(tmpFiles.map((file) async {
-      try {
-        await file.delete();
-      } on FileSystemException {
-        // Stale temp files are ignored by hydration, so cleanup should not
-        // prevent startup if a file is already gone or cannot be removed.
-      }
-    }));
-  } on PathNotFoundException {
-    return;
-  }
-}
-
 class FilePersistorWorkerConfig extends PersistorWorkerConfig {
   final Directory directory;
 
@@ -86,7 +66,6 @@ class FilePersistorWorker extends PersistorWorker<FilePersistorWorkerConfig> {
 
   @override
   init() async {
-    await _deleteTempFiles(config.directory);
     await _manager.init();
   }
 
