@@ -3,7 +3,6 @@ import 'dart:io';
 import 'package:loon/loon.dart';
 import 'package:loon/persistor/data_store.dart';
 import 'package:loon/persistor/data_store_resolver.dart';
-import 'package:pointycastle/api.dart' show InvalidCipherTextException;
 
 void _logHydrationFailure(
   File file,
@@ -111,8 +110,20 @@ class FileDataStoreConfig extends DataStoreConfig {
           hydrate: () async {
             try {
               final value = await file.readAsString();
+              String contents;
+              if (encrypted) {
+                try {
+                  contents = encrypter.decrypt(value);
+                } catch (error, stackTrace) {
+                  await _recoverCorruptFile(file, logger, error, stackTrace);
+                  return null;
+                }
+              } else {
+                contents = value;
+              }
+
               final json = _decodeJsonObject(
-                encrypted ? encrypter.decrypt(value) : value,
+                contents,
                 'persisted data store',
               );
               final store = ValueStore<ValueStore>();
@@ -135,15 +146,6 @@ class FileDataStoreConfig extends DataStoreConfig {
               _logHydrationFailure(file, logger, error, stackTrace);
               return null;
             } on FormatException catch (error, stackTrace) {
-              await _recoverCorruptFile(file, logger, error, stackTrace);
-              return null;
-            } on InvalidCipherTextException catch (error, stackTrace) {
-              await _recoverCorruptFile(file, logger, error, stackTrace);
-              return null;
-            } on ArgumentError catch (error, stackTrace) {
-              if (!encrypted) {
-                rethrow;
-              }
               await _recoverCorruptFile(file, logger, error, stackTrace);
               return null;
             }
@@ -180,12 +182,6 @@ class FileDataStoreResolverConfig extends DataStoreResolverConfig {
                 ),
               );
             } on PathNotFoundException {
-              return null;
-            } on FileSystemException catch (error, stackTrace) {
-              _logHydrationFailure(file, logger, error, stackTrace);
-              return null;
-            } on FormatException catch (error, stackTrace) {
-              await _recoverCorruptFile(file, logger, error, stackTrace);
               return null;
             }
           },

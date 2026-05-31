@@ -224,22 +224,27 @@ void main() {
       );
     });
 
-    test('A corrupt resolver file does not fail hydration', () async {
+    test('A corrupt resolver file fails hydration', () async {
       await writeDefaultStore();
       await File('${loonDir.path}/__resolver__.json')
           .writeAsString('}{ broken');
 
-      Loon.configure(persistor: newPersistor());
-
-      await Loon.hydrate();
+      await expectLater(
+        newPersistor().init(),
+        throwsA(
+          predicate(
+            (error) => error.toString().contains('FormatException'),
+          ),
+        ),
+      );
 
       expect(
-        Loon.collection<Json>('users').doc('1').get()?.data,
-        {"name": "User 1"},
+        await File('${loonDir.path}/__resolver__.json').exists(),
+        true,
       );
       expect(
         await File('${loonDir.path}/__resolver__.json.corrupt').exists(),
-        true,
+        false,
       );
     });
   });

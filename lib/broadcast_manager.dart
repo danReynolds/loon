@@ -38,6 +38,13 @@ class BroadcastManager {
 
   /// Whether the broadcast store is dirty and has a pending broadcast scheduled.
   bool _pendingBroadcast = false;
+  Timer? _broadcastTimer;
+
+  void _cancelBroadcast() {
+    _broadcastTimer?.cancel();
+    _broadcastTimer = null;
+    _pendingBroadcast = false;
+  }
 
   void _scheduleBroadcast() {
     if (!_pendingBroadcast) {
@@ -45,11 +52,13 @@ class BroadcastManager {
 
       // The broadcast is run async so that multiple broadcast events can be batched
       // together into one update across all changes that occur in the current task of the event loop.
-      Future.delayed(Duration.zero, _broadcast);
+      _broadcastTimer = Timer(Duration.zero, _broadcast);
     }
   }
 
   void _broadcast() {
+    _broadcastTimer = null;
+
     _depObservers.clear();
 
     for (final observer in _observers.toList()) {
@@ -136,6 +145,7 @@ class BroadcastManager {
   }
 
   void clear({bool broadcast = true}) {
+    _cancelBroadcast();
     eventStore.clear();
     observerValueStore.clear();
 
@@ -166,6 +176,8 @@ class BroadcastManager {
   }
 
   void unsubscribe() {
+    _cancelBroadcast();
+    eventStore.clear();
     for (final observer in _observers.toList()) {
       observer.dispose();
     }

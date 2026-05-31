@@ -16,7 +16,6 @@ void main() {
       });
 
       tearDown(() async {
-        await Future<void>.delayed(Duration.zero);
         Loon.unsubscribe();
         await Loon.clearAll(broadcast: false);
       });

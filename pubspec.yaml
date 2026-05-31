@@ -14,7 +14,6 @@ dependencies:
   flutter_secure_storage: ^10.0.0
   path: ^1.8.3
   path_provider: ^2.1.5
-  pointycastle: ^3.9.1
   web: ^1.1.0
   sqflite: ^2.4.1
   sqflite_common_ffi: ^2.3.4

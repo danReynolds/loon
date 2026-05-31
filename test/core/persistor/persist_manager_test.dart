@@ -6,10 +6,6 @@ import '../../models/test_persistor.dart';
 import '../../models/test_user_model.dart';
 import '../../utils.dart';
 
-void _flushPersistManagerOperation(FakeAsync async) {
-  elapseAndFlush(async, const Duration(milliseconds: 1));
-}
-
 void main() {
   tearDown(() async {
     Loon.configure(persistor: null);
@@ -34,7 +30,7 @@ void main() {
               },
             ),
           );
-          _flushPersistManagerOperation(async);
+          elapseAndFlush(async, const Duration(milliseconds: 1));
 
           final userCollection = Loon.collection(
             'users',
@@ -45,11 +41,11 @@ void main() {
           userCollection.doc('1').create(TestUserModel('User 1'));
           userCollection.doc('2').create(TestUserModel('User 2'));
 
-          _flushPersistManagerOperation(async);
+          elapseAndFlush(async, const Duration(milliseconds: 1));
 
           userCollection.doc('3').create(TestUserModel('User 3'));
 
-          _flushPersistManagerOperation(async);
+          elapseAndFlush(async, const Duration(milliseconds: 1));
 
           // There should be two persistence calls:
           // 1. The first two writes should be grouped together into a single batch in the first 1ms throttle.
@@ -81,7 +77,7 @@ void main() {
               },
             ),
           );
-          _flushPersistManagerOperation(async);
+          elapseAndFlush(async, const Duration(milliseconds: 1));
 
           final userCollection = Loon.collection(
             'users',
@@ -93,9 +89,9 @@ void main() {
           userCollection.delete();
           userCollection.doc('2').create(TestUserModel('User 2'));
 
-          _flushPersistManagerOperation(async);
-          _flushPersistManagerOperation(async);
-          _flushPersistManagerOperation(async);
+          elapseAndFlush(async, const Duration(milliseconds: 1));
+          elapseAndFlush(async, const Duration(milliseconds: 1));
+          elapseAndFlush(async, const Duration(milliseconds: 1));
 
           // There should be a separate persistence call for each document in this scenario since the operation
           // order must be persist->clear->persist in order to ensure the correct sequencing of events.
@@ -123,7 +119,7 @@ void main() {
               },
             ),
           );
-          _flushPersistManagerOperation(async);
+          elapseAndFlush(async, const Duration(milliseconds: 1));
 
           final userCollection = Loon.collection(
             'users',
@@ -134,11 +130,11 @@ void main() {
           userCollection.doc('1').create(TestUserModel('User 1'));
           userCollection.doc('1').update(TestUserModel('User 1 updated'));
 
-          _flushPersistManagerOperation(async);
+          elapseAndFlush(async, const Duration(milliseconds: 1));
 
           userCollection.doc('2').create(TestUserModel('User 2'));
 
-          _flushPersistManagerOperation(async);
+          elapseAndFlush(async, const Duration(milliseconds: 1));
 
           expect(batches.length, 2);
 
@@ -164,7 +160,7 @@ void main() {
               },
             ),
           );
-          _flushPersistManagerOperation(async);
+          elapseAndFlush(async, const Duration(milliseconds: 1));
 
           Loon.collection('users').doc('1').create(true);
           Loon.collection('posts').doc('1').create(true);
@@ -173,12 +169,12 @@ void main() {
           Loon.collection('users').delete();
           Loon.collection('posts').delete();
 
-          _flushPersistManagerOperation(async);
-          _flushPersistManagerOperation(async);
+          elapseAndFlush(async, const Duration(milliseconds: 1));
+          elapseAndFlush(async, const Duration(milliseconds: 1));
 
           Loon.collection('messages').delete();
 
-          _flushPersistManagerOperation(async);
+          elapseAndFlush(async, const Duration(milliseconds: 1));
 
           expect(batches.length, 2);
 
