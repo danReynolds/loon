@@ -109,12 +109,11 @@ class PathRefStore {
         node[segment]--;
       }
     } else if (node[segment] is Map) {
-      // If this is the last reference to the child node, then remove the ref key from the child,
-      // marking that it is now purely a transient node.
-      if (node[segment][_refKey] == 1) {
-        return true;
+      final Map child = node[segment];
+      if (child[_refKey] == 1) {
+        node.remove(segment);
       } else {
-        node[segment][_refKey]--;
+        child[_refKey]--;
       }
     }
 
@@ -125,9 +124,6 @@ class PathRefStore {
 
   /// Decrements the ref count to the node at the given path, removing it if it was the last reference to the node.
   void dec(String path) {
-    // `_dec` assumes every node it walks carries a `_refKey`; without this
-    // guard an untracked path would still decrement (and potentially clear)
-    // ancestors that share a prefix.
     if (!has(path)) {
       return;
     }
@@ -152,15 +148,14 @@ class PathRefStore {
     return node.containsKey(segment);
   }
 
-  /// Returns whether the path exists in the store.
+  /// Returns whether the path or any descendant path exists in the store.
   ///
   /// Example:
   /// ```dart
   /// final refStore = PathRefStore();
   /// refStore.inc('users__1__posts__2');
   /// refStore.has('users__1__posts__2') // true
-  /// refStore.has('users__1') // false
-  /// refStore.hasPath('users__1') // true
+  /// refStore.has('users__1') // true
   ///
   /// ```
   bool has(String path) {
