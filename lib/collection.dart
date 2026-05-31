@@ -89,7 +89,7 @@ class Collection<T> implements Queryable<T>, StoreReference {
   Document<T> doc([String? id]) {
     return Document<T>(
       path,
-      id ?? generateId(),
+      id ?? generateSecureId(),
       fromJson: fromJson,
       toJson: toJson,
       persistorSettings: persistorSettings,
