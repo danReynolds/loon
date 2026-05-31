@@ -57,7 +57,7 @@ void main() {
     const n = 100000;
     for (final entry in {
       'generateSecureId': generateSecureId,
-      'generateProcessLocalId': generateProcessLocalId,
+      'generateFastId': generateFastId,
     }.entries) {
       final gen = entry.value;
       final sw = Stopwatch()..start();

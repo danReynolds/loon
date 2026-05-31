@@ -8,7 +8,7 @@ final Uint8List _alphabytes = Uint8List.fromList(_alphabet.codeUnits);
 const int _u32 = 0x100000000; // 2^32
 
 final Random _secureRandom = Random.secure();
-final Random _processLocalRandom = Random();
+final Random _fastRandom = Random();
 
 String _generateRandomId(Random random, int size) {
   final out = Uint8List(size);
@@ -30,16 +30,18 @@ String _generateRandomId(Random random, int size) {
   return String.fromCharCodes(out);
 }
 
-/// Generates a cryptographically secure, URL-safe random ID.
-/// Default: 21 chars ≈ 126 bits of entropy.
+/// Generates a cryptographically secure, URL-safe random ID for values that may
+/// be user-visible, persisted, synced, or treated as unguessable by callers.
+///
+/// Use this for document IDs and other public identifiers.
+/// Default: 21 chars, about 126 bits of entropy.
 String generateSecureId([int size = 21]) =>
     _generateRandomId(_secureRandom, size);
 
-/// Backward-compatible alias for [generateSecureId].
-String generateId([int size = 21]) => generateSecureId(size);
-
-/// Generates a URL-safe random ID from a non-cryptographic PRNG, for internal
-/// identifiers that only need process-local uniqueness.
-/// Drawing from the OS CSPRNG via [generateSecureId] is needless overhead there.
-String generateProcessLocalId([int size = 21]) =>
-    _generateRandomId(_processLocalRandom, size);
+/// Generates a URL-safe random ID from a non-cryptographic PRNG.
+///
+/// Use this only for ephemeral internal identifiers that need local uniqueness
+/// but do not need to be hard to guess, such as observer IDs or request
+/// correlation IDs. Do not use it for document IDs, access tokens, or other
+/// public identifiers where unpredictability matters.
+String generateFastId([int size = 21]) => _generateRandomId(_fastRandom, size);
