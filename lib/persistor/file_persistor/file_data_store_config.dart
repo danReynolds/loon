@@ -18,17 +18,28 @@ import 'package:loon/persistor/data_store_resolver.dart';
 Future<void> _writeFileAtomic(File file, String contents) async {
   final tmpFile = File('${file.path}.tmp');
 
-  final raf = await tmpFile.open(mode: FileMode.writeOnly);
   try {
-    await raf.writeString(contents);
-    // Flush the data to disk before the rename so the rename can't expose an
-    // empty/partial file after a power loss.
-    await raf.flush();
-  } finally {
-    await raf.close();
-  }
+    final raf = await tmpFile.open(mode: FileMode.writeOnly);
+    try {
+      await raf.writeString(contents);
+      // Flush the data to disk before the rename so the rename can't expose an
+      // empty/partial file after a power loss.
+      await raf.flush();
+    } finally {
+      await raf.close();
+    }
 
-  await tmpFile.rename(file.path);
+    await tmpFile.rename(file.path);
+  } catch (_) {
+    // Best-effort cleanup for normal write failures. This will not run after a
+    // process crash; startup cleanup in the file worker handles those leftovers.
+    try {
+      await tmpFile.delete();
+    } on FileSystemException {
+      // Preserve the original write error if cleanup also fails.
+    }
+    rethrow;
+  }
 }
 
 class FileDataStoreConfig extends DataStoreConfig {

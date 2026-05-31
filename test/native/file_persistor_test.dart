@@ -104,5 +104,20 @@ void main() {
       expect(fileRegex.hasMatch('users.json.tmp'), false);
       expect(fileRegex.hasMatch('__store__.json.tmp'), false);
     });
+
+    test('Cleans orphaned .tmp files on startup', () async {
+      final orphanedStoreTmp = File('${loonDir.path}/users.json.tmp');
+      final orphanedResolverTmp = File('${loonDir.path}/__resolver__.json.tmp');
+      await orphanedStoreTmp.writeAsString('partial store write');
+      await orphanedResolverTmp.writeAsString('partial resolver write');
+
+      Loon.configure(
+        persistor: FilePersistor(encrypter: encrypter),
+      );
+      await Loon.hydrate();
+
+      expect(await orphanedStoreTmp.exists(), false);
+      expect(await orphanedResolverTmp.exists(), false);
+    });
   });
 }
