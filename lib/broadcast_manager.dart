@@ -36,20 +36,18 @@ class BroadcastManager {
   /// The subset of broadcast observers from [_observers] with dependencies.
   final Set<BroadcastObserver> _depObservers = {};
 
-  /// Whether the broadcast store is dirty and has a pending broadcast scheduled.
-  bool _pendingBroadcast = false;
+  /// Non-null while a broadcast is scheduled or currently draining.
   Timer? _broadcastTimer;
+
+  bool get _pendingBroadcast => _broadcastTimer != null;
 
   void _cancelBroadcast() {
     _broadcastTimer?.cancel();
     _broadcastTimer = null;
-    _pendingBroadcast = false;
   }
 
   void _scheduleBroadcast() {
     if (!_pendingBroadcast) {
-      _pendingBroadcast = true;
-
       // The broadcast is run async so that multiple broadcast events can be batched
       // together into one update across all changes that occur in the current task of the event loop.
       _broadcastTimer = Timer(Duration.zero, _broadcast);
@@ -57,8 +55,6 @@ class BroadcastManager {
   }
 
   void _broadcast() {
-    _broadcastTimer = null;
-
     _depObservers.clear();
 
     for (final observer in _observers.toList()) {
@@ -72,7 +68,7 @@ class BroadcastManager {
     }
 
     eventStore.clear();
-    _pendingBroadcast = false;
+    _broadcastTimer = null;
   }
 
   /// Schedules all dependents of the given document for broadcast.
