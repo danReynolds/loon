@@ -4,6 +4,45 @@ import 'package:loon/loon.dart';
 import 'package:loon/persistor/data_store.dart';
 import 'package:loon/persistor/data_store_resolver.dart';
 
+/// Writes [contents] to [file] atomically: the data is written to a sibling
+/// temporary file, flushed to disk, then renamed over the target. A rename on
+/// the same filesystem is atomic, so an interrupted write (crash, OOM kill,
+/// power loss) can never leave the target torn — it always holds either the
+/// complete previous contents or the complete new contents. A plain
+/// `writeAsString` truncates the target up front, leaving a window where a
+/// crash corrupts it.
+///
+/// The `.tmp` suffix is deliberately not matched by the data store file listing
+/// (`fileRegex` in the worker), so a temp file orphaned by an interrupted write
+/// is ignored and overwritten by the next write to the same target rather than
+/// loaded as a store.
+Future<void> _writeFileAtomic(File file, String contents) async {
+  final tmpFile = File('${file.path}.tmp');
+
+  try {
+    final raf = await tmpFile.open(mode: FileMode.writeOnly);
+    try {
+      await raf.writeString(contents);
+      // Flush the data to disk before the rename so the rename can't expose an
+      // empty/partial file after a power loss.
+      await raf.flush();
+    } finally {
+      await raf.close();
+    }
+
+    await tmpFile.rename(file.path);
+  } catch (_) {
+    // Best-effort cleanup for normal write failures. This will not run after a
+    // process crash; the next write to this target overwrites the stale temp.
+    try {
+      await tmpFile.delete();
+    } on FileSystemException {
+      // Preserve the original write error if cleanup also fails.
+    }
+    rethrow;
+  }
+}
+
 class FileDataStoreConfig extends DataStoreConfig {
   FileDataStoreConfig(
     super.name, {
@@ -34,7 +73,8 @@ class FileDataStoreConfig extends DataStoreConfig {
           persist: (store) async {
             final value = jsonEncode(store.extract());
 
-            await file.writeAsString(
+            await _writeFileAtomic(
+              file,
               encrypted ? encrypter.encrypt(value) : value,
             );
           },
@@ -61,7 +101,8 @@ class FileDataStoreResolverConfig extends DataStoreResolverConfig {
               return null;
             }
           },
-          persist: (store) => file.writeAsString(jsonEncode(store.inspect())),
+          persist: (store) =>
+              _writeFileAtomic(file, jsonEncode(store.inspect())),
           delete: () async {
             try {
               await file.delete();
