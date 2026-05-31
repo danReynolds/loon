@@ -43,23 +43,6 @@ Future<void> _recoverCorruptFile(
   }
 }
 
-Json _decodeJsonObject(String value, String description) {
-  final decoded = jsonDecode(value);
-  if (decoded is! Json) {
-    throw FormatException('Expected $description to be a JSON object.');
-  }
-
-  return decoded;
-}
-
-Json _readNestedJsonObject(Object? value, String description) {
-  if (value is! Json) {
-    throw FormatException('Expected $description to be a JSON object.');
-  }
-
-  return value;
-}
-
 /// Writes [contents] to [file] atomically: the data is written to a sibling
 /// temporary file, flushed to disk, then renamed over the target. A rename on
 /// the same filesystem is atomic, so an interrupted write (crash, OOM kill,
@@ -122,20 +105,12 @@ class FileDataStoreConfig extends DataStoreConfig {
                 contents = value;
               }
 
-              final json = _decodeJsonObject(
-                contents,
-                'persisted data store',
-              );
+              final json = jsonDecode(contents);
               final store = ValueStore<ValueStore>();
 
               for (final entry in json.entries) {
                 final resolverPath = entry.key;
-                final valueStore = ValueStore.fromJson(
-                  _readNestedJsonObject(
-                    entry.value,
-                    'persisted data store entry "$resolverPath"',
-                  ),
-                );
+                final valueStore = ValueStore.fromJson(entry.value);
                 store.write(resolverPath, valueStore);
               }
 
@@ -175,12 +150,8 @@ class FileDataStoreResolverConfig extends DataStoreResolverConfig {
   }) : super(
           hydrate: () async {
             try {
-              return ValueRefStore<String>(
-                _decodeJsonObject(
-                  await file.readAsString(),
-                  'persisted resolver',
-                ),
-              );
+              final json = jsonDecode(await file.readAsString());
+              return ValueRefStore<String>(json);
             } on PathNotFoundException {
               return null;
             }
