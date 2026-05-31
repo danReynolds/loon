@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:loon/loon.dart';
 import 'package:loon/persistor/data_store.dart';
 import 'package:loon/persistor/data_store_resolver.dart';
+import 'package:pointycastle/api.dart' show InvalidCipherTextException;
 
 void _logHydrationFailure(
   File file,
@@ -58,11 +59,6 @@ Json _readNestedJsonObject(Object? value, String description) {
   }
 
   return value;
-}
-
-bool _isInvalidCipherTextException(Object error) {
-  // encrypt wraps PointyCastle without exposing its exception types.
-  return error.runtimeType.toString() == 'InvalidCipherTextException';
 }
 
 /// Writes [contents] to [file] atomically: the data is written to a sibling
@@ -141,14 +137,11 @@ class FileDataStoreConfig extends DataStoreConfig {
             } on FormatException catch (error, stackTrace) {
               await _recoverCorruptFile(file, logger, error, stackTrace);
               return null;
-            } on ArgumentError catch (error, stackTrace) {
-              if (!encrypted) {
-                rethrow;
-              }
+            } on InvalidCipherTextException catch (error, stackTrace) {
               await _recoverCorruptFile(file, logger, error, stackTrace);
               return null;
-            } on Exception catch (error, stackTrace) {
-              if (!encrypted || !_isInvalidCipherTextException(error)) {
+            } on ArgumentError catch (error, stackTrace) {
+              if (!encrypted) {
                 rethrow;
               }
               await _recoverCorruptFile(file, logger, error, stackTrace);
