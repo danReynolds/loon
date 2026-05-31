@@ -74,51 +74,6 @@ class PathRefStore {
     _inc(_store, path.split(delimiter));
   }
 
-  int _refCount(Object? value) {
-    if (value is int) {
-      return value;
-    }
-    if (value is Map) {
-      return value[_refKey] as int? ?? 0;
-    }
-    return 0;
-  }
-
-  int _directRefCount(Map node) {
-    final refCount = node[_refKey] as int? ?? 0;
-    final descendantRefCount = node.entries
-        .where((entry) => entry.key != _refKey)
-        .fold<int>(0, (sum, entry) => sum + _refCount(entry.value));
-
-    return refCount - descendantRefCount;
-  }
-
-  bool _hasDirectRef(Map? node, List<String> segments, [int index = 0]) {
-    final segment = segments[index];
-    if (node == null) {
-      return false;
-    }
-
-    if (index < segments.length - 1) {
-      final child = node[segment];
-      if (child is! Map) {
-        return false;
-      }
-
-      return _hasDirectRef(child, segments, index + 1);
-    }
-
-    final child = node[segment];
-    if (child is int) {
-      return child > 0;
-    }
-    if (child is Map) {
-      return _directRefCount(child) > 0;
-    }
-
-    return false;
-  }
-
   bool _dec(
     Map? node,
     List<String> segments, [
@@ -169,14 +124,10 @@ class PathRefStore {
 
   /// Decrements the ref count to the node at the given path, removing it if it was the last reference to the node.
   void dec(String path) {
-    final segments = path.split(delimiter);
-    // `_dec` assumes the target path has a direct ref. `has` is broader: it is
-    // also true when only a descendant is live, which must not decrement this
-    // path.
-    if (!_hasDirectRef(_store, segments)) {
+    if (!has(path)) {
       return;
     }
-    _dec(_store, segments);
+    _dec(_store, path.split(delimiter));
   }
 
   bool _has(Map? node, List<String> segments, [int index = 0]) {
