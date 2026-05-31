@@ -105,7 +105,8 @@ void main() {
       expect(fileRegex.hasMatch('__store__.json.tmp'), false);
     });
 
-    test('Cleans orphaned .tmp files before rewriting their targets', () async {
+    test('Overwrites orphaned .tmp files when rewriting their targets',
+        () async {
       final orphanedStoreTmp = File('${loonDir.path}/custom_store.json.tmp');
       final orphanedResolverTmp = File('${loonDir.path}/__resolver__.json.tmp');
       await orphanedStoreTmp.writeAsString('partial store write');
