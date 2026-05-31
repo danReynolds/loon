@@ -17,12 +17,12 @@ late Directory testDirectory;
 class MockPathProvider extends Fake
     with MockPlatformInterfaceMixin
     implements PathProviderPlatform {
-  getApplicationDocumentsDirectory() {
+  Directory getApplicationDocumentsDirectory() {
     return testDirectory;
   }
 
   @override
-  getApplicationDocumentsPath() async {
+  Future<String> getApplicationDocumentsPath() async {
     return testDirectory.path;
   }
 }
@@ -60,9 +60,14 @@ void main() {
   group('FilePersistor fault recovery', () {
     final loonDir = Directory('${testDirectory.path}/loon');
 
-    // FlutterSecureStorage does not work in tests, so supply a fixed encrypter.
+    // FlutterSecureStorage does not work in tests, so use a deterministic in-process key.
     final encrypter = DataStoreEncrypter(
-      Encrypter(AES(Key.fromSecureRandom(32), mode: AESMode.cbc)),
+      Encrypter(
+        AES(
+          Key.fromUtf8('0123456789abcdef0123456789abcdef'),
+          mode: AESMode.cbc,
+        ),
+      ),
     );
 
     FilePersistor newPersistor() => FilePersistor(
@@ -92,7 +97,9 @@ void main() {
         jsonEncode({
           "": {
             "users": {
-              "__values": {"1": {"name": "User 1"}}
+              "__values": {
+                "1": {"name": "User 1"}
+              }
             }
           }
         }),
@@ -119,12 +126,44 @@ void main() {
       );
     });
 
+    test('A corrupt encrypted data store file does not fail hydration',
+        () async {
+      await File('${loonDir.path}/__store__.json').writeAsString(
+        jsonEncode({
+          "": {
+            "users": {
+              "__values": {
+                "1": {"name": "User 1"}
+              }
+            }
+          }
+        }),
+      );
+      await File('${loonDir.path}/__store__.encrypted.json')
+          .writeAsString('not encrypted');
+
+      Loon.configure(persistor: newPersistor());
+
+      await Loon.hydrate();
+
+      expect(
+        Loon.collection<Json>('users').doc('1').get()?.data,
+        {"name": "User 1"},
+      );
+      expect(
+        await File('${loonDir.path}/__store__.encrypted.json.corrupt').exists(),
+        true,
+      );
+    });
+
     test('A corrupt resolver file does not fail hydration', () async {
       await File('${loonDir.path}/__store__.json').writeAsString(
         jsonEncode({
           "": {
             "users": {
-              "__values": {"1": {"name": "User 1"}}
+              "__values": {
+                "1": {"name": "User 1"}
+              }
             }
           }
         }),

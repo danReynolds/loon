@@ -9,21 +9,60 @@ import 'package:loon/persistor/data_store_resolver.dart';
 /// one unreadable file cannot fail hydration of the entire store. The data is
 /// preserved for inspection, the `.corrupt` suffix is ignored by the data store
 /// file listing, and the next persist for the partition writes a fresh file.
+void _logHydrationFailure(
+  File file,
+  Logger logger,
+  Object error,
+  StackTrace stackTrace,
+) {
+  logger.log(
+    'Failed to hydrate ${file.path}, recovering without quarantine: '
+    '$error\n$stackTrace',
+  );
+}
+
 Future<void> _recoverCorruptFile(
   File file,
   Logger logger,
   Object error,
+  StackTrace stackTrace,
 ) async {
-  logger.log('Failed to hydrate ${file.path}, quarantining as corrupt: $error');
+  logger.log(
+    'Failed to hydrate ${file.path}, quarantining as corrupt: '
+    '$error\n$stackTrace',
+  );
+
   try {
     final quarantine = File('${file.path}.corrupt');
     if (await quarantine.exists()) {
       await quarantine.delete();
     }
     await file.rename(quarantine.path);
-  } catch (e) {
-    logger.log('Failed to quarantine ${file.path}: $e');
+  } catch (error, stackTrace) {
+    logger.log('Failed to quarantine ${file.path}: $error\n$stackTrace');
   }
+}
+
+Json _decodeJsonObject(String value, String description) {
+  final decoded = jsonDecode(value);
+  if (decoded is! Json) {
+    throw FormatException('Expected $description to be a JSON object.');
+  }
+
+  return decoded;
+}
+
+Json _readNestedJsonObject(Object? value, String description) {
+  if (value is! Json) {
+    throw FormatException('Expected $description to be a JSON object.');
+  }
+
+  return value;
+}
+
+bool _isInvalidCipherTextException(Object error) {
+  // encrypt wraps PointyCastle without exposing its exception types.
+  return error.runtimeType.toString() == 'InvalidCipherTextException';
 }
 
 class FileDataStoreConfig extends DataStoreConfig {
@@ -37,22 +76,43 @@ class FileDataStoreConfig extends DataStoreConfig {
           hydrate: () async {
             try {
               final value = await file.readAsString();
-              final json = jsonDecode(
+              final json = _decodeJsonObject(
                 encrypted ? encrypter.decrypt(value) : value,
+                'persisted data store',
               );
               final store = ValueStore<ValueStore>();
 
               for (final entry in json.entries) {
                 final resolverPath = entry.key;
-                final valueStore = ValueStore.fromJson(entry.value);
+                final valueStore = ValueStore.fromJson(
+                  _readNestedJsonObject(
+                    entry.value,
+                    'persisted data store entry "$resolverPath"',
+                  ),
+                );
                 store.write(resolverPath, valueStore);
               }
 
               return store;
             } on PathNotFoundException {
               return null;
-            } catch (error) {
-              await _recoverCorruptFile(file, logger, error);
+            } on FileSystemException catch (error, stackTrace) {
+              _logHydrationFailure(file, logger, error, stackTrace);
+              return null;
+            } on FormatException catch (error, stackTrace) {
+              await _recoverCorruptFile(file, logger, error, stackTrace);
+              return null;
+            } on ArgumentError catch (error, stackTrace) {
+              if (!encrypted) {
+                rethrow;
+              }
+              await _recoverCorruptFile(file, logger, error, stackTrace);
+              return null;
+            } on Exception catch (error, stackTrace) {
+              if (!encrypted || !_isInvalidCipherTextException(error)) {
+                rethrow;
+              }
+              await _recoverCorruptFile(file, logger, error, stackTrace);
               return null;
             }
           },
@@ -81,11 +141,18 @@ class FileDataStoreResolverConfig extends DataStoreResolverConfig {
           hydrate: () async {
             try {
               return ValueRefStore<String>(
-                  jsonDecode(await file.readAsString()));
+                _decodeJsonObject(
+                  await file.readAsString(),
+                  'persisted resolver',
+                ),
+              );
             } on PathNotFoundException {
               return null;
-            } catch (error) {
-              await _recoverCorruptFile(file, logger, error);
+            } on FileSystemException catch (error, stackTrace) {
+              _logHydrationFailure(file, logger, error, stackTrace);
+              return null;
+            } on FormatException catch (error, stackTrace) {
+              await _recoverCorruptFile(file, logger, error, stackTrace);
               return null;
             }
           },
