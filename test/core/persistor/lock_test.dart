@@ -1,85 +1,129 @@
+import 'package:fake_async/fake_async.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:loon/persistor/lock.dart';
+
+import '../../utils.dart';
+
+const _workDuration = Duration(milliseconds: 10);
+const _burstWorkDuration = Duration(milliseconds: 5);
 
 void main() {
   group('Lock', () {
     test(
       'Serializes a single waiter behind the holder',
-      () async {
-        final lock = Lock();
-        final order = <String>[];
+      () {
+        fakeAsync((async) {
+          final lock = Lock();
+          final order = <String>[];
+          var aComplete = false;
+          var bComplete = false;
 
-        final a = lock.run(() async {
-          order.add('A-start');
-          await Future.delayed(const Duration(milliseconds: 10));
-          order.add('A-end');
+          lock.run(() async {
+            order.add('A-start');
+            await Future.delayed(_workDuration);
+            order.add('A-end');
+          }).then((_) => aComplete = true);
+
+          async.flushMicrotasks();
+
+          lock.run(() async {
+            order.add('B-start');
+            await Future.delayed(_workDuration);
+            order.add('B-end');
+          }).then((_) => bComplete = true);
+
+          async.flushMicrotasks();
+          expect(order, ['A-start']);
+          expect(aComplete, false);
+          expect(bComplete, false);
+
+          elapseAndFlush(async, _workDuration);
+          expect(order, ['A-start', 'A-end', 'B-start']);
+          expect(aComplete, true);
+          expect(bComplete, false);
+
+          elapseAndFlush(async, _workDuration);
+          expect(order, ['A-start', 'A-end', 'B-start', 'B-end']);
+          expect(bComplete, true);
         });
-
-        // Give A time to acquire before B arrives.
-        await Future.delayed(Duration.zero);
-
-        final b = lock.run(() async {
-          order.add('B-start');
-          await Future.delayed(const Duration(milliseconds: 10));
-          order.add('B-end');
-        });
-
-        await Future.wait([a, b]);
-
-        expect(order, ['A-start', 'A-end', 'B-start', 'B-end']);
       },
     );
 
     test(
       'Serializes multiple waiters that all queue on the same holder',
-      () async {
-        final lock = Lock();
-        int inFlight = 0;
-        int maxInFlight = 0;
+      () {
+        fakeAsync((async) {
+          final lock = Lock();
+          var inFlight = 0;
+          var maxInFlight = 0;
+          var completed = 0;
 
-        Future<void> work() {
-          return lock.run(() async {
-            inFlight++;
-            if (inFlight > maxInFlight) maxInFlight = inFlight;
-            await Future.delayed(const Duration(milliseconds: 10));
-            inFlight--;
-          });
-        }
+          void work() {
+            lock.run(() async {
+              inFlight++;
+              if (inFlight > maxInFlight) maxInFlight = inFlight;
+              await Future.delayed(_workDuration);
+              inFlight--;
+            }).then((_) => completed++);
+          }
 
-        final a = work();
-        await Future.delayed(Duration.zero);
-        final b = work();
-        final c = work();
+          work();
+          async.flushMicrotasks();
+          work();
+          work();
+          async.flushMicrotasks();
 
-        await Future.wait([a, b, c]);
+          expect(maxInFlight, 1);
+          expect(completed, 0);
 
-        expect(maxInFlight, 1);
+          elapseAndFlush(async, _workDuration);
+          expect(maxInFlight, 1);
+          expect(completed, 1);
+
+          elapseAndFlush(async, _workDuration);
+          expect(maxInFlight, 1);
+          expect(completed, 2);
+
+          elapseAndFlush(async, _workDuration);
+          expect(maxInFlight, 1);
+          expect(completed, 3);
+        });
       },
     );
 
     test(
       'Serializes a burst of concurrent acquires',
-      () async {
-        final lock = Lock();
-        int inFlight = 0;
-        int maxInFlight = 0;
-        int completed = 0;
+      () {
+        fakeAsync((async) {
+          final lock = Lock();
+          var inFlight = 0;
+          var maxInFlight = 0;
+          var completed = 0;
 
-        Future<void> work() {
-          return lock.run(() async {
-            inFlight++;
-            if (inFlight > maxInFlight) maxInFlight = inFlight;
-            await Future.delayed(const Duration(milliseconds: 5));
-            inFlight--;
-            completed++;
-          });
-        }
+          void work() {
+            lock.run(() async {
+              inFlight++;
+              if (inFlight > maxInFlight) maxInFlight = inFlight;
+              await Future.delayed(_burstWorkDuration);
+              inFlight--;
+              completed++;
+            });
+          }
 
-        final futures = List.generate(10, (_) => work());
-        await Future.wait(futures);
+          for (var i = 0; i < 10; i++) {
+            work();
+          }
 
-        expect(maxInFlight, 1);
-        expect(completed, 10);
+          async.flushMicrotasks();
+          expect(maxInFlight, 1);
+
+          for (var i = 0; i < 10; i++) {
+            elapseAndFlush(async, _burstWorkDuration);
+            expect(maxInFlight, 1);
+          }
+
+          expect(completed, 10);
+        });
       },
     );
 

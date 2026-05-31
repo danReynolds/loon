@@ -2,6 +2,8 @@ import 'package:fake_async/fake_async.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:loon/loon.dart';
 
+import '../utils.dart';
+
 /// Deterministic tests for broadcast batching, coalescing, and ordering.
 ///
 /// Loon schedules a broadcast on a zero-duration timer so that all writes in a
@@ -15,12 +17,6 @@ import 'package:loon/loon.dart';
 ///
 /// (A dedicated file runs in its own test isolate, so the global store starts
 /// clean and these virtual-time tests are isolated from the rest of the suite.)
-
-/// Advances virtual time past the broadcast's zero-duration timer and drains
-/// the microtasks that deliver stream events.
-void _flush(FakeAsync async) {
-  async.elapse(const Duration(milliseconds: 1));
-}
 
 void _reset(FakeAsync async) {
   Loon.unsubscribe();
@@ -39,12 +35,12 @@ void main() {
         final sub = col
             .stream()
             .listen((snaps) => emissions.add([for (final s in snaps) s.data]));
-        _flush(async); // initial emission
+        flushBroadcasts(async); // initial emission
 
         col.doc('1').create(1);
         col.doc('2').create(2);
         col.doc('3').create(3);
-        _flush(async);
+        flushBroadcasts(async);
 
         // One emission for the initial value and exactly one for the batch.
         expect(emissions.length, 2);
@@ -62,11 +58,11 @@ void main() {
 
         final emissions = <int?>[];
         final sub = doc.stream().listen((snap) => emissions.add(snap?.data));
-        _flush(async); // initial null
+        flushBroadcasts(async); // initial null
 
         doc.create(1);
         doc.update(2);
-        _flush(async);
+        flushBroadcasts(async);
 
         // The create and update collapse into a single emission of the final value.
         expect(emissions, [null, 2]);
@@ -83,14 +79,14 @@ void main() {
 
         final emissions = <int?>[];
         final sub = doc.stream().listen((snap) => emissions.add(snap?.data));
-        _flush(async); // initial null
+        flushBroadcasts(async); // initial null
 
         doc.create(1);
-        _flush(async);
+        flushBroadcasts(async);
         doc.update(2);
-        _flush(async);
+        flushBroadcasts(async);
         doc.update(3);
-        _flush(async);
+        flushBroadcasts(async);
 
         expect(emissions, [null, 1, 2, 3]);
 
@@ -106,12 +102,12 @@ void main() {
 
         final emissions = <int?>[];
         final sub = doc.stream().listen((snap) => emissions.add(snap?.data));
-        _flush(async); // initial null
+        flushBroadcasts(async); // initial null
 
         doc.create(1);
-        _flush(async);
+        flushBroadcasts(async);
         doc.update(1); // same value
-        _flush(async);
+        flushBroadcasts(async);
 
         // No emission for the no-op update.
         expect(emissions, [null, 1]);

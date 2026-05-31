@@ -4,6 +4,45 @@ import 'package:loon/loon.dart';
 import 'package:loon/persistor/data_store.dart';
 import 'package:loon/persistor/data_store_resolver.dart';
 
+void _logHydrationFailure(
+  File file,
+  Logger logger,
+  Object error,
+  StackTrace stackTrace,
+) {
+  logger.log(
+    'Failed to hydrate ${file.path}, recovering without quarantine: '
+    '$error\n$stackTrace',
+  );
+}
+
+/// Moves a file that failed to hydrate (corrupt JSON, failed decryption) aside
+/// to `<path>.corrupt` and recovers by returning null (an empty store) so that
+/// one unreadable file cannot fail hydration of the entire store. The data is
+/// preserved for inspection, the `.corrupt` suffix is ignored by the data store
+/// file listing, and the next persist for the partition writes a fresh file.
+Future<void> _recoverCorruptFile(
+  File file,
+  Logger logger,
+  Object error,
+  StackTrace stackTrace,
+) async {
+  logger.log(
+    'Failed to hydrate ${file.path}, quarantining as corrupt: '
+    '$error\n$stackTrace',
+  );
+
+  try {
+    final quarantine = File('${file.path}.corrupt');
+    if (await quarantine.exists()) {
+      await quarantine.delete();
+    }
+    await file.rename(quarantine.path);
+  } catch (error, stackTrace) {
+    logger.log('Failed to quarantine ${file.path}: $error\n$stackTrace');
+  }
+}
+
 /// Writes [contents] to [file] atomically: the data is written to a sibling
 /// temporary file, flushed to disk, then renamed over the target. A rename on
 /// the same filesystem is atomic, so an interrupted write (crash, OOM kill,
@@ -54,9 +93,19 @@ class FileDataStoreConfig extends DataStoreConfig {
           hydrate: () async {
             try {
               final value = await file.readAsString();
-              final json = jsonDecode(
-                encrypted ? encrypter.decrypt(value) : value,
-              );
+              String contents;
+              if (encrypted) {
+                try {
+                  contents = encrypter.decrypt(value);
+                } catch (error, stackTrace) {
+                  await _recoverCorruptFile(file, logger, error, stackTrace);
+                  return null;
+                }
+              } else {
+                contents = value;
+              }
+
+              final json = jsonDecode(contents);
               final store = ValueStore<ValueStore>();
 
               for (final entry in json.entries) {
@@ -67,6 +116,12 @@ class FileDataStoreConfig extends DataStoreConfig {
 
               return store;
             } on PathNotFoundException {
+              return null;
+            } on FileSystemException catch (error, stackTrace) {
+              _logHydrationFailure(file, logger, error, stackTrace);
+              return null;
+            } on FormatException catch (error, stackTrace) {
+              await _recoverCorruptFile(file, logger, error, stackTrace);
               return null;
             }
           },
@@ -95,8 +150,8 @@ class FileDataStoreResolverConfig extends DataStoreResolverConfig {
   }) : super(
           hydrate: () async {
             try {
-              return ValueRefStore<String>(
-                  jsonDecode(await file.readAsString()));
+              final json = jsonDecode(await file.readAsString());
+              return ValueRefStore<String>(json);
             } on PathNotFoundException {
               return null;
             }

@@ -25,9 +25,21 @@ class MockPathProvider extends Fake
   }
 
   @override
-  getApplicationDocumentsPath() async {
+  Future<String> getApplicationDocumentsPath() async {
     return testDirectory.path;
   }
+}
+
+DataStoreEncrypter createTestEncrypter() {
+  // FlutterSecureStorage does not work in tests, so use a deterministic in-process key.
+  return DataStoreEncrypter(
+    Encrypter(
+      AES(
+        Key.fromUtf8('0123456789abcdef0123456789abcdef'),
+        mode: AESMode.cbc,
+      ),
+    ),
+  );
 }
 
 void main() {
@@ -62,14 +74,11 @@ void main() {
 
   group('FilePersistor durability', () {
     final loonDir = Directory('${testDirectory.path}/loon');
-
-    // FlutterSecureStorage does not work in tests, so supply a fixed encrypter.
-    final encrypter = DataStoreEncrypter(
-      Encrypter(AES(Key.fromSecureRandom(32), mode: AESMode.cbc)),
-    );
+    final encrypter = createTestEncrypter();
 
     tearDown(() async {
       await Loon.clearAll();
+      Loon.unsubscribe();
     });
 
     test('Persists atomically, leaving no .tmp files behind', () async {
@@ -134,6 +143,109 @@ void main() {
 
       expect(await orphanedStoreTmp.exists(), false);
       expect(await orphanedResolverTmp.exists(), false);
+    });
+  });
+
+  group('FilePersistor fault recovery', () {
+    final loonDir = Directory('${testDirectory.path}/loon');
+    final encrypter = createTestEncrypter();
+
+    FilePersistor newPersistor() => FilePersistor(
+          persistenceThrottle: const Duration(milliseconds: 1),
+          encrypter: encrypter,
+        );
+
+    Future<void> writeDefaultStore() {
+      return File('${loonDir.path}/__store__.json').writeAsString(
+        jsonEncode({
+          "": {
+            "users": {
+              "__values": {
+                "1": {"name": "User 1"}
+              }
+            }
+          }
+        }),
+      );
+    }
+
+    setUp(() {
+      if (loonDir.existsSync()) {
+        for (final entity in loonDir.listSync()) {
+          entity.deleteSync(recursive: true);
+        }
+      }
+      Loon.unsubscribe();
+    });
+
+    tearDown(() async {
+      await Loon.clearAll();
+      Loon.unsubscribe();
+    });
+
+    test('A corrupt data store file does not fail hydration of the rest',
+        () async {
+      await writeDefaultStore();
+      await File('${loonDir.path}/corrupt.json')
+          .writeAsString('{ not valid json');
+
+      Loon.configure(persistor: newPersistor());
+
+      await Loon.hydrate();
+
+      expect(
+        Loon.collection<Json>('users').doc('1').get()?.data,
+        {"name": "User 1"},
+      );
+      expect(await File('${loonDir.path}/corrupt.json').exists(), false);
+      expect(
+        await File('${loonDir.path}/corrupt.json.corrupt').exists(),
+        true,
+      );
+    });
+
+    test('A corrupt encrypted data store file does not fail hydration',
+        () async {
+      await writeDefaultStore();
+      await File('${loonDir.path}/__store__.encrypted.json')
+          .writeAsString('not encrypted');
+
+      Loon.configure(persistor: newPersistor());
+
+      await Loon.hydrate();
+
+      expect(
+        Loon.collection<Json>('users').doc('1').get()?.data,
+        {"name": "User 1"},
+      );
+      expect(
+        await File('${loonDir.path}/__store__.encrypted.json.corrupt').exists(),
+        true,
+      );
+    });
+
+    test('A corrupt resolver file fails hydration', () async {
+      await writeDefaultStore();
+      await File('${loonDir.path}/__resolver__.json')
+          .writeAsString('}{ broken');
+
+      await expectLater(
+        newPersistor().init(),
+        throwsA(
+          predicate(
+            (error) => error.toString().contains('FormatException'),
+          ),
+        ),
+      );
+
+      expect(
+        await File('${loonDir.path}/__resolver__.json').exists(),
+        true,
+      );
+      expect(
+        await File('${loonDir.path}/__resolver__.json.corrupt').exists(),
+        false,
+      );
     });
   });
 }
