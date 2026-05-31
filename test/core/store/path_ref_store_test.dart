@@ -209,6 +209,27 @@ void main() {
           },
         });
       });
+
+      test('Dec of untracked ancestor path leaves descendants intact', () {
+        final store = PathRefStore();
+        store.inc('a__b');
+        store.inc('x');
+
+        store.dec('a');
+
+        expect(store.has('a__b'), true);
+        expect(store.inspect(), {
+          "__ref": 2,
+          "a": {"__ref": 1, "b": 1},
+          "x": 1,
+        });
+
+        expect(() => store.dec('a__b'), returnsNormally);
+        expect(store.inspect(), {
+          "__ref": 1,
+          "x": 1,
+        });
+      });
     });
   });
 }

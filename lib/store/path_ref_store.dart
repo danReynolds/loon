@@ -74,6 +74,51 @@ class PathRefStore {
     _inc(_store, path.split(delimiter));
   }
 
+  int _refCount(Object? value) {
+    if (value is int) {
+      return value;
+    }
+    if (value is Map) {
+      return value[_refKey] as int? ?? 0;
+    }
+    return 0;
+  }
+
+  int _directRefCount(Map node) {
+    final refCount = node[_refKey] as int? ?? 0;
+    final descendantRefCount = node.entries
+        .where((entry) => entry.key != _refKey)
+        .fold<int>(0, (sum, entry) => sum + _refCount(entry.value));
+
+    return refCount - descendantRefCount;
+  }
+
+  bool _hasDirectRef(Map? node, List<String> segments, [int index = 0]) {
+    final segment = segments[index];
+    if (node == null) {
+      return false;
+    }
+
+    if (index < segments.length - 1) {
+      final child = node[segment];
+      if (child is! Map) {
+        return false;
+      }
+
+      return _hasDirectRef(child, segments, index + 1);
+    }
+
+    final child = node[segment];
+    if (child is int) {
+      return child > 0;
+    }
+    if (child is Map) {
+      return _directRefCount(child) > 0;
+    }
+
+    return false;
+  }
+
   bool _dec(
     Map? node,
     List<String> segments, [
@@ -111,14 +156,7 @@ class PathRefStore {
     } else if (node[segment] is Map) {
       final Map child = node[segment];
       if (child[_refKey] == 1) {
-        // Releasing the last reference to this node. If it has no descendants,
-        // remove it entirely; otherwise it still routes to live descendants, so
-        // drop only its ref key and keep it as a transient node.
-        if (child.length == 1) {
-          node.remove(segment);
-        } else {
-          child.remove(_refKey);
-        }
+        node.remove(segment);
       } else {
         child[_refKey]--;
       }
@@ -131,13 +169,14 @@ class PathRefStore {
 
   /// Decrements the ref count to the node at the given path, removing it if it was the last reference to the node.
   void dec(String path) {
-    // `_dec` assumes every node it walks carries a `_refKey`; without this
-    // guard an untracked path would still decrement (and potentially clear)
-    // ancestors that share a prefix.
-    if (!has(path)) {
+    final segments = path.split(delimiter);
+    // `_dec` assumes the target path has a direct ref. `has` is broader: it is
+    // also true when only a descendant is live, which must not decrement this
+    // path.
+    if (!_hasDirectRef(_store, segments)) {
       return;
     }
-    _dec(_store, path.split(delimiter));
+    _dec(_store, segments);
   }
 
   bool _has(Map? node, List<String> segments, [int index = 0]) {
@@ -158,15 +197,14 @@ class PathRefStore {
     return node.containsKey(segment);
   }
 
-  /// Returns whether the path exists in the store.
+  /// Returns whether the path or any descendant path exists in the store.
   ///
   /// Example:
   /// ```dart
   /// final refStore = PathRefStore();
   /// refStore.inc('users__1__posts__2');
   /// refStore.has('users__1__posts__2') // true
-  /// refStore.has('users__1') // false
-  /// refStore.hasPath('users__1') // true
+  /// refStore.has('users__1') // true
   ///
   /// ```
   bool has(String path) {
