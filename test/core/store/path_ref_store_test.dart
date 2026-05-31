@@ -171,6 +171,24 @@ void main() {
         });
       });
 
+      test('Dec of a map-backed path removes the empty node', () {
+        // The extra live sibling keeps the root ref count above 1 so this
+        // exercises the child-map branch rather than the root clear path.
+        final store = PathRefStore();
+        store.inc('c');
+        store.inc('c__c');
+        store.dec('c__c');
+        store.inc('a');
+
+        store.dec('c');
+
+        expect(store.has('c'), false);
+        expect(store.inspect(), {
+          "__ref": 1,
+          "a": 1,
+        });
+      });
+
       test('Dec of untracked deep path under a tracked node is a no-op', () {
         final store = PathRefStore();
         store.inc('a__b__c');
