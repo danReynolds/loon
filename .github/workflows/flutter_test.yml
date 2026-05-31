@@ -3,7 +3,10 @@ name: Run Flutter Tests
 on:
   pull_request:
     branches:
-      - main  # Adjust the target branch as needed
+      - main
+  push:
+    branches:
+      - main
 
 jobs:
   test:
