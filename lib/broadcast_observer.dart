@@ -43,7 +43,7 @@ mixin BroadcastObserver<T, S> {
     _controllerValue = initialValue;
     _controller.add(initialValue);
 
-    _observerId = "${path}__${generateId()}";
+    _observerId = "${path}__${generateFastId()}";
 
     Loon._instance.broadcastManager.addObserver(this, initialValue);
   }

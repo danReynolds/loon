@@ -35,6 +35,23 @@ mixin PersistorWorkerMixin on Persistor {
     // then initialize it before spawning the worker.
     await encrypter.init();
 
+    final errorPort = ReceivePort();
+    errorPort.listen((message) {
+      // onError delivers a [errorString, stackTraceString] pair.
+      final description =
+          message is List && message.isNotEmpty ? message.first : message;
+      logger.log('Worker isolate error: $description');
+      worker.failAll(Exception('Worker isolate error: $description'));
+    });
+
+    final exitPort = ReceivePort();
+    exitPort.listen((_) {
+      logger.log('Worker isolate exited');
+      worker.failAll(Exception('Worker isolate exited unexpectedly'));
+      errorPort.close();
+      exitPort.close();
+    });
+
     await Isolate.spawn(
       _entrypoint<T, S>,
       EntrypointArgs(
@@ -43,6 +60,8 @@ mixin PersistorWorkerMixin on Persistor {
         message: message,
         encrypter: encrypter,
       ),
+      onError: errorPort.sendPort,
+      onExit: exitPort.sendPort,
       debugName: 'PersistorWorker',
     );
 

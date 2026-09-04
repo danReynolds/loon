@@ -205,7 +205,7 @@ class Loon {
     documentStore.clear();
 
     // Clear any documents scheduled for broadcast, as whatever events happened prior to the clear are now irrelevant.
-    broadcastManager.clear();
+    broadcastManager.clear(broadcast: broadcast);
 
     dependencyManager.clear();
 

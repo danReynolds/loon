@@ -25,7 +25,7 @@ class RandomOperationRunner {
       _logger.log('Persist $count');
 
       for (int i = 0; i < count; i++) {
-        final id = generateId();
+        final id = generateSecureId();
         UserModel.store.doc(id).create(UserModel(name: 'User $id'));
       }
     } else if (operationIndex >= 80 && operationIndex < 90) {

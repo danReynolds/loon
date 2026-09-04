@@ -1,6 +1,6 @@
-import 'dart:async';
 import 'dart:convert';
 import 'package:encrypt/encrypt.dart';
+import 'package:fake_async/fake_async.dart';
 import 'package:loon/loon.dart';
 
 final testEncryptionKey = Key.fromSecureRandom(32);
@@ -22,6 +22,14 @@ Json decryptData(String encrypted) {
   );
 }
 
-Future<void> asyncEvent() {
-  return Future.delayed(const Duration(milliseconds: 1), () => null);
+/// Advances past Loon's zero-duration broadcast timer and drains stream delivery.
+void flushBroadcasts(FakeAsync async) {
+  elapseAndFlush(async, const Duration(milliseconds: 1));
+}
+
+/// Advances fake time and drains microtasks around any timer callbacks.
+void elapseAndFlush(FakeAsync async, Duration duration) {
+  async.flushMicrotasks();
+  async.elapse(duration);
+  async.flushMicrotasks();
 }

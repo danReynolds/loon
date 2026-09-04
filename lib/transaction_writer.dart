@@ -9,7 +9,11 @@ class TransactionWriter {
     if (_isCanceled) {
       throw 'Cannot write a transaction after a rollback';
     }
-    _rollbackIndex[doc] ??= doc.get()?.data;
+    // `??=` cannot distinguish a missing key from a stored null, which would
+    // overwrite the "doc did not exist" rollback state on subsequent writes.
+    if (!_rollbackIndex.containsKey(doc)) {
+      _rollbackIndex[doc] = doc.get()?.data;
+    }
   }
 
   DocumentSnapshot<T> create<T>(
