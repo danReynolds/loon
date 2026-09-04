@@ -103,12 +103,10 @@ class BroadcastManager {
   void writeDocument(Document doc, BroadcastEvents event) {
     final path = doc.path;
 
-    if (event != BroadcastEvents.touched) {
-      // All cached observer values for the document and its collection
-      // are invalidated after the document is mutated.
-      observerValueStore.delete(doc.path, recursive: false);
-      observerValueStore.delete(doc.parent, recursive: false);
-    }
+    // All cached observer values for the document and its collection
+    // are invalidated after the document is mutated.
+    observerValueStore.delete(doc.path, recursive: false);
+    observerValueStore.delete(doc.parent, recursive: false);
 
     final pendingEvent = eventStore.get(path);
     // Ignore writing a duplicate event or overwriting a pending mutative event type with a touched event.
