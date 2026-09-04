@@ -26,6 +26,12 @@ class DocumentView<S extends T, T> {
     }
     return DocumentSnapshotView(snap);
   }
+
+  Stream<DocumentSnapshotView<S, T>?> stream() {
+    return doc
+        .stream()
+        .map((snap) => snap == null ? null : DocumentSnapshotView(snap));
+  }
 }
 
 /// A view of a collection that allows for type-safe narrowing to a specific subtype of the collection's document type.
@@ -36,5 +42,17 @@ class CollectionView<S extends T, T> {
 
   DocumentView<S, T> doc(String id) {
     return DocumentView(_collection.doc(id));
+  }
+
+  List<DocumentSnapshotView<S, T>> get() {
+    return _collection
+        .get()
+        .map((snap) => DocumentSnapshotView<S, T>(snap))
+        .toList();
+  }
+
+  Stream<List<DocumentSnapshotView<S, T>>> stream() {
+    return _collection.stream().map((snaps) =>
+        snaps.map((snap) => DocumentSnapshotView<S, T>(snap)).toList());
   }
 }
