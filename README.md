@@ -286,11 +286,16 @@ A document can also be rebroadcast manually. This is useful when state that the 
 such as in-memory state read by a query's filter or sort:
 
 ```dart
+// `isTransfer` reads in-memory rules rather than stored data.
 final transfers = transactions.where((snap) => snap.data.isTransfer);
 
-// `isTransfer` reads in-memory rules. When the rules change, rebroadcast the affected
-// transactions so that the query re-evaluates them.
-transaction.rebroadcast();
+// When the rules change, rebroadcast the affected transactions so that queries
+// like `transfers` re-evaluate them.
+void onRulesChanged(Iterable<String> affectedTransactionIds) {
+  for (final id in affectedTransactionIds) {
+    transactions.doc(id).rebroadcast();
+  }
+}
 ```
 
 A rebroadcast is treated as a write of the document's current value that is not persisted: observers of the document re-read it, queries on its
