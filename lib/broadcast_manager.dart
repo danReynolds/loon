@@ -10,7 +10,8 @@ enum BroadcastEvents {
   /// The document has been removed.
   removed,
 
-  /// The document has been manually touched for rebroadcast.
+  /// The document has been touched: rebroadcast as if its current value had been written again,
+  /// either manually through [Document.rebroadcast] or because a document it depends on changed.
   touched,
 
   /// The document has been hydrated from persisted storage.
@@ -57,18 +58,23 @@ class BroadcastManager {
   void _broadcast() {
     _depObservers.clear();
 
-    for (final observer in _observers.toList()) {
-      observer._onBroadcast();
+    try {
+      for (final observer in _observers.toList()) {
+        observer._onBroadcast();
 
-      // Recalculate the set of observers with dependencies after they process the broadcast
-      // and update their dependency stores.
-      if (!observer._deps.isEmpty) {
-        _depObservers.add(observer);
+        // Recalculate the set of observers with dependencies after they process the broadcast
+        // and update their dependency stores.
+        if (!observer._deps.isEmpty) {
+          _depObservers.add(observer);
+        }
       }
+    } finally {
+      // The event store and pending broadcast are always reset so that an observer that throws
+      // while processing a broadcast (such as a filter that throws) cannot prevent all subsequent
+      // broadcasts from being scheduled.
+      eventStore.clear();
+      _broadcastTimer = null;
     }
-
-    eventStore.clear();
-    _broadcastTimer = null;
   }
 
   /// Schedules all dependents of the given document for broadcast.
@@ -108,12 +114,11 @@ class BroadcastManager {
   void writeDocument(Document doc, BroadcastEvents event) {
     final path = doc.path;
 
-    if (event != BroadcastEvents.touched) {
-      // All cached observer values for the document and its collection
-      // are invalidated after the document is mutated.
-      observerValueStore.delete(doc.path, recursive: false);
-      observerValueStore.delete(doc.parent, recursive: false);
-    }
+    // All cached observer values for the document and its collection are invalidated whenever
+    // the document is written, including when it is touched: a touch is a write of the document's
+    // current value, so its observers re-read it and the queries on its collection re-evaluate it.
+    observerValueStore.delete(doc.path, recursive: false);
+    observerValueStore.delete(doc.parent, recursive: false);
 
     final pendingEvent = eventStore.get(path);
     // Ignore writing a duplicate event or overwriting a pending mutative event type with a touched event.

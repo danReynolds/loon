@@ -234,10 +234,30 @@ class Document<T> implements StoreReference {
     return data;
   }
 
-  /// Schedules a document to be rebroadcasted, updating all listeners that are subscribed to that document.
+  /// Rebroadcasts the document to its listeners as if its current value had been written again,
+  /// without persisting it. Use it when state that the document's value or its queries derive from
+  /// has changed outside of the store, such as in-memory state read by a query's filter or sort.
+  ///
+  /// Observers of the document re-read it, queries on its collection re-evaluate whether it belongs
+  /// in their result set and where it sorts, and its dependencies are rebuilt. Change listeners
+  /// receive a [BroadcastEvents.touched] event rather than a modified event. If the document does
+  /// not exist, there is no value to re-evaluate and its listeners are simply notified again.
   void rebroadcast() {
-    Loon._instance.broadcastManager
-        .writeDocument(this, BroadcastEvents.touched);
+    // The store is read directly rather than through [get], which observable documents override
+    // with a cached value.
+    final snap = Loon._instance.getSnapshot<T>(this);
+    if (snap == null) {
+      Loon._instance.broadcastManager
+          .writeDocument(this, BroadcastEvents.touched);
+      return;
+    }
+
+    Loon._instance.writeDocument<T>(
+      this,
+      snap.data,
+      event: BroadcastEvents.touched,
+      persist: false,
+    );
   }
 
   /// Rebuild the document's dependencies with the [dependenciesBuilder].

@@ -46,6 +46,17 @@ class ObservableQuery<T> extends Query<T>
     }
   }
 
+  /// Replaces the snapshot and dependency caches with the given result set, returning it.
+  List<DocumentSnapshot<T>> _resetCache(List<DocumentSnapshot<T>> snaps) {
+    for (final doc in _snapCache.keys.toList()) {
+      _evictDoc(doc);
+    }
+    for (final snap in snaps) {
+      _cacheDoc(snap);
+    }
+    return snaps;
+  }
+
   /// Removes the doc from the index, clearing it in both the snapshot and dependency caches.
   void _evictDoc(Document<T> doc) {
     final deps = _docDepCache[doc];
@@ -73,8 +84,9 @@ class ObservableQuery<T> extends Query<T>
   ///     i. Previously satisfied the query filter and still does (since its modified data must be delivered on the query).
   ///     ii. Previously satisfied the query filter and now does not.
   ///     iii. Previously did not satisfy the query filter and now does.
-  ///   d. A document that has been manually touched to be rebroadcasted.
-  /// 3. The query itself has been touched for rebroadcast (such as when its dependencies have been marked as dirty).
+  ///   d. A document that has been touched, which is re-evaluated in the same way as a modified document.
+  /// 3. The query itself has been touched for rebroadcast (such as when a path that its documents depend on
+  ///    was deleted), in which case its result set is re-evaluated from the store.
   @override
   void _onBroadcast() {
     bool shouldRebroadcast = false;
@@ -183,20 +195,28 @@ class ObservableQuery<T> extends Query<T>
             }
             break;
 
-          // 2.c Add / remove modified documents.
+          // 2.c Add / remove modified or touched documents. A touched document is re-evaluated in the
+          // same way as a modified one, since a touch is a write of the document's current value that
+          // signals state its filter or sort depends on may have changed outside of the store.
           case BroadcastEvents.modified:
+          case BroadcastEvents.touched:
+            // A touched document that does not exist has no value to re-evaluate.
+            if (snap == null) {
+              break;
+            }
+
             if (_snapCache.containsKey(doc)) {
               shouldRebroadcast = true;
 
               // 2.c.i Previously satisfied the query filter and still does (updated value must still be rebroadcast on the query).
-              if (_filter(snap!)) {
+              if (_filter(snap)) {
                 _cacheDoc(snap);
 
                 if (hasChangeListener) {
                   changeSnaps.add(
                     DocumentChangeSnapshot(
                       doc: snap.doc,
-                      event: BroadcastEvents.modified,
+                      event: event,
                       prevData: prevSnap?.data,
                       data: snap.data,
                     ),
@@ -219,7 +239,7 @@ class ObservableQuery<T> extends Query<T>
               }
             } else {
               // 2.c.iii Previously did not satisfy the query filter and now does.
-              if (_filter(snap!)) {
+              if (_filter(snap)) {
                 _cacheDoc(snap);
 
                 shouldRebroadcast = true;
@@ -237,32 +257,17 @@ class ObservableQuery<T> extends Query<T>
               }
             }
             break;
-          // 2.d If the broadcast documents include any documents that were manually touched for rebroadcast and are part of this query's
-          // result set, then the query should be rebroadcasted.
-          case BroadcastEvents.touched:
-            if (_snapCache.containsKey(doc)) {
-              shouldRebroadcast = true;
-
-              if (hasChangeListener) {
-                changeSnaps.add(
-                  DocumentChangeSnapshot(
-                    doc: snap!.doc,
-                    event: BroadcastEvents.touched,
-                    prevData: prevSnap?.data,
-                    data: snap.data,
-                  ),
-                );
-              }
-            }
-            break;
         }
       }
     }
 
-    // 3. The query itself has been touched for rebroadcast.
+    // 3. The query itself has been touched for rebroadcast, which happens when a path that documents
+    //    in its result set depend on is deleted. Since the affected documents are not known individually,
+    //    the result set is re-evaluated from the store.
     if (Loon._instance.broadcastManager.eventStore.get(_observerId) ==
         BroadcastEvents.touched) {
       shouldRebroadcast = true;
+      _value = _resetCache(super.get());
     }
 
     if (changeSnaps.isNotEmpty) {

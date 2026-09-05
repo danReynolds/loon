@@ -280,6 +280,26 @@ In this example, whenever a post's associated user is updated, the post will als
 Additionally, whenever a document is updated, it will rebuild its set of dependencies, allowing documents to support dynamic dependencies
 that can change in response to updated document data.
 
+### Rebroadcasting
+
+A document can also be rebroadcast manually. This is useful when state that the document's value depends on has changed outside of the store,
+such as in-memory state read by a query's filter or sort:
+
+```dart
+final transfers = transactions.where((snap) => snap.data.isTransfer);
+
+// `isTransfer` reads in-memory rules. When the rules change, rebroadcast the affected
+// transactions so that the query re-evaluates them.
+transaction.rebroadcast();
+```
+
+A rebroadcast is treated as a write of the document's current value that is not persisted: observers of the document re-read it, queries on its
+collection re-evaluate whether the document belongs in their result set and where it sorts, and the document's dependencies are rebuilt. Change
+listeners receive a `BroadcastEvents.touched` event for the document rather than a `modified` event.
+
+Filters and sorts may therefore read state outside of the document's snapshot, as long as the document is rebroadcast when that state changes.
+Data dependencies do this automatically when that state is another document.
+
 ## 🪴 Root collection
 
 Not all documents necessarily make sense to be grouped together under any particular collection. In this scenario, any one-off documents can be stored

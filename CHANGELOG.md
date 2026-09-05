@@ -1,3 +1,9 @@
+## 5.7.0
+
+* `Document.rebroadcast` is now treated as a write of the document's current value that is not persisted: observers re-read the document, queries re-evaluate its membership and order (so filters and sorts may read state outside of the store, as long as the document is rebroadcast when that state changes), and its dependencies are rebuilt. Previously a rebroadcast only re-emitted cached values, so a query could not add, remove or re-sort a document in response to it.
+* Deleting a path that a query's documents depend on now re-evaluates the query's result set.
+* An observer that throws while processing a broadcast no longer prevents subsequent broadcasts.
+
 ## 5.6.1
 
 * Update `flutter_secure_storage` to v10.
