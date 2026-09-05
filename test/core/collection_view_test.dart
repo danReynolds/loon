@@ -1,3 +1,4 @@
+import 'package:fake_async/fake_async.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:loon/loon.dart';
 
@@ -85,46 +86,50 @@ void main() {
       group(
         'stream',
         () {
-          test('Returns a stream of views of the collection', () async {
-            final dog = TestDogModel('Dog 1');
-            final dogUpdated = TestDogModel('Dog 1 updated');
-            final cat = TestCatModel('Cat 2');
-            final dogDoc = TestAnimalModel.store.doc('1');
-            final catDoc = TestAnimalModel.store.doc('2');
+          test('Returns a stream of views of the collection', () {
+            fakeAsync((async) {
+              final dog = TestDogModel('Dog 1');
+              final dogUpdated = TestDogModel('Dog 1 updated');
+              final cat = TestCatModel('Cat 2');
+              final dogDoc = TestAnimalModel.store.doc('1');
+              final catDoc = TestAnimalModel.store.doc('2');
+              final events =
+                  <List<DocumentSnapshotView<TestDogModel, TestAnimalModel>>>[];
+              final sub = dogs.stream().listen(events.add);
 
-            final stream = dogs.stream();
+              flushBroadcasts(async);
+              dogDoc.create(dog);
+              flushBroadcasts(async);
+              catDoc.create(cat);
+              flushBroadcasts(async);
+              dogDoc.update(dogUpdated);
+              flushBroadcasts(async);
+              dogDoc.delete();
+              flushBroadcasts(async);
+              TestAnimalModel.store.delete();
+              flushBroadcasts(async);
 
-            await asyncEvent();
-            dogDoc.create(dog);
-            await asyncEvent();
-            catDoc.create(cat);
-            await asyncEvent();
-            dogDoc.update(dogUpdated);
-            await asyncEvent();
-            dogDoc.delete();
-            await asyncEvent();
-            TestAnimalModel.store.delete();
-            await asyncEvent();
+              expect(
+                events,
+                [
+                  // No data
+                  [],
+                  // Dog 1 created
+                  [isDogView(dog)],
+                  // Cat 2 created
+                  [isDogView(dog), isDogView(null)],
+                  // Dog 1 updated
+                  [isDogView(dogUpdated), isDogView(null)],
+                  // Dog 1 deleted
+                  [isDogView(null)],
+                  // Animal collection deleted
+                  [],
+                ],
+              );
 
-            final events = await stream.take(6).toList();
-
-            expect(
-              events,
-              [
-                // No data
-                [],
-                // Dog 1 created
-                [isDogView(dog)],
-                // Cat 2 created
-                [isDogView(dog), isDogView(null)],
-                // Dog 1 updated
-                [isDogView(dogUpdated), isDogView(null)],
-                // Dog 1 deleted
-                [isDogView(null)],
-                // Animal collection deleted
-                [],
-              ],
-            );
+              sub.cancel();
+              async.flushMicrotasks();
+            });
           });
         },
       );
@@ -168,41 +173,45 @@ void main() {
       group(
         'stream',
         () {
-          test('Returns a stream of document views', () async {
-            final dog = TestDogModel('Dog 1');
-            final dogUpdated = TestDogModel('Dog 1 updated');
-            final cat = TestCatModel('Cat 1');
-            final doc = TestAnimalModel.store.doc('1');
+          test('Returns a stream of document views', () {
+            fakeAsync((async) {
+              final dog = TestDogModel('Dog 1');
+              final dogUpdated = TestDogModel('Dog 1 updated');
+              final cat = TestCatModel('Cat 1');
+              final doc = TestAnimalModel.store.doc('1');
+              final events =
+                  <DocumentSnapshotView<TestDogModel, TestAnimalModel>?>[];
+              final sub = dogs.doc('1').stream().listen(events.add);
 
-            final stream = dogs.doc('1').stream();
+              flushBroadcasts(async);
+              doc.create(dog);
+              flushBroadcasts(async);
+              doc.update(dogUpdated);
+              flushBroadcasts(async);
+              doc.update(cat);
+              flushBroadcasts(async);
+              doc.delete();
+              flushBroadcasts(async);
 
-            await asyncEvent();
-            doc.create(dog);
-            await asyncEvent();
-            doc.update(dogUpdated);
-            await asyncEvent();
-            doc.update(cat);
-            await asyncEvent();
-            doc.delete();
-            await asyncEvent();
+              expect(
+                events,
+                [
+                  // No data
+                  null,
+                  // Dog 1 created
+                  isDogView(dog),
+                  // Dog 1 updated
+                  isDogView(dogUpdated),
+                  // Dog 1 changed to a cat through the parent collection
+                  isDogView(null),
+                  // Dog 1 deleted
+                  null,
+                ],
+              );
 
-            final events = await stream.take(5).toList();
-
-            expect(
-              events,
-              [
-                // No data
-                null,
-                // Dog 1 created
-                isDogView(dog),
-                // Dog 1 updated
-                isDogView(dogUpdated),
-                // Dog 1 changed to a cat through the parent collection
-                isDogView(null),
-                // Dog 1 deleted
-                null,
-              ],
-            );
+              sub.cancel();
+              async.flushMicrotasks();
+            });
           });
         },
       );
