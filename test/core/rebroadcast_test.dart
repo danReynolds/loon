@@ -313,6 +313,64 @@ void main() {
   });
 
   group('Broadcast', () {
+    test(
+      'An observer that throws does not prevent other observers from processing the broadcast',
+      () {
+        final errors = <Object>[];
+
+        runZonedGuarded(() {
+          fakeAsync((async) {
+            _reset(async);
+            bool shouldThrow = false;
+            final items = Loon.collection<int>('items');
+            items.doc('1').create(1);
+            flushBroadcasts(async);
+
+            // Observers process a broadcast in the order they were created, so both throwing
+            // observers run before the one that does not throw.
+            final throwingA = items.where((snap) {
+              if (shouldThrow) {
+                throw StateError('Filter A failed');
+              }
+              return true;
+            }).observe();
+            final throwingB = items.where((snap) {
+              if (shouldThrow) {
+                throw StateError('Filter B failed');
+              }
+              return true;
+            }).observe();
+            final other = items.observe();
+            final otherEvents = <List<int>>[];
+            final subA = throwingA.stream().listen((_) {});
+            final subB = throwingB.stream().listen((_) {});
+            final sub = other.stream().listen(
+              (snaps) => otherEvents.add([for (final snap in snaps) snap.data]),
+            );
+            flushBroadcasts(async);
+
+            shouldThrow = true;
+            items.doc('1').update(2);
+            flushBroadcasts(async);
+
+            // The remaining observer still processed the broadcast.
+            expect(otherEvents, [
+              [1],
+              [2],
+            ]);
+
+            subA.cancel();
+            subB.cancel();
+            sub.cancel();
+            async.flushMicrotasks();
+          });
+        }, (error, stack) => errors.add(error));
+
+        // Every error is surfaced.
+        expect(errors, [isStateError, isStateError]);
+      },
+    );
+
     test('An observer that throws does not prevent subsequent broadcasts', () {
       // fake_async runs timer callbacks guarded, so the error thrown by the observer is
       // delivered to the zone's error handler rather than thrown from the broadcast flush.

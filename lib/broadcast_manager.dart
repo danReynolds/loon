@@ -58,9 +58,18 @@ class BroadcastManager {
   void _broadcast() {
     _depObservers.clear();
 
+    final errors = <(Object, StackTrace)>[];
+
     try {
       for (final observer in _observers.toList()) {
-        observer._onBroadcast();
+        try {
+          observer._onBroadcast();
+        } catch (error, stackTrace) {
+          // An observer that throws while processing the broadcast (such as a filter that throws)
+          // must not prevent the remaining observers from processing it, since the events are
+          // cleared once the broadcast completes. Errors are surfaced after every observer has run.
+          errors.add((error, stackTrace));
+        }
 
         // Recalculate the set of observers with dependencies after they process the broadcast
         // and update their dependency stores.
@@ -69,11 +78,20 @@ class BroadcastManager {
         }
       }
     } finally {
-      // The event store and pending broadcast are always reset so that an observer that throws
-      // while processing a broadcast (such as a filter that throws) cannot prevent all subsequent
-      // broadcasts from being scheduled.
+      // The event store and pending broadcast are always reset so that a failed broadcast cannot
+      // prevent subsequent broadcasts from being scheduled.
       eventStore.clear();
       _broadcastTimer = null;
+    }
+
+    if (errors.isNotEmpty) {
+      // The first error is rethrown from the broadcast and any others are reported to the zone,
+      // so that none are lost.
+      for (final (error, stackTrace) in errors.skip(1)) {
+        Zone.current.handleUncaughtError(error, stackTrace);
+      }
+      final (error, stackTrace) = errors.first;
+      Error.throwWithStackTrace(error, stackTrace);
     }
   }
 
