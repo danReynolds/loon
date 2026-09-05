@@ -1,4 +1,4 @@
-library loon;
+library;
 
 import 'dart:async';
 import 'dart:convert';
@@ -35,6 +35,7 @@ part 'utils/validation.dart';
 part 'utils/logger.dart';
 part 'utils/exceptions.dart';
 part 'store_reference.dart';
+part 'collection_view.dart';
 
 class Loon {
   static final Loon _instance = Loon._();
