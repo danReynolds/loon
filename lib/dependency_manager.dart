@@ -4,9 +4,7 @@ class DependencyManager {
   /// The store of dependencies of documents indexed by document path.
   final _dependencies = ValueStore<Set<Document>>();
 
-  /// The store of dependents of documents indexed by the path of the document they depend on, so that
-  /// the dependents of every document under a path (such as a deleted document or collection) can be
-  /// found together.
+  /// The store of dependents of documents indexed by document path.
   final _dependents = ValueStore<Set<Document>>();
 
   /// The cache of documents referenced as dependencies. A cache is used so that multiple documents
@@ -121,7 +119,7 @@ class DependencyManager {
 
   /// Returns the existing dependents of the document or collection at the given path and of every
   /// document under it, such as the documents of a deleted document's subcollections.
-  Set<Document> getDependentsUnder(String path) {
+  Set<Document> getPathDependents(String path) {
     final dependents = <Document>{};
 
     for (final pathDependents in _dependents.extractValues(path)) {

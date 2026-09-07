@@ -366,6 +366,49 @@ void main() {
         async.flushMicrotasks();
       });
     });
+
+    test('Does not touch dependents that are deleted along with their dependency', () {
+      fakeAsync((async) {
+        _reset(async);
+        final items = Loon.collection<String>(
+          'items',
+          dependenciesBuilder: (snap) =>
+              snap.id == '2' ? {Loon.collection<String>('items').doc('1')} : null,
+        );
+        final outside = Loon.collection<String>(
+          'outside',
+          dependenciesBuilder: (snap) => {items.doc('1')},
+        );
+        items.doc('1').create('one');
+        // Depends on a sibling that is deleted along with it.
+        items.doc('2').create('two');
+        // Depends on the deleted document from outside the deleted collection.
+        outside.doc('x').create('x');
+        flushBroadcasts(async);
+
+        final insideChanges = <String>[];
+        final outsideChanges = <String>[];
+        final sub = items.doc('2').streamChanges().listen(
+          (change) => insideChanges.add(change.event.name),
+        );
+        final sub2 = outside.doc('x').streamChanges().listen(
+          (change) => outsideChanges.add(change.event.name),
+        );
+        flushBroadcasts(async);
+
+        items.delete();
+        flushBroadcasts(async);
+
+        // The document deleted with the collection is reported as removed rather than touched,
+        // while the dependent outside of the collection is touched.
+        expect(insideChanges, ['removed']);
+        expect(outsideChanges, ['touched']);
+
+        sub.cancel();
+        sub2.cancel();
+        async.flushMicrotasks();
+      });
+    });
   });
 
   group('Broadcast', () {

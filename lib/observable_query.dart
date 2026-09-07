@@ -40,12 +40,10 @@ class ObservableQuery<T> extends Query<T>
   /// 2. The query collection documents have broadcast events. These events include:
   ///   a. A new document has been added that satisfies the query filter.
   ///   b. A document that previously satisfied the query filter has been removed.
-  ///   c. A document that has been modified and meets one of the following requirements:
+  ///   c. A document that has been modified/touched and meets one of the following requirements:
   ///     i. Previously satisfied the query filter and still does (since its modified data must be delivered on the query).
   ///     ii. Previously satisfied the query filter and now does not.
   ///     iii. Previously did not satisfy the query filter and now does.
-  ///   d. A document that has been touched (manually, or because a document it depends on was written
-  ///      or deleted), which is re-evaluated in the same way as a modified document.
   @override
   void _onBroadcast() {
     bool shouldRebroadcast = false;
@@ -152,7 +150,7 @@ class ObservableQuery<T> extends Query<T>
             }
             break;
 
-          // 2.c Add / remove modified or touched documents. A touched document is re-evaluated in the
+          // 2.c Re-evaluate modified/touched documents. A touched document is re-evaluated in the
           // same way as a modified one, since a touch signals that state its filter or sort depends on
           // may have changed outside of the store.
           case BroadcastEvents.modified:

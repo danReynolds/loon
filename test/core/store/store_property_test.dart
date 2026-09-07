@@ -49,40 +49,6 @@ String _lastSegment(String path) {
 }
 
 void main() {
-  group('PathRefStore property', () {
-    test('matches reference model across random inc/dec sequences', () {
-      for (var seed = 0; seed < 200; seed++) {
-        final r = Random(seed);
-        final store = PathRefStore();
-        final live = <String>[]; // inc'd paths, with multiplicity
-        final ops = <String>[];
-
-        for (var step = 0; step < 50; step++) {
-          // dec only targets paths that were actually inc'd, mirroring how the
-          // library pairs inc/dec; bias toward inc when nothing is live.
-          if (live.isEmpty || r.nextBool()) {
-            final p = _randomPath(r);
-            store.inc(p);
-            live.add(p);
-            ops.add('inc($p)');
-          } else {
-            final p = live.removeAt(r.nextInt(live.length));
-            store.dec(p);
-            ops.add('dec($p)');
-          }
-
-          final reason = 'seed=$seed ops=$ops';
-          for (final q in {..._grid, ...live}) {
-            // has(q): true iff some live path is q or a descendant of q.
-            final expected = live.any((p) => _atOrUnder(p, q));
-            expect(store.has(q), expected, reason: '$reason has($q)');
-          }
-          expect(store.isEmpty, live.isEmpty, reason: '$reason isEmpty');
-        }
-      }
-    });
-  });
-
   group('ValueStore property', () {
     test('matches reference model across random write/delete sequences', () {
       for (var seed = 0; seed < 200; seed++) {

@@ -1,4 +1,4 @@
-library loon;
+library;
 
 import 'dart:async';
 import 'dart:convert';
@@ -12,7 +12,6 @@ export 'widgets/query_stream_builder.dart';
 export 'widgets/document_stream_builder.dart';
 
 part 'store/base_value_store.dart';
-part 'store/path_ref_store.dart';
 part 'store/value_store.dart';
 part 'store/value_ref_store.dart';
 part 'broadcast_observer.dart';
@@ -176,8 +175,8 @@ class Loon {
     }
 
     documentStore.delete(doc.path);
-    broadcastManager.deleteDocument(doc);
     dependencyManager.deleteDocument(doc);
+    broadcastManager.deleteDocument(doc);
 
     if (doc.isPersistenceEnabled()) {
       persistManager?.persist(doc);
@@ -190,9 +189,9 @@ class Loon {
       return;
     }
 
-    broadcastManager.deleteCollection(collection);
-    dependencyManager.deleteCollection(collection);
     documentStore.delete(path);
+    dependencyManager.deleteCollection(collection);
+    broadcastManager.deleteCollection(collection);
     persistManager?.clear(collection);
   }
 

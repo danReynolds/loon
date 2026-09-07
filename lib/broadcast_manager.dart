@@ -93,9 +93,8 @@ class BroadcastManager {
   /// Schedules the dependents of the document or collection at the given path, and of every document
   /// under it, for broadcast. Used when a path is deleted, since the documents under it are removed
   /// together and each of their dependents needs to be re-evaluated.
-  void _broadcastDependentsUnder(String path) {
-    final dependents =
-        Loon._instance.dependencyManager.getDependentsUnder(path);
+  void _broadcastPathDependents(String path) {
+    final dependents = Loon._instance.dependencyManager.getPathDependents(path);
     for (final doc in dependents) {
       if (!eventStore.hasValue(doc.path)) {
         writeDocument(doc, BroadcastEvents.touched);
@@ -113,6 +112,9 @@ class BroadcastManager {
     // Deleting a path also invalidates all cached values under that path in the observer
     // value store recursively.
     observerValueStore.delete(path);
+
+    // Deleting a path also schedules all dependents under that path for broadcast.
+    _broadcastPathDependents(path);
 
     _scheduleBroadcast();
   }
@@ -138,7 +140,6 @@ class BroadcastManager {
 
   void deleteCollection(Collection collection) {
     _deletePath(collection.path);
-    _broadcastDependentsUnder(collection.path);
   }
 
   void deleteDocument(Document doc) {
@@ -147,9 +148,6 @@ class BroadcastManager {
     // All cached observer values for the document's collection are also invalidated after
     // the document is deleted.
     observerValueStore.delete(doc.parent, recursive: false);
-
-    // The dependents of the document and of the documents in its subcollections are re-evaluated.
-    _broadcastDependentsUnder(doc.path);
   }
 
   void clear({bool broadcast = true}) {
