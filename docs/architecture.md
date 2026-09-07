@@ -82,18 +82,24 @@ that post in its list of documents, should also notify its listeners.
 If a post is displayed alongside its user's profile picture, then without dependencies the code for the post would need to observe
 both the post and user document for changes separately. With dependencies, it only needs to observe the post and the post will react to any changes to the user automatically.
 
-Document dependencies are modeled using a `ValueStore` for indexing a document's dependencies by path, and a flat map of documents to their set of dependents.
+Document dependencies are modeled with two `ValueStore`s: one indexing each document's dependencies by the document's path, and one
+indexing each document's dependents by the path of the document they depend on, so that the dependents of every document under a path
+can be found together.
 
 ```dart
 final dependenciesStore = ValueStore<Set<Document>>();
-final Map<Document, Set<Document>> dependentsStore = {};
+final dependentsStore = ValueStore<Set<Document>>();
 ```
 
-When a document is updated, it iterates through its set of dependents and marks each of them for broadcast with a `BroadcastEvent.touched` event.
+When a document is written, each of its dependents is marked for broadcast with a `BroadcastEvents.touched` event.
 
-When a document or collection is deleted, each broadcast observer with dependencies checks to see if the deleted path is present in its dependency tree and if it is, then the broadcast observer notifies its listeners.
+When a document or collection is deleted, the dependents of every document under the deleted path (including the documents of its
+subcollections) are looked up in the dependents store and marked for broadcast with a `BroadcastEvents.touched` event in the same way,
+excluding any documents that were removed by the same delete.
 
-Each broadcast observer has its own cached dependency tree which maintains a ref count of the number of times a path exists in the tree using the `PathRefStore`. When a path's ref count goes to 0, it is removed from the tree. This ref store is used to determine if a deleted path exists in an observer's dependencies.
+A touched document is re-evaluated by its observers as if it had been modified: an `ObservableDocument` re-reads it, and an
+`ObservableQuery` re-runs its filter and sort for it, adding, refreshing or evicting it from its result set. Broadcast observers keep no
+dependency state of their own.
 
 ## Persistence Layer
 

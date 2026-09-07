@@ -236,7 +236,14 @@ class Document<T> implements StoreReference {
 
   /// Rebroadcasts the document as a [BroadcastEvents.touched] event. Used when document or query
   /// observers should re-evaluate the document without rewriting or persisting its value.
+  /// Rebroadcasting a document that does not exist does nothing.
   void rebroadcast() {
+    // There is no value for observers to re-evaluate, and scheduling a touched event would
+    // needlessly invalidate the cached values of every query on the collection.
+    if (!exists()) {
+      return;
+    }
+
     Loon._instance.broadcastManager
         .writeDocument(this, BroadcastEvents.touched);
   }

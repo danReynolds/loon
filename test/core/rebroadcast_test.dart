@@ -228,25 +228,29 @@ void main() {
       });
     });
 
-    test('Notifies the listeners of a document that does not exist', () {
+    test('Does nothing for a document that does not exist', () {
       fakeAsync((async) {
         _reset(async);
+        TestUserModel.store.doc('1').create(TestUserModel('a'));
+        flushBroadcasts(async);
+
         final doc = TestUserModel.store.doc('missing');
+        final query = TestUserModel.store.observe();
         final events = <String?>[];
         final collectionEvents = <int>[];
         final sub = doc.stream().listen((snap) => events.add(snap?.data.name));
-        final sub2 = TestUserModel.store.stream().listen(
-          (snaps) => collectionEvents.add(snaps.length),
-        );
+        final sub2 = query.stream().listen((snaps) => collectionEvents.add(snaps.length));
         flushBroadcasts(async);
 
         doc.rebroadcast();
+
+        // There is no value to re-evaluate, so nothing is scheduled and the cached values of
+        // the collection's queries are left intact.
+        expect(query.isDirty, false);
         flushBroadcasts(async);
 
-        // There is no value to re-evaluate, so the document's listeners are notified again
-        // and the collection is unaffected.
-        expect(events, [null, null]);
-        expect(collectionEvents, [0]);
+        expect(events, [null]);
+        expect(collectionEvents, [1]);
 
         sub.cancel();
         sub2.cancel();
