@@ -67,7 +67,7 @@ class DependencyManager {
       }
 
       if (deps.isEmpty) {
-        _dependencies.delete(doc.path);
+        _dependencies.delete(doc.path, recursive: false);
       } else {
         _dependencies.write(doc.path, deps);
       }
@@ -82,7 +82,7 @@ class DependencyManager {
         _removeDependent(dep, doc);
       }
 
-      _dependencies.delete(doc.path);
+      _dependencies.delete(doc.path, recursive: false);
     }
   }
 

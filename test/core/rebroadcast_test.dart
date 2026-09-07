@@ -413,6 +413,51 @@ void main() {
         async.flushMicrotasks();
       });
     });
+
+    test("Clearing a document's dependencies keeps its subcollection documents' dependencies", () {
+      fakeAsync((async) {
+        _reset(async);
+        final users = Loon.collection<String>('users');
+        users.doc('a1').create('a');
+        users.doc('a2').create('b');
+        final posts = Loon.collection<Map<String, String>>(
+          'posts',
+          dependenciesBuilder: (snap) =>
+              snap.data['userId'] != null ? {users.doc(snap.data['userId']!)} : null,
+        );
+        final comments = posts.doc('1').subcollection<String>(
+          'comments',
+          dependenciesBuilder: (snap) => {users.doc(snap.data)},
+        );
+        posts.doc('1').create({'userId': 'a1'});
+        comments.doc('c1').create('a1');
+        flushBroadcasts(async);
+
+        // The post no longer has dependencies of its own.
+        posts.doc('1').update({'text': 'x'});
+        flushBroadcasts(async);
+
+        expect(comments.doc('c1').dependencies(), {users.doc('a1')});
+
+        // Switching the comment's dependency still removes it from the old one.
+        comments.doc('c1').update('a2');
+        flushBroadcasts(async);
+        final events = <String?>[];
+        final sub = comments.doc('c1').stream().listen((snap) => events.add(snap?.data));
+        flushBroadcasts(async);
+
+        users.doc('a1').update('a updated');
+        flushBroadcasts(async);
+        expect(events, ['a2']);
+
+        users.doc('a2').update('b updated');
+        flushBroadcasts(async);
+        expect(events, ['a2', 'a2']);
+
+        sub.cancel();
+        async.flushMicrotasks();
+      });
+    });
   });
 
   group('Broadcast', () {
