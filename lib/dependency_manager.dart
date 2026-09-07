@@ -4,12 +4,38 @@ class DependencyManager {
   /// The store of dependencies of documents indexed by document path.
   final _dependencies = ValueStore<Set<Document>>();
 
-  /// The store of dependents of documents.
-  final _dependents = <Document, Set<Document>?>{};
+  /// The store of dependents of documents indexed by the path of the document they depend on, so that
+  /// the dependents of every document under a path (such as a deleted document or collection) can be
+  /// found together.
+  final _dependents = ValueStore<Set<Document>>();
 
   /// The cache of documents referenced as dependencies. A cache is used so that multiple documents
   /// that share the same dependency reference the same object.
   final _depCache = <Document>{};
+
+  void _addDependent(Document dep, Document doc) {
+    final dependents = _dependents.get(dep.path);
+    if (dependents == null) {
+      _dependents.write(dep.path, {doc});
+    } else {
+      dependents.add(doc);
+    }
+  }
+
+  void _removeDependent(Document dep, Document doc) {
+    final dependents = _dependents.get(dep.path);
+    if (dependents == null) {
+      return;
+    }
+
+    dependents.remove(doc);
+
+    if (dependents.isEmpty) {
+      // The dependents of documents under the dependency's path are unaffected.
+      _dependents.delete(dep.path, recursive: false);
+      _depCache.remove(dep);
+    }
+  }
 
   /// Updates the dependencies/dependents store for the given [DocumentSnapshot]
   /// with the document's recalculated dependencies.
@@ -35,19 +61,11 @@ class DependencyManager {
     }
 
     if (deps != null && prevDeps != null) {
-      final addedDeps = deps.difference(prevDeps);
-      final removedDeps = prevDeps.difference(deps);
-
-      for (final dep in addedDeps) {
-        (_dependents[dep] ??= {}).add(doc);
+      for (final dep in deps.difference(prevDeps)) {
+        _addDependent(dep, doc);
       }
-      for (final dep in removedDeps) {
-        if (_dependents[dep]!.length == 1) {
-          _dependents.remove(dep);
-          _depCache.remove(dep);
-        } else {
-          _dependents[dep]!.remove(doc);
-        }
+      for (final dep in prevDeps.difference(deps)) {
+        _removeDependent(dep, doc);
       }
 
       if (deps.isEmpty) {
@@ -57,17 +75,13 @@ class DependencyManager {
       }
     } else if (deps != null) {
       for (final dep in deps) {
-        (_dependents[dep] ??= {}).add(doc);
+        _addDependent(dep, doc);
       }
 
       _dependencies.write(doc.path, deps);
     } else if (prevDeps != null) {
       for (final dep in prevDeps) {
-        if (_dependents[dep]!.length == 1) {
-          _dependents.remove(dep);
-        } else {
-          _dependents[dep]!.remove(doc);
-        }
+        _removeDependent(dep, doc);
       }
 
       _dependencies.delete(doc.path);
@@ -79,7 +93,7 @@ class DependencyManager {
   }
 
   Set<Document>? getDependents(Document doc) {
-    final dependents = _dependents[doc];
+    final dependents = _dependents.get(doc.path);
 
     if (dependents == null) {
       return null;
@@ -99,7 +113,23 @@ class DependencyManager {
     }
 
     if (dependents.isEmpty) {
-      _dependents.remove(doc);
+      _dependents.delete(doc.path, recursive: false);
+    }
+
+    return dependents;
+  }
+
+  /// Returns the existing dependents of the document or collection at the given path and of every
+  /// document under it, such as the documents of a deleted document's subcollections.
+  Set<Document> getDependentsUnder(String path) {
+    final dependents = <Document>{};
+
+    for (final pathDependents in _dependents.extractValues(path)) {
+      for (final dep in pathDependents) {
+        if (dep.exists()) {
+          dependents.add(dep);
+        }
+      }
     }
 
     return dependents;
@@ -123,7 +153,7 @@ class DependencyManager {
   Map inspect() {
     return {
       "dependencyStore": _dependencies.inspect(),
-      "dependentsStore": _dependents,
+      "dependentsStore": _dependents.inspect(),
       "dependencyCache": _depCache,
     };
   }

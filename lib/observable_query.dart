@@ -7,9 +7,6 @@ class ObservableQuery<T> extends Query<T>
   /// An observable query maintains a cache of snapshots of the documents in its current result set.
   final Map<Document<T>, DocumentSnapshot<T>> _snapCache = {};
 
-  /// An observable query maintains a cache of the dependencies of documents in its current result set.
-  final Map<Document<T>, Set<Document>> _docDepCache = {};
-
   ObservableQuery(
     super.collection, {
     required super.filters,
@@ -24,50 +21,13 @@ class ObservableQuery<T> extends Query<T>
     _init(snaps, multicast: multicast);
   }
 
-  /// Update the doc in the snapshot and dependency caches.
+  /// Caches the snapshot of a document in the result set.
   void _cacheDoc(DocumentSnapshot<T> snap) {
-    final doc = snap.doc;
-    final prevDeps = _docDepCache[doc];
-    final deps = doc.dependencies();
-
-    _snapCache[doc] = snap;
-
-    // If the dependencies of the document have not changed, then the set is guaranteed
-    // to be referentially equal.
-    if (deps != prevDeps) {
-      // The old document should be unconditionally removed and then optionally re-added
-      // with the updated document reference if the document still has dependencies.
-      _docDepCache.remove(doc);
-      if (deps != null) {
-        _docDepCache[doc] = deps;
-      }
-
-      _updateDeps(prevDeps, deps);
-    }
+    _snapCache[snap.doc] = snap;
   }
 
-  /// Replaces the snapshot and dependency caches with the given result set, returning it.
-  List<DocumentSnapshot<T>> _resetCache(List<DocumentSnapshot<T>> snaps) {
-    for (final doc in _snapCache.keys.toList()) {
-      _evictDoc(doc);
-    }
-    for (final snap in snaps) {
-      _cacheDoc(snap);
-    }
-    return snaps;
-  }
-
-  /// Removes the doc from the index, clearing it in both the snapshot and dependency caches.
+  /// Removes the document from the result set cache.
   void _evictDoc(Document<T> doc) {
-    final deps = _docDepCache[doc];
-
-    if (deps != null) {
-      for (final dep in deps) {
-        _deps.dec(dep.path);
-      }
-    }
-
-    _docDepCache.remove(doc);
     _snapCache.remove(doc);
   }
 
@@ -84,9 +44,8 @@ class ObservableQuery<T> extends Query<T>
   ///     i. Previously satisfied the query filter and still does (since its modified data must be delivered on the query).
   ///     ii. Previously satisfied the query filter and now does not.
   ///     iii. Previously did not satisfy the query filter and now does.
-  ///   d. A document that has been touched, which is re-evaluated in the same way as a modified document.
-  /// 3. The query itself has been touched for rebroadcast (such as when a path that its documents depend on
-  ///    was deleted), in which case its result set is re-evaluated from the store.
+  ///   d. A document that has been touched (manually, or because a document it depends on was written
+  ///      or deleted), which is re-evaluated in the same way as a modified document.
   @override
   void _onBroadcast() {
     bool shouldRebroadcast = false;
@@ -120,8 +79,6 @@ class ObservableQuery<T> extends Query<T>
         );
 
         _snapCache.clear();
-        _docDepCache.clear();
-        _deps.clear();
       }
     }
 
@@ -196,8 +153,8 @@ class ObservableQuery<T> extends Query<T>
             break;
 
           // 2.c Add / remove modified or touched documents. A touched document is re-evaluated in the
-          // same way as a modified one, since a touch is a write of the document's current value that
-          // signals state its filter or sort depends on may have changed outside of the store.
+          // same way as a modified one, since a touch signals that state its filter or sort depends on
+          // may have changed outside of the store.
           case BroadcastEvents.modified:
           case BroadcastEvents.touched:
             // A touched document that does not exist has no value to re-evaluate.
@@ -261,22 +218,12 @@ class ObservableQuery<T> extends Query<T>
       }
     }
 
-    // 3. The query itself has been touched for rebroadcast, which happens when a path that documents
-    //    in its result set depend on is deleted. Since the affected documents are not known individually,
-    //    the result set is re-evaluated from the store.
-    if (Loon._instance.broadcastManager.eventStore.get(_observerId) ==
-        BroadcastEvents.touched) {
-      shouldRebroadcast = true;
-      _value = _resetCache(super.get());
-    }
-
     if (changeSnaps.isNotEmpty) {
       _changeController.add(changeSnaps);
     }
 
-    // If the query should be rebroadcast, then it checks if it has a cached computed value,
-    // emitting either that value or if there's a cache miss, recomputing it, caching it
-    // and then emitting it on the stream.
+    // If the query should be rebroadcast, then it emits its cached value if a read already
+    // recomputed it since it was invalidated, and otherwise rebuilds it from the snapshot cache.
     if (shouldRebroadcast) {
       final updatedValue =
           _value ?? (_value = _sortQuery(_snapCache.values.toList()));
@@ -301,8 +248,6 @@ class ObservableQuery<T> extends Query<T>
 
   Map inspect() {
     return {
-      "deps": _deps.inspect(),
-      "docDeps": _docDepCache,
       "docSnaps": _snapCache,
     };
   }

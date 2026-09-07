@@ -10,8 +10,9 @@ enum BroadcastEvents {
   /// The document has been removed.
   removed,
 
-  /// The document has been touched: rebroadcast as if its current value had been written again,
-  /// either manually through [Document.rebroadcast] or because a document it depends on changed.
+  /// The document has been touched: its observers re-read it and the queries on its collection
+  /// re-evaluate it, either manually through [Document.rebroadcast] or because a document it
+  /// depends on was written or deleted.
   touched,
 
   /// The document has been hydrated from persisted storage.
@@ -34,9 +35,6 @@ class BroadcastManager {
   /// The set of broadcast observers that should be notified on broadcast.
   final Set<BroadcastObserver> _observers = {};
 
-  /// The subset of broadcast observers from [_observers] with dependencies.
-  final Set<BroadcastObserver> _depObservers = {};
-
   /// Non-null while a broadcast is scheduled or currently draining.
   Timer? _broadcastTimer;
 
@@ -56,43 +54,28 @@ class BroadcastManager {
   }
 
   void _broadcast() {
-    _depObservers.clear();
-
-    final errors = <(Object, StackTrace)>[];
-
-    try {
-      for (final observer in _observers.toList()) {
-        try {
-          observer._onBroadcast();
-        } catch (error, stackTrace) {
-          // An observer that throws while processing the broadcast (such as a filter that throws)
-          // must not prevent the remaining observers from processing it, since the events are
-          // cleared once the broadcast completes. Errors are surfaced after every observer has run.
-          errors.add((error, stackTrace));
-        }
-
-        // Recalculate the set of observers with dependencies after they process the broadcast
-        // and update their dependency stores.
-        if (!observer._deps.isEmpty) {
-          _depObservers.add(observer);
-        }
+    for (final observer in _observers.toList()) {
+      try {
+        observer._onBroadcast();
+      } catch (error, stackTrace) {
+        // An observer can throw while processing a broadcast, for example if a query's filter throws.
+        // The error is reported rather than thrown so that the remaining observers still process the
+        // broadcast, since its events are cleared once it completes.
+        FlutterError.reportError(
+          FlutterErrorDetails(
+            exception: error,
+            stack: stackTrace,
+            library: 'loon',
+            context: ErrorDescription(
+              'while broadcasting to an observer of ${observer.path}',
+            ),
+          ),
+        );
       }
-    } finally {
-      // The event store and pending broadcast are always reset so that a failed broadcast cannot
-      // prevent subsequent broadcasts from being scheduled.
-      eventStore.clear();
-      _broadcastTimer = null;
     }
 
-    if (errors.isNotEmpty) {
-      // The first error is rethrown from the broadcast and any others are reported to the zone,
-      // so that none are lost.
-      for (final (error, stackTrace) in errors.skip(1)) {
-        Zone.current.handleUncaughtError(error, stackTrace);
-      }
-      final (error, stackTrace) = errors.first;
-      Error.throwWithStackTrace(error, stackTrace);
-    }
+    eventStore.clear();
+    _broadcastTimer = null;
   }
 
   /// Schedules all dependents of the given document for broadcast.
@@ -103,6 +86,19 @@ class BroadcastManager {
         if (!eventStore.hasValue(doc.path)) {
           writeDocument(doc, BroadcastEvents.touched);
         }
+      }
+    }
+  }
+
+  /// Schedules the dependents of the document or collection at the given path, and of every document
+  /// under it, for broadcast. Used when a path is deleted, since the documents under it are removed
+  /// together and each of their dependents needs to be re-evaluated.
+  void _broadcastDependentsUnder(String path) {
+    final dependents =
+        Loon._instance.dependencyManager.getDependentsUnder(path);
+    for (final doc in dependents) {
+      if (!eventStore.hasValue(doc.path)) {
+        writeDocument(doc, BroadcastEvents.touched);
       }
     }
   }
@@ -118,14 +114,6 @@ class BroadcastManager {
     // value store recursively.
     observerValueStore.delete(path);
 
-    /// Deleting a path is relatively infrequent, so iterating over the subset of active observers with dependencies
-    /// is presumed to be reasonable for performance, given the small number of deletions and deps observers.
-    for (final observer in _depObservers) {
-      if (observer._deps.has(path)) {
-        eventStore.write(observer._observerId, BroadcastEvents.touched);
-      }
-    }
-
     _scheduleBroadcast();
   }
 
@@ -133,8 +121,7 @@ class BroadcastManager {
     final path = doc.path;
 
     // All cached observer values for the document and its collection are invalidated whenever
-    // the document is written, including when it is touched: a touch is a write of the document's
-    // current value, so its observers re-read it and the queries on its collection re-evaluate it.
+    // the document is written or touched.
     observerValueStore.delete(doc.path, recursive: false);
     observerValueStore.delete(doc.parent, recursive: false);
 
@@ -151,6 +138,7 @@ class BroadcastManager {
 
   void deleteCollection(Collection collection) {
     _deletePath(collection.path);
+    _broadcastDependentsUnder(collection.path);
   }
 
   void deleteDocument(Document doc) {
@@ -160,7 +148,8 @@ class BroadcastManager {
     // the document is deleted.
     observerValueStore.delete(doc.parent, recursive: false);
 
-    _broadcastDependents(doc);
+    // The dependents of the document and of the documents in its subcollections are re-evaluated.
+    _broadcastDependentsUnder(doc.path);
   }
 
   void clear({bool broadcast = true}) {
@@ -180,16 +169,11 @@ class BroadcastManager {
   void addObserver<T, S>(BroadcastObserver<T, S> observer, T initialValue) {
     _observers.add(observer);
 
-    if (!observer._deps.isEmpty) {
-      _depObservers.add(observer);
-    }
-
     observerValueStore.write(observer._observerId, initialValue);
   }
 
   void removeObserver(BroadcastObserver observer) {
     _observers.remove(observer);
-    _depObservers.remove(observer);
 
     observerValueStore.delete(observer._observerId);
   }
@@ -201,7 +185,6 @@ class BroadcastManager {
       observer.dispose();
     }
     _observers.clear();
-    _depObservers.clear();
     observerValueStore.clear();
   }
 

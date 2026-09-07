@@ -298,9 +298,9 @@ void onRulesChanged(Iterable<String> affectedTransactionIds) {
 }
 ```
 
-A rebroadcast is treated as a write of the document's current value that is not persisted: observers of the document re-read it, queries on its
-collection re-evaluate whether the document belongs in their result set and where it sorts, and the document's dependencies are rebuilt. Change
-listeners receive a `BroadcastEvents.touched` event for the document rather than a `modified` event.
+On a rebroadcast, observers of the document re-read it and queries on its collection re-evaluate whether the document belongs in their result
+set and where it sorts. Nothing is persisted and the document's dependencies are not rebuilt; call `rebuildDependencies()` first if they may have
+changed. Change listeners receive a `BroadcastEvents.touched` event for the document rather than a `modified` event.
 
 Filters and sorts may therefore read state outside of the document's snapshot, as long as the document is rebroadcast when that state changes.
 Data dependencies do this automatically when that state is another document.

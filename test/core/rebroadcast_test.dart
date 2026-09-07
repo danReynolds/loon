@@ -1,15 +1,14 @@
-import 'dart:async';
-
 import 'package:fake_async/fake_async.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:loon/loon.dart';
 
 import '../models/test_user_model.dart';
 import '../utils.dart';
 
-/// Tests for [Document.rebroadcast], which is treated as a write of the document's current value
-/// that is not persisted: observers re-read the document, queries re-evaluate it, and its
-/// dependencies are rebuilt.
+/// Tests for [Document.rebroadcast] and for dependents being rebroadcast when the documents they
+/// depend on are written or deleted. A touched document is re-evaluated by its observers: document
+/// observers re-read it and queries re-evaluate its membership and order.
 ///
 /// These run under [fakeAsync] so that the broadcast timer is flushed deterministically.
 
@@ -17,6 +16,19 @@ void _reset(FakeAsync async) {
   Loon.unsubscribe();
   Loon.clearAll(broadcast: false);
   async.flushMicrotasks();
+}
+
+/// Runs [body] while capturing the errors reported through [FlutterError.reportError].
+List<Object> _captureErrors(void Function() body) {
+  final errors = <Object>[];
+  final onError = FlutterError.onError;
+  FlutterError.onError = (details) => errors.add(details.exception);
+  try {
+    body();
+  } finally {
+    FlutterError.onError = onError;
+  }
+  return errors;
 }
 
 void main() {
@@ -138,7 +150,7 @@ void main() {
       });
     });
 
-    test("Rebuilds the document's dependencies", () {
+    test('Propagates rebuilt dependencies', () {
       fakeAsync((async) {
         _reset(async);
         bool dependsOnSecond = false;
@@ -153,22 +165,28 @@ void main() {
         post.create('Post 1');
         flushBroadcasts(async);
 
-        expect(post.dependencies(), {users.doc('1')});
+        final events = <String?>[];
+        final sub = post.stream().listen((snap) => events.add(snap?.data));
+        flushBroadcasts(async);
 
+        // A rebroadcast does not rebuild dependencies on its own.
         dependsOnSecond = true;
         post.rebroadcast();
         flushBroadcasts(async);
+        expect(post.dependencies(), {users.doc('1')});
 
+        post.rebuildDependencies();
+        post.rebroadcast();
+        flushBroadcasts(async);
         expect(post.dependencies(), {users.doc('2')});
 
-        // The new dependency now causes the post to be rebroadcast.
-        final events = <String?>[];
-        final sub = post.stream().listen((snap) => events.add(snap?.data));
+        // The new dependency now causes the post to be rebroadcast, and the old one does not.
+        users.doc('1').update('User 1 updated');
         flushBroadcasts(async);
         users.doc('2').update('User 2 updated');
         flushBroadcasts(async);
 
-        expect(events, ['Post 1', 'Post 1']);
+        expect(events, ['Post 1', 'Post 1', 'Post 1', 'Post 1']);
 
         sub.cancel();
         async.flushMicrotasks();
@@ -277,7 +295,7 @@ void main() {
       });
     });
 
-    test('Re-evaluates a query when a path that its documents depend on is deleted', () {
+    test('Re-evaluates dependents when a dependency collection is deleted', () {
       fakeAsync((async) {
         _reset(async);
         final users = Loon.collection<bool>('users');
@@ -286,7 +304,9 @@ void main() {
           dependenciesBuilder: (snap) => {users.doc(snap.data)},
         );
         users.doc('u1').create(true);
+        users.doc('u2').create(true);
         posts.doc('p1').create('u1');
+        posts.doc('p2').create('u2');
         flushBroadcasts(async);
 
         final active = posts
@@ -302,6 +322,42 @@ void main() {
         flushBroadcasts(async);
 
         expect(emissions, [
+          ['p1', 'p2'],
+          [],
+        ]);
+
+        sub.cancel();
+        async.flushMicrotasks();
+      });
+    });
+
+    test("Re-evaluates dependents of a deleted document's subcollection documents", () {
+      fakeAsync((async) {
+        _reset(async);
+        final users = Loon.collection<String>('users');
+        final friends = users.doc('u1').subcollection<bool>('friends');
+        final posts = Loon.collection<String>(
+          'posts',
+          dependenciesBuilder: (snap) => {friends.doc(snap.data)},
+        );
+        users.doc('u1').create('User 1');
+        friends.doc('f1').create(true);
+        posts.doc('p1').create('f1');
+        flushBroadcasts(async);
+
+        // Posts whose tagged friend still exists.
+        final tagged = posts.where((snap) => friends.doc(snap.data).exists()).observe();
+        final emissions = <List<String>>[];
+        final sub = tagged.stream().listen(
+          (snaps) => emissions.add([for (final snap in snaps) snap.id]),
+        );
+        flushBroadcasts(async);
+
+        // Deleting the user deletes its friends subcollection, so the post's dependency is gone.
+        users.doc('u1').delete();
+        flushBroadcasts(async);
+
+        expect(emissions, [
           ['p1'],
           [],
         ]);
@@ -313,70 +369,61 @@ void main() {
   });
 
   group('Broadcast', () {
-    test(
-      'An observer that throws does not prevent other observers from processing the broadcast',
-      () {
-        final errors = <Object>[];
+    test('An observer that throws does not prevent other observers from processing the broadcast', () {
+      final errors = _captureErrors(() {
+        fakeAsync((async) {
+          _reset(async);
+          bool shouldThrow = false;
+          final items = Loon.collection<int>('items');
+          items.doc('1').create(1);
+          flushBroadcasts(async);
 
-        runZonedGuarded(() {
-          fakeAsync((async) {
-            _reset(async);
-            bool shouldThrow = false;
-            final items = Loon.collection<int>('items');
-            items.doc('1').create(1);
-            flushBroadcasts(async);
+          // Observers process a broadcast in the order they were created, so both throwing
+          // observers run before the one that does not throw.
+          final throwingA = items.where((snap) {
+            if (shouldThrow) {
+              throw StateError('Filter A failed');
+            }
+            return true;
+          }).observe();
+          final throwingB = items.where((snap) {
+            if (shouldThrow) {
+              throw StateError('Filter B failed');
+            }
+            return true;
+          }).observe();
+          final other = items.observe();
+          final otherEvents = <List<int>>[];
+          final subA = throwingA.stream().listen((_) {});
+          final subB = throwingB.stream().listen((_) {});
+          final sub = other.stream().listen(
+            (snaps) => otherEvents.add([for (final snap in snaps) snap.data]),
+          );
+          flushBroadcasts(async);
 
-            // Observers process a broadcast in the order they were created, so both throwing
-            // observers run before the one that does not throw.
-            final throwingA = items.where((snap) {
-              if (shouldThrow) {
-                throw StateError('Filter A failed');
-              }
-              return true;
-            }).observe();
-            final throwingB = items.where((snap) {
-              if (shouldThrow) {
-                throw StateError('Filter B failed');
-              }
-              return true;
-            }).observe();
-            final other = items.observe();
-            final otherEvents = <List<int>>[];
-            final subA = throwingA.stream().listen((_) {});
-            final subB = throwingB.stream().listen((_) {});
-            final sub = other.stream().listen(
-              (snaps) => otherEvents.add([for (final snap in snaps) snap.data]),
-            );
-            flushBroadcasts(async);
+          shouldThrow = true;
+          items.doc('1').update(2);
+          flushBroadcasts(async);
 
-            shouldThrow = true;
-            items.doc('1').update(2);
-            flushBroadcasts(async);
+          // The remaining observer still processed the broadcast.
+          expect(otherEvents, [
+            [1],
+            [2],
+          ]);
 
-            // The remaining observer still processed the broadcast.
-            expect(otherEvents, [
-              [1],
-              [2],
-            ]);
+          subA.cancel();
+          subB.cancel();
+          sub.cancel();
+          async.flushMicrotasks();
+        });
+      });
 
-            subA.cancel();
-            subB.cancel();
-            sub.cancel();
-            async.flushMicrotasks();
-          });
-        }, (error, stack) => errors.add(error));
-
-        // Every error is surfaced.
-        expect(errors, [isStateError, isStateError]);
-      },
-    );
+      // Every error is reported.
+      expect(errors, [isStateError, isStateError]);
+    });
 
     test('An observer that throws does not prevent subsequent broadcasts', () {
-      // fake_async runs timer callbacks guarded, so the error thrown by the observer is
-      // delivered to the zone's error handler rather than thrown from the broadcast flush.
-      final errors = <Object>[];
-
-      runZonedGuarded(() {
+      final errors = _captureErrors(() {
         fakeAsync((async) {
           _reset(async);
           bool shouldThrow = false;
@@ -412,7 +459,7 @@ void main() {
           sub2.cancel();
           async.flushMicrotasks();
         });
-      }, (error, stack) => errors.add(error));
+      });
 
       expect(errors, [isStateError]);
     });

@@ -23,9 +23,6 @@ mixin BroadcastObserver<T, S> {
   /// The path being observed in the store.
   String get path;
 
-  /// The dependencies of the observer in the store.
-  final _deps = PathRefStore();
-
   void _init(
     T initialValue, {
     required bool multicast,
@@ -78,29 +75,6 @@ mixin BroadcastObserver<T, S> {
   set _value(T? value) {
     Loon._instance.broadcastManager.observerValueStore
         .write(_observerId, value);
-  }
-
-  /// Updates the observer's dependency graph given the change in its previous and updated set of dependencies.
-  void _updateDeps(Set<Document>? prevDeps, Set<Document>? deps) {
-    if (deps != null && prevDeps != null) {
-      final addedDeps = deps.difference(prevDeps);
-      final removedDeps = prevDeps.difference(deps);
-
-      for (final dep in addedDeps) {
-        _deps.inc(dep.path);
-      }
-      for (final dep in removedDeps) {
-        _deps.dec(dep.path);
-      }
-    } else if (deps != null) {
-      for (final dep in deps) {
-        _deps.inc(dep.path);
-      }
-    } else if (prevDeps != null) {
-      for (final dep in prevDeps) {
-        _deps.dec(dep.path);
-      }
-    }
   }
 
   void _onBroadcast();

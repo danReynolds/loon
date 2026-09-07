@@ -844,80 +844,6 @@ void main() {
           );
 
           test(
-            "Maintains its dependency cache correctly",
-            () {
-              fakeAsync((async) {
-                final usersCollection = Loon.collection('users');
-                final postsCollection = Loon.collection<Json>(
-                  'posts',
-                  dependenciesBuilder: (snap) {
-                    if (snap.data['userId'] != null) {
-                      return {
-                        usersCollection.doc(snap.data['userId'].toString()),
-                      };
-                    }
-                    return null;
-                  },
-                );
-
-                final postDoc = postsCollection.doc('1');
-                final postData = {"id": 1, "text": "Post 1", "userId": 1};
-                final postData2 = {"id": 1, "text": "Post 1 updated"};
-                final postData3 = {
-                  "id": 1,
-                  "text": "Post 1 updated",
-                  "userId": 3
-                };
-                final postObs = postDoc.observe();
-
-                postDoc.create(postData);
-                flushBroadcasts(async);
-
-                // After creating the post document, it should have added its user dependency into the observable's
-                // dep tree.
-                expect(postObs.inspect(), {
-                  "deps": {
-                    "__ref": 1,
-                    "users": {
-                      "__ref": 1,
-                      "1": 1,
-                    },
-                  },
-                });
-
-                postDoc.update(postData2);
-                flushBroadcasts(async);
-
-                // After updating the document, it should have removed the user dependency from the observable's
-                // dep tree.
-                expect(postObs.inspect(), {
-                  "deps": {},
-                });
-
-                postDoc.update(postData3);
-                flushBroadcasts(async);
-
-                // The observable should have been updated to have a user dependency again.
-                expect(postObs.inspect(), {
-                  "deps": {
-                    "__ref": 1,
-                    "users": {
-                      "__ref": 1,
-                      "3": 1,
-                    },
-                  },
-                });
-
-                postsCollection.delete();
-                flushBroadcasts(async);
-
-                // After deleting the posts collection, observable should have cleared its dependencies.
-                expect(postObs.inspect(), {"deps": {}});
-              });
-            },
-          );
-
-          test(
             'Invalidates its cached value when the document is updated',
             () {
               fakeAsync((async) {
@@ -1715,7 +1641,7 @@ void main() {
           );
 
           test(
-            "Maintains its dependency/snapshot caches correctly",
+            "Maintains its snapshot cache correctly",
             () {
               fakeAsync((async) {
                 final usersCollection = Loon.collection('users');
@@ -1741,29 +1667,13 @@ void main() {
                 };
                 final postDoc2 = postsCollection.doc('2');
                 final post2Data = {"id": 2, "text": "Post 2", "userId": 2};
-                final userDoc = usersCollection.doc('1');
-                final userDoc2 = usersCollection.doc('2');
-                final userDoc3 = usersCollection.doc('3');
                 final postsObs = postsCollection.toQuery().observe();
 
                 postDoc.create(post1Data);
                 flushBroadcasts(async);
 
-                // After creating the post document, the query should have a global and document level
-                // dependency.
+                // After creating the post document, the query should have cached its snapshot.
                 expect(postsObs.inspect(), {
-                  "deps": {
-                    "__ref": 1,
-                    "users": {
-                      "__ref": 1,
-                      "1": 1,
-                    },
-                  },
-                  "docDeps": {
-                    postDoc: {
-                      userDoc,
-                    },
-                  },
                   "docSnaps": {
                     postDoc: DocumentSnapshot(doc: postDoc, data: post1Data),
                   }
@@ -1772,11 +1682,8 @@ void main() {
                 postDoc.update(post1Data2);
                 flushBroadcasts(async);
 
-                // After updating the document, it should have removed the user dependency from the observable's
-                // dep tree and document level dependency cache.
+                // After updating the document, the cached snapshot should reflect the update.
                 expect(postsObs.inspect(), {
-                  "deps": {},
-                  "docDeps": {},
                   "docSnaps": {
                     postDoc: DocumentSnapshot(doc: postDoc, data: post1Data2),
                   }
@@ -1786,25 +1693,7 @@ void main() {
                 postDoc2.create(post2Data);
                 flushBroadcasts(async);
 
-                // After updating the first post to have a user dependency again, and creating a second
-                // post with another user dependency, the query's dependencies should have two entries.
                 expect(postsObs.inspect(), {
-                  "deps": {
-                    "__ref": 2,
-                    "users": {
-                      "__ref": 2,
-                      "1": 1,
-                      "2": 1,
-                    },
-                  },
-                  "docDeps": {
-                    postDoc: {
-                      userDoc,
-                    },
-                    postDoc2: {
-                      userDoc2,
-                    },
-                  },
                   "docSnaps": {
                     postDoc: DocumentSnapshot(doc: postDoc, data: post1Data),
                     postDoc2: DocumentSnapshot(doc: postDoc2, data: post2Data),
@@ -1814,26 +1703,7 @@ void main() {
                 postDoc.update(post1Data3);
                 flushBroadcasts(async);
 
-                // After updating the post to be dependent on a different user, the observable query
-                // should have removed the reference to the previous user (user 1) and replaced it with the
-                // dependency on user 3.
                 expect(postsObs.inspect(), {
-                  "deps": {
-                    "__ref": 2,
-                    "users": {
-                      "__ref": 2,
-                      "2": 1,
-                      "3": 1,
-                    },
-                  },
-                  "docDeps": {
-                    postDoc: {
-                      userDoc3,
-                    },
-                    postDoc2: {
-                      userDoc2,
-                    },
-                  },
                   "docSnaps": {
                     postDoc: DocumentSnapshot(doc: postDoc, data: post1Data3),
                     postDoc2: DocumentSnapshot(doc: postDoc2, data: post2Data),
@@ -1843,12 +1713,8 @@ void main() {
                 postsCollection.delete();
                 flushBroadcasts(async);
 
-                // After deleting the posts collection, the query should have cleared its global
-                // and document level dependencies.
-                expect(
-                  postsObs.inspect(),
-                  {"deps": {}, "docDeps": {}, "docSnaps": {}},
-                );
+                // After deleting the posts collection, the query should have cleared its cache.
+                expect(postsObs.inspect(), {"docSnaps": {}});
               });
             },
           );
@@ -2336,9 +2202,13 @@ void main() {
           expect(
             Loon.inspect()['dependentsStore'],
             {
-              userDoc: {
-                postDoc,
-              },
+              "users": {
+                "__values": {
+                  "1": {
+                    postDoc,
+                  }
+                }
+              }
             },
           );
 
@@ -2370,9 +2240,13 @@ void main() {
           expect(
             Loon.inspect()['dependentsStore'],
             {
-              userDoc: {
-                postDoc,
-              },
+              "users": {
+                "__values": {
+                  "1": {
+                    postDoc,
+                  }
+                }
+              }
             },
           );
 
@@ -2608,8 +2482,12 @@ void main() {
             expect(
               Loon.inspect()['dependentsStore'],
               {
-                postDoc: {
-                  userDoc,
+                "posts": {
+                  "__values": {
+                    "1": {
+                      userDoc,
+                    }
+                  }
                 }
               },
             );
@@ -2641,11 +2519,19 @@ void main() {
             expect(
               Loon.inspect()['dependentsStore'],
               {
-                postDoc: {
-                  userDoc,
+                "posts": {
+                  "__values": {
+                    "1": {
+                      userDoc,
+                    }
+                  }
                 },
-                userDoc: {
-                  postDoc,
+                "users": {
+                  "__values": {
+                    "1": {
+                      postDoc,
+                    }
+                  }
                 }
               },
             );
@@ -2714,8 +2600,12 @@ void main() {
             expect(
               Loon.inspect()['dependentsStore'],
               {
-                userDoc: {
-                  friendDoc,
+                "users": {
+                  "__values": {
+                    "1": {
+                      friendDoc,
+                    }
+                  }
                 }
               },
             );
@@ -2733,9 +2623,13 @@ void main() {
               {
                 // The dependents are not cleared when a collection is cleared, instead
                 // the dependents are lazily cleared when the dependent is updated.
-                userDoc: {
-                  friendDoc,
-                },
+                "users": {
+                  "__values": {
+                    "1": {
+                      friendDoc,
+                    }
+                  }
+                }
               },
             );
 
