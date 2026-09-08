@@ -2,8 +2,12 @@ part of './loon.dart';
 
 /// A mixin that provides an observable interface for the access and streaming of data broadcasted from the store.
 mixin BroadcastObserver<T, S> {
-  late final StreamController<T> _controller;
-  late final StreamController<S> _changeController;
+  StreamController<T>? _controller;
+  StreamController<S>? _changeController;
+
+  /// Whether the observer has been disposed. A disposed observer releases its controllers and
+  /// last value, so that anything still referencing it retains nothing of its observer state.
+  bool _disposed = false;
 
   /// Whether the [Observable] can have more than one observable subscription. A single-subscription
   /// observable will allow one listener and release its resources automatically when its listener cancels its subscription.
@@ -15,7 +19,7 @@ mixin BroadcastObserver<T, S> {
   /// The latest value emitted on the observer's stream controller. This value can be different
   /// from the *current* value of the observer, which may not have been broadcast on its stream yet
   /// and is cached in the [BroadcastManager].
-  late T _controllerValue;
+  T? _controllerValue;
 
   /// The unique ID of the observer instance.
   late String _observerId;
@@ -29,16 +33,20 @@ mixin BroadcastObserver<T, S> {
   }) {
     this.multicast = multicast;
 
+    final StreamController<T> controller;
+    final StreamController<S> changeController;
     if (multicast) {
-      _controller = StreamController<T>.broadcast();
-      _changeController = StreamController<S>.broadcast();
+      controller = StreamController<T>.broadcast();
+      changeController = StreamController<S>.broadcast();
     } else {
-      _controller = StreamController<T>(onCancel: dispose);
-      _changeController = StreamController<S>(onCancel: dispose);
+      controller = StreamController<T>(onCancel: dispose);
+      changeController = StreamController<S>(onCancel: dispose);
     }
+    _controller = controller;
+    _changeController = changeController;
 
     _controllerValue = initialValue;
-    _controller.add(initialValue);
+    controller.add(initialValue);
 
     _observerId = "${path}__${generateFastId()}";
 
@@ -46,24 +54,38 @@ mixin BroadcastObserver<T, S> {
   }
 
   void dispose() {
-    _controller.close();
-    _changeController.close();
+    if (_disposed) {
+      return;
+    }
+    _disposed = true;
+
+    _controller?.close();
+    _changeController?.close();
+    // The controllers and last value are released so that a disposed observer that is still
+    // referenced elsewhere, such as through a snapshot written through it, retains nothing.
+    _controller = null;
+    _changeController = null;
+    _controllerValue = null;
+
     Loon._instance.broadcastManager.removeObserver(this);
   }
 
   T add(T updatedValue) {
     Loon._instance.broadcastManager.observerValueStore
         .write(_observerId, updatedValue);
-    _controller.add(updatedValue);
-    return _controllerValue = updatedValue;
+    _controller?.add(updatedValue);
+    _controllerValue = updatedValue;
+    return updatedValue;
   }
 
+  /// The observer's stream of values. A disposed observer's stream is empty.
   Stream<T> stream() {
-    return _controller.stream;
+    return _controller?.stream ?? Stream<T>.empty();
   }
 
+  /// The observer's stream of changes. A disposed observer's stream is empty.
   Stream<S> streamChanges() {
-    return _changeController.stream;
+    return _changeController?.stream ?? Stream<S>.empty();
   }
 
   bool get isDirty;

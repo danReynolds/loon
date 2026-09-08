@@ -47,8 +47,9 @@ class ObservableDocument<T> extends Document<T>
     if (event != null) {
       final snap = get();
 
-      if (_changeController.hasListener) {
-        _changeController.add(
+      final changeController = _changeController;
+      if (changeController != null && changeController.hasListener) {
+        changeController.add(
           DocumentChangeSnapshot(
             doc: this,
             event: event,
@@ -69,6 +70,18 @@ class ObservableDocument<T> extends Document<T>
   ObservableDocument<T> observe({
     bool multicast = false,
   }) {
+    // A disposed observable no longer observes anything, so a fresh one is returned instead.
+    if (_disposed) {
+      return ObservableDocument<T>(
+        parent,
+        id,
+        fromJson: fromJson,
+        toJson: toJson,
+        persistorSettings: persistorSettings,
+        dependenciesBuilder: dependenciesBuilder,
+        multicast: multicast,
+      );
+    }
     return this;
   }
 
