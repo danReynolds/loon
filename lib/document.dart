@@ -51,17 +51,9 @@ class Document<T> implements StoreReference {
       return true;
     }
 
-    if (other is! Document) {
-      return false;
-    }
-
-    // Documents are equivalent based on their ID and collection, however, observable documents
-    // are not, since they have additional properties unique to their instance.
-    if (other is! ObservableDocument && this is! ObservableDocument) {
-      return other.path == path;
-    }
-
-    return false;
+    // Documents are equivalent based on their path. An [ObservableDocument] is equal to the
+    // document it observes; observer instances are tracked by identity in the [BroadcastManager].
+    return other is Document && other.path == path;
   }
 
   @override

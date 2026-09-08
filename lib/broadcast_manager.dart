@@ -32,8 +32,9 @@ class BroadcastManager {
   /// The store of broadcast observer values.
   final observerValueStore = ValueStore();
 
-  /// The set of broadcast observers that should be notified on broadcast.
-  final Set<BroadcastObserver> _observers = {};
+  /// The set of broadcast observers that should be notified on broadcast. Observers are tracked
+  /// by identity, since observable documents compare equal to the documents they observe.
+  final Set<BroadcastObserver> _observers = LinkedHashSet.identity();
 
   /// Non-null while a broadcast is scheduled or currently draining.
   Timer? _broadcastTimer;
