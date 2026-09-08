@@ -458,6 +458,52 @@ void main() {
         async.flushMicrotasks();
       });
     });
+
+    test('Deleting a document drops the dependents under it from the index', () {
+      fakeAsync((async) {
+        _reset(async);
+        final accounts = Loon.collection<String>('accounts');
+        final account = accounts.doc('a1');
+        final transactions = account.subcollection<String>(
+          'transactions',
+          dependenciesBuilder: (snap) => {account},
+        );
+        final reports = Loon.collection<String>(
+          'reports',
+          dependenciesBuilder: (snap) => {account},
+        );
+        account.create('Account 1');
+        transactions.doc('t1').create('tx');
+        transactions.doc('t2').create('tx');
+        reports.doc('r1').create('report');
+        flushBroadcasts(async);
+
+        final reportEvents = <String>[];
+        final sub = reports.doc('r1').streamChanges().listen(
+          (change) => reportEvents.add(change.event.name),
+        );
+        flushBroadcasts(async);
+
+        account.delete();
+        flushBroadcasts(async);
+
+        // The transactions were deleted with the account and are no longer indexed as its
+        // dependents, while the report outside of it was touched and remains indexed.
+        expect(reportEvents, ['touched']);
+        expect(Loon.inspect()['dependentsStore'], {
+          'accounts__a1': {
+            'reports': {
+              '__values': {
+                'r1': reports.doc('r1'),
+              }
+            }
+          }
+        });
+
+        sub.cancel();
+        async.flushMicrotasks();
+      });
+    });
   });
 
   group('Broadcast', () {

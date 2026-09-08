@@ -83,12 +83,13 @@ If a post is displayed alongside its user's profile picture, then without depend
 both the post and user document for changes separately. With dependencies, it only needs to observe the post and the post will react to any changes to the user automatically.
 
 Document dependencies are modeled with two `ValueStore`s: one indexing each document's dependencies by the document's path, and one
-indexing each document's dependents by the path of the document they depend on, so that the dependents of every document under a path
-can be found together.
+indexing each document's dependents by the path of the document they depend on. Each document's dependents are themselves a
+`ValueStore` keyed by path, so that the dependents of every document under a path can be found together and, when a path is deleted,
+the dependents under it (which are deleted along with it) can be dropped with a single delete.
 
 ```dart
 final dependenciesStore = ValueStore<Set<Document>>();
-final dependentsStore = ValueStore<Set<Document>>();
+final dependentsStore = ValueStore<ValueStore<Document>>();
 ```
 
 When a document is written, each of its dependents is marked for broadcast with a `BroadcastEvents.touched` event.

@@ -2202,10 +2202,10 @@ void main() {
           expect(
             Loon.inspect()['dependentsStore'],
             {
-              "users": {
-                "__values": {
-                  "1": {
-                    postDoc,
+              "users__1": {
+                "posts": {
+                  "__values": {
+                    "1": postDoc,
                   }
                 }
               }
@@ -2240,10 +2240,10 @@ void main() {
           expect(
             Loon.inspect()['dependentsStore'],
             {
-              "users": {
-                "__values": {
-                  "1": {
-                    postDoc,
+              "users__1": {
+                "posts": {
+                  "__values": {
+                    "1": postDoc,
                   }
                 }
               }
@@ -2482,10 +2482,10 @@ void main() {
             expect(
               Loon.inspect()['dependentsStore'],
               {
-                "posts": {
-                  "__values": {
-                    "1": {
-                      userDoc,
+                "posts__1": {
+                  "users": {
+                    "__values": {
+                      "1": userDoc,
                     }
                   }
                 }
@@ -2519,17 +2519,17 @@ void main() {
             expect(
               Loon.inspect()['dependentsStore'],
               {
-                "posts": {
-                  "__values": {
-                    "1": {
-                      userDoc,
+                "posts__1": {
+                  "users": {
+                    "__values": {
+                      "1": userDoc,
                     }
                   }
                 },
-                "users": {
-                  "__values": {
-                    "1": {
-                      postDoc,
+                "users__1": {
+                  "posts": {
+                    "__values": {
+                      "1": postDoc,
                     }
                   }
                 }
@@ -2600,10 +2600,10 @@ void main() {
             expect(
               Loon.inspect()['dependentsStore'],
               {
-                "users": {
-                  "__values": {
-                    "1": {
-                      friendDoc,
+                "users__1": {
+                  "friends": {
+                    "__values": {
+                      "1": friendDoc,
                     }
                   }
                 }
@@ -2623,10 +2623,10 @@ void main() {
               {
                 // The dependents are not cleared when a collection is cleared, instead
                 // the dependents are lazily cleared when the dependent is updated.
-                "users": {
-                  "__values": {
-                    "1": {
-                      friendDoc,
+                "users__1": {
+                  "friends": {
+                    "__values": {
+                      "1": friendDoc,
                     }
                   }
                 }
