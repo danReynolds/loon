@@ -89,20 +89,19 @@ class DependencyManager {
   /// Deleting a store ref performs two operations:
   ///
   /// 1. It deletes all dependency entries under the given path.
-  /// 2. It deletes all dependent entries that contain deleted documents.
+  /// 2. It deletes all dependent entries for the deleted documents.
   void _deleteRef(StoreReference ref) {
     final StoreReference(:path) = ref;
 
-    final extractedDeps = _dependencies.extractValues(path).flatten();
+    final extracted = _dependencies.extract(path);
     _dependencies.delete(path);
 
-    for (final dep in extractedDeps) {
-      final dependents = getDependents(dep);
-      if (dependents != null) {
-        dependents.removeWhere((dependent) => dependent.isDescendant(ref));
-        if (dependents.isEmpty) {
-          _dependents.delete(dep.path, recursive: false);
-        }
+    for (final MapEntry(key: docPath, value: dependencies)
+        in extracted.entries) {
+      final doc = Document.fromPath(docPath);
+
+      for (final dep in dependencies) {
+        _removeDependent(dep, doc);
       }
     }
   }
