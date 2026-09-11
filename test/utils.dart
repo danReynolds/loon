@@ -22,6 +22,13 @@ Json decryptData(String encrypted) {
   );
 }
 
+/// Resets the store between [fakeAsync] tests without scheduling a real broadcast.
+void resetStore(FakeAsync async) {
+  Loon.unsubscribe();
+  Loon.clearAll(broadcast: false);
+  async.flushMicrotasks();
+}
+
 /// Advances past Loon's zero-duration broadcast timer and drains stream delivery.
 void flushBroadcasts(FakeAsync async) {
   elapseAndFlush(async, const Duration(milliseconds: 1));

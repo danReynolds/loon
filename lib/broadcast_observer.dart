@@ -5,6 +5,10 @@ mixin BroadcastObserver<T, S> {
   late final StreamController<T> _controller;
   late final StreamController<S> _changeController;
 
+  /// Whether the observer has been disposed. A disposed observer has closed its controllers and
+  /// released its last value.
+  bool _disposed = false;
+
   /// Whether the [Observable] can have more than one observable subscription. A single-subscription
   /// observable will allow one listener and release its resources automatically when its listener cancels its subscription.
   /// A multicast observable must have its resources released manually by calling [dispose].
@@ -15,16 +19,13 @@ mixin BroadcastObserver<T, S> {
   /// The latest value emitted on the observer's stream controller. This value can be different
   /// from the *current* value of the observer, which may not have been broadcast on its stream yet
   /// and is cached in the [BroadcastManager].
-  late T _controllerValue;
+  T? _controllerValue;
 
   /// The unique ID of the observer instance.
   late String _observerId;
 
   /// The path being observed in the store.
   String get path;
-
-  /// The dependencies of the observer in the store.
-  final _deps = PathRefStore();
 
   void _init(
     T initialValue, {
@@ -49,8 +50,15 @@ mixin BroadcastObserver<T, S> {
   }
 
   void dispose() {
+    if (_disposed) {
+      return;
+    }
+    _disposed = true;
+
     _controller.close();
     _changeController.close();
+    _controllerValue = null;
+
     Loon._instance.broadcastManager.removeObserver(this);
   }
 
@@ -61,10 +69,12 @@ mixin BroadcastObserver<T, S> {
     return _controllerValue = updatedValue;
   }
 
+  /// The observer's stream of values.
   Stream<T> stream() {
     return _controller.stream;
   }
 
+  /// The observer's stream of changes.
   Stream<S> streamChanges() {
     return _changeController.stream;
   }
@@ -78,29 +88,6 @@ mixin BroadcastObserver<T, S> {
   set _value(T? value) {
     Loon._instance.broadcastManager.observerValueStore
         .write(_observerId, value);
-  }
-
-  /// Updates the observer's dependency graph given the change in its previous and updated set of dependencies.
-  void _updateDeps(Set<Document>? prevDeps, Set<Document>? deps) {
-    if (deps != null && prevDeps != null) {
-      final addedDeps = deps.difference(prevDeps);
-      final removedDeps = prevDeps.difference(deps);
-
-      for (final dep in addedDeps) {
-        _deps.inc(dep.path);
-      }
-      for (final dep in removedDeps) {
-        _deps.dec(dep.path);
-      }
-    } else if (deps != null) {
-      for (final dep in deps) {
-        _deps.inc(dep.path);
-      }
-    } else if (prevDeps != null) {
-      for (final dep in prevDeps) {
-        _deps.dec(dep.path);
-      }
-    }
   }
 
   void _onBroadcast();

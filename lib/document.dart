@@ -51,17 +51,9 @@ class Document<T> implements StoreReference {
       return true;
     }
 
-    if (other is! Document) {
-      return false;
-    }
-
-    // Documents are equivalent based on their ID and collection, however, observable documents
-    // are not, since they have additional properties unique to their instance.
-    if (other is! ObservableDocument && this is! ObservableDocument) {
-      return other.path == path;
-    }
-
-    return false;
+    // Documents are equivalent based on their path. An [ObservableDocument] is equal to the
+    // document it observes; observer instances are tracked by identity in the [BroadcastManager].
+    return other is Document && other.path == path;
   }
 
   @override
@@ -234,8 +226,14 @@ class Document<T> implements StoreReference {
     return data;
   }
 
-  /// Schedules a document to be rebroadcasted, updating all listeners that are subscribed to that document.
+  /// Rebroadcasts the document as a [BroadcastEvents.touched] event. Useful when document or query
+  /// observers should re-evaluate the document without rewriting or persisting its value.
+  /// Rebroadcasting a document that does not exist does nothing.
   void rebroadcast() {
+    if (!exists()) {
+      return;
+    }
+
     Loon._instance.broadcastManager
         .writeDocument(this, BroadcastEvents.touched);
   }

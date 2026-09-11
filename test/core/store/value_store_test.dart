@@ -1,5 +1,9 @@
+import 'dart:math';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:loon/loon.dart';
+
+import '../../store_paths.dart';
 
 void main() {
   group('ValueStore', () {
@@ -722,5 +726,58 @@ void main() {
         );
       },
     );
+
+    group('property', () {
+      // Random write/delete sequences are checked against a flat map used as an
+      // independent oracle for the store's incremental bookkeeping. On failure the seed
+      // and operation log identify the case.
+      test('Matches a reference model across random write and delete sequences',
+          () {
+        for (var seed = 0; seed < 50; seed++) {
+          final r = Random(seed);
+          final store = ValueStore<int>();
+          final model = <String, int>{};
+          final ops = <String>[];
+          var counter = 0;
+
+          for (var step = 0; step < 50; step++) {
+            if (r.nextInt(3) != 0) {
+              final p = randomPath(r);
+              final v = counter++;
+              store.write(p, v);
+              model[p] = v;
+              ops.add('write($p,$v)');
+            } else {
+              final p = randomPath(r);
+              store.delete(p);
+              model.removeWhere((k, _) => isAtOrUnder(k, p));
+              ops.add('delete($p)');
+            }
+
+            final reason = 'seed=$seed ops=$ops';
+            for (final q in {...pathGrid, ...model.keys}) {
+              expect(store.get(q), model[q], reason: '$reason get($q)');
+              expect(store.hasValue(q), model.containsKey(q),
+                  reason: '$reason hasValue($q)');
+              final hasPath = model.containsKey(q) ||
+                  model.keys.any((k) => k.startsWith('$q$pathDelimiter'));
+              expect(store.hasPath(q), hasPath, reason: '$reason hasPath($q)');
+            }
+            for (final q in pathGrid) {
+              final expected = <String, int>{};
+              for (final entry in model.entries) {
+                if (parentPath(entry.key) == q) {
+                  expected[lastSegment(entry.key)] = entry.value;
+                }
+              }
+              final actual = store.getChildValues(q) ?? const <String, int>{};
+              expect(actual, equals(expected),
+                  reason: '$reason getChildValues($q)');
+            }
+            expect(store.isEmpty, model.isEmpty, reason: '$reason isEmpty');
+          }
+        }
+      });
+    });
   });
 }

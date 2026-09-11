@@ -1,4 +1,7 @@
+import 'dart:math';
+
 import 'package:fake_async/fake_async.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:loon/loon.dart';
 
@@ -693,6 +696,204 @@ void main() {
                   });
                 },
               );
+
+              test('Re-reads a document written without a broadcast', () {
+                fakeAsync((async) {
+                  final doc = TestUserModel.store.doc('1');
+                  doc.create(TestUserModel('a'));
+                  flushBroadcasts(async);
+
+                  final docEvents = <String?>[];
+                  final collectionEvents = <List<String>>[];
+                  final sub = doc
+                      .stream()
+                      .listen((snap) => docEvents.add(snap?.data.name));
+                  final sub2 = TestUserModel.store.stream().listen(
+                        (snaps) => collectionEvents
+                            .add([for (final snap in snaps) snap.data.name]),
+                      );
+                  flushBroadcasts(async);
+
+                  doc.update(TestUserModel('b'), broadcast: false);
+                  doc.rebroadcast();
+                  flushBroadcasts(async);
+
+                  // Both the document and the collection observers deliver the current value.
+                  expect(docEvents, ['a', 'b']);
+                  expect(collectionEvents, [
+                    ['a'],
+                    ['b'],
+                  ]);
+
+                  sub.cancel();
+                  sub2.cancel();
+                  async.flushMicrotasks();
+                });
+              });
+
+              test(
+                  'Re-evaluates query membership from state outside of the store',
+                  () {
+                fakeAsync((async) {
+                  final flags = <String, bool>{};
+                  final items = Loon.collection<String>('items');
+                  items.doc('1').create('a');
+                  items.doc('2').create('b');
+                  flushBroadcasts(async);
+
+                  final flagged =
+                      items.where((snap) => flags[snap.id] ?? false).observe();
+                  final unrelated =
+                      items.where((snap) => snap.id == 'none').observe();
+                  final emissions = <List<String>>[];
+                  final unrelatedEmissions = <int>[];
+                  final sub = flagged.stream().listen(
+                        (snaps) =>
+                            emissions.add([for (final snap in snaps) snap.id]),
+                      );
+                  final sub2 = unrelated
+                      .stream()
+                      .listen((snaps) => unrelatedEmissions.add(snaps.length));
+                  flushBroadcasts(async);
+
+                  // The document now satisfies the filter because of a change outside of the store.
+                  flags['1'] = true;
+                  items.doc('1').rebroadcast();
+
+                  // A read before the broadcast already reflects the change.
+                  expect([for (final snap in flagged.get()) snap.id], ['1']);
+                  flushBroadcasts(async);
+
+                  // It no longer does.
+                  flags['1'] = false;
+                  items.doc('1').rebroadcast();
+                  flushBroadcasts(async);
+
+                  expect(emissions, [
+                    [],
+                    ['1'],
+                    [],
+                  ]);
+                  // A query that the document can never be part of is not rebroadcast.
+                  expect(unrelatedEmissions, [0]);
+
+                  sub.cancel();
+                  sub2.cancel();
+                  async.flushMicrotasks();
+                });
+              });
+
+              test(
+                  'Re-sorts a query whose sort reads state outside of the store',
+                  () {
+                fakeAsync((async) {
+                  bool reverse = false;
+                  final items = Loon.collection<int>('items');
+                  items.doc('1').create(1);
+                  items.doc('2').create(2);
+                  flushBroadcasts(async);
+
+                  final sorted = items
+                      .sortBy(
+                        (a, b) => reverse
+                            ? b.data.compareTo(a.data)
+                            : a.data.compareTo(b.data),
+                      )
+                      .observe();
+                  final emissions = <List<int>>[];
+                  final sub = sorted.stream().listen(
+                        (snaps) => emissions
+                            .add([for (final snap in snaps) snap.data]),
+                      );
+                  flushBroadcasts(async);
+
+                  reverse = true;
+                  items.doc('1').rebroadcast();
+                  flushBroadcasts(async);
+
+                  expect(emissions, [
+                    [1, 2],
+                    [2, 1],
+                  ]);
+
+                  sub.cancel();
+                  async.flushMicrotasks();
+                });
+              });
+
+              test('Emits touched, added and removed change events on queries',
+                  () {
+                fakeAsync((async) {
+                  final flags = <String, bool>{'1': true};
+                  final items = Loon.collection<String>('items');
+                  items.doc('1').create('a');
+                  items.doc('2').create('b');
+                  flushBroadcasts(async);
+
+                  final flagged =
+                      items.where((snap) => flags[snap.id] ?? false).observe();
+                  final changes = <String>[];
+                  final sub = flagged.streamChanges().listen(
+                        (snaps) => changes.addAll(
+                          [
+                            for (final snap in snaps)
+                              '${snap.id}:${snap.event.name}'
+                          ],
+                        ),
+                      );
+                  flushBroadcasts(async);
+
+                  // Still a member.
+                  items.doc('1').rebroadcast();
+                  // Enters the result set.
+                  flags['2'] = true;
+                  items.doc('2').rebroadcast();
+                  flushBroadcasts(async);
+
+                  // Leaves the result set.
+                  flags['1'] = false;
+                  items.doc('1').rebroadcast();
+                  flushBroadcasts(async);
+
+                  expect(changes, ['1:touched', '2:added', '1:removed']);
+
+                  sub.cancel();
+                  async.flushMicrotasks();
+                });
+              });
+
+              test('Does nothing for a document that does not exist', () {
+                fakeAsync((async) {
+                  TestUserModel.store.doc('1').create(TestUserModel('a'));
+                  flushBroadcasts(async);
+
+                  final doc = TestUserModel.store.doc('missing');
+                  final query = TestUserModel.store.observe();
+                  final events = <String?>[];
+                  final collectionEvents = <int>[];
+                  final sub = doc
+                      .stream()
+                      .listen((snap) => events.add(snap?.data.name));
+                  final sub2 = query
+                      .stream()
+                      .listen((snaps) => collectionEvents.add(snaps.length));
+                  flushBroadcasts(async);
+
+                  doc.rebroadcast();
+
+                  // There is no value to re-evaluate, so nothing is scheduled and the cached
+                  // values of the collection's queries are left intact.
+                  expect(query.isDirty, false);
+                  flushBroadcasts(async);
+
+                  expect(events, [null]);
+                  expect(collectionEvents, [1]);
+
+                  sub.cancel();
+                  sub2.cancel();
+                  async.flushMicrotasks();
+                });
+              });
             },
           );
 
@@ -767,6 +968,50 @@ void main() {
           group(
             'stream',
             () {
+              test(
+                  'Coalesces a create and update in the same task into one broadcast',
+                  () {
+                fakeAsync((async) {
+                  final doc = Loon.collection<int>('items').doc('1');
+                  final emissions = <int?>[];
+                  final sub =
+                      doc.stream().listen((snap) => emissions.add(snap?.data));
+                  flushBroadcasts(async);
+
+                  doc.create(1);
+                  doc.update(2);
+                  flushBroadcasts(async);
+
+                  // The create and update collapse into a single emission of the final value.
+                  expect(emissions, [null, 2]);
+
+                  sub.cancel();
+                  async.flushMicrotasks();
+                });
+              });
+
+              test('Broadcasts writes in separate tasks separately', () {
+                fakeAsync((async) {
+                  final doc = Loon.collection<int>('items').doc('1');
+                  final emissions = <int?>[];
+                  final sub =
+                      doc.stream().listen((snap) => emissions.add(snap?.data));
+                  flushBroadcasts(async);
+
+                  doc.create(1);
+                  flushBroadcasts(async);
+                  doc.update(2);
+                  flushBroadcasts(async);
+                  doc.update(3);
+                  flushBroadcasts(async);
+
+                  expect(emissions, [null, 1, 2, 3]);
+
+                  sub.cancel();
+                  async.flushMicrotasks();
+                });
+              });
+
               test('Returns a stream of document snapshots', () {
                 fakeAsync((async) {
                   final user = TestUserModel('User 1');
@@ -844,80 +1089,6 @@ void main() {
           );
 
           test(
-            "Maintains its dependency cache correctly",
-            () {
-              fakeAsync((async) {
-                final usersCollection = Loon.collection('users');
-                final postsCollection = Loon.collection<Json>(
-                  'posts',
-                  dependenciesBuilder: (snap) {
-                    if (snap.data['userId'] != null) {
-                      return {
-                        usersCollection.doc(snap.data['userId'].toString()),
-                      };
-                    }
-                    return null;
-                  },
-                );
-
-                final postDoc = postsCollection.doc('1');
-                final postData = {"id": 1, "text": "Post 1", "userId": 1};
-                final postData2 = {"id": 1, "text": "Post 1 updated"};
-                final postData3 = {
-                  "id": 1,
-                  "text": "Post 1 updated",
-                  "userId": 3
-                };
-                final postObs = postDoc.observe();
-
-                postDoc.create(postData);
-                flushBroadcasts(async);
-
-                // After creating the post document, it should have added its user dependency into the observable's
-                // dep tree.
-                expect(postObs.inspect(), {
-                  "deps": {
-                    "__ref": 1,
-                    "users": {
-                      "__ref": 1,
-                      "1": 1,
-                    },
-                  },
-                });
-
-                postDoc.update(postData2);
-                flushBroadcasts(async);
-
-                // After updating the document, it should have removed the user dependency from the observable's
-                // dep tree.
-                expect(postObs.inspect(), {
-                  "deps": {},
-                });
-
-                postDoc.update(postData3);
-                flushBroadcasts(async);
-
-                // The observable should have been updated to have a user dependency again.
-                expect(postObs.inspect(), {
-                  "deps": {
-                    "__ref": 1,
-                    "users": {
-                      "__ref": 1,
-                      "3": 1,
-                    },
-                  },
-                });
-
-                postsCollection.delete();
-                flushBroadcasts(async);
-
-                // After deleting the posts collection, observable should have cleared its dependencies.
-                expect(postObs.inspect(), {"deps": {}});
-              });
-            },
-          );
-
-          test(
             'Invalidates its cached value when the document is updated',
             () {
               fakeAsync((async) {
@@ -957,6 +1128,75 @@ void main() {
               });
             },
           );
+
+          test('Is equal to the document it observes', () {
+            final doc = Loon.collection<int>('items').doc('1');
+            final obs = doc.observe();
+
+            expect(obs == doc, true);
+            expect(doc == obs, true);
+            expect(obs.hashCode, doc.hashCode);
+            expect({doc}.contains(obs), true);
+
+            obs.dispose();
+          });
+
+          test(
+              'Is a distinct observer from other observables of the same document',
+              () {
+            fakeAsync((async) {
+              final doc = Loon.collection<int>('items').doc('1');
+              final first = <int?>[];
+              final second = <int?>[];
+              final sub1 = doc.stream().listen((snap) => first.add(snap?.data));
+              final sub2 =
+                  doc.stream().listen((snap) => second.add(snap?.data));
+              flushBroadcasts(async);
+
+              doc.create(1);
+              flushBroadcasts(async);
+
+              expect(first, [null, 1]);
+              expect(second, [null, 1]);
+
+              sub1.cancel();
+              sub2.cancel();
+              async.flushMicrotasks();
+            });
+          });
+          test('Closes its streams when it is disposed', () {
+            fakeAsync((async) {
+              final doc = Loon.collection<int>('items').doc('1');
+              doc.create(1);
+              flushBroadcasts(async);
+
+              final obs = doc.observe();
+              final events = <int?>[];
+              final changes = <BroadcastEvents>[];
+              final sub = obs.stream().listen((snap) => events.add(snap?.data));
+              final sub2 = obs
+                  .streamChanges()
+                  .listen((change) => changes.add(change.event));
+              flushBroadcasts(async);
+
+              obs.dispose();
+              doc.update(2);
+              flushBroadcasts(async);
+
+              expect(events, [1]);
+              expect(changes, isEmpty);
+              // The disposed observer's streams are closed and cannot be listened to again.
+              expect(() => obs.stream().listen((_) {}), throwsStateError);
+              expect(
+                  () => obs.streamChanges().listen((_) {}), throwsStateError);
+              // Disposing again is a no-op.
+              obs.dispose();
+
+              sub.cancel();
+              sub2.cancel();
+              async.flushMicrotasks();
+            });
+          });
         },
       );
 
@@ -1715,7 +1955,7 @@ void main() {
           );
 
           test(
-            "Maintains its dependency/snapshot caches correctly",
+            "Maintains its snapshot cache correctly",
             () {
               fakeAsync((async) {
                 final usersCollection = Loon.collection('users');
@@ -1741,29 +1981,13 @@ void main() {
                 };
                 final postDoc2 = postsCollection.doc('2');
                 final post2Data = {"id": 2, "text": "Post 2", "userId": 2};
-                final userDoc = usersCollection.doc('1');
-                final userDoc2 = usersCollection.doc('2');
-                final userDoc3 = usersCollection.doc('3');
                 final postsObs = postsCollection.toQuery().observe();
 
                 postDoc.create(post1Data);
                 flushBroadcasts(async);
 
-                // After creating the post document, the query should have a global and document level
-                // dependency.
+                // After creating the post document, the query should have cached its snapshot.
                 expect(postsObs.inspect(), {
-                  "deps": {
-                    "__ref": 1,
-                    "users": {
-                      "__ref": 1,
-                      "1": 1,
-                    },
-                  },
-                  "docDeps": {
-                    postDoc: {
-                      userDoc,
-                    },
-                  },
                   "docSnaps": {
                     postDoc: DocumentSnapshot(doc: postDoc, data: post1Data),
                   }
@@ -1772,11 +1996,8 @@ void main() {
                 postDoc.update(post1Data2);
                 flushBroadcasts(async);
 
-                // After updating the document, it should have removed the user dependency from the observable's
-                // dep tree and document level dependency cache.
+                // After updating the document, the cached snapshot should reflect the update.
                 expect(postsObs.inspect(), {
-                  "deps": {},
-                  "docDeps": {},
                   "docSnaps": {
                     postDoc: DocumentSnapshot(doc: postDoc, data: post1Data2),
                   }
@@ -1786,25 +2007,7 @@ void main() {
                 postDoc2.create(post2Data);
                 flushBroadcasts(async);
 
-                // After updating the first post to have a user dependency again, and creating a second
-                // post with another user dependency, the query's dependencies should have two entries.
                 expect(postsObs.inspect(), {
-                  "deps": {
-                    "__ref": 2,
-                    "users": {
-                      "__ref": 2,
-                      "1": 1,
-                      "2": 1,
-                    },
-                  },
-                  "docDeps": {
-                    postDoc: {
-                      userDoc,
-                    },
-                    postDoc2: {
-                      userDoc2,
-                    },
-                  },
                   "docSnaps": {
                     postDoc: DocumentSnapshot(doc: postDoc, data: post1Data),
                     postDoc2: DocumentSnapshot(doc: postDoc2, data: post2Data),
@@ -1814,26 +2017,7 @@ void main() {
                 postDoc.update(post1Data3);
                 flushBroadcasts(async);
 
-                // After updating the post to be dependent on a different user, the observable query
-                // should have removed the reference to the previous user (user 1) and replaced it with the
-                // dependency on user 3.
                 expect(postsObs.inspect(), {
-                  "deps": {
-                    "__ref": 2,
-                    "users": {
-                      "__ref": 2,
-                      "2": 1,
-                      "3": 1,
-                    },
-                  },
-                  "docDeps": {
-                    postDoc: {
-                      userDoc3,
-                    },
-                    postDoc2: {
-                      userDoc2,
-                    },
-                  },
                   "docSnaps": {
                     postDoc: DocumentSnapshot(doc: postDoc, data: post1Data3),
                     postDoc2: DocumentSnapshot(doc: postDoc2, data: post2Data),
@@ -1843,12 +2027,8 @@ void main() {
                 postsCollection.delete();
                 flushBroadcasts(async);
 
-                // After deleting the posts collection, the query should have cleared its global
-                // and document level dependencies.
-                expect(
-                  postsObs.inspect(),
-                  {"deps": {}, "docDeps": {}, "docSnaps": {}},
-                );
+                // After deleting the posts collection, the query should have cleared its cache.
+                expect(postsObs.inspect(), {"docSnaps": {}});
               });
             },
           );
@@ -2007,6 +2187,231 @@ void main() {
               );
             },
           );
+
+          test(
+              'Matches a document written through an observable handle in its cached result',
+              () {
+            fakeAsync((async) {
+              final items = Loon.collection<String>('items');
+              final query = items.observe();
+              final emissions = <List<String>>[];
+              final sub = query.stream().listen(
+                    (snaps) => emissions.add(
+                        [for (final snap in snaps) '${snap.id}=${snap.data}']),
+                  );
+              flushBroadcasts(async);
+
+              final obs = items.doc('1').observe();
+              obs.create('x');
+              flushBroadcasts(async);
+              // Updated and deleted through the plain document.
+              items.doc('1').update('y');
+              flushBroadcasts(async);
+              items.doc('1').delete();
+              flushBroadcasts(async);
+
+              expect(emissions, [
+                [],
+                ['1=x'],
+                ['1=y'],
+                [],
+              ]);
+              expect(query.get(), isEmpty);
+
+              sub.cancel();
+              obs.dispose();
+              async.flushMicrotasks();
+            });
+          });
+          test(
+              'Resets its cached value when its filter throws without affecting other observers',
+              () {
+            final errors = <Object>[];
+            final onError = FlutterError.onError;
+            FlutterError.onError = (details) => errors.add(details.exception);
+            try {
+              fakeAsync((async) {
+                bool shouldThrow = false;
+                final items = Loon.collection<int>('items');
+                items.doc('1').create(1);
+                flushBroadcasts(async);
+
+                // Observers process a broadcast in the order they were created, so the
+                // throwing observer runs before the healthy one.
+                final throwing = items.where((snap) {
+                  if (shouldThrow) {
+                    throw StateError('Filter failed');
+                  }
+                  return true;
+                }).observe();
+                final healthy = items.observe();
+                final other = Loon.collection<int>('other').doc('1');
+                final healthyEmissions = <List<int>>[];
+                final otherEvents = <int?>[];
+                final sub = throwing.stream().listen((_) {});
+                final sub2 = healthy.stream().listen(
+                      (snaps) => healthyEmissions
+                          .add([for (final snap in snaps) snap.data]),
+                    );
+                final sub3 = other
+                    .stream()
+                    .listen((snap) => otherEvents.add(snap?.data));
+                flushBroadcasts(async);
+
+                shouldThrow = true;
+                items.doc('1').update(2);
+                flushBroadcasts(async);
+
+                // The throwing query is reset, and the remaining observers and later
+                // broadcasts are unaffected.
+                expect(throwing.isDirty, true);
+                shouldThrow = false;
+                other.create(7);
+                flushBroadcasts(async);
+
+                expect(healthyEmissions, [
+                  [1],
+                  [2],
+                ]);
+                expect(otherEvents, [null, 7]);
+
+                sub.cancel();
+                sub2.cancel();
+                sub3.cancel();
+                async.flushMicrotasks();
+              });
+            } finally {
+              FlutterError.onError = onError;
+            }
+
+            // The error is reported.
+            expect(errors, [isStateError]);
+          });
+
+          test('Batches writes in the same task into a single broadcast', () {
+            fakeAsync((async) {
+              final items = Loon.collection<int>('items');
+              final emissions = <List<int>>[];
+              final sub = items.stream().listen(
+                    (snaps) =>
+                        emissions.add([for (final snap in snaps) snap.data]),
+                  );
+              flushBroadcasts(async);
+
+              items.doc('1').create(1);
+              items.doc('2').create(2);
+              items.doc('3').create(3);
+              flushBroadcasts(async);
+
+              // One emission for the initial value and exactly one for the batch.
+              expect(emissions.length, 2);
+              expect(emissions.last..sort(), [1, 2, 3]);
+
+              sub.cancel();
+              async.flushMicrotasks();
+            });
+          });
+
+          test('Evicts a document deleted and re-created in the same task', () {
+            fakeAsync((async) {
+              final items = Loon.collection<int>('items');
+              final doc = items.doc('1');
+              doc.create(5);
+              flushBroadcasts(async);
+
+              final query = items.where((snap) => snap.data >= 4).observe();
+              final emissions = <List<DocumentSnapshot<int>>>[];
+              final changes = <List<DocumentChangeSnapshot<int>>>[];
+              final sub = query.stream().listen(emissions.add);
+              final sub2 = query.streamChanges().listen(changes.add);
+              flushBroadcasts(async);
+
+              expect(emissions.last, [DocumentSnapshot(doc: doc, data: 5)]);
+
+              // The delete and re-create coalesce into a single added event for a document
+              // that no longer satisfies the filter, so the cached result must evict it.
+              doc.delete();
+              doc.create(0);
+              flushBroadcasts(async);
+
+              expect(emissions.last, isEmpty);
+              expect(changes, [
+                [
+                  DocumentChangeSnapshot<int>(
+                    doc: doc,
+                    data: null,
+                    event: BroadcastEvents.removed,
+                    prevData: 5,
+                  ),
+                ],
+              ]);
+
+              sub.cancel();
+              sub2.cancel();
+              async.flushMicrotasks();
+            });
+          });
+
+          // The query maintains its result incrementally, patching a cached result on each
+          // broadcast rather than recomputing it. A random walk of creates, updates and deletes
+          // over a small id/value space drives documents across the filter boundary and checks
+          // after every step that the incremental result equals a fresh full recompute.
+          for (final sorted in [true, false]) {
+            test(
+                'Maintains a ${sorted ? 'sorted' : 'unsorted'} result equal to a full recompute across random writes',
+                () {
+              fakeAsync((async) {
+                const threshold = 4;
+                final random = Random(1000);
+                final items = Loon.collection<int>('items');
+                bool filter(DocumentSnapshot<int> snap) =>
+                    snap.data >= threshold;
+                // A total order (value, then id) keeps the sorted result unambiguous.
+                int compare(DocumentSnapshot<int> a, DocumentSnapshot<int> b) {
+                  final byValue = a.data.compareTo(b.data);
+                  return byValue != 0 ? byValue : a.id.compareTo(b.id);
+                }
+
+                Query<int> query() => sorted
+                    ? items.where(filter).sortBy(compare)
+                    : items.where(filter);
+                List<String> describe(List<DocumentSnapshot<int>> snaps) {
+                  final entries = [
+                    for (final snap in snaps) '${snap.id}=${snap.data}'
+                  ];
+                  return sorted ? entries : (entries..sort());
+                }
+
+                final emissions = <List<DocumentSnapshot<int>>>[];
+                final sub = query().observe().stream().listen(emissions.add);
+                flushBroadcasts(async);
+
+                final present = <String>{};
+                for (var round = 0; round < 400; round++) {
+                  final ops = 1 + random.nextInt(3);
+                  for (var k = 0; k < ops; k++) {
+                    if (present.isEmpty || random.nextInt(10) < 7) {
+                      final id = '${random.nextInt(8)}';
+                      items.doc(id).createOrUpdate(random.nextInt(10));
+                      present.add(id);
+                    } else {
+                      final id =
+                          present.elementAt(random.nextInt(present.length));
+                      items.doc(id).delete();
+                      present.remove(id);
+                    }
+                  }
+                  flushBroadcasts(async);
+
+                  expect(describe(emissions.last), describe(query().get()),
+                      reason: 'round $round');
+                }
+
+                sub.cancel();
+                async.flushMicrotasks();
+              });
+            });
+          }
         },
       );
 
@@ -2336,18 +2741,13 @@ void main() {
           expect(
             Loon.inspect()['dependentsStore'],
             {
-              userDoc: {
-                postDoc,
-              },
-            },
-          );
-
-          // After writing the post, its user doc dependency should exist in the dependency
-          // doc cache.
-          expect(
-            Loon.inspect()['dependencyCache'],
-            {
-              userDoc,
+              "users": {
+                "__values": {
+                  "1": {
+                    postDoc,
+                  }
+                }
+              }
             },
           );
           userDoc.create(userData);
@@ -2370,22 +2770,17 @@ void main() {
           expect(
             Loon.inspect()['dependentsStore'],
             {
-              userDoc: {
-                postDoc,
-              },
+              "users": {
+                "__values": {
+                  "1": {
+                    postDoc,
+                  }
+                }
+              }
             },
           );
 
           postDoc.update(postData);
-
-          // Updating the post should not create a duplicate user dependency, it should re-use
-          // the existing cached user document.
-          expect(
-            Loon.inspect()['dependencyCache'],
-            {
-              userDoc,
-            },
-          );
 
           postDoc.update(updatedPostData1);
 
@@ -2397,13 +2792,6 @@ void main() {
           expect(
             Loon.inspect()['dependentsStore'],
             {},
-          );
-
-          // Since the user doc no longer has any dependencies, it should be removed from the dependency
-          // document cache.
-          expect(
-            Loon.inspect()['dependencyCache'],
-            [],
           );
         });
 
@@ -2608,8 +2996,12 @@ void main() {
             expect(
               Loon.inspect()['dependentsStore'],
               {
-                postDoc: {
-                  userDoc,
+                "posts": {
+                  "__values": {
+                    "1": {
+                      userDoc,
+                    }
+                  }
                 }
               },
             );
@@ -2641,11 +3033,19 @@ void main() {
             expect(
               Loon.inspect()['dependentsStore'],
               {
-                postDoc: {
-                  userDoc,
+                "posts": {
+                  "__values": {
+                    "1": {
+                      userDoc,
+                    }
+                  }
                 },
-                userDoc: {
-                  postDoc,
+                "users": {
+                  "__values": {
+                    "1": {
+                      postDoc,
+                    }
+                  }
                 }
               },
             );
@@ -2714,8 +3114,12 @@ void main() {
             expect(
               Loon.inspect()['dependentsStore'],
               {
-                userDoc: {
-                  friendDoc,
+                "users": {
+                  "__values": {
+                    "1": {
+                      friendDoc,
+                    }
+                  }
                 }
               },
             );
@@ -2728,24 +3132,315 @@ void main() {
               Loon.inspect()['dependencyStore'],
               {},
             );
-            expect(
-              Loon.inspect()['dependentsStore'],
-              {
-                // The dependents are not cleared when a collection is cleared, instead
-                // the dependents are lazily cleared when the dependent is updated.
-                userDoc: {
-                  friendDoc,
-                },
-              },
-            );
+            // Deleting the friends collection removes the deleted friend from its user's dependents.
+            expect(Loon.inspect()['dependentsStore'], {});
 
-            // Now that the user has been updated, it has cleared its friend dependent.
+            // A subsequent update to the user leaves the stores empty.
             userDoc.update(TestUserModel('User 1 updated'));
 
             flushBroadcasts(async);
 
             expect(Loon.inspect()['dependencyStore'], {});
             expect(Loon.inspect()['dependentsStore'], {});
+          });
+        });
+
+        test('Re-evaluates dependents in queries when a dependency changes',
+            () {
+          fakeAsync((async) {
+            final users = Loon.collection<bool>('users');
+            final posts = Loon.collection<String>(
+              'posts',
+              dependenciesBuilder: (snap) => {users.doc(snap.data)},
+            );
+            users.doc('u1').create(true);
+            posts.doc('p1').create('u1');
+            flushBroadcasts(async);
+
+            // Posts whose user is active. The filter reads the dependency, so the post must
+            // be re-evaluated whenever its user changes.
+            final active = posts
+                .where((snap) => users.doc(snap.data).get()?.data ?? false)
+                .observe();
+            final emissions = <List<String>>[];
+            final sub = active.stream().listen(
+                  (snaps) => emissions.add([for (final snap in snaps) snap.id]),
+                );
+            flushBroadcasts(async);
+
+            users.doc('u1').update(false);
+            flushBroadcasts(async);
+            users.doc('u1').update(true);
+            flushBroadcasts(async);
+
+            expect(emissions, [
+              ['p1'],
+              [],
+              ['p1'],
+            ]);
+
+            sub.cancel();
+            async.flushMicrotasks();
+          });
+        });
+
+        test('Re-evaluates dependents when a dependency collection is deleted',
+            () {
+          fakeAsync((async) {
+            final users = Loon.collection<bool>('users');
+            final posts = Loon.collection<String>(
+              'posts',
+              dependenciesBuilder: (snap) => {users.doc(snap.data)},
+            );
+            users.doc('u1').create(true);
+            users.doc('u2').create(true);
+            posts.doc('p1').create('u1');
+            posts.doc('p2').create('u2');
+            flushBroadcasts(async);
+
+            final active = posts
+                .where((snap) => users.doc(snap.data).get()?.data ?? false)
+                .observe();
+            final emissions = <List<String>>[];
+            final sub = active.stream().listen(
+                  (snaps) => emissions.add([for (final snap in snaps) snap.id]),
+                );
+            flushBroadcasts(async);
+
+            users.delete();
+            flushBroadcasts(async);
+
+            expect(emissions, [
+              ['p1', 'p2'],
+              [],
+            ]);
+
+            sub.cancel();
+            async.flushMicrotasks();
+          });
+        });
+
+        test(
+            "Re-evaluates dependents of a deleted document's subcollection documents",
+            () {
+          fakeAsync((async) {
+            final users = Loon.collection<String>('users');
+            final friends = users.doc('u1').subcollection<bool>('friends');
+            final posts = Loon.collection<String>(
+              'posts',
+              dependenciesBuilder: (snap) => {friends.doc(snap.data)},
+            );
+            users.doc('u1').create('User 1');
+            friends.doc('f1').create(true);
+            posts.doc('p1').create('f1');
+            flushBroadcasts(async);
+
+            // Posts whose tagged friend still exists.
+            final tagged = posts
+                .where((snap) => friends.doc(snap.data).exists())
+                .observe();
+            final emissions = <List<String>>[];
+            final sub = tagged.stream().listen(
+                  (snaps) => emissions.add([for (final snap in snaps) snap.id]),
+                );
+            flushBroadcasts(async);
+
+            // Deleting the user deletes its friends subcollection, so the post's dependency
+            // is gone.
+            users.doc('u1').delete();
+            flushBroadcasts(async);
+
+            expect(emissions, [
+              ['p1'],
+              [],
+            ]);
+
+            sub.cancel();
+            async.flushMicrotasks();
+          });
+        });
+
+        test(
+            'Does not touch dependents that are deleted along with their dependency',
+            () {
+          fakeAsync((async) {
+            final accounts = Loon.collection<String>('accounts');
+            final account = accounts.doc('a1');
+            final transactions = account.subcollection<String>(
+              'transactions',
+              dependenciesBuilder: (snap) => {account},
+            );
+            final reports = Loon.collection<String>(
+              'reports',
+              dependenciesBuilder: (snap) => {account},
+            );
+            account.create('Account 1');
+            transactions.doc('t1').create('tx');
+            reports.doc('r1').create('report');
+            flushBroadcasts(async);
+
+            final insideChanges = <String>[];
+            final outsideChanges = <String>[];
+            final sub = transactions.doc('t1').streamChanges().listen(
+                  (change) => insideChanges.add(change.event.name),
+                );
+            final sub2 = reports.doc('r1').streamChanges().listen(
+                  (change) => outsideChanges.add(change.event.name),
+                );
+            flushBroadcasts(async);
+
+            account.delete();
+            flushBroadcasts(async);
+
+            // The transaction deleted with the account is reported as removed rather than
+            // touched, and is no longer indexed as a dependent, while the report outside of
+            // it is touched and remains indexed.
+            expect(insideChanges, ['removed']);
+            expect(outsideChanges, ['touched']);
+            expect(Loon.inspect()['dependentsStore'], {
+              'accounts': {
+                '__values': {
+                  'a1': {reports.doc('r1')},
+                }
+              }
+            });
+
+            sub.cancel();
+            sub2.cancel();
+            async.flushMicrotasks();
+          });
+        });
+
+        test(
+            "Clearing a document's dependencies keeps its subcollection documents' dependencies",
+            () {
+          fakeAsync((async) {
+            final users = Loon.collection<String>('users');
+            users.doc('a1').create('a');
+            users.doc('a2').create('b');
+            final posts = Loon.collection<Map<String, String>>(
+              'posts',
+              dependenciesBuilder: (snap) => snap.data['userId'] != null
+                  ? {users.doc(snap.data['userId']!)}
+                  : null,
+            );
+            final comments = posts.doc('1').subcollection<String>(
+                  'comments',
+                  dependenciesBuilder: (snap) => {users.doc(snap.data)},
+                );
+            posts.doc('1').create({'userId': 'a1'});
+            comments.doc('c1').create('a1');
+            flushBroadcasts(async);
+
+            // The post no longer has dependencies of its own.
+            posts.doc('1').update({'text': 'x'});
+            flushBroadcasts(async);
+
+            expect(comments.doc('c1').dependencies(), {users.doc('a1')});
+
+            // Switching the comment's dependency still removes it from the old one.
+            comments.doc('c1').update('a2');
+            flushBroadcasts(async);
+            final events = <String?>[];
+            final sub = comments
+                .doc('c1')
+                .stream()
+                .listen((snap) => events.add(snap?.data));
+            flushBroadcasts(async);
+
+            users.doc('a1').update('a updated');
+            flushBroadcasts(async);
+            expect(events, ['a2']);
+
+            users.doc('a2').update('b updated');
+            flushBroadcasts(async);
+            expect(events, ['a2', 'a2']);
+
+            sub.cancel();
+            async.flushMicrotasks();
+          });
+        });
+
+        test(
+            'Re-creating a document with different dependencies drops its old ones',
+            () {
+          fakeAsync((async) {
+            final users = Loon.collection<String>('users');
+            final posts = Loon.collection<String>(
+              'posts',
+              dependenciesBuilder: (snap) => {users.doc(snap.data)},
+            );
+            users.doc('u1').create('User 1');
+            users.doc('u2').create('User 2');
+            posts.doc('p1').create('u1');
+            flushBroadcasts(async);
+
+            // The post is deleted and re-created depending on a different user.
+            posts.replace([DocumentSnapshot(doc: posts.doc('p1'), data: 'u2')]);
+            flushBroadcasts(async);
+
+            expect(Loon.inspect()['dependentsStore'], {
+              'users': {
+                '__values': {
+                  'u2': {posts.doc('p1')},
+                }
+              }
+            });
+
+            final events = <String>[];
+            final sub = posts.doc('p1').streamChanges().listen(
+                  (change) => events.add(change.event.name),
+                );
+            flushBroadcasts(async);
+
+            users.doc('u1').update('User 1 updated');
+            flushBroadcasts(async);
+            expect(events, isEmpty,
+                reason: 'the old dependency no longer rebroadcasts the post');
+
+            users.doc('u2').update('User 2 updated');
+            flushBroadcasts(async);
+            expect(events, ['touched']);
+
+            sub.cancel();
+            async.flushMicrotasks();
+          });
+        });
+
+        test(
+            'A dependent written through an observable is removed from its old dependency',
+            () {
+          fakeAsync((async) {
+            final users = Loon.collection<String>('users');
+            final posts = Loon.collection<String>(
+              'posts',
+              dependenciesBuilder: (snap) => {users.doc(snap.data)},
+            );
+            users.doc('u1').create('a');
+            users.doc('u2').create('b');
+            final obs = posts.doc('p1').observe();
+            final events = <String?>[];
+            final sub = obs.stream().listen((snap) => events.add(snap?.data));
+            flushBroadcasts(async);
+
+            obs.create('u1');
+            flushBroadcasts(async);
+            // Switched through the plain document.
+            posts.doc('p1').update('u2');
+            flushBroadcasts(async);
+            final before = events.length;
+
+            users.doc('u1').update('a updated');
+            flushBroadcasts(async);
+            expect(events.length, before,
+                reason: 'the old dependency no longer rebroadcasts the post');
+
+            users.doc('u2').update('b updated');
+            flushBroadcasts(async);
+            expect(events.length, before + 1);
+
+            sub.cancel();
+            async.flushMicrotasks();
           });
         });
       });
