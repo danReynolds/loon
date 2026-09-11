@@ -7,21 +7,21 @@ class DependencyManager {
   /// The reverse index of dependents of a document by path.
   final _dependents = ValueStore<Set<Document>>();
 
-  void _addDependent(Document dep, Document doc) {
+  void _addDependent(Document doc, Document dep) {
     final dependents =
-        _dependents.get(dep.path) ?? _dependents.write(dep.path, <Document>{});
-    dependents.add(doc);
+        _dependents.get(doc.path) ?? _dependents.write(doc.path, {});
+    dependents.add(dep);
   }
 
-  void _removeDependent(Document dep, Document doc) {
-    final dependents = _dependents.get(dep.path);
+  void _removeDependent(Document doc, Document dep) {
+    final dependents = _dependents.get(doc.path);
     if (dependents == null) {
       return;
     }
 
-    dependents.remove(doc);
+    dependents.remove(dep);
     if (dependents.isEmpty) {
-      _dependents.delete(dep.path, recursive: false);
+      _dependents.delete(doc.path, recursive: false);
     }
   }
 
@@ -72,11 +72,12 @@ class DependencyManager {
     }
   }
 
+  /// Returns all dependencies of the given document.
   Set<Document>? getDependencies(Document doc) {
     return _dependencies.get(doc.path);
   }
 
-  /// Returns the dependents of the given document.
+  /// Returns all dependents under the given store reference.
   Set<Document>? getDependents(
     StoreReference ref, {
     bool recursive = false,
@@ -98,10 +99,10 @@ class DependencyManager {
 
     for (final MapEntry(key: docPath, value: dependencies)
         in extracted.entries) {
-      final doc = Document.fromPath(docPath);
+      final dependent = Document.fromPath(docPath);
 
-      for (final dep in dependencies) {
-        _removeDependent(dep, doc);
+      for (final doc in dependencies) {
+        _removeDependent(doc, dependent);
       }
     }
   }
