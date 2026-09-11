@@ -4,13 +4,13 @@ import 'package:loon/loon.dart';
 
 import '../utils.dart';
 
-/// A disposed observer releases its controllers and last value, its streams are empty, and
+/// A disposed observer stops delivering, its closed streams cannot be listened to again, and
 /// observing it again returns a fresh observer.
 
 
 void main() {
 
-  test('A disposed observer stops delivering and exposes empty streams', () {
+  test('A disposed observer stops delivering and cannot be listened to again', () {
     fakeAsync((async) {
       resetStore(async);
       final doc = Loon.collection<int>('items').doc('1');
@@ -19,28 +19,25 @@ void main() {
 
       final obs = doc.observe();
       final events = <int?>[];
+      final changes = <BroadcastEvents>[];
       final sub = obs.stream().listen((snap) => events.add(snap?.data));
+      final sub2 = obs.streamChanges().listen((change) => changes.add(change.event));
       flushBroadcasts(async);
 
       obs.dispose();
       doc.update(2);
       flushBroadcasts(async);
 
-      final afterDispose = <int?>[];
-      final changesAfterDispose = <BroadcastEvents>[];
-      final sub2 = obs.stream().listen((snap) => afterDispose.add(snap?.data));
-      final sub3 = obs.streamChanges().listen((change) => changesAfterDispose.add(change.event));
-      flushBroadcasts(async);
-
       expect(events, [1]);
-      expect(afterDispose, isEmpty);
-      expect(changesAfterDispose, isEmpty);
+      expect(changes, isEmpty);
+      // The disposed observer's streams are closed and cannot be listened to again.
+      expect(() => obs.stream().listen((_) {}), throwsStateError);
+      expect(() => obs.streamChanges().listen((_) {}), throwsStateError);
       // Disposing again is a no-op.
       obs.dispose();
 
       sub.cancel();
       sub2.cancel();
-      sub3.cancel();
       async.flushMicrotasks();
     });
   });

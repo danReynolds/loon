@@ -55,8 +55,7 @@ class ObservableQuery<T> extends Query<T>
       // then its event type at the query-level is [BroadcastEvents.added] while its global event was
       // [EventTypes.modified].
       final List<DocumentChangeSnapshot<T>> changeSnaps = [];
-      final changeController = _changeController;
-      final hasChangeListener = changeController?.hasListener ?? false;
+      final hasChangeListener = _changeController.hasListener;
 
       // 1.  Any path along the query's collection path has been removed.
       if (Loon._instance.broadcastManager.eventStore
@@ -220,7 +219,7 @@ class ObservableQuery<T> extends Query<T>
       }
 
       if (changeSnaps.isNotEmpty) {
-        changeController?.add(changeSnaps);
+        _changeController.add(changeSnaps);
       }
 
       // If the query should be rebroadcast, then it emits its cached value if a read already

@@ -40,9 +40,8 @@ class ObservableDocument<T> extends Document<T>
     if (event != null) {
       final snap = get();
 
-      final changeController = _changeController;
-      if (changeController != null && changeController.hasListener) {
-        changeController.add(
+      if (_changeController.hasListener) {
+        _changeController.add(
           DocumentChangeSnapshot(
             doc: this,
             event: event,
