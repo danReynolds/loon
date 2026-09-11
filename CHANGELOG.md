@@ -1,10 +1,7 @@
 ## 5.7.0
 
-* `Document.rebroadcast` now makes observers re-read the document and queries re-evaluate its membership and order, so filters and sorts may read state outside of the store as long as the document is rebroadcast when that state changes. Previously a rebroadcast only re-emitted cached values, so a query could not add, remove or re-sort a document in response to it.
-* Deleting a collection, or a document with subcollections, now rebroadcasts the dependents of every document under the deleted path, so queries re-evaluate exactly the affected documents. Deleted documents are removed from the dependents of their dependencies, so a document that is later re-created does not keep its old dependencies. This replaces the observer-level dependency tracking: [Breaking] `ObservableDocument.inspect` and `PathRefStore` have been removed, `ObservableQuery.inspect` no longer reports `deps` or `docDeps`, and `Loon.inspect()['dependentsStore']` is now indexed by path.
-* `ObservableDocument` is now equal to the `Document` it observes.
-* A query whose filter throws while processing a broadcast no longer prevents the remaining observers from being processed. The error is reported through `FlutterError.reportError` and the query resets its cached result.
-* Rebroadcasting a document that does not exist is now a no-op instead of re-notifying its listeners.
+* Makes dependency management emit a BroadcastEvents.touched for each dependent affected by a write/delete. 
+* Makes dependent management eager vs lazy, which was always a compromise and should be the right trade-off. Net lines removed! Some overly complex abstractions fell out as a result.
 
 ## 5.6.1
 

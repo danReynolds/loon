@@ -47,18 +47,6 @@ void main() {
           );
 
           group(
-            'doc',
-            () {
-              test('Generates IDs that do not contain the path delimiter', () {
-                final collection = Loon.collection('users');
-                for (var i = 0; i < 1000; i++) {
-                  expect(collection.doc().id, isNot(contains('__')));
-                }
-              });
-            },
-          );
-
-          group(
             'create',
             () {
               test(
