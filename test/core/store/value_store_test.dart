@@ -3,38 +3,7 @@ import 'dart:math';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:loon/loon.dart';
 
-const _d = '__';
-const _alphabet = ['a', 'b', 'c'];
-
-/// A random path of 1 to 3 segments over a small alphabet, so that paths collide and share
-/// prefixes, which is where the tree-restructuring edge cases live.
-String _randomPath(Random r) {
-  final depth = 1 + r.nextInt(3);
-  return List.generate(depth, (_) => _alphabet[r.nextInt(_alphabet.length)])
-      .join(_d);
-}
-
-/// All non-empty paths of depth 1 and 2: a fixed grid of query points.
-final _grid = <String>[
-  for (final a in _alphabet) ...[
-    a,
-    for (final b in _alphabet) '$a$_d$b',
-  ],
-];
-
-/// Whether [key] is at or below [path] in the tree.
-bool _atOrUnder(String key, String path) =>
-    path.isEmpty || key == path || key.startsWith('$path$_d');
-
-String _parent(String path) {
-  final i = path.lastIndexOf(_d);
-  return i == -1 ? '' : path.substring(0, i);
-}
-
-String _lastSegment(String path) {
-  final i = path.lastIndexOf(_d);
-  return i == -1 ? path : path.substring(i + _d.length);
-}
+import '../../store_paths.dart';
 
 void main() {
   group('ValueStore', () {
@@ -773,32 +742,32 @@ void main() {
 
           for (var step = 0; step < 50; step++) {
             if (r.nextInt(3) != 0) {
-              final p = _randomPath(r);
+              final p = randomPath(r);
               final v = counter++;
               store.write(p, v);
               model[p] = v;
               ops.add('write($p,$v)');
             } else {
-              final p = _randomPath(r);
+              final p = randomPath(r);
               store.delete(p);
-              model.removeWhere((k, _) => _atOrUnder(k, p));
+              model.removeWhere((k, _) => isAtOrUnder(k, p));
               ops.add('delete($p)');
             }
 
             final reason = 'seed=$seed ops=$ops';
-            for (final q in {..._grid, ...model.keys}) {
+            for (final q in {...pathGrid, ...model.keys}) {
               expect(store.get(q), model[q], reason: '$reason get($q)');
               expect(store.hasValue(q), model.containsKey(q),
                   reason: '$reason hasValue($q)');
               final hasPath = model.containsKey(q) ||
-                  model.keys.any((k) => k.startsWith('$q$_d'));
+                  model.keys.any((k) => k.startsWith('$q$pathDelimiter'));
               expect(store.hasPath(q), hasPath, reason: '$reason hasPath($q)');
             }
-            for (final q in _grid) {
+            for (final q in pathGrid) {
               final expected = <String, int>{};
               for (final entry in model.entries) {
-                if (_parent(entry.key) == q) {
-                  expected[_lastSegment(entry.key)] = entry.value;
+                if (parentPath(entry.key) == q) {
+                  expected[lastSegment(entry.key)] = entry.value;
                 }
               }
               final actual = store.getChildValues(q) ?? const <String, int>{};
