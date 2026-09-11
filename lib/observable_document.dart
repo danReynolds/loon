@@ -22,7 +22,7 @@ class ObservableDocument<T> extends Document<T>
   ///    event scheduled because a document it depends on was written or deleted.
   /// 2. There is a [BroadcastEvents.removed] event for any path above the document path.
   @override
-  void _onBroadcast() {
+  void _processBroadcast() {
     BroadcastEvents? event;
 
     // 1.
@@ -54,6 +54,11 @@ class ObservableDocument<T> extends Document<T>
 
       add(snap);
     }
+  }
+
+  @override
+  void _recover() {
+    _value = null;
   }
 
   @override

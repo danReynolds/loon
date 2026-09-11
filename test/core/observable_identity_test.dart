@@ -8,17 +8,8 @@ import '../utils.dart';
 /// observable handle are matched by plain document references in the structures keyed by
 /// documents, while observer instances remain distinct in the broadcast manager.
 
-void _reset(FakeAsync async) {
-  Loon.unsubscribe();
-  Loon.clearAll(broadcast: false);
-  async.flushMicrotasks();
-}
 
 void main() {
-  tearDown(() async {
-    Loon.unsubscribe();
-    await Loon.clearAll();
-  });
 
   test('An observable document is equal to the document it observes', () {
     final doc = Loon.collection<int>('items').doc('1');
@@ -34,7 +25,7 @@ void main() {
 
   test('Observables of the same document are distinct observers', () {
     fakeAsync((async) {
-      _reset(async);
+      resetStore(async);
       final doc = Loon.collection<int>('items').doc('1');
       final first = <int?>[];
       final second = <int?>[];
@@ -56,7 +47,7 @@ void main() {
 
   test('A document written through an observable is matched by queries', () {
     fakeAsync((async) {
-      _reset(async);
+      resetStore(async);
       final items = Loon.collection<String>('items');
       final query = items.observe();
       final emissions = <List<String>>[];
@@ -90,7 +81,7 @@ void main() {
 
   test('A dependent written through an observable is removed from its old dependency', () {
     fakeAsync((async) {
-      _reset(async);
+      resetStore(async);
       final users = Loon.collection<String>('users');
       final posts = Loon.collection<String>(
         'posts',

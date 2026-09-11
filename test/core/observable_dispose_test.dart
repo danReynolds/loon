@@ -7,21 +7,12 @@ import '../utils.dart';
 /// A disposed observer releases its controllers and last value, its streams are empty, and
 /// observing it again returns a fresh observer.
 
-void _reset(FakeAsync async) {
-  Loon.unsubscribe();
-  Loon.clearAll(broadcast: false);
-  async.flushMicrotasks();
-}
 
 void main() {
-  tearDown(() async {
-    Loon.unsubscribe();
-    await Loon.clearAll();
-  });
 
   test('A disposed observer stops delivering and exposes empty streams', () {
     fakeAsync((async) {
-      _reset(async);
+      resetStore(async);
       final doc = Loon.collection<int>('items').doc('1');
       doc.create(1);
       flushBroadcasts(async);
@@ -56,7 +47,7 @@ void main() {
 
   test('Observing a disposed observable document returns a fresh observer', () {
     fakeAsync((async) {
-      _reset(async);
+      resetStore(async);
       final doc = Loon.collection<int>('items').doc('1');
       doc.create(1);
       flushBroadcasts(async);
@@ -81,7 +72,7 @@ void main() {
 
   test('Observing a disposed observable query returns a fresh observer', () {
     fakeAsync((async) {
-      _reset(async);
+      resetStore(async);
       final items = Loon.collection<int>('items');
       items.doc('1').create(1);
       flushBroadcasts(async);

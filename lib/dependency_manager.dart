@@ -19,10 +19,9 @@ class DependencyManager {
       return;
     }
 
-    if (dependents.length == 1) {
+    dependents.remove(doc);
+    if (dependents.isEmpty) {
       _dependents.delete(dep.path, recursive: false);
-    } else {
-      dependents.remove(doc);
     }
   }
 

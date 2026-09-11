@@ -55,28 +55,16 @@ class BroadcastManager {
   }
 
   void _broadcast() {
-    for (final observer in _observers.toList()) {
-      try {
+    try {
+      for (final observer in _observers.toList()) {
         observer._onBroadcast();
-      } catch (error, stackTrace) {
-        // An observer can throw while processing a broadcast, for example if a query's filter throws.
-        // The error is reported rather than thrown so that the remaining observers still process the
-        // broadcast, since its events are cleared once it completes.
-        FlutterError.reportError(
-          FlutterErrorDetails(
-            exception: error,
-            stack: stackTrace,
-            library: 'loon',
-            context: ErrorDescription(
-              'while broadcasting to an observer of ${observer.path}',
-            ),
-          ),
-        );
       }
+    } finally {
+      // The events and pending broadcast are always reset, so that nothing thrown while
+      // broadcasting can prevent subsequent broadcasts from being scheduled.
+      eventStore.clear();
+      _broadcastTimer = null;
     }
-
-    eventStore.clear();
-    _broadcastTimer = null;
   }
 
   void _broadcastDependents(

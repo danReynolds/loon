@@ -39,13 +39,6 @@ List<String> _ordered(List<DocumentSnapshot<int>> snaps) =>
 List<String> _asSet(List<DocumentSnapshot<int>> snaps) =>
     _ordered(snaps)..sort();
 
-void _reset(FakeAsync async) {
-  Loon.unsubscribe();
-  // broadcast: false so the reset doesn't schedule a broadcast that could
-  // race the next test's observer.
-  Loon.clearAll(broadcast: false);
-  async.flushMicrotasks();
-}
 
 void _walk({
   required FakeAsync async,
@@ -54,7 +47,7 @@ void _walk({
   required int threshold,
   int rounds = 400,
 }) {
-  _reset(async);
+  resetStore(async);
 
   final r = Random(seed);
   final col = Loon.collection<int>('items');
@@ -108,7 +101,7 @@ void main() {
 
   test('Coalesced delete and recreate evicts a cached query result', () {
     fakeAsync((async) {
-      _reset(async);
+      resetStore(async);
 
       final col = Loon.collection<int>('items');
       final doc = col.doc('1');

@@ -1,5 +1,4 @@
 import 'package:fake_async/fake_async.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:loon/loon.dart';
 
@@ -12,35 +11,14 @@ import '../utils.dart';
 ///
 /// These run under [fakeAsync] so that the broadcast timer is flushed deterministically.
 
-void _reset(FakeAsync async) {
-  Loon.unsubscribe();
-  Loon.clearAll(broadcast: false);
-  async.flushMicrotasks();
-}
 
-/// Runs [body] while capturing the errors reported through [FlutterError.reportError].
-List<Object> _captureErrors(void Function() body) {
-  final errors = <Object>[];
-  final onError = FlutterError.onError;
-  FlutterError.onError = (details) => errors.add(details.exception);
-  try {
-    body();
-  } finally {
-    FlutterError.onError = onError;
-  }
-  return errors;
-}
 
 void main() {
-  tearDown(() async {
-    Loon.unsubscribe();
-    await Loon.clearAll();
-  });
 
   group('Document.rebroadcast', () {
     test('Re-reads a document written without a broadcast', () {
       fakeAsync((async) {
-        _reset(async);
+        resetStore(async);
         final doc = TestUserModel.store.doc('1');
         doc.create(TestUserModel('a'));
         flushBroadcasts(async);
@@ -72,7 +50,7 @@ void main() {
 
     test('Re-evaluates query membership from state outside of the store', () {
       fakeAsync((async) {
-        _reset(async);
+        resetStore(async);
         final flags = <String, bool>{};
         final items = Loon.collection<String>('items');
         items.doc('1').create('a');
@@ -118,7 +96,7 @@ void main() {
 
     test('Re-sorts a query whose sort reads state outside of the store', () {
       fakeAsync((async) {
-        _reset(async);
+        resetStore(async);
         bool reverse = false;
         final items = Loon.collection<int>('items');
         items.doc('1').create(1);
@@ -152,7 +130,7 @@ void main() {
 
     test('Propagates rebuilt dependencies', () {
       fakeAsync((async) {
-        _reset(async);
+        resetStore(async);
         bool dependsOnSecond = false;
         final users = Loon.collection<String>('users');
         final posts = Loon.collection<String>(
@@ -180,12 +158,13 @@ void main() {
         flushBroadcasts(async);
         expect(post.dependencies(), {users.doc('2')});
 
-        // The new dependency now causes the post to be rebroadcast, and the old one does not.
+        // The old dependency no longer rebroadcasts the post, and the new one does.
         users.doc('1').update('User 1 updated');
         flushBroadcasts(async);
+        expect(events, ['Post 1', 'Post 1', 'Post 1']);
+
         users.doc('2').update('User 2 updated');
         flushBroadcasts(async);
-
         expect(events, ['Post 1', 'Post 1', 'Post 1', 'Post 1']);
 
         sub.cancel();
@@ -195,7 +174,7 @@ void main() {
 
     test('Emits touched, added and removed change events on queries', () {
       fakeAsync((async) {
-        _reset(async);
+        resetStore(async);
         final flags = <String, bool>{'1': true};
         final items = Loon.collection<String>('items');
         items.doc('1').create('a');
@@ -230,7 +209,7 @@ void main() {
 
     test('Does nothing for a document that does not exist', () {
       fakeAsync((async) {
-        _reset(async);
+        resetStore(async);
         TestUserModel.store.doc('1').create(TestUserModel('a'));
         flushBroadcasts(async);
 
@@ -262,7 +241,7 @@ void main() {
   group('Dependencies', () {
     test('Re-evaluates dependents in queries when a dependency changes', () {
       fakeAsync((async) {
-        _reset(async);
+        resetStore(async);
         final users = Loon.collection<bool>('users');
         final posts = Loon.collection<String>(
           'posts',
@@ -301,7 +280,7 @@ void main() {
 
     test('Re-evaluates dependents when a dependency collection is deleted', () {
       fakeAsync((async) {
-        _reset(async);
+        resetStore(async);
         final users = Loon.collection<bool>('users');
         final posts = Loon.collection<String>(
           'posts',
@@ -337,7 +316,7 @@ void main() {
 
     test("Re-evaluates dependents of a deleted document's subcollection documents", () {
       fakeAsync((async) {
-        _reset(async);
+        resetStore(async);
         final users = Loon.collection<String>('users');
         final friends = users.doc('u1').subcollection<bool>('friends');
         final posts = Loon.collection<String>(
@@ -373,7 +352,7 @@ void main() {
 
     test('Does not touch dependents that are deleted along with their dependency', () {
       fakeAsync((async) {
-        _reset(async);
+        resetStore(async);
         final items = Loon.collection<String>(
           'items',
           dependenciesBuilder: (snap) =>
@@ -416,7 +395,7 @@ void main() {
 
     test("Clearing a document's dependencies keeps its subcollection documents' dependencies", () {
       fakeAsync((async) {
-        _reset(async);
+        resetStore(async);
         final users = Loon.collection<String>('users');
         users.doc('a1').create('a');
         users.doc('a2').create('b');
@@ -461,7 +440,7 @@ void main() {
 
     test('Deleting a document drops the dependents under it from the index', () {
       fakeAsync((async) {
-        _reset(async);
+        resetStore(async);
         final accounts = Loon.collection<String>('accounts');
         final account = accounts.doc('a1');
         final transactions = account.subcollection<String>(
@@ -502,102 +481,150 @@ void main() {
         async.flushMicrotasks();
       });
     });
+
+    test('Re-creating a document with different dependencies drops its old ones', () {
+      fakeAsync((async) {
+        resetStore(async);
+        final users = Loon.collection<String>('users');
+        final posts = Loon.collection<String>(
+          'posts',
+          dependenciesBuilder: (snap) => {users.doc(snap.data)},
+        );
+        users.doc('u1').create('User 1');
+        users.doc('u2').create('User 2');
+        posts.doc('p1').create('u1');
+        flushBroadcasts(async);
+
+        // The post is deleted and re-created depending on a different user.
+        posts.replace([DocumentSnapshot(doc: posts.doc('p1'), data: 'u2')]);
+        flushBroadcasts(async);
+
+        expect(Loon.inspect()['dependentsStore'], {
+          'users': {
+            '__values': {
+              'u2': {posts.doc('p1')},
+            }
+          }
+        });
+
+        final events = <String>[];
+        final sub = posts.doc('p1').streamChanges().listen(
+          (change) => events.add(change.event.name),
+        );
+        flushBroadcasts(async);
+
+        users.doc('u1').update('User 1 updated');
+        flushBroadcasts(async);
+        expect(events, isEmpty, reason: 'the old dependency no longer rebroadcasts the post');
+
+        users.doc('u2').update('User 2 updated');
+        flushBroadcasts(async);
+        expect(events, ['touched']);
+
+        sub.cancel();
+        async.flushMicrotasks();
+      });
+    });
   });
 
   group('Broadcast', () {
-    test('An observer that throws does not prevent other observers from processing the broadcast', () {
-      final errors = _captureErrors(() {
-        fakeAsync((async) {
-          _reset(async);
-          bool shouldThrow = false;
-          final items = Loon.collection<int>('items');
-          items.doc('1').create(1);
-          flushBroadcasts(async);
+    test('A query whose filter throws recovers on the next broadcast', () {
+      fakeAsync((async) {
+        resetStore(async);
+        bool shouldThrow = false;
+        final items = Loon.collection<int>('items');
+        items.doc('1').create(1);
+        items.doc('2').create(2);
+        items.doc('3').create(3);
+        flushBroadcasts(async);
 
-          // Observers process a broadcast in the order they were created, so both throwing
-          // observers run before the one that does not throw.
-          final throwingA = items.where((snap) {
-            if (shouldThrow) {
-              throw StateError('Filter A failed');
-            }
-            return true;
-          }).observe();
-          final throwingB = items.where((snap) {
-            if (shouldThrow) {
-              throw StateError('Filter B failed');
-            }
-            return true;
-          }).observe();
-          final other = items.observe();
-          final otherEvents = <List<int>>[];
-          final subA = throwingA.stream().listen((_) {});
-          final subB = throwingB.stream().listen((_) {});
-          final sub = other.stream().listen(
-            (snaps) => otherEvents.add([for (final snap in snaps) snap.data]),
-          );
-          flushBroadcasts(async);
+        final query = items.where((snap) {
+          if (shouldThrow && snap.id == '2') {
+            throw StateError('Filter failed');
+          }
+          return true;
+        }).observe();
+        final emissions = <List<String>>[];
+        final errors = <Object>[];
+        final sub = query.stream().listen(
+          (snaps) => emissions.add([for (final snap in snaps) '${snap.id}=${snap.data}']),
+          onError: errors.add,
+        );
+        flushBroadcasts(async);
 
-          shouldThrow = true;
-          items.doc('1').update(2);
-          flushBroadcasts(async);
+        // The filter throws while processing doc 2, so the delete of doc 3 in the same
+        // broadcast is never applied to the query's cache.
+        shouldThrow = true;
+        items.doc('2').update(20);
+        items.doc('3').delete();
+        flushBroadcasts(async);
 
-          // The remaining observer still processed the broadcast.
-          expect(otherEvents, [
-            [1],
-            [2],
-          ]);
+        // The error is delivered on the query's own stream, and the next broadcast rebuilds
+        // the result set from the store.
+        expect(errors, [isStateError]);
+        shouldThrow = false;
+        items.doc('9').create(9);
+        flushBroadcasts(async);
 
-          subA.cancel();
-          subB.cancel();
-          sub.cancel();
-          async.flushMicrotasks();
-        });
+        expect(emissions, [
+          ['1=1', '2=2', '3=3'],
+          ['1=1', '2=20', '9=9'],
+        ]);
+        expect([for (final snap in query.get()) '${snap.id}=${snap.data}'], ['1=1', '2=20', '9=9']);
+
+        sub.cancel();
+        async.flushMicrotasks();
       });
-
-      // Every error is reported.
-      expect(errors, [isStateError, isStateError]);
     });
 
-    test('An observer that throws does not prevent subsequent broadcasts', () {
-      final errors = _captureErrors(() {
-        fakeAsync((async) {
-          _reset(async);
-          bool shouldThrow = false;
-          final items = Loon.collection<int>('items');
-          items.doc('1').create(1);
-          flushBroadcasts(async);
+    test('An observer that throws does not affect other observers or later broadcasts', () {
+      fakeAsync((async) {
+        resetStore(async);
+        bool shouldThrow = false;
+        final items = Loon.collection<int>('items');
+        items.doc('1').create(1);
+        flushBroadcasts(async);
 
-          final throwing = items.where((snap) {
-            if (shouldThrow) {
-              throw StateError('Filter failed');
-            }
-            return true;
-          }).observe();
-          final other = Loon.collection<int>('other').doc('1');
-          final otherEvents = <int?>[];
-          final sub = throwing.stream().listen((_) {});
-          final sub2 = other.stream().listen((snap) => otherEvents.add(snap?.data));
-          flushBroadcasts(async);
+        // Observers process a broadcast in the order they were created, so the throwing
+        // observer runs before the healthy one.
+        final throwing = items.where((snap) {
+          if (shouldThrow) {
+            throw StateError('Filter failed');
+          }
+          return true;
+        }).observe();
+        final healthy = items.observe();
+        final other = Loon.collection<int>('other').doc('1');
+        final errors = <Object>[];
+        final healthyEmissions = <List<int>>[];
+        final otherEvents = <int?>[];
+        final sub = throwing.stream().listen((_) {}, onError: errors.add);
+        final sub2 = healthy.stream().listen(
+          (snaps) => healthyEmissions.add([for (final snap in snaps) snap.data]),
+        );
+        final sub3 = other.stream().listen((snap) => otherEvents.add(snap?.data));
+        flushBroadcasts(async);
 
-          // The filter throws while this broadcast is processed.
-          shouldThrow = true;
-          items.doc('1').update(2);
-          flushBroadcasts(async);
+        shouldThrow = true;
+        items.doc('1').update(2);
+        flushBroadcasts(async);
 
-          // Later broadcasts are still delivered.
-          shouldThrow = false;
-          other.create(7);
-          flushBroadcasts(async);
+        shouldThrow = false;
+        other.create(7);
+        flushBroadcasts(async);
 
-          expect(otherEvents, [null, 7]);
+        expect(errors, [isStateError]);
+        expect(healthyEmissions, [
+          [1],
+          [2],
+        ]);
+        expect(otherEvents, [null, 7]);
 
-          sub.cancel();
-          sub2.cancel();
-          async.flushMicrotasks();
-        });
+        sub.cancel();
+        sub2.cancel();
+        sub3.cancel();
+        async.flushMicrotasks();
       });
-
-      expect(errors, [isStateError]);
     });
   });
 }

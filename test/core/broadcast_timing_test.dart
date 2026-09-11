@@ -18,17 +18,12 @@ import '../utils.dart';
 /// (A dedicated file runs in its own test isolate, so the global store starts
 /// clean and these virtual-time tests are isolated from the rest of the suite.)
 
-void _reset(FakeAsync async) {
-  Loon.unsubscribe();
-  Loon.clearAll(broadcast: false);
-  async.flushMicrotasks();
-}
 
 void main() {
   group('Broadcast batching and coalescing', () {
     test('Multiple writes in one task produce a single broadcast', () {
       fakeAsync((async) {
-        _reset(async);
+        resetStore(async);
         final col = Loon.collection<int>('items');
 
         final emissions = <List<int>>[];
@@ -53,7 +48,7 @@ void main() {
 
     test('Create then update in one task coalesces to the final value', () {
       fakeAsync((async) {
-        _reset(async);
+        resetStore(async);
         final doc = Loon.collection<int>('items').doc('1');
 
         final emissions = <int?>[];
@@ -74,7 +69,7 @@ void main() {
 
     test('Writes in separate tasks produce separate broadcasts', () {
       fakeAsync((async) {
-        _reset(async);
+        resetStore(async);
         final doc = Loon.collection<int>('items').doc('1');
 
         final emissions = <int?>[];
@@ -97,7 +92,7 @@ void main() {
 
     test('An unchanged update does not rebroadcast', () {
       fakeAsync((async) {
-        _reset(async);
+        resetStore(async);
         final doc = Loon.collection<int>('items').doc('1');
 
         final emissions = <int?>[];
