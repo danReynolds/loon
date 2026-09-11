@@ -1,5 +1,40 @@
+import 'dart:math';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:loon/loon.dart';
+
+const _d = '__';
+const _alphabet = ['a', 'b', 'c'];
+
+/// A random path of 1 to 3 segments over a small alphabet, so that paths collide and share
+/// prefixes, which is where the tree-restructuring edge cases live.
+String _randomPath(Random r) {
+  final depth = 1 + r.nextInt(3);
+  return List.generate(depth, (_) => _alphabet[r.nextInt(_alphabet.length)])
+      .join(_d);
+}
+
+/// All non-empty paths of depth 1 and 2: a fixed grid of query points.
+final _grid = <String>[
+  for (final a in _alphabet) ...[
+    a,
+    for (final b in _alphabet) '$a$_d$b',
+  ],
+];
+
+/// Whether [key] is at or below [path] in the tree.
+bool _atOrUnder(String key, String path) =>
+    path.isEmpty || key == path || key.startsWith('$path$_d');
+
+String _parent(String path) {
+  final i = path.lastIndexOf(_d);
+  return i == -1 ? '' : path.substring(0, i);
+}
+
+String _lastSegment(String path) {
+  final i = path.lastIndexOf(_d);
+  return i == -1 ? path : path.substring(i + _d.length);
+}
 
 void main() {
   group('ValueStore', () {
@@ -722,5 +757,58 @@ void main() {
         );
       },
     );
+
+    group('property', () {
+      // Random write/delete sequences are checked against a flat map used as an
+      // independent oracle for the store's incremental bookkeeping. On failure the seed
+      // and operation log identify the case.
+      test('Matches a reference model across random write and delete sequences',
+          () {
+        for (var seed = 0; seed < 50; seed++) {
+          final r = Random(seed);
+          final store = ValueStore<int>();
+          final model = <String, int>{};
+          final ops = <String>[];
+          var counter = 0;
+
+          for (var step = 0; step < 50; step++) {
+            if (r.nextInt(3) != 0) {
+              final p = _randomPath(r);
+              final v = counter++;
+              store.write(p, v);
+              model[p] = v;
+              ops.add('write($p,$v)');
+            } else {
+              final p = _randomPath(r);
+              store.delete(p);
+              model.removeWhere((k, _) => _atOrUnder(k, p));
+              ops.add('delete($p)');
+            }
+
+            final reason = 'seed=$seed ops=$ops';
+            for (final q in {..._grid, ...model.keys}) {
+              expect(store.get(q), model[q], reason: '$reason get($q)');
+              expect(store.hasValue(q), model.containsKey(q),
+                  reason: '$reason hasValue($q)');
+              final hasPath = model.containsKey(q) ||
+                  model.keys.any((k) => k.startsWith('$q$_d'));
+              expect(store.hasPath(q), hasPath, reason: '$reason hasPath($q)');
+            }
+            for (final q in _grid) {
+              final expected = <String, int>{};
+              for (final entry in model.entries) {
+                if (_parent(entry.key) == q) {
+                  expected[_lastSegment(entry.key)] = entry.value;
+                }
+              }
+              final actual = store.getChildValues(q) ?? const <String, int>{};
+              expect(actual, equals(expected),
+                  reason: '$reason getChildValues($q)');
+            }
+            expect(store.isEmpty, model.isEmpty, reason: '$reason isEmpty');
+          }
+        }
+      });
+    });
   });
 }

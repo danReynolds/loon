@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:fake_async/fake_async.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -41,6 +43,18 @@ void main() {
                   );
                 },
               );
+            },
+          );
+
+          group(
+            'doc',
+            () {
+              test('Generates IDs that do not contain the path delimiter', () {
+                final collection = Loon.collection('users');
+                for (var i = 0; i < 1000; i++) {
+                  expect(collection.doc().id, isNot(contains('__')));
+                }
+              });
             },
           );
 
@@ -966,6 +980,50 @@ void main() {
           group(
             'stream',
             () {
+              test(
+                  'Coalesces a create and update in the same task into one broadcast',
+                  () {
+                fakeAsync((async) {
+                  final doc = Loon.collection<int>('items').doc('1');
+                  final emissions = <int?>[];
+                  final sub =
+                      doc.stream().listen((snap) => emissions.add(snap?.data));
+                  flushBroadcasts(async);
+
+                  doc.create(1);
+                  doc.update(2);
+                  flushBroadcasts(async);
+
+                  // The create and update collapse into a single emission of the final value.
+                  expect(emissions, [null, 2]);
+
+                  sub.cancel();
+                  async.flushMicrotasks();
+                });
+              });
+
+              test('Broadcasts writes in separate tasks separately', () {
+                fakeAsync((async) {
+                  final doc = Loon.collection<int>('items').doc('1');
+                  final emissions = <int?>[];
+                  final sub =
+                      doc.stream().listen((snap) => emissions.add(snap?.data));
+                  flushBroadcasts(async);
+
+                  doc.create(1);
+                  flushBroadcasts(async);
+                  doc.update(2);
+                  flushBroadcasts(async);
+                  doc.update(3);
+                  flushBroadcasts(async);
+
+                  expect(emissions, [null, 1, 2, 3]);
+
+                  sub.cancel();
+                  async.flushMicrotasks();
+                });
+              });
+
               test('Returns a stream of document snapshots', () {
                 fakeAsync((async) {
                   final user = TestUserModel('User 1');
@@ -2241,6 +2299,131 @@ void main() {
             // The error is reported.
             expect(errors, [isStateError]);
           });
+
+          test('Batches writes in the same task into a single broadcast', () {
+            fakeAsync((async) {
+              final items = Loon.collection<int>('items');
+              final emissions = <List<int>>[];
+              final sub = items.stream().listen(
+                    (snaps) =>
+                        emissions.add([for (final snap in snaps) snap.data]),
+                  );
+              flushBroadcasts(async);
+
+              items.doc('1').create(1);
+              items.doc('2').create(2);
+              items.doc('3').create(3);
+              flushBroadcasts(async);
+
+              // One emission for the initial value and exactly one for the batch.
+              expect(emissions.length, 2);
+              expect(emissions.last..sort(), [1, 2, 3]);
+
+              sub.cancel();
+              async.flushMicrotasks();
+            });
+          });
+
+          test('Evicts a document deleted and re-created in the same task', () {
+            fakeAsync((async) {
+              final items = Loon.collection<int>('items');
+              final doc = items.doc('1');
+              doc.create(5);
+              flushBroadcasts(async);
+
+              final query = items.where((snap) => snap.data >= 4).observe();
+              final emissions = <List<DocumentSnapshot<int>>>[];
+              final changes = <List<DocumentChangeSnapshot<int>>>[];
+              final sub = query.stream().listen(emissions.add);
+              final sub2 = query.streamChanges().listen(changes.add);
+              flushBroadcasts(async);
+
+              expect(emissions.last, [DocumentSnapshot(doc: doc, data: 5)]);
+
+              // The delete and re-create coalesce into a single added event for a document
+              // that no longer satisfies the filter, so the cached result must evict it.
+              doc.delete();
+              doc.create(0);
+              flushBroadcasts(async);
+
+              expect(emissions.last, isEmpty);
+              expect(changes, [
+                [
+                  DocumentChangeSnapshot<int>(
+                    doc: doc,
+                    data: null,
+                    event: BroadcastEvents.removed,
+                    prevData: 5,
+                  ),
+                ],
+              ]);
+
+              sub.cancel();
+              sub2.cancel();
+              async.flushMicrotasks();
+            });
+          });
+
+          // The query maintains its result incrementally, patching a cached result on each
+          // broadcast rather than recomputing it. A random walk of creates, updates and deletes
+          // over a small id/value space drives documents across the filter boundary and checks
+          // after every step that the incremental result equals a fresh full recompute.
+          for (final sorted in [true, false]) {
+            test(
+                'Maintains a ${sorted ? 'sorted' : 'unsorted'} result equal to a full recompute across random writes',
+                () {
+              fakeAsync((async) {
+                const threshold = 4;
+                final random = Random(1000);
+                final items = Loon.collection<int>('items');
+                bool filter(DocumentSnapshot<int> snap) =>
+                    snap.data >= threshold;
+                // A total order (value, then id) keeps the sorted result unambiguous.
+                int compare(DocumentSnapshot<int> a, DocumentSnapshot<int> b) {
+                  final byValue = a.data.compareTo(b.data);
+                  return byValue != 0 ? byValue : a.id.compareTo(b.id);
+                }
+
+                Query<int> query() => sorted
+                    ? items.where(filter).sortBy(compare)
+                    : items.where(filter);
+                List<String> describe(List<DocumentSnapshot<int>> snaps) {
+                  final entries = [
+                    for (final snap in snaps) '${snap.id}=${snap.data}'
+                  ];
+                  return sorted ? entries : (entries..sort());
+                }
+
+                final emissions = <List<DocumentSnapshot<int>>>[];
+                final sub = query().observe().stream().listen(emissions.add);
+                flushBroadcasts(async);
+
+                final present = <String>{};
+                for (var round = 0; round < 400; round++) {
+                  final ops = 1 + random.nextInt(3);
+                  for (var k = 0; k < ops; k++) {
+                    if (present.isEmpty || random.nextInt(10) < 7) {
+                      final id = '${random.nextInt(8)}';
+                      items.doc(id).createOrUpdate(random.nextInt(10));
+                      present.add(id);
+                    } else {
+                      final id =
+                          present.elementAt(random.nextInt(present.length));
+                      items.doc(id).delete();
+                      present.remove(id);
+                    }
+                  }
+                  flushBroadcasts(async);
+
+                  expect(describe(emissions.last), describe(query().get()),
+                      reason: 'round $round');
+                }
+
+                sub.cancel();
+                async.flushMicrotasks();
+              });
+            });
+          }
         },
       );
 

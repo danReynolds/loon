@@ -1,5 +1,30 @@
+import 'dart:math';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:loon/loon.dart';
+
+const _d = '__';
+const _alphabet = ['a', 'b', 'c'];
+
+/// A random path of 1 to 3 segments over a small alphabet, so that paths collide and share
+/// prefixes, which is where the tree-restructuring edge cases live.
+String _randomPath(Random r) {
+  final depth = 1 + r.nextInt(3);
+  return List.generate(depth, (_) => _alphabet[r.nextInt(_alphabet.length)])
+      .join(_d);
+}
+
+/// All non-empty paths of depth 1 and 2: a fixed grid of query points.
+final _grid = <String>[
+  for (final a in _alphabet) ...[
+    a,
+    for (final b in _alphabet) '$a$_d$b',
+  ],
+];
+
+/// Whether [key] is at or below [path] in the tree.
+bool _atOrUnder(String key, String path) =>
+    path.isEmpty || key == path || key.startsWith('$path$_d');
 
 void main() {
   group(
@@ -508,6 +533,61 @@ void main() {
             );
           },
         );
+      });
+
+      group('property', () {
+        // Random write/delete sequences are checked against a flat map used as an
+        // independent oracle for the ref aggregation in each subtree.
+        test(
+            'Aggregates refs matching the values in each subtree across random writes and deletes',
+            () {
+          for (var seed = 0; seed < 50; seed++) {
+            final r = Random(seed);
+            final store = ValueRefStore<String>();
+            final model = <String, String>{};
+            final ops = <String>[];
+
+            // getRefs(path) aggregates values strictly under a node; for the root path it
+            // aggregates every value in the store.
+            Map<String, int> refsUnder(String path) {
+              final counts = <String, int>{};
+              for (final entry in model.entries) {
+                final under =
+                    path.isEmpty ? true : entry.key.startsWith('$path$_d');
+                if (under) {
+                  counts[entry.value] = (counts[entry.value] ?? 0) + 1;
+                }
+              }
+              return counts;
+            }
+
+            for (var step = 0; step < 50; step++) {
+              if (r.nextInt(3) != 0) {
+                final p = _randomPath(r);
+                // A small value space produces many shared refs.
+                final v = _alphabet[r.nextInt(_alphabet.length)];
+                store.write(p, v);
+                model[p] = v;
+                ops.add('write($p,$v)');
+              } else {
+                final p = _randomPath(r);
+                store.delete(p);
+                model.removeWhere((k, _) => _atOrUnder(k, p));
+                ops.add('delete($p)');
+              }
+
+              final reason = 'seed=$seed ops=$ops';
+              for (final q in ['', ..._grid]) {
+                final expected = refsUnder(q);
+                final actual = store.getRefs(q) ?? const <String, int>{};
+                expect(Map<String, int>.from(actual), equals(expected),
+                    reason: '$reason getRefs("$q")');
+                expect(store.extractValues(q), equals(expected.keys.toSet()),
+                    reason: '$reason extractValues("$q")');
+              }
+            }
+          }
+        });
       });
     },
   );
