@@ -1,4 +1,5 @@
 import 'package:fake_async/fake_async.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:loon/loon.dart';
 
@@ -12,6 +13,19 @@ import '../utils.dart';
 /// These run under [fakeAsync] so that the broadcast timer is flushed deterministically.
 
 
+
+/// Runs [body] while capturing the errors reported through [FlutterError.reportError].
+List<Object> _captureErrors(void Function() body) {
+  final errors = <Object>[];
+  final onError = FlutterError.onError;
+  FlutterError.onError = (details) => errors.add(details.exception);
+  try {
+    body();
+  } finally {
+    FlutterError.onError = onError;
+  }
+  return errors;
+}
 
 void main() {
 
@@ -528,103 +542,60 @@ void main() {
   });
 
   group('Broadcast', () {
-    test('A query whose filter throws recovers on the next broadcast', () {
-      fakeAsync((async) {
-        resetStore(async);
-        bool shouldThrow = false;
-        final items = Loon.collection<int>('items');
-        items.doc('1').create(1);
-        items.doc('2').create(2);
-        items.doc('3').create(3);
-        flushBroadcasts(async);
+    test('A query whose filter throws is reset and does not affect other observers', () {
+      final errors = _captureErrors(() {
+        fakeAsync((async) {
+          resetStore(async);
+          bool shouldThrow = false;
+          final items = Loon.collection<int>('items');
+          items.doc('1').create(1);
+          flushBroadcasts(async);
 
-        final query = items.where((snap) {
-          if (shouldThrow && snap.id == '2') {
-            throw StateError('Filter failed');
-          }
-          return true;
-        }).observe();
-        final emissions = <List<String>>[];
-        final errors = <Object>[];
-        final sub = query.stream().listen(
-          (snaps) => emissions.add([for (final snap in snaps) '${snap.id}=${snap.data}']),
-          onError: errors.add,
-        );
-        flushBroadcasts(async);
+          // Observers process a broadcast in the order they were created, so the throwing
+          // observer runs before the healthy one.
+          final throwing = items.where((snap) {
+            if (shouldThrow) {
+              throw StateError('Filter failed');
+            }
+            return true;
+          }).observe();
+          final healthy = items.observe();
+          final other = Loon.collection<int>('other').doc('1');
+          final healthyEmissions = <List<int>>[];
+          final otherEvents = <int?>[];
+          final sub = throwing.stream().listen((_) {});
+          final sub2 = healthy.stream().listen(
+            (snaps) => healthyEmissions.add([for (final snap in snaps) snap.data]),
+          );
+          final sub3 = other.stream().listen((snap) => otherEvents.add(snap?.data));
+          flushBroadcasts(async);
 
-        // The filter throws while processing doc 2, so the delete of doc 3 in the same
-        // broadcast is never applied to the query's cache.
-        shouldThrow = true;
-        items.doc('2').update(20);
-        items.doc('3').delete();
-        flushBroadcasts(async);
+          shouldThrow = true;
+          items.doc('1').update(2);
+          flushBroadcasts(async);
 
-        // The error is delivered on the query's own stream, and the next broadcast rebuilds
-        // the result set from the store.
-        expect(errors, [isStateError]);
-        shouldThrow = false;
-        items.doc('9').create(9);
-        flushBroadcasts(async);
+          // The throwing query is reset, and the remaining observers and later broadcasts
+          // are unaffected.
+          expect(throwing.isDirty, true);
+          shouldThrow = false;
+          other.create(7);
+          flushBroadcasts(async);
 
-        expect(emissions, [
-          ['1=1', '2=2', '3=3'],
-          ['1=1', '2=20', '9=9'],
-        ]);
-        expect([for (final snap in query.get()) '${snap.id}=${snap.data}'], ['1=1', '2=20', '9=9']);
+          expect(healthyEmissions, [
+            [1],
+            [2],
+          ]);
+          expect(otherEvents, [null, 7]);
 
-        sub.cancel();
-        async.flushMicrotasks();
+          sub.cancel();
+          sub2.cancel();
+          sub3.cancel();
+          async.flushMicrotasks();
+        });
       });
-    });
 
-    test('An observer that throws does not affect other observers or later broadcasts', () {
-      fakeAsync((async) {
-        resetStore(async);
-        bool shouldThrow = false;
-        final items = Loon.collection<int>('items');
-        items.doc('1').create(1);
-        flushBroadcasts(async);
-
-        // Observers process a broadcast in the order they were created, so the throwing
-        // observer runs before the healthy one.
-        final throwing = items.where((snap) {
-          if (shouldThrow) {
-            throw StateError('Filter failed');
-          }
-          return true;
-        }).observe();
-        final healthy = items.observe();
-        final other = Loon.collection<int>('other').doc('1');
-        final errors = <Object>[];
-        final healthyEmissions = <List<int>>[];
-        final otherEvents = <int?>[];
-        final sub = throwing.stream().listen((_) {}, onError: errors.add);
-        final sub2 = healthy.stream().listen(
-          (snaps) => healthyEmissions.add([for (final snap in snaps) snap.data]),
-        );
-        final sub3 = other.stream().listen((snap) => otherEvents.add(snap?.data));
-        flushBroadcasts(async);
-
-        shouldThrow = true;
-        items.doc('1').update(2);
-        flushBroadcasts(async);
-
-        shouldThrow = false;
-        other.create(7);
-        flushBroadcasts(async);
-
-        expect(errors, [isStateError]);
-        expect(healthyEmissions, [
-          [1],
-          [2],
-        ]);
-        expect(otherEvents, [null, 7]);
-
-        sub.cancel();
-        sub2.cancel();
-        sub3.cancel();
-        async.flushMicrotasks();
-      });
+      // The error is reported.
+      expect(errors, [isStateError]);
     });
   });
 }

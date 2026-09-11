@@ -5,7 +5,7 @@ class ObservableQuery<T> extends Query<T>
         BroadcastObserver<List<DocumentSnapshot<T>>,
             List<DocumentChangeSnapshot<T>>> {
   /// An observable query maintains a cache of snapshots of the documents in its current result set.
-  Map<Document<T>, DocumentSnapshot<T>> _snapCache = {};
+  final Map<Document<T>, DocumentSnapshot<T>> _snapCache = {};
 
   ObservableQuery(
     super.collection, {
@@ -31,17 +31,6 @@ class ObservableQuery<T> extends Query<T>
     _snapCache.remove(doc);
   }
 
-  /// Whether the result set must be rebuilt from the store on the next broadcast, after a
-  /// broadcast that threw left the snapshot cache in an unknown state.
-  bool _rebuild = false;
-
-  @override
-  void _recover() {
-    _value = null;
-    _snapCache = {};
-    _rebuild = true;
-  }
-
   /// On broadcast, the [ObservableQuery] examines the events that have occurred
   /// since the last broadcast and determines if the query needs to be rebroadcast.
   ///
@@ -56,18 +45,8 @@ class ObservableQuery<T> extends Query<T>
   ///     ii. Previously satisfied the query filter and now does not.
   ///     iii. Previously did not satisfy the query filter and now does.
   @override
-  void _processBroadcast() {
+  void _onBroadcast() {
     bool shouldRebroadcast = false;
-
-    // The result set is rebuilt from the store after a failed broadcast, since the events it did
-    // not finish processing were cleared with that broadcast.
-    if (_rebuild) {
-      _rebuild = false;
-      for (final snap in super.get()) {
-        _cacheDoc(snap);
-      }
-      shouldRebroadcast = true;
-    }
 
     // The list of changes to the query. Note that the [BroadcastEvents] of the document
     // local to the query are different from the global broadcast events. For example, if a document

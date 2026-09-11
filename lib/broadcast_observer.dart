@@ -99,22 +99,5 @@ mixin BroadcastObserver<T, S> {
         .write(_observerId, value);
   }
 
-  /// Processes the pending broadcast events, emitting an updated value if necessary.
-  void _processBroadcast();
-
-  /// Discards any state that may have been partially applied by a [_processBroadcast] that threw,
-  /// so that the observer rebuilds from the store on its next read or broadcast.
-  void _recover();
-
-  /// Processes the broadcast, recovering the observer if it throws (for example, if a query's
-  /// filter throws). The error is delivered on the observer's own stream, so that its listener
-  /// learns which observer failed, and the remaining observers still process the broadcast.
-  void _onBroadcast() {
-    try {
-      _processBroadcast();
-    } catch (error, stackTrace) {
-      _recover();
-      _controller?.addError(error, stackTrace);
-    }
-  }
+  void _onBroadcast();
 }
