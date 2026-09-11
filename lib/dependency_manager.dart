@@ -87,7 +87,7 @@ class DependencyManager {
         : _dependents.get(ref.path);
   }
 
-  /// Deleting a ref in the dependency store performs two operations:
+  /// Deleting a store ref performs two operations:
   ///
   /// 1. It deletes all dependency entries under the given path.
   /// 2. It deletes all dependent entries that contain deleted documents.

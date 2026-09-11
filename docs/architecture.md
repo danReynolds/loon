@@ -82,21 +82,26 @@ that post in its list of documents, should also notify its listeners.
 If a post is displayed alongside its user's profile picture, then without dependencies the code for the post would need to observe
 both the post and user document for changes separately. With dependencies, it only needs to observe the post and the post will react to any changes to the user automatically.
 
-Document dependencies are modeled with two `ValueStore`s: one indexing each document's dependencies by the document's path, and one
-indexing each document's dependents by the path of the document they depend on. Each document's dependents are themselves a
-`ValueStore` keyed by path, so that the dependents of every document under a path can be found together and, when a path is deleted,
-the dependents under it (which are deleted along with it) can be dropped with a single delete.
+Document dependencies are modeled with two `ValueStore`s: an index of each document's dependencies by the document's path, and a
+reverse index of each document's dependents by the path of the document they depend on.
 
 ```dart
 final dependenciesStore = ValueStore<Set<Document>>();
-final dependentsStore = ValueStore<ValueStore<Document>>();
+final dependentsStore = ValueStore<Set<Document>>();
 ```
+
+The dependencies index is authoritative: it is rewritten whenever a document is written and cleared when the document is deleted. The
+dependents index is derived from it and is kept exact in two ways. When a document is written, it is added to the dependents of its new
+dependencies and removed from the dependents of the ones it dropped. When a document or collection is deleted, every document under the
+deleted path is removed from the dependents of its dependencies (read from the dependencies index before it is cleared), so that
+deleted documents are never left behind as dependents and a document that is later re-created does not keep its old memberships.
 
 When a document is written, each of its dependents is marked for broadcast with a `BroadcastEvents.touched` event.
 
-When a document or collection is deleted, the dependents of every document under the deleted path (including the documents of its
-subcollections) are looked up in the dependents store and marked for broadcast with a `BroadcastEvents.touched` event in the same way,
-excluding any documents that were removed by the same delete.
+When a document or collection is deleted, the dependents index is pruned first, and then the remaining dependents of every document
+under the deleted path (including the documents of its subcollections) are marked for broadcast with a `BroadcastEvents.touched` event
+in the same way. Since the documents deleted along with the path were pruned, they are not touched; their observers receive the
+`BroadcastEvents.removed` event for the deleted path instead.
 
 A touched document is re-evaluated by its observers as if it had been modified: an `ObservableDocument` re-reads it, and an
 `ObservableQuery` re-runs its filter and sort for it, adding, refreshing or evicting it from its result set. Broadcast observers keep no
