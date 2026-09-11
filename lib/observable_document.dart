@@ -62,18 +62,6 @@ class ObservableDocument<T> extends Document<T>
   ObservableDocument<T> observe({
     bool multicast = false,
   }) {
-    // A disposed observable no longer observes anything, so a fresh one is returned instead.
-    if (_disposed) {
-      return ObservableDocument<T>(
-        parent,
-        id,
-        fromJson: fromJson,
-        toJson: toJson,
-        persistorSettings: persistorSettings,
-        dependenciesBuilder: dependenciesBuilder,
-        multicast: multicast,
-      );
-    }
     return this;
   }
 

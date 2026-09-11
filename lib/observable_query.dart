@@ -250,15 +250,6 @@ class ObservableQuery<T> extends Query<T>
   ObservableQuery<T> observe({
     bool multicast = false,
   }) {
-    // A disposed observable no longer observes anything, so a fresh one is returned instead.
-    if (_disposed) {
-      return ObservableQuery<T>(
-        collection,
-        filters: filters,
-        sort: sort,
-        multicast: multicast,
-      );
-    }
     return this;
   }
 

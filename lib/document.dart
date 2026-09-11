@@ -194,11 +194,6 @@ class Document<T> implements StoreReference {
     return Loon._instance.existsSnap(this);
   }
 
-  bool isDescendant(StoreReference ref) {
-    return path == ref.path ||
-        path.startsWith('${ref.path}${_BaseValueStore.delimiter}');
-  }
-
   Set<Document>? dependencies() {
     return Loon._instance.dependencyManager.getDependencies(this);
   }
@@ -231,12 +226,10 @@ class Document<T> implements StoreReference {
     return data;
   }
 
-  /// Rebroadcasts the document as a [BroadcastEvents.touched] event. Used when document or query
+  /// Rebroadcasts the document as a [BroadcastEvents.touched] event. Useful when document or query
   /// observers should re-evaluate the document without rewriting or persisting its value.
   /// Rebroadcasting a document that does not exist does nothing.
   void rebroadcast() {
-    // There is no value for observers to re-evaluate, and scheduling a touched event would
-    // needlessly invalidate the cached values of every query on the collection.
     if (!exists()) {
       return;
     }
