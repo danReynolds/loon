@@ -1083,78 +1083,72 @@ void main() {
             },
           );
 
-          group('equality', () {
-            test('An observable document is equal to the document it observes',
-                () {
-              final doc = Loon.collection<int>('items').doc('1');
-              final obs = doc.observe();
+          test('Is equal to the document it observes', () {
+            final doc = Loon.collection<int>('items').doc('1');
+            final obs = doc.observe();
 
-              expect(obs == doc, true);
-              expect(doc == obs, true);
-              expect(obs.hashCode, doc.hashCode);
-              expect({doc}.contains(obs), true);
+            expect(obs == doc, true);
+            expect(doc == obs, true);
+            expect(obs.hashCode, doc.hashCode);
+            expect({doc}.contains(obs), true);
 
-              obs.dispose();
-            });
-
-            test('Observables of the same document are distinct observers', () {
-              fakeAsync((async) {
-                final doc = Loon.collection<int>('items').doc('1');
-                final first = <int?>[];
-                final second = <int?>[];
-                final sub1 =
-                    doc.stream().listen((snap) => first.add(snap?.data));
-                final sub2 =
-                    doc.stream().listen((snap) => second.add(snap?.data));
-                flushBroadcasts(async);
-
-                doc.create(1);
-                flushBroadcasts(async);
-
-                expect(first, [null, 1]);
-                expect(second, [null, 1]);
-
-                sub1.cancel();
-                sub2.cancel();
-                async.flushMicrotasks();
-              });
-            });
+            obs.dispose();
           });
 
-          group('dispose', () {
-            test('Stops delivering and cannot be listened to again', () {
-              fakeAsync((async) {
-                final doc = Loon.collection<int>('items').doc('1');
-                doc.create(1);
-                flushBroadcasts(async);
+          test(
+              'Is a distinct observer from other observables of the same document',
+              () {
+            fakeAsync((async) {
+              final doc = Loon.collection<int>('items').doc('1');
+              final first = <int?>[];
+              final second = <int?>[];
+              final sub1 = doc.stream().listen((snap) => first.add(snap?.data));
+              final sub2 =
+                  doc.stream().listen((snap) => second.add(snap?.data));
+              flushBroadcasts(async);
 
-                final obs = doc.observe();
-                final events = <int?>[];
-                final changes = <BroadcastEvents>[];
-                final sub =
-                    obs.stream().listen((snap) => events.add(snap?.data));
-                final sub2 = obs
-                    .streamChanges()
-                    .listen((change) => changes.add(change.event));
-                flushBroadcasts(async);
+              doc.create(1);
+              flushBroadcasts(async);
 
-                obs.dispose();
-                doc.update(2);
-                flushBroadcasts(async);
+              expect(first, [null, 1]);
+              expect(second, [null, 1]);
 
-                expect(events, [1]);
-                expect(changes, isEmpty);
-                // The disposed observer's streams are closed and cannot be listened to again.
-                expect(() => obs.stream().listen((_) {}), throwsStateError);
-                expect(
-                    () => obs.streamChanges().listen((_) {}), throwsStateError);
-                // Disposing again is a no-op.
-                obs.dispose();
+              sub1.cancel();
+              sub2.cancel();
+              async.flushMicrotasks();
+            });
+          });
+          test('Closes its streams when it is disposed', () {
+            fakeAsync((async) {
+              final doc = Loon.collection<int>('items').doc('1');
+              doc.create(1);
+              flushBroadcasts(async);
 
-                sub.cancel();
-                sub2.cancel();
-                async.flushMicrotasks();
-              });
+              final obs = doc.observe();
+              final events = <int?>[];
+              final changes = <BroadcastEvents>[];
+              final sub = obs.stream().listen((snap) => events.add(snap?.data));
+              final sub2 = obs
+                  .streamChanges()
+                  .listen((change) => changes.add(change.event));
+              flushBroadcasts(async);
+
+              obs.dispose();
+              doc.update(2);
+              flushBroadcasts(async);
+
+              expect(events, [1]);
+              expect(changes, isEmpty);
+              // The disposed observer's streams are closed and cannot be listened to again.
+              expect(() => obs.stream().listen((_) {}), throwsStateError);
+              expect(
+                  () => obs.streamChanges().listen((_) {}), throwsStateError);
+              // Disposing again is a no-op.
+              obs.dispose();
+
+              sub.cancel();
+              sub2.cancel();
+              async.flushMicrotasks();
             });
           });
         },
@@ -2148,110 +2142,104 @@ void main() {
             },
           );
 
-          group('observable writes', () {
-            test(
-                'A document written through an observable is matched by queries',
-                () {
-              fakeAsync((async) {
-                final items = Loon.collection<String>('items');
-                final query = items.observe();
-                final emissions = <List<String>>[];
-                final sub = query.stream().listen(
-                      (snaps) => emissions.add([
-                        for (final snap in snaps) '${snap.id}=${snap.data}'
-                      ]),
-                    );
-                flushBroadcasts(async);
+          test(
+              'Matches a document written through an observable handle in its cached result',
+              () {
+            fakeAsync((async) {
+              final items = Loon.collection<String>('items');
+              final query = items.observe();
+              final emissions = <List<String>>[];
+              final sub = query.stream().listen(
+                    (snaps) => emissions.add(
+                        [for (final snap in snaps) '${snap.id}=${snap.data}']),
+                  );
+              flushBroadcasts(async);
 
-                final obs = items.doc('1').observe();
-                obs.create('x');
-                flushBroadcasts(async);
-                // Updated and deleted through the plain document.
-                items.doc('1').update('y');
-                flushBroadcasts(async);
-                items.doc('1').delete();
-                flushBroadcasts(async);
+              final obs = items.doc('1').observe();
+              obs.create('x');
+              flushBroadcasts(async);
+              // Updated and deleted through the plain document.
+              items.doc('1').update('y');
+              flushBroadcasts(async);
+              items.doc('1').delete();
+              flushBroadcasts(async);
 
-                expect(emissions, [
-                  [],
-                  ['1=x'],
-                  ['1=y'],
-                  [],
-                ]);
-                expect(query.get(), isEmpty);
+              expect(emissions, [
+                [],
+                ['1=x'],
+                ['1=y'],
+                [],
+              ]);
+              expect(query.get(), isEmpty);
 
-                sub.cancel();
-                obs.dispose();
-                async.flushMicrotasks();
-              });
+              sub.cancel();
+              obs.dispose();
+              async.flushMicrotasks();
             });
           });
+          test(
+              'Resets its cached value when its filter throws without affecting other observers',
+              () {
+            final errors = <Object>[];
+            final onError = FlutterError.onError;
+            FlutterError.onError = (details) => errors.add(details.exception);
+            try {
+              fakeAsync((async) {
+                bool shouldThrow = false;
+                final items = Loon.collection<int>('items');
+                items.doc('1').create(1);
+                flushBroadcasts(async);
 
-          group('errors', () {
-            test(
-                'A query whose filter throws is reset and does not affect other observers',
-                () {
-              final errors = <Object>[];
-              final onError = FlutterError.onError;
-              FlutterError.onError = (details) => errors.add(details.exception);
-              try {
-                fakeAsync((async) {
-                  bool shouldThrow = false;
-                  final items = Loon.collection<int>('items');
-                  items.doc('1').create(1);
-                  flushBroadcasts(async);
+                // Observers process a broadcast in the order they were created, so the
+                // throwing observer runs before the healthy one.
+                final throwing = items.where((snap) {
+                  if (shouldThrow) {
+                    throw StateError('Filter failed');
+                  }
+                  return true;
+                }).observe();
+                final healthy = items.observe();
+                final other = Loon.collection<int>('other').doc('1');
+                final healthyEmissions = <List<int>>[];
+                final otherEvents = <int?>[];
+                final sub = throwing.stream().listen((_) {});
+                final sub2 = healthy.stream().listen(
+                      (snaps) => healthyEmissions
+                          .add([for (final snap in snaps) snap.data]),
+                    );
+                final sub3 = other
+                    .stream()
+                    .listen((snap) => otherEvents.add(snap?.data));
+                flushBroadcasts(async);
 
-                  // Observers process a broadcast in the order they were created, so the
-                  // throwing observer runs before the healthy one.
-                  final throwing = items.where((snap) {
-                    if (shouldThrow) {
-                      throw StateError('Filter failed');
-                    }
-                    return true;
-                  }).observe();
-                  final healthy = items.observe();
-                  final other = Loon.collection<int>('other').doc('1');
-                  final healthyEmissions = <List<int>>[];
-                  final otherEvents = <int?>[];
-                  final sub = throwing.stream().listen((_) {});
-                  final sub2 = healthy.stream().listen(
-                        (snaps) => healthyEmissions
-                            .add([for (final snap in snaps) snap.data]),
-                      );
-                  final sub3 = other
-                      .stream()
-                      .listen((snap) => otherEvents.add(snap?.data));
-                  flushBroadcasts(async);
+                shouldThrow = true;
+                items.doc('1').update(2);
+                flushBroadcasts(async);
 
-                  shouldThrow = true;
-                  items.doc('1').update(2);
-                  flushBroadcasts(async);
+                // The throwing query is reset, and the remaining observers and later
+                // broadcasts are unaffected.
+                expect(throwing.isDirty, true);
+                shouldThrow = false;
+                other.create(7);
+                flushBroadcasts(async);
 
-                  // The throwing query is reset, and the remaining observers and later
-                  // broadcasts are unaffected.
-                  expect(throwing.isDirty, true);
-                  shouldThrow = false;
-                  other.create(7);
-                  flushBroadcasts(async);
+                expect(healthyEmissions, [
+                  [1],
+                  [2],
+                ]);
+                expect(otherEvents, [null, 7]);
 
-                  expect(healthyEmissions, [
-                    [1],
-                    [2],
-                  ]);
-                  expect(otherEvents, [null, 7]);
+                sub.cancel();
+                sub2.cancel();
+                sub3.cancel();
+                async.flushMicrotasks();
+              });
+            } finally {
+              FlutterError.onError = onError;
+            }
 
-                  sub.cancel();
-                  sub2.cancel();
-                  sub3.cancel();
-                  async.flushMicrotasks();
-                });
-              } finally {
-                FlutterError.onError = onError;
-              }
-
-              // The error is reported.
-              expect(errors, [isStateError]);
-            });
+            // The error is reported.
+            expect(errors, [isStateError]);
           });
         },
       );
