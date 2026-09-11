@@ -38,7 +38,7 @@ part of '../loon.dart';
 /// ```
 /// The [ValueStore] is the data structure used throughout the library for storing collections of documents.
 class ValueStore<T> extends _BaseValueStore<T> {
-  ValueStore([Map? store]) : super(store);
+  ValueStore([super.store]);
 
   static const root = _BaseValueStore.root;
 

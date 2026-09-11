@@ -30,6 +30,7 @@ part 'persistor/persistor.dart';
 part 'persistor/operations.dart';
 part 'persistor/persist_manager.dart';
 part 'extensions/iterable.dart';
+part 'extensions/set.dart';
 part 'utils/validation.dart';
 part 'utils/logger.dart';
 part 'utils/exceptions.dart';

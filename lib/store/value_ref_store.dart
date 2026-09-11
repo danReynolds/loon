@@ -3,7 +3,7 @@ part of '../loon.dart';
 class ValueRefStore<T> extends _BaseValueStore<T> {
   static const _refs = '__refs';
 
-  ValueRefStore([Map? store]) : super(store);
+  ValueRefStore([super.store]);
 
   T? _write(Map node, List<String> segments, int index, T value) {
     final segment = segments[index];

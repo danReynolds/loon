@@ -7,7 +7,7 @@ class UserModel {
     required this.name,
   });
 
-  toJson() {
+  Map<String, String> toJson() {
     return {
       "name": name,
     };

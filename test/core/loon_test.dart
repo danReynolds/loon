@@ -2202,22 +2202,13 @@ void main() {
           expect(
             Loon.inspect()['dependentsStore'],
             {
-              "users__1": {
-                "posts": {
-                  "__values": {
-                    "1": postDoc,
+              "users": {
+                "__values": {
+                  "1": {
+                    postDoc,
                   }
                 }
               }
-            },
-          );
-
-          // After writing the post, its user doc dependency should exist in the dependency
-          // doc cache.
-          expect(
-            Loon.inspect()['dependencyCache'],
-            {
-              userDoc,
             },
           );
           userDoc.create(userData);
@@ -2240,10 +2231,10 @@ void main() {
           expect(
             Loon.inspect()['dependentsStore'],
             {
-              "users__1": {
-                "posts": {
-                  "__values": {
-                    "1": postDoc,
+              "users": {
+                "__values": {
+                  "1": {
+                    postDoc,
                   }
                 }
               }
@@ -2251,15 +2242,6 @@ void main() {
           );
 
           postDoc.update(postData);
-
-          // Updating the post should not create a duplicate user dependency, it should re-use
-          // the existing cached user document.
-          expect(
-            Loon.inspect()['dependencyCache'],
-            {
-              userDoc,
-            },
-          );
 
           postDoc.update(updatedPostData1);
 
@@ -2271,13 +2253,6 @@ void main() {
           expect(
             Loon.inspect()['dependentsStore'],
             {},
-          );
-
-          // Since the user doc no longer has any dependencies, it should be removed from the dependency
-          // document cache.
-          expect(
-            Loon.inspect()['dependencyCache'],
-            [],
           );
         });
 
@@ -2482,10 +2457,10 @@ void main() {
             expect(
               Loon.inspect()['dependentsStore'],
               {
-                "posts__1": {
-                  "users": {
-                    "__values": {
-                      "1": userDoc,
+                "posts": {
+                  "__values": {
+                    "1": {
+                      userDoc,
                     }
                   }
                 }
@@ -2519,17 +2494,17 @@ void main() {
             expect(
               Loon.inspect()['dependentsStore'],
               {
-                "posts__1": {
-                  "users": {
-                    "__values": {
-                      "1": userDoc,
+                "posts": {
+                  "__values": {
+                    "1": {
+                      userDoc,
                     }
                   }
                 },
-                "users__1": {
-                  "posts": {
-                    "__values": {
-                      "1": postDoc,
+                "users": {
+                  "__values": {
+                    "1": {
+                      postDoc,
                     }
                   }
                 }
@@ -2600,10 +2575,10 @@ void main() {
             expect(
               Loon.inspect()['dependentsStore'],
               {
-                "users__1": {
-                  "friends": {
-                    "__values": {
-                      "1": friendDoc,
+                "users": {
+                  "__values": {
+                    "1": {
+                      friendDoc,
                     }
                   }
                 }
@@ -2618,22 +2593,10 @@ void main() {
               Loon.inspect()['dependencyStore'],
               {},
             );
-            expect(
-              Loon.inspect()['dependentsStore'],
-              {
-                // The dependents are not cleared when a collection is cleared, instead
-                // the dependents are lazily cleared when the dependent is updated.
-                "users__1": {
-                  "friends": {
-                    "__values": {
-                      "1": friendDoc,
-                    }
-                  }
-                }
-              },
-            );
+            // Deleting the friends collection removes the deleted friend from its user's dependents.
+            expect(Loon.inspect()['dependentsStore'], {});
 
-            // Now that the user has been updated, it has cleared its friend dependent.
+            // A subsequent update to the user leaves the stores empty.
             userDoc.update(TestUserModel('User 1 updated'));
 
             flushBroadcasts(async);

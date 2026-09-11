@@ -1,23 +1,16 @@
 part of 'loon.dart';
 
 class DependencyManager {
-  /// The store of dependencies of documents indexed by document path.
+  /// The index of dependencies of a document by path.
   final _dependencies = ValueStore<Set<Document>>();
 
-  /// The store of dependents of documents indexed by the path of the document they depend on.
-  /// Each document's dependents are themselves indexed by path, so that when a path is deleted
-  /// the dependents under it (which are deleted along with it) can be dropped with a single
-  /// delete, and the dependents of every document under the path can be found together.
-  final _dependents = ValueStore<ValueStore<Document>>();
-
-  /// The cache of documents referenced as dependencies. A cache is used so that multiple documents
-  /// that share the same dependency reference the same object.
-  final _depCache = <Document>{};
+  /// The reverse index of dependents of a document by path.
+  final _dependents = ValueStore<Set<Document>>();
 
   void _addDependent(Document dep, Document doc) {
-    final dependents = _dependents.get(dep.path) ??
-        _dependents.write(dep.path, ValueStore<Document>());
-    dependents.write(doc.path, doc);
+    final dependents =
+        _dependents.get(dep.path) ?? _dependents.write(dep.path, <Document>{});
+    dependents.add(doc);
   }
 
   void _removeDependent(Document dep, Document doc) {
@@ -26,17 +19,10 @@ class DependencyManager {
       return;
     }
 
-    // Only the document's own membership is removed; the documents of its subcollections keep
-    // theirs.
-    dependents.delete(doc.path, recursive: false);
-    _pruneDependency(dep, dependents);
-  }
-
-  /// Removes the dependency's entry once it has no dependents left.
-  void _pruneDependency(Document dep, ValueStore<Document> dependents) {
-    if (dependents.isEmpty) {
+    if (dependents.length == 1) {
       _dependents.delete(dep.path, recursive: false);
-      _depCache.remove(dep);
+    } else {
+      dependents.remove(doc);
     }
   }
 
@@ -50,13 +36,7 @@ class DependencyManager {
       return;
     }
 
-    final deps = dependenciesBuilder.call(snap)?.map((dep) {
-      final cacheDoc = _depCache.lookup(dep);
-      if (cacheDoc == null) {
-        _depCache.add(dep);
-      }
-      return cacheDoc ?? dep;
-    }).toSet();
+    final deps = dependenciesBuilder.call(snap);
     final prevDeps = _dependencies.get(doc.path);
 
     if (setEquals(deps, prevDeps)) {
@@ -97,82 +77,55 @@ class DependencyManager {
     return _dependencies.get(doc.path);
   }
 
-  /// Returns the existing dependents of the given document.
-  Set<Document>? getDependents(Document doc) {
-    final dependents = _dependents.get(doc.path);
-
-    if (dependents == null) {
-      return null;
-    }
-
-    final result = <Document>{};
-    for (final dep in dependents.extractValues()) {
-      // If a dependent no longer exists in the store, then it is lazily removed from
-      // the document's dependents.
-      //
-      // This scenario can occur if an entire subtree of documents was removed, in which case
-      // the descendant documents did not eagerly remove themselves from their dependencies'
-      // set of dependents, and instead they are removed lazily when the document accesses
-      // its dependents.
-      if (dep.exists()) {
-        result.add(dep);
-      } else {
-        dependents.delete(dep.path, recursive: false);
-      }
-    }
-    _pruneDependency(doc, dependents);
-
-    return result;
+  /// Returns the dependents of the given document.
+  Set<Document>? getDependents(
+    StoreReference ref, {
+    bool recursive = false,
+  }) {
+    return recursive
+        ? _dependents.extractValues(ref.path).flatten()
+        : _dependents.get(ref.path);
   }
 
-  /// Returns the existing dependents of the document or collection at the given path and of every
-  /// document under it (such as the documents of a deleted document's subcollections). Dependents
-  /// that are themselves under the path are deleted along with it, so they are dropped from the
-  /// index rather than returned.
-  Set<Document> getPathDependents(String path) {
-    final result = <Document>{};
+  /// Deleting a ref in the dependency store performs two operations:
+  ///
+  /// 1. It deletes all dependency entries under the given path.
+  /// 2. It deletes all dependent entries that contain deleted documents.
+  void _deleteRef(StoreReference ref) {
+    final StoreReference(:path) = ref;
 
-    for (final entry in _dependents.extract(path).entries) {
-      final dependents = entry.value;
+    final extractedDeps = _dependencies.extractValues(path).flatten();
+    _dependencies.delete(path);
 
-      dependents.delete(path);
-
-      for (final dep in dependents.extractValues()) {
-        if (dep.exists()) {
-          result.add(dep);
-        } else {
-          dependents.delete(dep.path, recursive: false);
+    for (final dep in extractedDeps) {
+      final dependents = getDependents(dep);
+      if (dependents != null) {
+        dependents.removeWhere((dependent) => dependent.isDescendant(ref));
+        if (dependents.isEmpty) {
+          _dependents.delete(dep.path, recursive: false);
         }
       }
-      _pruneDependency(Document.fromPath(entry.key), dependents);
     }
-
-    return result;
   }
 
   void deleteDocument(Document doc) {
-    _dependencies.delete(doc.path);
+    _deleteRef(doc);
   }
 
   void deleteCollection(Collection collection) {
-    _dependencies.delete(collection.path);
+    _deleteRef(collection);
   }
 
   /// Clears all dependencies and dependents of documents.
   void clear() {
     _dependencies.clear();
     _dependents.clear();
-    _depCache.clear();
   }
 
   Map inspect() {
     return {
       "dependencyStore": _dependencies.inspect(),
-      "dependentsStore": {
-        for (final entry in _dependents.extract().entries)
-          entry.key: entry.value.inspect(),
-      },
-      "dependencyCache": _depCache,
+      "dependentsStore": _dependents.inspect(),
     };
   }
 }

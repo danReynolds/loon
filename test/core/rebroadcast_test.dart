@@ -491,11 +491,9 @@ void main() {
         // dependents, while the report outside of it was touched and remains indexed.
         expect(reportEvents, ['touched']);
         expect(Loon.inspect()['dependentsStore'], {
-          'accounts__a1': {
-            'reports': {
-              '__values': {
-                'r1': reports.doc('r1'),
-              }
+          'accounts': {
+            '__values': {
+              'a1': {reports.doc('r1')},
             }
           }
         });

@@ -194,6 +194,11 @@ class Document<T> implements StoreReference {
     return Loon._instance.existsSnap(this);
   }
 
+  bool isDescendant(StoreReference ref) {
+    return path == ref.path ||
+        path.startsWith('${ref.path}${_BaseValueStore.delimiter}');
+  }
+
   Set<Document>? dependencies() {
     return Loon._instance.dependencyManager.getDependencies(this);
   }
