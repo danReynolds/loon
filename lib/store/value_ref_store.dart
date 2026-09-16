@@ -166,6 +166,8 @@ class ValueRefStore<T> extends _BaseValueStore<T> {
       return;
     }
 
+    if (_store.isEmpty) return;
+
     _delete(_store, path.split(_BaseValueStore.delimiter), 0, recursive);
   }
 }

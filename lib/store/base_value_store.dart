@@ -136,13 +136,19 @@ abstract class _BaseValueStore<T> {
   }
 
   T? get(String path) {
-    final segments = _getSegments(path);
-    final last = segments.removeLast();
+    if (_store.isEmpty) return null;
 
-    return _getNode(
-      _store,
-      segments,
-    )?[_values]?[last];
+    Map node = _store;
+    var start = 0;
+    while (true) {
+      final end = path.indexOf(delimiter, start);
+      if (end < 0) return node[_values]?[path.substring(start)];
+
+      final Map? child = node[path.substring(start, end)];
+      if (child == null) return null;
+      node = child;
+      start = end + delimiter.length;
+    }
   }
 
   /// Returns a map of all values that are immediate children of the given path.

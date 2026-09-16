@@ -34,6 +34,7 @@ part 'extensions/set.dart';
 part 'utils/validation.dart';
 part 'utils/logger.dart';
 part 'utils/exceptions.dart';
+part 'utils/store.dart';
 part 'store_reference.dart';
 
 class Loon {

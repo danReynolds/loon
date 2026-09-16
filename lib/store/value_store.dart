@@ -155,6 +155,8 @@ class ValueStore<T> extends _BaseValueStore<T> {
       return;
     }
 
+    if (_store.isEmpty) return;
+
     _delete(_store, _getSegments(path), 0, recursive);
   }
 

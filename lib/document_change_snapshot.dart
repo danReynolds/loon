@@ -26,5 +26,5 @@ class DocumentChangeSnapshot<T> extends DocumentSnapshot<T?> {
   }
 
   @override
-  int get hashCode => Object.hashAll([doc, event, data, prevData]);
+  int get hashCode => Object.hash(doc, event, data, prevData);
 }

@@ -22,7 +22,7 @@ class DocumentSnapshot<T> {
   }
 
   @override
-  int get hashCode => Object.hashAll([doc, data]);
+  int get hashCode => Object.hash(doc, data);
 
   String get id {
     return doc.id;

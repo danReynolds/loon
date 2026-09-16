@@ -38,6 +38,35 @@ void main() {
     });
 
     group('get', () {
+      test('Preserves empty segments and nullable values in exact lookups', () {
+        final store = ValueStore<int?>();
+        final paths = [
+          '',
+          '__',
+          '__leading',
+          'trailing__',
+          'a____b',
+          'a_b',
+          'a___b',
+          'a__b__c'
+        ];
+        for (var i = 0; i < paths.length; i++) {
+          store.write(paths[i], i);
+        }
+        store.write('nullable__value', null);
+        for (var i = 0; i < paths.length; i++) {
+          expect(store.get(paths[i]), i, reason: paths[i]);
+        }
+        expect(store.get('nullable__value'), isNull);
+        expect(store.get('missing__branch__value'), isNull);
+        expect(store.get('a__b__missing'), isNull);
+        store.clear();
+        expect(store.get('a__b__c'), isNull);
+        store.delete('a__b', recursive: false);
+        store.write('a__b__c', 42);
+        expect(store.get('a__b__c'), 42);
+      });
+
       test('Retrieves the value at the given path', () {
         final store = ValueStore<String>();
 
@@ -98,6 +127,16 @@ void main() {
     });
 
     group('delete', () {
+      test('Root deletion detaches an empty backing map', () {
+        for (final store in [ValueStore<int>(), ValueRefStore<int>()]) {
+          final backing = store.inspect();
+          store.delete(ValueStore.root);
+          backing['__values'] = {'late': 1};
+          expect(store.get('late'), isNull);
+          expect(store.isEmpty, isTrue);
+        }
+      });
+
       group(
         "when recursive",
         () {

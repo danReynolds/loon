@@ -1,8 +1,16 @@
 part of 'loon.dart';
 
+/// Keeps the dependent handle available when its dependency entries are deleted.
+class _DependencyEntry {
+  final Document doc;
+  final Set<Document> dependencies;
+
+  _DependencyEntry(this.doc, this.dependencies);
+}
+
 class DependencyManager {
   /// The index of dependencies of a document by path.
-  final _dependencies = ValueStore<Set<Document>>();
+  final _dependencies = ValueStore<_DependencyEntry>();
 
   /// The reverse index of dependents of a document by path.
   final _dependents = ValueStore<Set<Document>>();
@@ -35,19 +43,24 @@ class DependencyManager {
       return;
     }
 
-    final deps = dependenciesBuilder.call(snap);
-    final prevDeps = _dependencies.get(doc.path);
+    // Keep the previous dependencies independent of a mutable set owned by the builder.
+    final deps = dependenciesBuilder.call(snap)?.toSet();
+    final prevDeps = _dependencies.get(doc.path)?.dependencies;
 
     if (setEquals(deps, prevDeps)) {
       return;
     }
 
     if (deps != null && prevDeps != null) {
-      for (final dep in deps.difference(prevDeps)) {
-        _addDependent(dep, doc);
+      for (final dep in deps) {
+        if (!prevDeps.contains(dep)) {
+          _addDependent(dep, doc);
+        }
       }
-      for (final dep in prevDeps.difference(deps)) {
-        _removeDependent(dep, doc);
+      for (final dep in prevDeps) {
+        if (!deps.contains(dep)) {
+          _removeDependent(dep, doc);
+        }
       }
 
       if (deps.isEmpty) {
@@ -55,14 +68,14 @@ class DependencyManager {
         // subcollections keep theirs.
         _dependencies.delete(doc.path, recursive: false);
       } else {
-        _dependencies.write(doc.path, deps);
+        _dependencies.write(doc.path, _DependencyEntry(doc, deps));
       }
     } else if (deps != null) {
       for (final dep in deps) {
         _addDependent(dep, doc);
       }
 
-      _dependencies.write(doc.path, deps);
+      _dependencies.write(doc.path, _DependencyEntry(doc, deps));
     } else if (prevDeps != null) {
       for (final dep in prevDeps) {
         _removeDependent(dep, doc);
@@ -74,7 +87,7 @@ class DependencyManager {
 
   /// Returns all dependencies of the given document.
   Set<Document>? getDependencies(Document doc) {
-    return _dependencies.get(doc.path);
+    return _dependencies.get(doc.path)?.dependencies;
   }
 
   /// Returns all dependents under the given store reference.
@@ -94,15 +107,12 @@ class DependencyManager {
   void _deleteRef(StoreReference ref) {
     final StoreReference(:path) = ref;
 
-    final extracted = _dependencies.extract(path);
+    final entries = _dependencies.extractValues(path);
     _dependencies.delete(path);
 
-    for (final MapEntry(key: docPath, value: dependencies)
-        in extracted.entries) {
-      final dependent = Document.fromPath(docPath);
-
-      for (final doc in dependencies) {
-        _removeDependent(doc, dependent);
+    for (final entry in entries) {
+      for (final dependency in entry.dependencies) {
+        _removeDependent(dependency, entry.doc);
       }
     }
   }
@@ -122,8 +132,18 @@ class DependencyManager {
   }
 
   Map inspect() {
+    // Preserve the set-valued inspection format while entries retain their documents.
+    Map inspectDependencies(Map node) => node.map(
+          (key, value) => MapEntry(
+            key,
+            value is _DependencyEntry
+                ? value.dependencies
+                : inspectDependencies(value as Map),
+          ),
+        );
+
     return {
-      "dependencyStore": _dependencies.inspect(),
+      "dependencyStore": inspectDependencies(_dependencies.inspect()),
       "dependentsStore": _dependents.inspect(),
     };
   }

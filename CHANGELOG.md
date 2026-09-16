@@ -1,5 +1,7 @@
 ## 5.7.0
 
+* Snapshot builder-owned dependency sets so reusing a mutable set cannot leave stale reverse dependencies.
+* Reduce document allocation and path lookup overhead, and reuse document handles when unlinking a deleted subtree's dependencies.
 * Makes dependency management emit a BroadcastEvents.touched for each dependent affected by a write/delete. 
 * Makes dependent management eager vs lazy, which was always a compromise and should be the right trade-off. Net lines removed! Some overly complex abstractions fell out as a result.
 

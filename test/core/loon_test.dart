@@ -23,6 +23,78 @@ void main() {
         await Loon.clearAll(broadcast: false);
       });
 
+      group('Reference paths', () {
+        test(
+            'reference factories preserve split semantics, including overlapping separators',
+            () {
+          final random = Random(42);
+          final paths = <String>[
+            '',
+            'a',
+            '__',
+            '___',
+            '____',
+            'a___b',
+            'a____b',
+            '__a',
+            'a__',
+            'a__b__',
+            'users__alice__transactions__1',
+            for (var i = 0; i < 3000; i++)
+              List.generate(random.nextInt(40),
+                  (_) => ['_', '_', 'a', 'b'][random.nextInt(4)]).join(),
+          ];
+          for (final path in paths) {
+            final segments = path.split('__');
+            final id = segments.removeLast();
+            final parent = segments.join('__');
+            final doc = Document.fromPath(path);
+            final collection = Collection.fromPath(path);
+            expect((
+              doc.parent,
+              doc.id,
+              doc.path
+            ), (
+              parent,
+              id,
+              Document(parent, id).path
+            ), reason: path);
+            expect((
+              collection.parent,
+              collection.name,
+              collection.path
+            ), (
+              parent,
+              id,
+              Collection(parent, id).path
+            ), reason: path);
+          }
+        });
+
+        test('factory configuration and persistence scope survive path parsing',
+            () {
+          int fromJson(Json json) => json['value'] as int;
+          Json toJson(int value) => {'value': value};
+          Set<Document>? dependencies(DocumentSnapshot<int> _) => {};
+          const settings = PersistorSettings(enabled: false);
+          final doc = Document.fromPath<int>('users__alice',
+              fromJson: fromJson,
+              toJson: toJson,
+              dependenciesBuilder: dependencies,
+              persistorSettings: settings);
+          expect(doc.fromJson, same(fromJson));
+          expect(doc.toJson, same(toJson));
+          expect(doc.dependenciesBuilder, same(dependencies));
+          expect(doc.persistorSettings!.ref, same(doc));
+          expect(doc.persistorSettings!.enabled, isFalse);
+          final children = doc.subcollection<int>('items');
+          expect(children.doc('1').parent, 'users__alice__items');
+          expect(children.doc('2').parent, 'users__alice__items');
+          expect(
+              children.doc('2').persistorSettings, same(doc.persistorSettings));
+        });
+      });
+
       group(
         'Document',
         () {
@@ -2793,6 +2865,119 @@ void main() {
             Loon.inspect()['dependentsStore'],
             {},
           );
+        });
+
+        test('overlapping dependency updates remove only departed sources',
+            () async {
+          Loon.configure(persistor: null);
+          await Loon.clearAll(broadcast: false);
+          final sources = Loon.collection<int>('sources');
+          final a = sources.doc('a');
+          final b = sources.doc('b');
+          final c = sources.doc('c');
+          final callerOwned = <Document>{a, b};
+          final docs = Loon.collection<int>('docs',
+              dependenciesBuilder: (_) => callerOwned);
+          final doc = docs.doc('1')
+            ..create(0, broadcast: false, persist: false);
+          callerOwned
+            ..remove(a)
+            ..add(c);
+          doc.update(1, broadcast: false, persist: false);
+          expect(a.dependents(), isNull);
+          expect(b.dependents(), {doc});
+          expect(c.dependents(), {doc});
+          callerOwned.clear();
+          expect(doc.dependencies(), {b, c});
+          doc.update(2, broadcast: false, persist: false);
+          expect(b.dependents(), isNull);
+          expect(c.dependents(), isNull);
+          await Loon.clearAll(broadcast: false);
+        });
+
+        test('Deleting a subtree unlinks every document sharing a dependency',
+            () {
+          fakeAsync((async) {
+            final source = Loon.collection<int>('sources').doc('shared')
+              ..create(0);
+            final groups = Loon.collection<int>(
+              'groups',
+              dependenciesBuilder: (_) => {source},
+            );
+            final removed = groups.doc('removed')..create(0);
+            final kept = groups.doc('kept')..create(0);
+            final children = removed.subcollection<int>(
+              'children',
+              dependenciesBuilder: (_) => {source},
+            );
+            final first = children.doc('first')..create(0);
+            final second = children.doc('second')..create(0);
+            flushBroadcasts(async);
+
+            expect(source.dependents(), {removed, kept, first, second});
+            removed.delete();
+            flushBroadcasts(async);
+
+            // Both the parent and all descendants must be unlinked, even when
+            // their dependency sets are equal. Unrelated memberships survive.
+            expect(source.dependents(), {kept});
+            expect(kept.dependencies(), {source});
+            expect(Loon.inspect()['dependencyStore'], {
+              'groups': {
+                '__values': {
+                  'kept': {source},
+                },
+              },
+            });
+
+            kept.delete();
+            flushBroadcasts(async);
+            expect(Loon.inspect()['dependencyStore'], isEmpty);
+            expect(Loon.inspect()['dependentsStore'], isEmpty);
+          });
+        });
+
+        test('Rebuilds dependencies when the builder reuses a mutable set', () {
+          fakeAsync((async) {
+            final users = Loon.collection<int>('users');
+            final alice = users.doc('alice')..create(1);
+            final bob = users.doc('bob')..create(1);
+            final dependencies = <Document>{alice};
+            final posts = Loon.collection<String>(
+              'posts',
+              dependenciesBuilder: (_) => dependencies,
+            );
+            final post = posts.doc('p1')..create('Hello');
+            flushBroadcasts(async);
+
+            final events = <BroadcastEvents>[];
+            final sub = post.streamChanges().listen(
+                  (snap) => events.add(snap.event),
+                );
+            flushBroadcasts(async);
+
+            dependencies
+              ..clear()
+              ..add(bob);
+            post.rebuildDependencies();
+
+            bob.update(2);
+            flushBroadcasts(async);
+            expect(events, [BroadcastEvents.touched]);
+
+            events.clear();
+            alice.update(2);
+            flushBroadcasts(async);
+            expect(events, isEmpty);
+
+            // Deletion must also remove the membership from the rebuilt dependency.
+            post.delete();
+            flushBroadcasts(async);
+            expect(Loon.inspect()['dependentsStore'], isEmpty);
+
+            sub.cancel();
+            async.flushMicrotasks();
+          });
         });
 
         test("Rebroadcasts an observable document on dependency changes", () {

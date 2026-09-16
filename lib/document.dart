@@ -34,9 +34,9 @@ class Document<T> implements StoreReference {
     PersistorSettings? persistorSettings,
     DependenciesBuilder<S>? dependenciesBuilder,
   }) {
-    final [...pathSegments, id] = path.split(_BaseValueStore.delimiter);
+    final (parent, id) = _splitReferencePath(path);
     return Document<S>(
-      pathSegments.join(_BaseValueStore.delimiter),
+      parent,
       id,
       fromJson: fromJson,
       toJson: toJson,
@@ -57,16 +57,10 @@ class Document<T> implements StoreReference {
   }
 
   @override
-  int get hashCode => Object.hashAll([parent, id]);
+  late final int hashCode = Object.hash(parent, id);
 
   @override
-  String get path {
-    if (id.isEmpty) {
-      return parent;
-    }
-
-    return "${parent}__$id";
-  }
+  late final String path = id.isEmpty ? parent : '${parent}__$id';
 
   Collection<S> subcollection<S>(
     String name, {
