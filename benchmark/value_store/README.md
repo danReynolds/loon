@@ -246,6 +246,12 @@ parsing without splitting/rejoining intermediate collections. Both Document and
 Collection factories share the parser. No callback traversal API is used in this
 comparison, so it evaluates the entry model as currently implemented.
 
+The two path-reconstruction controls store raw sets instead of entries. Their
+validation excludes only the entry-specific JSON serialization test; dependency
+behavior, subtree cleanup and all other core checks still run. Production
+`inspect()` returns the stored entries, whose `toJson()` encodes document paths.
+Archived measurements retain the inspection format of their recorded revision.
+
 The traversal helpers are proposals using `inspect()` to access the current tree.
 They visit the target's own value plus all descendants, including nulls and
 repeated values. They must not structurally mutate the traversed store during

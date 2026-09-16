@@ -205,6 +205,12 @@ Future<void> main(List<String> arguments) async {
             'benchmark/value_store/traversal_apis_test.dart',
             'benchmark/value_store/collection_lookup_demo_test.dart',
             'benchmark/value_store/documents_profile_test.dart',
+            // These historical controls contain sets, not serializable entries.
+            if (['document_paths', 'document_before_paths']
+                .contains(variant)) ...[
+              '--name',
+              '^(?!.*Dependency entries use standard JSON serialization)',
+            ],
             '--concurrency=1',
             '--reporter',
             'expanded'

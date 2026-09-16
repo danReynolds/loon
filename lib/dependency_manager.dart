@@ -6,6 +6,14 @@ class _DependencyEntry {
   final Set<Document> dependencies;
 
   _DependencyEntry(this.doc, this.dependencies);
+
+  /// Serialize reference identities without reading or serializing document data.
+  Json toJson() => {
+        'doc': doc.path,
+        'dependencies': [
+          for (final dependency in dependencies) dependency.path
+        ],
+      };
 }
 
 class DependencyManager {
@@ -132,18 +140,8 @@ class DependencyManager {
   }
 
   Map inspect() {
-    // Preserve the set-valued inspection format while entries retain their documents.
-    Map inspectDependencies(Map node) => node.map(
-          (key, value) => MapEntry(
-            key,
-            value is _DependencyEntry
-                ? value.dependencies
-                : inspectDependencies(value as Map),
-          ),
-        );
-
     return {
-      "dependencyStore": inspectDependencies(_dependencies.inspect()),
+      "dependencyStore": _dependencies.inspect(),
       "dependentsStore": _dependents.inspect(),
     };
   }

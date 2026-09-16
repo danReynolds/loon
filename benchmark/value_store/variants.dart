@@ -191,15 +191,5 @@ void _rebuildDocumentsFromPaths(File manager) {
         _removeDependent(dependency, dependent);
       }
     }''');
-  final inspect = source.indexOf('  Map inspect() {');
-  if (inspect < 0) throw StateError('Update dependency inspection');
-  source = source.replaceRange(inspect, source.length, '''  Map inspect() {
-    return {
-      "dependencyStore": _dependencies.inspect(),
-      "dependentsStore": _dependents.inspect(),
-    };
-  }
-}
-''');
   manager.writeAsStringSync(source);
 }

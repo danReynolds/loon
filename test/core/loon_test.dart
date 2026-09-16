@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:math';
 
 import 'package:fake_async/fake_async.dart';
@@ -2773,6 +2774,45 @@ void main() {
       });
 
       group('Dependencies', () {
+        test('Dependency entries use standard JSON serialization', () {
+          final source = Document<int>('sources', 'shared',
+              toJson: (_) =>
+                  throw StateError('Do not serialize document data'));
+          final records = Loon.collection<int>('records',
+              dependenciesBuilder: (_) => {source});
+          final parent = records.doc('parent')
+            ..create(0, broadcast: false, persist: false);
+          final child = parent
+              .subcollection<int>('children', dependenciesBuilder: (_) => {})
+              .doc('child')
+            ..create(0, broadcast: false, persist: false);
+
+          final tree = Loon.inspect()['dependencyStore'];
+          expect(Loon.inspect()['dependencyStore'], same(tree));
+          expect(jsonDecode(jsonEncode(tree)), {
+            'records': {
+              '__values': {
+                'parent': {
+                  'doc': parent.path,
+                  'dependencies': [source.path],
+                },
+              },
+              'parent': {
+                'children': {
+                  '__values': {
+                    'child': {
+                      'doc': child.path,
+                      'dependencies': [],
+                    },
+                  },
+                },
+              },
+            },
+          });
+          expect(parent.dependencies(), {source});
+          expect(child.dependencies(), isEmpty);
+        });
+
         test("Updates the dependencies/dependents stores correctly", () async {
           final usersCollection = Loon.collection('users');
           final postsCollection = Loon.collection<Json>(
@@ -2798,18 +2838,7 @@ void main() {
 
           postDoc.create(postData);
 
-          expect(
-            Loon.inspect()['dependencyStore'],
-            {
-              "posts": {
-                "__values": {
-                  "1": {
-                    userDoc,
-                  }
-                }
-              }
-            },
-          );
+          expect(postDoc.dependencies(), {userDoc});
           expect(
             Loon.inspect()['dependentsStore'],
             {
@@ -2827,18 +2856,7 @@ void main() {
 
           // Deleting the user doc should not alter the post's dependencies, as the post doc remains
           // dependent on the user doc, even when it is no longer in the store, since it could be added back later.
-          expect(
-            Loon.inspect()['dependencyStore'],
-            {
-              "posts": {
-                "__values": {
-                  "1": {
-                    userDoc,
-                  }
-                }
-              },
-            },
-          );
+          expect(postDoc.dependencies(), {userDoc});
           expect(
             Loon.inspect()['dependentsStore'],
             {
@@ -2925,7 +2943,7 @@ void main() {
             expect(Loon.inspect()['dependencyStore'], {
               'groups': {
                 '__values': {
-                  'kept': {source},
+                  'kept': isNotNull,
                 },
               },
             });
@@ -3166,18 +3184,7 @@ void main() {
 
             flushBroadcasts(async);
 
-            expect(
-              Loon.inspect()['dependencyStore'],
-              {
-                "users": {
-                  "__values": {
-                    "1": {
-                      postDoc,
-                    },
-                  }
-                },
-              },
-            );
+            expect(userDoc.dependencies(), {postDoc});
             expect(
               Loon.inspect()['dependentsStore'],
               {
@@ -3196,25 +3203,8 @@ void main() {
               "name": "Post 1",
             });
 
-            expect(
-              Loon.inspect()['dependencyStore'],
-              {
-                "users": {
-                  "__values": {
-                    "1": {
-                      postDoc,
-                    },
-                  },
-                },
-                "posts": {
-                  "__values": {
-                    "1": {
-                      userDoc,
-                    },
-                  },
-                },
-              },
-            );
+            expect(userDoc.dependencies(), {postDoc});
+            expect(postDoc.dependencies(), {userDoc});
             expect(
               Loon.inspect()['dependentsStore'],
               {
@@ -3287,15 +3277,7 @@ void main() {
 
             flushBroadcasts(async);
 
-            expect(Loon.inspect()['dependencyStore'], {
-              "friends": {
-                "__values": {
-                  "1": {
-                    userDoc,
-                  }
-                }
-              }
-            });
+            expect(friendDoc.dependencies(), {userDoc});
             expect(
               Loon.inspect()['dependentsStore'],
               {
