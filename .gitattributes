@@ -1,0 +1,2 @@
+# Keep benchmark evidence available without expanding generated data in reviews.
+benchmark/value_store/results/*.json linguist-generated=true
