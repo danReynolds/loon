@@ -81,9 +81,8 @@ class BroadcastManager {
   void _deleteRef(StoreReference ref) {
     final StoreReference(:path) = ref;
 
-    /// When a path is deleted, the event store is updated to remove all broadcast events
-    /// scheduled for that path and its subtree and replaces the root of that broadcast store path
-    /// with a single removed event.
+    // Replace all pending events for the deleted path and its subtree with a
+    // single removed event at the deleted path.
     eventStore.delete(path);
     eventStore.write(path, BroadcastEvents.removed);
 
@@ -101,7 +100,7 @@ class BroadcastManager {
 
     // All cached observer values for the document and its collection are invalidated whenever
     // the document is written or touched.
-    observerValueStore.delete(doc.path, recursive: false);
+    observerValueStore.delete(path, recursive: false);
     observerValueStore.delete(doc.parent, recursive: false);
 
     final pendingEvent = eventStore.get(path);

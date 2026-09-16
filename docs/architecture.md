@@ -60,6 +60,10 @@ On broadcast, each broadcast observer checks if it is affected by any of the cha
 
 If the broadcast observer has changes, then it emits its updated data to its listeners.
 
+Filtering is incremental, but emitting a fresh result list still takes O(n) time for n matching documents.
+Sorted queries also sort the full result list, taking O(n log n), unless a read already recomputed the cached result
+after its last invalidation. Dependency propagation visits the affected dependents before the broadcast.
+
 ### Dependencies
 
 Documents can specify that they depend on other documents and that they should react to changes to those documents.
@@ -76,8 +80,8 @@ Loon.collection(
 ```
 
 In this example, each post specifies that it has a dependency on its associated user. This means that when a post's user changes,
-any observers of the post, such as an `ObservableDocument` for that specific post or an `ObservableQuery` that currently includes
-that post in its list of documents, should also notify its listeners.
+observers of the post re-read it, and queries on its collection re-evaluate whether it matches their filters.
+A query can therefore add a previously excluded post, remove a previously included post, or refresh an existing result.
 
 If a post is displayed alongside its user's profile picture, then without dependencies the code for the post would need to observe
 both the post and user document for changes separately. With dependencies, it only needs to observe the post and the post will react to any changes to the user automatically.
@@ -86,11 +90,16 @@ Document dependencies are modeled with two `ValueStore`s: an index of each docum
 reverse index of each document's dependents by the path of the document they depend on.
 
 ```dart
-final dependenciesStore = ValueStore<Set<Document>>();
+final dependenciesStore = ValueStore<_DependencyEntry>();
 final dependentsStore = ValueStore<Set<Document>>();
 ```
 
-The dependencies index is authoritative: it is rewritten whenever a document is written and cleared when the document is deleted. The
+Each private `_DependencyEntry` keeps the dependent document handle and a snapshot of the set returned by its dependencies builder.
+Keeping the handle avoids rebuilding documents from paths when deleting a subtree. The snapshot prevents later mutations to a
+builder-owned set from changing the stored graph. Entries serialize through `toJson()` using document paths, without reading document data.
+
+The dependencies index is authoritative: a write with a dependencies builder recalculates its dependencies, updates the index if they
+changed, and deletion clears the index under the deleted path. The
 dependents index is derived from it and is kept exact in two ways. When a document is written, it is added to the dependents of its new
 dependencies and removed from the dependents of the ones it dropped. When a document or collection is deleted, every document under the
 deleted path is removed from the dependents of its dependencies (read from the dependencies index before it is cleared), so that
@@ -104,7 +113,7 @@ in the same way. Since the documents deleted along with the path were pruned, th
 `BroadcastEvents.removed` event for the deleted path instead.
 
 A touched document is re-evaluated by its observers as if it had been modified: an `ObservableDocument` re-reads it, and an
-`ObservableQuery` re-runs its filter and sort for it, adding, refreshing or evicting it from its result set. Broadcast observers keep no
+`ObservableQuery` re-runs its filter, adding, refreshing or evicting it from its result set and re-sorting the results when needed. Broadcast observers keep no
 dependency state of their own.
 
 ## Persistence Layer
@@ -295,5 +304,4 @@ The worker parses the message and tells the `FileDataStoreManager` to hydrate al
 The `FileDataStoreManager` then iterates over each resolved `FileDataStore` and hydrates its file from disk. The manager returns only the subset of paths requested by the hydration call to the `FileDataStoreWorker`, which packages it into a message and sends its response back to the `FilePersistor` on the main isolate.
 
 The documents are then written into the Loon document store on the main isolate and broadcast to observers.
-
 

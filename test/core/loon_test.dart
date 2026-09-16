@@ -2296,8 +2296,7 @@ void main() {
               async.flushMicrotasks();
             });
           });
-          test(
-              'Resets its cached value when its filter throws without affecting other observers',
+          test('Reports filter failures without interrupting other observers',
               () {
             final errors = <Object>[];
             final onError = FlutterError.onError;
@@ -2335,8 +2334,8 @@ void main() {
                 items.doc('1').update(2);
                 flushBroadcasts(async);
 
-                // The throwing query is reset, and the remaining observers and later
-                // broadcasts are unaffected.
+                // The throwing query stays dirty. The remaining observers and
+                // later broadcasts are unaffected.
                 expect(throwing.isDirty, true);
                 shouldThrow = false;
                 other.create(7);

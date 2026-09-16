@@ -53,7 +53,7 @@ class ObservableQuery<T> extends Query<T>
       // local to the query are different from the global broadcast events. For example, if a document
       // was modified globally such that now it should be included in the query and before was not,
       // then its event type at the query-level is [BroadcastEvents.added] while its global event was
-      // [EventTypes.modified].
+      // [BroadcastEvents.modified].
       final List<DocumentChangeSnapshot<T>> changeSnaps = [];
       final hasChangeListener = _changeController.hasListener;
 
@@ -180,7 +180,7 @@ class ObservableQuery<T> extends Query<T>
                     );
                   }
                 } else {
-                  /// 2.c.ii Previously satisfied the query filter and now does not.
+                  // 2.c.ii Previously satisfied the query filter and now does not.
                   _evictDoc(doc);
 
                   if (hasChangeListener) {

@@ -23,21 +23,21 @@ class DependencyManager {
   /// The reverse index of dependents of a document by path.
   final _dependents = ValueStore<Set<Document>>();
 
-  void _addDependent(Document doc, Document dep) {
-    final dependents =
-        _dependents.get(doc.path) ?? _dependents.write(doc.path, {});
-    dependents.add(dep);
+  void _addDependent(Document dependency, Document dependent) {
+    final dependents = _dependents.get(dependency.path) ??
+        _dependents.write(dependency.path, {});
+    dependents.add(dependent);
   }
 
-  void _removeDependent(Document doc, Document dep) {
-    final dependents = _dependents.get(doc.path);
+  void _removeDependent(Document dependency, Document dependent) {
+    final dependents = _dependents.get(dependency.path);
     if (dependents == null) {
       return;
     }
 
-    dependents.remove(dep);
+    dependents.remove(dependent);
     if (dependents.isEmpty) {
-      _dependents.delete(doc.path, recursive: false);
+      _dependents.delete(dependency.path, recursive: false);
     }
   }
 
@@ -111,7 +111,10 @@ class DependencyManager {
   /// Deleting a store ref performs two operations:
   ///
   /// 1. It deletes all dependency entries under the given path.
-  /// 2. It deletes all dependent entries for the deleted documents.
+  /// 2. It removes the deleted documents from their dependencies' reverse indexes.
+  ///
+  /// Surviving documents that depend on the deleted path keep their memberships,
+  /// so they can react to both its deletion and later recreation.
   void _deleteRef(StoreReference ref) {
     final StoreReference(:path) = ref;
 
