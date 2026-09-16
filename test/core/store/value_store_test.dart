@@ -1,5 +1,9 @@
+import 'dart:math';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:loon/loon.dart';
+
+import '../../store_paths.dart';
 
 void main() {
   group('ValueStore', () {
@@ -34,6 +38,35 @@ void main() {
     });
 
     group('get', () {
+      test('Preserves empty segments and nullable values in exact lookups', () {
+        final store = ValueStore<int?>();
+        final paths = [
+          '',
+          '__',
+          '__leading',
+          'trailing__',
+          'a____b',
+          'a_b',
+          'a___b',
+          'a__b__c'
+        ];
+        for (var i = 0; i < paths.length; i++) {
+          store.write(paths[i], i);
+        }
+        store.write('nullable__value', null);
+        for (var i = 0; i < paths.length; i++) {
+          expect(store.get(paths[i]), i, reason: paths[i]);
+        }
+        expect(store.get('nullable__value'), isNull);
+        expect(store.get('missing__branch__value'), isNull);
+        expect(store.get('a__b__missing'), isNull);
+        store.clear();
+        expect(store.get('a__b__c'), isNull);
+        store.delete('a__b', recursive: false);
+        store.write('a__b__c', 42);
+        expect(store.get('a__b__c'), 42);
+      });
+
       test('Retrieves the value at the given path', () {
         final store = ValueStore<String>();
 
@@ -94,6 +127,16 @@ void main() {
     });
 
     group('delete', () {
+      test('Root deletion detaches an empty backing map', () {
+        for (final store in [ValueStore<int>(), ValueRefStore<int>()]) {
+          final backing = store.inspect();
+          store.delete(ValueStore.root);
+          backing['__values'] = {'late': 1};
+          expect(store.get('late'), isNull);
+          expect(store.isEmpty, isTrue);
+        }
+      });
+
       group(
         "when recursive",
         () {
@@ -722,5 +765,58 @@ void main() {
         );
       },
     );
+
+    group('property', () {
+      // Random write/delete sequences are checked against a flat map used as an
+      // independent oracle for the store's incremental bookkeeping. On failure the seed
+      // and operation log identify the case.
+      test('Matches a reference model across random write and delete sequences',
+          () {
+        for (var seed = 0; seed < 50; seed++) {
+          final r = Random(seed);
+          final store = ValueStore<int>();
+          final model = <String, int>{};
+          final ops = <String>[];
+          var counter = 0;
+
+          for (var step = 0; step < 50; step++) {
+            if (r.nextInt(3) != 0) {
+              final p = randomPath(r);
+              final v = counter++;
+              store.write(p, v);
+              model[p] = v;
+              ops.add('write($p,$v)');
+            } else {
+              final p = randomPath(r);
+              store.delete(p);
+              model.removeWhere((k, _) => isAtOrUnder(k, p));
+              ops.add('delete($p)');
+            }
+
+            final reason = 'seed=$seed ops=$ops';
+            for (final q in {...pathGrid, ...model.keys}) {
+              expect(store.get(q), model[q], reason: '$reason get($q)');
+              expect(store.hasValue(q), model.containsKey(q),
+                  reason: '$reason hasValue($q)');
+              final hasPath = model.containsKey(q) ||
+                  model.keys.any((k) => k.startsWith('$q$pathDelimiter'));
+              expect(store.hasPath(q), hasPath, reason: '$reason hasPath($q)');
+            }
+            for (final q in pathGrid) {
+              final expected = <String, int>{};
+              for (final entry in model.entries) {
+                if (parentPath(entry.key) == q) {
+                  expected[lastSegment(entry.key)] = entry.value;
+                }
+              }
+              final actual = store.getChildValues(q) ?? const <String, int>{};
+              expect(actual, equals(expected),
+                  reason: '$reason getChildValues($q)');
+            }
+            expect(store.isEmpty, model.isEmpty, reason: '$reason isEmpty');
+          }
+        }
+      });
+    });
   });
 }

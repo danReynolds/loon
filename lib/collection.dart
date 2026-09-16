@@ -47,10 +47,10 @@ class Collection<T> implements Queryable<T>, StoreReference {
     PersistorSettings? persistorSettings,
     DependenciesBuilder<S>? dependenciesBuilder,
   }) {
-    final [...pathSegments, id] = path.split(_BaseValueStore.delimiter);
+    final (parent, id) = _splitReferencePath(path);
 
     return Collection<S>(
-      pathSegments.join(_BaseValueStore.delimiter),
+      parent,
       id,
       fromJson: fromJson,
       toJson: toJson,
@@ -60,12 +60,8 @@ class Collection<T> implements Queryable<T>, StoreReference {
   }
 
   @override
-  String get path {
-    if (parent.isEmpty || parent == _rootKey) {
-      return name;
-    }
-    return "${parent}__$name";
-  }
+  late final String path =
+      parent.isEmpty || parent == _rootKey ? name : '${parent}__$name';
 
   @override
   bool operator ==(Object other) {
@@ -79,7 +75,7 @@ class Collection<T> implements Queryable<T>, StoreReference {
   }
 
   @override
-  int get hashCode => Object.hashAll([parent, name]);
+  int get hashCode => Object.hash(parent, name);
 
   bool isPersistenceEnabled() {
     return persistorSettings?.enabled ??

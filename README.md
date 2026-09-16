@@ -245,6 +245,9 @@ UserModel.store.streamChanges().listen((changes) {
       case BroadcastEvents.hydrated:
         print('${changeSnap.id} was hydrated from the persisted data.');
         break;
+      case BroadcastEvents.touched:
+        print('${changeSnap.id} was rebroadcast because state it depends on changed.');
+        break;
     }
   }
 });
@@ -275,10 +278,38 @@ final posts = Loon.collection<PostModel>(
 );
 ```
 
-In this example, whenever a post's associated user is updated, the post will also be rebroadcast to its active listeners.
+In this example, whenever a post's associated user is updated or deleted (including through the deletion of a parent document or
+collection), the post is rebroadcast to its active listeners and re-evaluated by any queries that observe it.
 
 Additionally, whenever a document is updated, it will rebuild its set of dependencies, allowing documents to support dynamic dependencies
 that can change in response to updated document data.
+
+### Rebroadcasting
+
+A document can also be rebroadcast manually. This is useful when state that the document's value depends on has changed outside of the store,
+such as in-memory state read by a query's filter or sort:
+
+```dart
+// `isTransfer` reads in-memory rules rather than stored data.
+final transfers = transactions.where((snap) => snap.data.isTransfer);
+
+// When the rules change, rebroadcast the affected transactions so that queries
+// like `transfers` re-evaluate them.
+void onRulesChanged(Iterable<String> affectedTransactionIds) {
+  for (final id in affectedTransactionIds) {
+    transactions.doc(id).rebroadcast();
+  }
+}
+```
+
+On a rebroadcast, observers of the document re-read it and queries on its collection re-evaluate whether the document belongs in their result
+set and where it sorts. Nothing is persisted and the document's dependencies are not rebuilt; call `rebuildDependencies()` first if they may have
+changed. Document change listeners receive a `BroadcastEvents.touched` event rather than a `modified` event; query change listeners
+receive `touched` for a document that stays in the result set, and `added` or `removed` when the rebroadcast changes its membership.
+Rebroadcasting a document that does not exist does nothing.
+
+Filters and sorts may therefore read state outside of the document's snapshot, as long as the document is rebroadcast when that state changes.
+Data dependencies do this automatically when that state is another document.
 
 ## 🪴 Root collection
 
