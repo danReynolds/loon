@@ -31,7 +31,7 @@ void summarize(String root) {
               data['mode'] != mode ||
               data['variant'] != variant ||
               data['suite'] != suite ||
-              data['host'] != 'flutter_app' ||
+              data['host'] != (manifest['host'] ?? 'flutter_app') ||
               rows == null ||
               rows.isEmpty) {
             throw StateError('Failed or misclassified result: $path');
@@ -58,16 +58,27 @@ void summarize(String root) {
       }
     }
   }
-  final flutter = manifest['flutter'] as Map;
+  final flutter = manifest['flutter'] as Map?;
+  final standalone = manifest['host'] == 'dart_store_core';
   final lines = <String>[
     '# Native ValueStore profiling',
     '',
-    'Flutter ${flutter['frameworkVersion']}; Dart ${flutter['dartSdkVersion']}; '
-        '${manifest['machine']}; ${manifest['os']}.',
+    if (standalone)
+      'Dart ${manifest['dart']}; ${manifest['machine']}; ${manifest['os']}.'
+    else
+      'Flutter ${flutter!['frameworkVersion']}; Dart ${flutter['dartSdkVersion']}; '
+          '${manifest['machine']}; ${manifest['os']}.',
     '',
-    'JIT = Flutter debug; AOT = Flutter release; profile = instrumented AOT. '
-        'Separate series from actual Flutter desktop apps; these do not qualify '
-        'iOS/Android performance. Source/build hashes and commands are archived.',
+    if (standalone)
+      'Isolated actual store sources: JIT = Dart VM with assertions; AOT = dart compile exe. '
+          'This isolates store algorithms, not full Flutter-engine or mobile-device performance.'
+    else
+      'JIT = Flutter debug; AOT = Flutter release; profile = instrumented AOT. '
+          'Separate series from actual Flutter desktop apps; these do not qualify '
+          'iOS/Android performance. Source/build hashes and commands are archived.',
+    if (manifest['headless'] == true)
+      'This series uses headless Flutter engines with no windows or rendered frames. '
+          'Compare candidates within this series, not directly against historical windowed runs.',
     '',
     'Values are pooled medians in milliseconds, with the range of per-process '
         'medians (not a confidence interval). Setup, compilation and correctness '

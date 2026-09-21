@@ -69,13 +69,63 @@ class BroadcastManager {
   }) {
     final dependents = Loon._instance.dependencyManager
         .getDependents(ref, recursive: recursive);
-    if (dependents != null) {
+    if (dependents == null || dependents.isEmpty) return;
+    _queueDependentEvents(dependents);
+  }
+
+  void _queueDependentEvents(Set<Document> dependents) {
+    final manager = Loon._instance.dependencyManager;
+
+    // This synchronous walk only adds events and reads the reverse index. Keep
+    // at most one collection map from each store, only until the walk returns.
+    String? eventParent;
+    Map<String, BroadcastEvents>? events;
+    String? reverseParent;
+    Map<String, Set<Document>>? reverse;
+
+    void visit(Set<Document> dependents) {
       for (final doc in dependents) {
-        if (!eventStore.hasValue(doc.path)) {
-          writeDocument(doc, BroadcastEvents.touched);
+        // Unusual constructor inputs can split differently from parent/id.
+        final useBucket = doc.id.isNotEmpty &&
+            !doc.id.contains('__') &&
+            !doc.parent.endsWith('_');
+        if (useBucket && eventParent != doc.parent) {
+          eventParent = doc.parent;
+          events = eventStore.getChildValues(doc.parent);
         }
+        final pending =
+            useBucket ? (events?[doc.id]) : eventStore.get(doc.path);
+        if (pending != null) continue;
+
+        observerValueStore.delete(doc.path, recursive: false);
+        observerValueStore.delete(doc.parent, recursive: false);
+        if (useBucket && events != null) {
+          events![doc.id] = BroadcastEvents.touched;
+        } else {
+          eventStore.write(doc.path, BroadcastEvents.touched);
+          if (useBucket) {
+            events = eventStore.getChildValues(doc.parent);
+          } else {
+            // This write may have created a bucket previously cached as absent.
+            eventParent = null;
+          }
+        }
+
+        Set<Document>? next;
+        if (useBucket) {
+          if (reverseParent != doc.parent) {
+            reverseParent = doc.parent;
+            reverse = manager._dependents.getChildValues(doc.parent);
+          }
+          next = reverse?[doc.id];
+        } else {
+          next = manager.getDependents(doc);
+        }
+        if (next != null) visit(next);
       }
     }
+
+    visit(dependents);
   }
 
   void _deleteRef(StoreReference ref) {

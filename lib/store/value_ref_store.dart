@@ -5,17 +5,19 @@ class ValueRefStore<T> extends _BaseValueStore<T> {
 
   ValueRefStore([super.store]);
 
-  T? _write(Map node, List<String> segments, int index, T value) {
-    final segment = segments[index];
+  T? _write(Map node, String path, int start, T value) {
+    final end = _nextStoreDelimiter(path, start);
 
     T? prevValue;
-    if (index == segments.length - 1) {
+    if (end < 0) {
       final values = node[_BaseValueStore._values] ??= <String, T>{};
+      final segment = path.substring(start);
       prevValue = values[segment];
       values[segment] = value;
     } else {
-      final Map child = node[segment] ??= {};
-      prevValue = _write(child, segments, index + 1, value);
+      final Map child = node[path.substring(start, end)] ??= {};
+      prevValue =
+          _write(child, path, end + _BaseValueStore.delimiter.length, value);
     }
 
     if (prevValue == value) {
@@ -43,22 +45,24 @@ class ValueRefStore<T> extends _BaseValueStore<T> {
 
   Map? _delete(
     Map node,
-    List<String> segments,
-    int index,
+    String path,
+    int start,
     bool recursive,
   ) {
-    final segment = segments[index];
+    final end = _nextStoreDelimiter(path, start);
+    final segment = path.substring(start, end < 0 ? path.length : end);
     final Map? child = node[segment];
 
     T? childValue;
     Map? removedRefs;
 
-    if (index < segments.length - 1) {
+    if (end >= 0) {
       if (child == null) {
         return null;
       }
 
-      removedRefs = _delete(child, segments, index + 1, recursive);
+      removedRefs = _delete(
+          child, path, end + _BaseValueStore.delimiter.length, recursive);
       if (child.isEmpty) {
         node.remove(segment);
       }
@@ -118,18 +122,9 @@ class ValueRefStore<T> extends _BaseValueStore<T> {
       return null;
     }
 
-    Map? node = _store;
-
-    if (path.isNotEmpty) {
-      final segments = _getSegments(path);
-      node = _getNode(
-        _store,
-        segments.isEmpty ? segments : segments.sublist(0, segments.length),
-      );
-
-      if (node == null) {
-        return null;
-      }
+    final Map? node = path.isEmpty ? _store : _getNode(path);
+    if (node == null) {
+      return null;
     }
 
     final refs = node[_refs];
@@ -152,7 +147,7 @@ class ValueRefStore<T> extends _BaseValueStore<T> {
 
   @override
   T write(String path, T value) {
-    _write(_store, path.split(_BaseValueStore.delimiter), 0, value);
+    _write(_store, path, 0, value);
     return value;
   }
 
@@ -168,6 +163,6 @@ class ValueRefStore<T> extends _BaseValueStore<T> {
 
     if (_store.isEmpty) return;
 
-    _delete(_store, path.split(_BaseValueStore.delimiter), 0, recursive);
+    _delete(_store, path, 0, recursive);
   }
 }

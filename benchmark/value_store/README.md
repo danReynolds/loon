@@ -9,6 +9,17 @@ The workloads in `workloads/` run unchanged through either the small
 The native host imports the actual Loon library. It does not substitute a Dart-only
 copy of the store or mock Flutter to make AOT compilation work.
 
+The macOS runner is **headless**: it starts a Flutter engine without a window or
+view, runs as a background-only process, and prohibits activation. It does not
+take keyboard focus or create a Dock icon. Results explicitly record headless
+execution. Historical windowed hosts must be rebuilt; compare candidates within
+the same host setup rather than mixing old windowed and new headless timings.
+
+For quick store-algorithm experiments, `run_core.dart` additionally isolates the
+actual store source files in a standalone Dart library. This avoids Flutter builds
+between candidates. It is a separate measurement series; verify selected changes
+with the full Flutter runner before drawing engine-level conclusions.
+
 First paired native run: [results and interpretation](results/2026-09-15-native.md),
 with [raw samples and receipts](results/2026-09-15-native.json).
 
@@ -23,6 +34,86 @@ with [raw samples and receipts](results/2026-09-16-traversal-apis.json).
 Document allocation changes and retained dependency entries:
 [timing and live-heap comparison](results/2026-09-16-document-entries.md),
 with [raw samples and receipts](results/2026-09-16-document-entries.json).
+
+Core store comparison against main, the committed PR and the incoming refactor:
+[results and implementation decisions](results/2026-09-20-store-core.md),
+with [source snapshots, raw samples and receipts](results/2026-09-20-store-core.json).
+
+Delimiter-scanning follow-up, including long IDs, Unicode and complete dependency
+workloads: [results and changes versus main](results/2026-09-20-path-scanning.md),
+with [source snapshots, raw samples and receipts](results/2026-09-20-path-scanning.json).
+
+Parsed-path ownership, bounded caches and cleanup:
+[memory and timing experiments](results/2026-09-20-path-cache.md),
+with [source snapshots, raw samples and heap captures](results/2026-09-20-path-cache.json).
+
+Operation-local dependency traversal:
+[complexity trade-offs and results](results/2026-09-20-scoped-traversal.md),
+with [source snapshots, raw samples and receipts](results/2026-09-20-scoped-traversal.json).
+
+Shared helper cleanup and headless execution:
+[implementation trade-offs and results](results/2026-09-21-scoped-cleanup.md),
+with [source snapshots, headless focus checks and timings](results/2026-09-21-scoped-cleanup.json).
+
+## Compare exact store versions
+
+```sh
+# main, the committed PR, and the current working tree; JIT and native Dart AOT.
+dart run benchmark/value_store/run_core.dart
+
+# Pin any baseline and compare a separate checkout or source snapshot.
+dart run benchmark/value_store/run_core.dart \
+  --source main=git:origin/main \
+  --source previous=git:d18a5e4 \
+  --source candidate=dir:. \
+  --passes 3 --trials 11 --warmups 5 --warmup-ms 200
+
+# Confirm a candidate against a saved package's store files in real Flutter hosts.
+dart run benchmark/value_store/run.dart \
+  --store-baseline /path/to/saved/package \
+  --variants store_before,combined --suites store_core,dependency,extraction_cost
+```
+
+The core runner preserves the selected source text and hashes in its manifest,
+resolves Git refs to commits, builds every AOT candidate before timing, reverses
+process order on alternate passes, and records raw samples and command receipts.
+Only the store files' `part of` directives change for standalone compilation;
+`Json` keeps its existing alias. The measurement helper gets compilation-mode
+constants in place of its Flutter import. Production method bodies are unchanged.
+Result checks remain enabled in AOT and run outside the timed interval.
+
+The Flutter `store_before` variant overlays only the three store files and
+`lib/utils/store.dart` from `--store-baseline`. The rest of Loon is identical to
+`combined`, isolating store costs in real dependency workloads. It does not claim
+to compare the entire historical library. The directory must contain those files;
+the manifest records the resulting full-library hashes.
+
+## Parsed-path experiments
+
+```sh
+# Cold admission, warm reuse, scan churn and mixed access; standalone JIT/AOT.
+dart run benchmark/value_store/run_core.dart --suite path_cache \
+  --source current=dir:. --out build/path-cache-core
+
+# Separate diagnostic process: seed 100k handles, parse, delete stored values,
+# release handles, then clear the cache. Uses the frozen candidate above.
+dart run benchmark/value_store/run_path_cache_retention.dart build/path-cache-core/current
+
+# Confirm cache costs in complete Flutter release dependency workloads.
+dart run benchmark/value_store/run.dart \
+  --variants combined,path_cache_lru,path_cache_recent --modes aot \
+  --suites lookup,store_core,dependency --out build/path-cache-flutter
+```
+
+These caches exist only in benchmark drafts/disposable variant copies. The LRU
+uses an estimated byte budget plus entry and key-length limits; this is not a
+strict VM heap bound. The recent-path alternative admits the second consecutive
+read and retains one key/plan. Both cache immutable path components, never store
+nodes or document values. The full-engine variants share one cache across stores
+and clear it on engine reset. The owner prototype measures optional parsed
+metadata on synthetic handles; it does not include the cost of adding a field to
+every real Document. Retention is a separate JIT VM-service diagnostic, not AOT
+RSS or a dominator-size measurement. GC is requested for diagnostics only.
 
 ## Default comparison: JIT and release AOT
 
@@ -40,7 +131,7 @@ The runner builds isolated Flutter hosts under ignored
 - `aot`: Flutter release, with native ahead-of-time compilation.
 - `profile`: optional instrumented AOT for DevTools investigations.
 
-The default compares `baseline,combined` in `jit,aot`, across all eight workload
+The default compares `baseline,combined` in `jit,aot`, across all eleven workload
 suites. It uses at least five warmup iterations and 250 ms of warmup phase time,
 then fifteen measured trials per operation, in two independent processes. Job
 order and iterable/extraction/extraction-cost/traversal-API method order are reversed for the second
@@ -96,6 +187,30 @@ the report:
 dart run benchmark/value_store/summarize.dart build/value_store_profiles/<run>
 ```
 
+For call-site optimizations, `--library-source /path/to/saved/package` supplies
+the entire starting `lib/` before each variant is applied; tests and workloads
+come from the current checkout. `combined` means that supplied library unchanged.
+Freeze the library before editing it so the comparison does not accidentally
+include the candidate on both sides. Every variant is prepared and parsed before
+any native builds begin.
+
+```sh
+dart run benchmark/value_store/run.dart \
+  --library-source /path/to/saved/package \
+  --variants combined,scoped_guard \
+  --suites dependency,dependency_shapes,sparse_writes \
+  --modes jit,aot --passes 3 --trials 9
+```
+
+`scoped_guard` reuses collection maps during synchronous propagation and the last
+reverse dependency set during deletion. An outer guard keeps traversal setup
+off empty dependency lookups. All local references are released when the operation
+returns. `batch_clean` and `scoped_clean` are intermediate controls isolating
+propagation alone and both changes before that outer guard.
+`touch`, `delete_recent` and `batch_buckets` are earlier experimental controls.
+These transforms are relative to the supplied library; use a saved starting
+version to reproduce a before/after comparison once an optimization is adopted.
+
 The report keeps runtime modes separate. It includes pooled medians and the range
 of per-process medians, alongside raw samples. That range is not a confidence
 interval. `manifest.json` records Flutter/Dart versions, hardware/OS, source and
@@ -108,6 +223,19 @@ engine and native libraries and are not allocation or retained Dart heap metrics
 
 - `lookup`: exact shallow/deep reads, missing paths, empty-store operations,
   collection access and subtree deletion, with a flat-map comparison.
+- `store_core`: prebuilt shallow/deep paths for reads, value/node/missing-path
+  existence checks, collection lookups, ancestor queries, new writes, overwrites,
+  deletion, and ordered set/map extraction across flat, bucketed, singleton,
+  deeply nested, and duplicate-value shapes. Reports milliseconds per named batch;
+  operation counts are included with each row. Shared by standalone and Flutter runs.
+  Path controls include UUID-like IDs, long segments, Unicode and underscore runs;
+  mutation controls include separate branch creation and shared-value reference counts.
+- `dependency_shapes`: poor collection locality, shared summaries and cycles,
+  and alternating source dependencies during deletion. Checks reached document
+  events and reverse-index cleanup outside timing.
+- `sparse_writes`: 1k updates in large resident collections, with zero or one
+  dependent per source. Includes writes and broadcast flush; verifies event
+  counts and final data outside timing.
 - `traversal`: subtree aggregation, list export, direct collection access,
   sparse known-ID reads, duplicate visits and distinct-value collection.
 - `traversal_apis`: callback and typed-callback controls, recursive generators,
@@ -227,7 +355,10 @@ project's [multi-runtime benchmark harness](https://pub.dev/packages/benchmark_h
 anchors when production methods change. The default comparison does not include
 all historical prototypes; select them explicitly when investigating them.
 Each baseline disables the features listed above in the current source; it is
-not a frozen historical checkout. Archived runs describe their measured source
+not a frozen historical checkout. The store fast paths are the incremental path
+parsing in `get` and the shared `_lookup` walk, plus the empty-store delete guards.
+Writes, deletes and the recursive walks keep incremental parsing in every variant.
+Archived runs describe their measured source
 using hashes, SDK versions and command receipts.
 
 The document comparison keeps the earlier store optimizations, dependency-set

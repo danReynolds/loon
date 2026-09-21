@@ -7,21 +7,30 @@ import 'package:path/path.dart' as p;
 
 import 'tool_support.dart';
 import 'variants.dart';
+import 'headless_host.dart';
 
 const suiteNames = [
   'lookup',
+  'store_core',
   'traversal',
   'traversal_apis',
   'iterable',
   'extraction',
   'extraction_cost',
   'dependency',
+  'dependency_shapes',
+  'sparse_writes',
   'documents'
 ];
 
 Future<void> main(List<String> arguments) async {
   final parser = ArgParser()
     ..addOption('out')
+    ..addOption('library-source',
+        help: 'Package directory supplying lib/ before applying each variant')
+    ..addOption('store-baseline',
+        help:
+            'Package directory supplying frozen store sources for store_before')
     ..addOption('variants', defaultsTo: 'baseline,combined')
     ..addOption('modes', defaultsTo: 'jit,aot')
     ..addOption('suites', defaultsTo: suiteNames.join(','))
@@ -66,7 +75,11 @@ Future<void> main(List<String> arguments) async {
     return value;
   }
 
-  final variants = selection('variants', variantNames);
+  final storeBaseline = args['store-baseline'] as String?;
+  final variants = selection('variants', [
+    ...variantNames,
+    if (storeBaseline != null) 'store_before',
+  ]);
   final modes = selection('modes', ['jit', 'aot', 'profile']);
   final suites = selection('suites', suiteNames);
   final passes = count('passes');
@@ -75,6 +88,10 @@ Future<void> main(List<String> arguments) async {
   final warmupMs = count('warmup-ms', minimum: 0);
   final skipValidation = args['skip-validation'] as bool;
   final repo = File.fromUri(Platform.script).parent.parent.parent.path;
+  final librarySource = p.absolute(args['library-source'] as String? ?? repo);
+  if (!Directory(p.join(librarySource, 'lib')).existsSync()) {
+    throw ArgumentError('No lib/ in $librarySource');
+  }
   final stamp =
       DateTime.now().toIso8601String().replaceAll(RegExp(r'[^0-9]'), '');
   final out = p.absolute(args['out'] as String? ??
@@ -156,12 +173,15 @@ Future<void> main(List<String> arguments) async {
     'warmups': warmups,
     'minimum_warmup_ms': warmupMs,
     'case': args['case'],
+    if (storeBaseline != null) 'store_baseline': p.absolute(storeBaseline),
     'runner': 'dart',
+    'headless': true,
+    'library_source': librarySource,
     'validation': skipValidation
         ? 'skipped'
         : 'core and benchmark semantics before timing',
     'source_sha256': {
-      ...sourceHashes(p.join(repo, 'lib'), repo),
+      ...sourceHashes(p.join(librarySource, 'lib'), librarySource),
       ...sourceHashes(p.join(repo, 'benchmark/value_store'), repo)
     },
     'root_lock_sha256': hashFile(lock),
@@ -172,11 +192,12 @@ Future<void> main(List<String> arguments) async {
   void saveManifest() => writeJson(p.join(out, 'manifest.json'), manifest);
   saveManifest();
   final binaries = <(String, String), String>{};
-  // Build and validate every candidate before timing to avoid compiler load.
+  // Prepare and parse every variant before starting expensive host builds.
   for (final variant in variants) {
     final package = p.join(out, 'packages', variant);
     for (final directory in ['lib', 'test', 'benchmark/value_store']) {
-      copyTree(p.join(repo, directory), p.join(package, directory));
+      copyTree(p.join(directory == 'lib' ? librarySource : repo, directory),
+          p.join(package, directory));
     }
     for (final name in [
       'pubspec.yaml',
@@ -185,9 +206,39 @@ Future<void> main(List<String> arguments) async {
     ]) {
       File(p.join(repo, name)).copySync(p.join(package, name));
     }
-    configureVariant(package, variant);
+    if (variant == 'store_before') {
+      for (final path in [
+        'lib/store/base_value_store.dart',
+        'lib/store/value_store.dart',
+        'lib/store/value_ref_store.dart',
+        'lib/utils/store.dart',
+      ]) {
+        File(p.join(storeBaseline!, path)).copySync(p.join(package, path));
+      }
+    } else {
+      configureVariant(package, variant);
+    }
+    if (['batch_clean', 'scoped_clean', 'scoped_guard'].contains(variant)) {
+      await run(
+          '$variant-format',
+          [
+            Platform.resolvedExecutable,
+            'format',
+            'lib/broadcast_manager.dart',
+            'lib/dependency_manager.dart'
+          ],
+          package);
+    }
     variantHashes[variant] = sourceHashes(p.join(package, 'lib'), package);
     saveManifest();
+    await run(
+        '$variant-syntax',
+        [Platform.resolvedExecutable, 'format', '--output=none', 'lib'],
+        package);
+  }
+  // Finish all validation/builds before timing to avoid compiler load.
+  for (final variant in variants) {
+    final package = p.join(out, 'packages', variant);
     await run(
         '$variant-resolve', ['flutter', 'pub', 'get', '--offline'], package);
     if (!skipValidation) {
@@ -205,6 +256,10 @@ Future<void> main(List<String> arguments) async {
             'benchmark/value_store/traversal_apis_test.dart',
             'benchmark/value_store/collection_lookup_demo_test.dart',
             'benchmark/value_store/documents_profile_test.dart',
+            'benchmark/value_store/store_core_profile_test.dart',
+            'benchmark/value_store/path_cache_test.dart',
+            'benchmark/value_store/dependency_shapes_test.dart',
+            'benchmark/value_store/document_values_test.dart',
             // These historical controls contain sets, not serializable entries.
             if (['document_paths', 'document_before_paths']
                 .contains(variant)) ...[
@@ -240,6 +295,7 @@ Future<void> main(List<String> arguments) async {
           host
         ],
         repo);
+    configureHeadlessHost(host);
     final spec = StringBuffer('''name: loon_profile
 publish_to: none
 version: 1.0.0+1
@@ -308,7 +364,11 @@ dependency_overrides:
             if (['kernel_blob.bin', 'App'].contains(p.basename(file.path)))
               p.relative(file.path, from: app): hashFile(file.path)
         },
-        'host_lock_sha256': hashFile(p.join(host, 'pubspec.lock'))
+        'host_lock_sha256': hashFile(p.join(host, 'pubspec.lock')),
+        'host_source_sha256': {
+          for (final name in ['Info.plist', 'AppDelegate.swift'])
+            name: hashFile(p.join(host, 'macos/Runner', name)),
+        }
       };
       saveManifest();
     }
@@ -347,6 +407,7 @@ dependency_overrides:
       final data = readJson(output);
       if (data['exit_code'] != 0 ||
           data['mode'] != mode ||
+          data['headless'] != true ||
           data['host'] != 'flutter_app') {
         throw StateError('Failed or misclassified result: $output');
       }

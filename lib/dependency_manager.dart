@@ -7,7 +7,6 @@ class _DependencyEntry {
 
   _DependencyEntry(this.doc, this.dependencies);
 
-  /// Serialize reference identities without reading or serializing document data.
   Json toJson() => {
         'doc': doc.path,
         'dependencies': [
@@ -29,16 +28,20 @@ class DependencyManager {
     dependents.add(dependent);
   }
 
-  void _removeDependent(Document dependency, Document dependent) {
-    final dependents = _dependents.get(dependency.path);
-    if (dependents == null) {
-      return;
-    }
+  Set<Document>? _removeDependent(
+    Document dependency,
+    Document dependent, {
+    Set<Document>? dependents,
+  }) {
+    dependents ??= _dependents.get(dependency.path);
+    if (dependents == null) return null;
 
     dependents.remove(dependent);
     if (dependents.isEmpty) {
       _dependents.delete(dependency.path, recursive: false);
+      return null;
     }
+    return dependents;
   }
 
   /// Updates the dependencies/dependents store for the given [DocumentSnapshot]
@@ -121,9 +124,15 @@ class DependencyManager {
     final entries = _dependencies.extractValues(path);
     _dependencies.delete(path);
 
+    // Reuse a shared dependency's set only within this removal operation.
+    String? previousPath;
+    Set<Document>? previousDependents;
     for (final entry in entries) {
       for (final dependency in entry.dependencies) {
-        _removeDependent(dependency, entry.doc);
+        final path = dependency.path;
+        previousDependents = _removeDependent(dependency, entry.doc,
+            dependents: path == previousPath ? previousDependents : null);
+        previousPath = path;
       }
     }
   }

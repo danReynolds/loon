@@ -70,40 +70,46 @@ class ValueStore<T> extends _BaseValueStore<T> {
     return node;
   }
 
-  void _write(Map node, List<String> segments, T value) {
-    for (int i = 0; i < segments.length - 1; i++) {
-      node = node[segments[i]] ??= {};
+  @override
+  write(String path, T value) {
+    Map node = _store;
+    var start = 0;
+    while (true) {
+      final end = _nextStoreDelimiter(path, start);
+      if (end < 0) {
+        break;
+      }
+      node = node[path.substring(start, end)] ??= {};
+      start = end + _BaseValueStore.delimiter.length;
     }
 
     final values = node[_BaseValueStore._values] ??= <String, T>{};
-    values[segments.last] = value;
-  }
-
-  @override
-  write(String path, T value) {
-    _write(_store, _getSegments(path), value);
+    values[path.substring(start)] = value;
     return value;
   }
 
-  /// Deletes all data under the given path delimited into segments. Returns whether
+  /// Deletes all data under the segment of the path beginning at [start]. Returns whether
   /// the current node can be deleted as well as a result of the deleted path.
   bool _delete(
     Map node,
-    List<String> segments,
-    int index, [
+    String path,
+    int start, [
     bool recursive = true,
   ]) {
-    if (index < segments.length - 1) {
-      final segment = segments[index];
+    final end = _nextStoreDelimiter(path, start);
+
+    if (end >= 0) {
+      final segment = path.substring(start, end);
       final Map? child = node[segment];
 
       if (child == null) {
         return false;
       }
 
-      if (_delete(child, segments, index + 1, recursive)) {
+      if (_delete(
+          child, path, end + _BaseValueStore.delimiter.length, recursive)) {
         if (node.length == 1) {
-          if (index == 0) {
+          if (start == 0) {
             node.remove(segment);
           }
 
@@ -115,7 +121,7 @@ class ValueStore<T> extends _BaseValueStore<T> {
       return false;
     }
 
-    final segment = segments.last;
+    final segment = path.substring(start);
     if (recursive) {
       node.remove(segment);
     } else {
@@ -157,19 +163,20 @@ class ValueStore<T> extends _BaseValueStore<T> {
 
     if (_store.isEmpty) return;
 
-    _delete(_store, _getSegments(path), 0, recursive);
+    _delete(_store, path, 0, recursive);
   }
 
   /// Grafts the data under the given path from the other store into this store. Returns
   /// whether the other store's node can be deleted after grafted.
-  bool _graft(Map node, Map? otherNode, List<String> segments, int index) {
+  bool _graft(Map node, Map? otherNode, String path, int start) {
     if (otherNode == null) {
       return false;
     }
 
-    final segment = segments[index];
+    final end = _nextStoreDelimiter(path, start);
+    final segment = path.substring(start, end < 0 ? path.length : end);
 
-    if (index < segments.length - 1) {
+    if (end >= 0) {
       final Map? otherChildNode = otherNode[segment];
 
       if (otherChildNode == null) {
@@ -178,9 +185,10 @@ class ValueStore<T> extends _BaseValueStore<T> {
 
       final Map childNode = node[segment] ??= {};
 
-      if (_graft(childNode, otherChildNode, segments, index + 1)) {
+      if (_graft(childNode, otherChildNode, path,
+          end + _BaseValueStore.delimiter.length)) {
         if (otherNode.length == 1) {
-          if (index == 0) {
+          if (start == 0) {
             otherNode.remove(segment);
           }
           return true;
@@ -230,7 +238,7 @@ class ValueStore<T> extends _BaseValueStore<T> {
       other.clear();
       _mergeNode(_store, otherNode);
     } else {
-      _graft(_store, other._store, _getSegments(path), 0);
+      _graft(_store, other._store, path, 0);
     }
   }
 }

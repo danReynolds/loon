@@ -5,12 +5,15 @@ import 'package:flutter/widgets.dart';
 
 import 'profile_support.dart';
 import 'workloads/dependency.dart' show profileDependencies;
+import 'workloads/dependency_shapes.dart' show profileDependencyShapes;
 import 'workloads/dependency_retention.dart';
 import 'workloads/documents.dart' show profileDocuments;
 import 'workloads/extraction.dart' show profileExtraction;
 import 'workloads/extraction_cost.dart' show profileExtractionCost;
 import 'workloads/iterable.dart' show profileIterable;
 import 'workloads/lookup.dart' show profileLookups;
+import 'workloads/store_core.dart' show profileStoreCore;
+import 'workloads/sparse_writes.dart' show profileSparseWrites;
 import 'workloads/traversal.dart' show profileTraversal;
 import 'workloads/traversal_apis.dart' show profileTraversalApis;
 
@@ -19,11 +22,14 @@ import 'workloads/traversal_apis.dart' show profileTraversalApis;
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   ProfileResults.nativeHost = true;
-  runApp(const Directionality(
-    textDirection: TextDirection.ltr,
-    child: Center(child: Text('Running Loon ValueStore benchmarks')),
-  ));
-  await WidgetsBinding.instance.endOfFrame;
+  final headless = Platform.environment['LOON_PROFILE_HEADLESS'] == 'true';
+  if (!headless) {
+    runApp(const Directionality(
+      textDirection: TextDirection.ltr,
+      child: Center(child: Text('Running Loon ValueStore benchmarks')),
+    ));
+    await WidgetsBinding.instance.endOfFrame;
+  }
   await Future<void>.delayed(Duration(
       milliseconds:
           int.parse(profileSetting('PROFILE_START_DELAY_MS') ?? '250')));
@@ -41,12 +47,15 @@ Future<void> main() async {
     } else {
       final run = {
         'lookup': profileLookups,
+        'store_core': profileStoreCore,
         'traversal': profileTraversal,
         'traversal_apis': profileTraversalApis,
         'iterable': profileIterable,
         'extraction': profileExtraction,
         'extraction_cost': profileExtractionCost,
         'dependency': profileDependencies,
+        'dependency_shapes': profileDependencyShapes,
+        'sparse_writes': profileSparseWrites,
         'documents': profileDocuments,
       }[suite];
       check(run != null, 'Unknown suite $suite');
@@ -60,6 +69,7 @@ Future<void> main() async {
     payload.addAll({'error': '$error', 'stack': '$stack', 'mode': profileMode});
   }
   payload.addAll({
+    'headless': headless,
     'exit_code': status,
     // Process RSS includes Flutter and native libraries. It is diagnostic
     // context, not an allocation count or a retained Dart heap measurement.
@@ -84,6 +94,7 @@ Future<void> main() async {
   // ignore: avoid_print
   print('LOON_PROFILE_END');
   if (profileSetting('PROFILE_EXIT') != 'false') exit(status);
+  if (headless) return;
   runApp(Directionality(
     textDirection: TextDirection.ltr,
     child: Center(

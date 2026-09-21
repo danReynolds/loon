@@ -10,6 +10,9 @@ Future<void> main(List<String> args) async {
   }
   final root = p.absolute(args.single);
   final manifest = readJson(p.join(root, 'manifest.json'));
+  if (manifest['headless'] != true) {
+    throw StateError('Rebuild this host with run.dart for headless execution.');
+  }
   final variants = (manifest['variants'] as List).cast<String>();
   final runs = <String, Object>{};
   for (var pass = 1; pass <= 3; pass++) {
@@ -40,6 +43,7 @@ Future<void> main(List<String> args) async {
       }
       final data = readJson(output);
       if (data['exit_code'] != 0 ||
+          data['headless'] != true ||
           data['mode'] != 'profile' ||
           data['variant'] != variant) {
         throw StateError('Invalid heap result: $output');

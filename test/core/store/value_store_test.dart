@@ -112,6 +112,20 @@ void main() {
     });
 
     group('hasPath', () {
+      test('Distinguishes null values, child nodes and missing paths', () {
+        final store = ValueStore<int?>();
+        store.write('a___b', null);
+        store.write('a___b__child', 7);
+        store.write('null_only', null);
+        expect(store.hasPath(''), isTrue);
+        expect(store.hasPath('a'), isTrue);
+        expect(store.hasPath('a___b'), isTrue);
+        expect(store.hasPath('a___b__child'), isTrue);
+        expect(store.hasPath('a___b__missing'), isFalse);
+        expect(store.hasPath('null_only'), isFalse);
+        expect(store.hasPath('a__b'), isFalse);
+      });
+
       test('Returns whether a given path exists in the store.', () {
         final store = ValueStore<String>();
         store.write('users__1__friends__1', 'Test');
@@ -589,6 +603,21 @@ void main() {
     );
 
     group('getNearest', () {
+      test('Preserves delimiter boundaries and root fallback', () {
+        for (final path in ['a___b', '__leading', 'trailing__', 'a____b']) {
+          final store = ValueStore<int>();
+          store.write('', 0);
+          store.write(path, 1);
+          store.write('${path}__child', 2);
+          expect(store.getNearest('${path}__child__missing'),
+              ('${path}__child', 2));
+          expect(store.getNearestMatch('${path}__child__missing', 1), path);
+          expect(store.getNearest('absent__child'), ('', 0));
+          expect(store.extractParentPath('${path}__child__missing'),
+              {path: 1, '${path}__child': 2, '': 0});
+        }
+      });
+
       test(
         'With no value, returns the nearest non-null node along the given path.',
         () {
@@ -766,6 +795,27 @@ void main() {
       },
     );
 
+    test(
+        'Extraction preserves order, nulls, equality and independent snapshots',
+        () {
+      final store = ValueStore<String?>();
+      store.write('a___b', null);
+      store.write('a___b__first', 'duplicate');
+      store.write('a___b__second', 'duplicate');
+      store.write('a___b__first__deep', 'nested');
+      final values = store.extractValues('a___b');
+      final entries = store.extract('a___b');
+      expect(values.toList(), [null, 'duplicate', 'nested']);
+      expect(entries.keys.toList(),
+          ['a___b', 'a___b__first', 'a___b__second', 'a___b__first__deep']);
+      store.delete('a___b');
+      expect(values.toList(), [null, 'duplicate', 'nested']);
+      expect(entries.length, 4);
+      values.add('local');
+      entries['local'] = 'local';
+      expect(store.isEmpty, isTrue);
+    });
+
     group('property', () {
       // Random write/delete sequences are checked against a flat map used as an
       // independent oracle for the store's incremental bookkeeping. On failure the seed
@@ -812,6 +862,29 @@ void main() {
               final actual = store.getChildValues(q) ?? const <String, int>{};
               expect(actual, equals(expected),
                   reason: '$reason getChildValues($q)');
+              final subtree = {
+                for (final entry in model.entries)
+                  if (isAtOrUnder(entry.key, q)) entry.key: entry.value,
+              };
+              expect(store.extract(q), subtree, reason: '$reason extract($q)');
+              expect(store.extractValues(q), subtree.values.toSet(),
+                  reason: '$reason extractValues($q)');
+              final ancestors = model.keys
+                  .where((key) => isAtOrUnder(q, key))
+                  .toList()
+                ..sort((a, b) => a.length.compareTo(b.length));
+              expect(
+                  store.extractParentPath(q),
+                  {
+                    for (final path in ancestors) path: model[path],
+                  },
+                  reason: '$reason extractParentPath($q)');
+              expect(
+                  store.getNearest(q),
+                  ancestors.isEmpty
+                      ? null
+                      : (ancestors.last, model[ancestors.last]),
+                  reason: '$reason getNearest($q)');
             }
             expect(store.isEmpty, model.isEmpty, reason: '$reason isEmpty');
           }
