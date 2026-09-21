@@ -5,6 +5,8 @@ import '../profile_support.dart';
 /// Paths are prepared once; mutation setup and result checks stay outside timing.
 void profileStoreCore() {
   final results = ProfileResults();
+  final filter = profileSetting('PROFILE_FILTER');
+  final selected = filter == null ? null : RegExp(filter);
   const n = 20000;
   const repeats = 100000;
   const total = n * (n - 1) ~/ 2;
@@ -15,6 +17,7 @@ void profileStoreCore() {
 
   void measure<R>(String name, R Function() action, bool Function(R) validate,
       {void Function()? prepare, int operations = 1}) {
+    if (selected != null && !selected.hasMatch(name)) return;
     final samples = <int>[];
     for (final record in samplePhases()) {
       prepare?.call();
@@ -26,6 +29,15 @@ void profileStoreCore() {
     }
     results.add(name, samples, {'operations': operations});
   }
+
+  final empty = ValueStore<int>();
+  measure('empty/get', () {
+    var missing = 0;
+    for (var i = 0; i < repeats; i++) {
+      if (empty.get('missing__child') == null) missing++;
+    }
+    return missing;
+  }, (missing) => missing == repeats, operations: repeats);
 
   for (final (shape, paths) in [
     ('shallow', shallowPaths),
@@ -54,6 +66,15 @@ void profileStoreCore() {
       ('early_miss', 'missing__${prefix}__0'),
       ('late_miss', '${prefix}__missing'),
     ]) {
+      if (kind.endsWith('miss')) {
+        measure('$shape/get_$kind', () {
+          var missing = 0;
+          for (var i = 0; i < repeats; i++) {
+            if (store.get(path) == null) missing++;
+          }
+          return missing;
+        }, (missing) => missing == repeats, operations: repeats);
+      }
       measure('$shape/has_path_$kind', () {
         var hits = 0;
         for (var i = 0; i < repeats; i++) {
@@ -151,6 +172,22 @@ void profileStoreCore() {
     }
     return refs.isEmpty;
   }, (empty) => empty, prepare: seedRefs, operations: n);
+  measure('refs/overwrite_shared', () {
+    for (var i = 0; i < n; i++) {
+      refs.write(deepPaths[i], (i + 1) % 64);
+    }
+    return refs;
+  },
+      (store) =>
+          store.get(deepPaths.first) == 1 &&
+          store.getRefs()!.length == 64 &&
+          store.getRefs()!.values.fold(0, (sum, count) => sum + count) == n,
+      prepare: seedRefs,
+      operations: n);
+  measure('refs/delete_subtree', () {
+    refs.delete('orgs__o__teams__t__accounts__a__items');
+    return refs.isEmpty;
+  }, (empty) => empty, prepare: seedRefs);
 
   // IDs can be much longer than collection names, and Dart supports both
   // one-byte and two-byte strings. Keep delimiter optimizations honest across
@@ -270,5 +307,6 @@ void profileStoreCore() {
                     : count * (count - 1) ~/ 2),
         operations: count);
   }
+  check(results.rows.isNotEmpty, 'No store operations matched $filter');
   results.save();
 }

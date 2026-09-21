@@ -5,6 +5,15 @@ class ValueRefStore<T> extends _BaseValueStore<T> {
 
   ValueRefStore([super.store]);
 
+  void _subtractRef(Map refs, Object? value, int count) {
+    final remaining = refs[value] - count;
+    if (remaining == 0) {
+      refs.remove(value);
+    } else {
+      refs[value] = remaining;
+    }
+  }
+
   T? _write(Map node, String path, int start, T value) {
     final end = _nextStoreDelimiter(path, start);
 
@@ -25,19 +34,10 @@ class ValueRefStore<T> extends _BaseValueStore<T> {
     }
 
     final refs = node[_refs] ??= {};
-    refs[value] ??= 0;
-    refs[value] = refs[value]! + 1;
+    refs[value] = (refs[value] ?? 0) + 1;
 
     if (prevValue != null) {
-      if (refs[prevValue] == 1) {
-        if (refs.length == 1) {
-          node.remove(_refs);
-        } else {
-          refs.remove(prevValue);
-        }
-      } else {
-        refs[prevValue] = refs[prevValue]! - 1;
-      }
+      _subtractRef(refs, prevValue, 1);
     }
 
     return prevValue;
@@ -83,8 +83,7 @@ class ValueRefStore<T> extends _BaseValueStore<T> {
         removedRefs = child[_refs]!;
 
         if (childValue != null) {
-          removedRefs![childValue] ??= 0;
-          removedRefs[childValue] = removedRefs[childValue]! + 1;
+          removedRefs![childValue] = (removedRefs[childValue] ?? 0) + 1;
         }
 
         node.remove(segment);
@@ -97,20 +96,9 @@ class ValueRefStore<T> extends _BaseValueStore<T> {
       final Map nodeRefs = node[_refs];
 
       for (final entry in removedRefs.entries) {
-        final key = entry.key;
-        final nodeRefCount = node[_refs][key];
-        final childRefCount = entry.value;
-
-        if (nodeRefCount == childRefCount) {
-          nodeRefs.remove(key);
-        } else {
-          nodeRefs[key] = nodeRefCount - childRefCount;
-        }
-
-        if (nodeRefs.isEmpty) {
-          node.remove(_refs);
-        }
+        _subtractRef(nodeRefs, entry.key, entry.value);
       }
+      if (nodeRefs.isEmpty) node.remove(_refs);
     }
 
     return removedRefs;

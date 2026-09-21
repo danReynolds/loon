@@ -3,12 +3,16 @@ import 'dart:io';
 import 'package:args/args.dart';
 import 'package:path/path.dart' as p;
 
+import 'manager_fixtures.dart';
 import 'summarize.dart';
 import 'tool_support.dart';
+import 'workloads/manager_core.dart';
 
 /// Isolates the actual store sources from Flutter startup/build costs. Only their
 /// `part of` directives change; the Json alias matches lib/types.dart. Final
 /// candidates must also pass the full library's tests and Flutter AOT workloads.
+/// The optional manager_core suite substitutes explicit document/observer
+/// fixtures around the unchanged manager methods to screen algorithm changes.
 Future<void> main(List<String> arguments) async {
   final parser = ArgParser()
     ..addMultiOption('source',
@@ -18,7 +22,11 @@ Future<void> main(List<String> arguments) async {
     ..addOption('out')
     ..addOption('modes', defaultsTo: 'jit,aot')
     ..addOption('suite',
-        defaultsTo: 'store_core', allowed: ['store_core', 'path_cache'])
+        defaultsTo: 'store_core',
+        allowed: ['store_core', 'path_cache', 'manager_core'])
+    ..addOption('filter',
+        help:
+            'Regular expression selecting store_core or manager_core operations')
     ..addOption('passes', defaultsTo: '3')
     ..addOption('trials', defaultsTo: '11')
     ..addOption('warmups', defaultsTo: '5')
@@ -41,8 +49,18 @@ Future<void> main(List<String> arguments) async {
   final warmups = count('warmups');
   final warmupMs = count('warmup-ms', 0);
   final suite = args['suite'] as String;
-  final entrypoint =
-      suite == 'store_core' ? 'profileStoreCore' : 'profilePathCache';
+  final filter = args['filter'] as String?;
+  if (filter != null) {
+    if (suite == 'path_cache') {
+      throw ArgumentError('--filter is not supported by path_cache');
+    }
+    RegExp(filter);
+  }
+  final entrypoint = switch (suite) {
+    'store_core' => 'profileStoreCore',
+    'manager_core' => 'profileManagerCore',
+    _ => 'profilePathCache',
+  };
   final modes = (args['modes'] as String).split(',');
   if (modes.isEmpty ||
       modes.toSet().length != modes.length ||
@@ -114,12 +132,16 @@ Future<void> main(List<String> arguments) async {
     'variants': sources.keys.toList(),
     'modes': modes,
     'suites': [suite],
+    if (filter != null) 'operation_filter': filter,
     'passes': passes,
     'trials': trials,
     'warmups': warmups,
     'minimum_warmup_ms': warmupMs,
     'validation':
         'Release-active result checks outside each timed operation; see accompanying full-library validation',
+    if (suite == 'manager_core')
+      'isolation':
+          'Actual store and manager methods with benchmark document/observer fixtures; not a full Loon engine benchmark',
     'source_snapshots': sourceReceipts,
     'artifacts': artifacts,
     'harness_sha256': {
@@ -128,6 +150,7 @@ Future<void> main(List<String> arguments) async {
         'profile_support.dart',
         'workloads/$suite.dart',
         if (suite == 'path_cache') 'path_cache_draft.dart',
+        if (suite == 'manager_core') 'manager_fixtures.dart',
       ])
         name: hashFile(p.join(repo, 'benchmark/value_store', name))
     },
@@ -143,13 +166,19 @@ Future<void> main(List<String> arguments) async {
             cwd: repo)
         : p.absolute(entry.value.substring(4));
     final code = StringBuffer(
-        "import 'dart:convert';\ntypedef Json = Map<String, dynamic>;\n");
+        "import 'dart:convert';\nimport 'dart:async';\nimport 'dart:collection';\ntypedef Json = Map<String, dynamic>;\n");
     final files = <String, Object>{};
     for (final path in [
       'lib/store/base_value_store.dart',
       'lib/store/value_store.dart',
       'lib/store/value_ref_store.dart',
-      'lib/utils/store.dart'
+      'lib/utils/store.dart',
+      if (suite == 'manager_core') ...[
+        'lib/dependency_manager.dart',
+        'lib/broadcast_manager.dart',
+        'lib/document_snapshot.dart',
+        'lib/extensions/set.dart',
+      ],
     ]) {
       String source;
       if (entry.value.startsWith('git:')) {
@@ -166,6 +195,11 @@ Future<void> main(List<String> arguments) async {
       files[path] = {'sha256': hashFile(snapshot.path), 'source': source};
       code.writeln(source.replaceFirst(RegExp(r"^part of '[^']+';"), ''));
     }
+    if (suite == 'manager_core') {
+      code.writeln(managerFixtures);
+      File(p.join(root, 'manager_fixtures.dart'))
+          .writeAsStringSync(managerFixtures);
+    }
     sourceReceipts[name] = {
       'source': entry.value,
       'resolved': origin,
@@ -179,8 +213,9 @@ Future<void> main(List<String> arguments) async {
         support,
         "import 'package:flutter/foundation.dart';",
         "const kReleaseMode = bool.fromEnvironment('CORE_AOT');\nconst kProfileMode = false;"));
-    final workload =
-        File(p.join(repo, 'benchmark/value_store/workloads/$suite.dart'))
+    final workload = suite == 'manager_core'
+        ? managerWorkload
+        : File(p.join(repo, 'benchmark/value_store/workloads/$suite.dart'))
             .readAsStringSync();
     File(p.join(root, 'workload.dart')).writeAsStringSync(workload
         .replaceFirst("'package:loon/loon.dart'", "'store.dart'")
@@ -240,6 +275,7 @@ void main() {
             'PROFILE_WARMUPS': '$warmups',
             'PROFILE_WARMUP_MS': '$warmupMs',
             'PROFILE_TRIALS': '$trials',
+            if (filter != null) 'PROFILE_FILTER': filter,
           });
     }
   }

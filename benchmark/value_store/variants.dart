@@ -62,9 +62,12 @@ void configureVariant(String destination, String variant) {
     source = base.readAsStringSync();
     final start = source.indexOf('  T? get(String path) {');
     final guard = source.indexOf('    if (_store.isEmpty) return null;', start);
-    if (start < 0 || guard < 0) throw StateError('Update cached-get transform');
-    final end = guard + '    if (_store.isEmpty) return null;'.length;
+    if (start < 0) throw StateError('Update cached-get transform');
+    final end = guard < 0
+        ? start + '  T? get(String path) {'.length
+        : guard + '    if (_store.isEmpty) return null;'.length;
     source = source.replaceRange(end, end, '''
+${guard < 0 ? '    if (_store.isEmpty) return null;\n' : ''}
     final parsed = _profilePathCache.lookup(path);
     if (parsed != null) return parsed.read<T>(_store);
 ''');
@@ -80,12 +83,23 @@ void configureVariant(String destination, String variant) {
     // Restore up-front splitting for the exact getter and the shared flat reads.
     final base = file('lib/store/base_value_store.dart');
     var source = base.readAsStringSync();
-    final start =
-        source.indexOf('  Object? _lookup(String path, _Lookup part) {');
+    final typedParent =
+        source.contains('  (Map, String)? _getParent(String path) {') &&
+            !source.contains('  Object? _lookup(String path, _Lookup part) {');
+    final signature = typedParent
+        ? '  (Map, String)? _getParent(String path) {'
+        : '  Object? _lookup(String path, _Lookup part) {';
+    final start = source.indexOf(signature);
     final end = source.indexOf('\n  }\n', start);
     if (start < 0 || end < 0) throw StateError('Update lookup transform');
-    source = source.replaceRange(
-        start, end + 4, '''  Object? _lookup(String path, _Lookup part) {
+    final result = typedParent
+        ? '    return (node, last);'
+        : '''    return switch (part) {
+      _Lookup.node => node[last],
+      _Lookup.parent => (node, last),
+      _Lookup.path => node[_values]?[last] != null || node[last] != null,
+    };''';
+    source = source.replaceRange(start, end + 4, '''$signature
     final segments = path.split(delimiter);
     final last = segments.removeLast();
     Map? node = _store;
@@ -94,11 +108,7 @@ void configureVariant(String destination, String variant) {
       node = node[segment];
     }
     if (node == null) return null;
-    return switch (part) {
-      _Lookup.node => node[last],
-      _Lookup.parent => (node, last),
-      _Lookup.path => node[_values]?[last] != null || node[last] != null,
-    };
+$result
   }
 ''');
     final getStart = source.indexOf('  T? get(String path) {');

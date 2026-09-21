@@ -79,6 +79,7 @@ void summarize(String root) {
     if (manifest['headless'] == true)
       'This series uses headless Flutter engines with no windows or rendered frames. '
           'Compare candidates within this series, not directly against historical windowed runs.',
+    if (manifest['isolation'] case final String isolation) isolation,
     '',
     'Values are pooled medians in milliseconds, with the range of per-process '
         'medians (not a confidence interval). Setup, compilation and correctness '

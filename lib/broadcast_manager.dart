@@ -78,10 +78,8 @@ class BroadcastManager {
 
     // This synchronous walk only adds events and reads the reverse index. Keep
     // at most one collection map from each store, only until the walk returns.
-    String? eventParent;
-    Map<String, BroadcastEvents>? events;
-    String? reverseParent;
-    Map<String, Set<Document>>? reverse;
+    final eventCollections = _CollectionValues(eventStore);
+    final reverseCollections = _CollectionValues(manager._dependents);
 
     void visit(Set<Document> dependents) {
       for (final doc in dependents) {
@@ -89,38 +87,24 @@ class BroadcastManager {
         final useBucket = doc.id.isNotEmpty &&
             !doc.id.contains('__') &&
             !doc.parent.endsWith('_');
-        if (useBucket && eventParent != doc.parent) {
-          eventParent = doc.parent;
-          events = eventStore.getChildValues(doc.parent);
-        }
+        final events = useBucket ? eventCollections[doc.parent] : null;
         final pending =
             useBucket ? (events?[doc.id]) : eventStore.get(doc.path);
         if (pending != null) continue;
 
         observerValueStore.delete(doc.path, recursive: false);
         observerValueStore.delete(doc.parent, recursive: false);
-        if (useBucket && events != null) {
-          events![doc.id] = BroadcastEvents.touched;
+        if (events != null) {
+          events[doc.id] = BroadcastEvents.touched;
         } else {
           eventStore.write(doc.path, BroadcastEvents.touched);
-          if (useBucket) {
-            events = eventStore.getChildValues(doc.parent);
-          } else {
-            // This write may have created a bucket previously cached as absent.
-            eventParent = null;
-          }
+          // This write may have created a collection previously cached as absent.
+          eventCollections.invalidate();
         }
 
-        Set<Document>? next;
-        if (useBucket) {
-          if (reverseParent != doc.parent) {
-            reverseParent = doc.parent;
-            reverse = manager._dependents.getChildValues(doc.parent);
-          }
-          next = reverse?[doc.id];
-        } else {
-          next = manager.getDependents(doc);
-        }
+        final next = useBucket
+            ? (reverseCollections[doc.parent]?[doc.id])
+            : manager.getDependents(doc);
         if (next != null) visit(next);
       }
     }
@@ -217,5 +201,28 @@ class BroadcastManager {
       "events": eventStore.inspect(),
       "observerValues": observerValueStore.inspect(),
     };
+  }
+}
+
+/// Reuses the last collection map within a synchronous traversal. The caller
+/// must invalidate after a write that could create or replace that map.
+class _CollectionValues<T> {
+  final ValueStore<T> _store;
+  String? _path;
+  Map<String, T>? _values;
+
+  _CollectionValues(this._store);
+
+  Map<String, T>? operator [](String path) {
+    if (_path != path) {
+      _path = path;
+      _values = _store.getChildValues(path);
+    }
+    return _values;
+  }
+
+  void invalidate() {
+    _path = null;
+    _values = null;
   }
 }

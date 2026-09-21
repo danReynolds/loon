@@ -1,17 +1,5 @@
 part of '../loon.dart';
 
-/// The part of the tree that [_BaseValueStore._lookup] resolves for the final segment of a path.
-enum _Lookup {
-  /// The node holding the path's children.
-  node,
-
-  /// The owning node and final segment, for reading both the value and subtree.
-  parent,
-
-  /// Whether the final segment has a non-null value or a child node.
-  path,
-}
-
 abstract class _BaseValueStore<T> {
   Map _store = {};
 
@@ -25,14 +13,14 @@ abstract class _BaseValueStore<T> {
     }
   }
 
-  /// Walks the delimited segments of [path] down the tree and resolves the given [part] of its
-  /// final segment, or returns null if a node along the way is missing.
+  /// Returns the node that owns the final segment of [path] together with that segment, or null
+  /// if the parent node is missing. `parent[_values][segment]` is the path's value and
+  /// `parent[segment]` its child node.
   ///
   /// Segments are parsed as they are visited rather than split up front, so a lookup allocates
   /// only the segments it reaches and stops at the first missing node.
-  // Native callers use a constant lookup kind, allowing the final step to specialize.
   @pragma('vm:prefer-inline')
-  Object? _lookup(String path, _Lookup part) {
+  (Map, String)? _getParent(String path) {
     if (_store.isEmpty) {
       return null;
     }
@@ -42,13 +30,7 @@ abstract class _BaseValueStore<T> {
     while (true) {
       final end = _nextStoreDelimiter(path, start);
       if (end < 0) {
-        final segment = path.substring(start);
-        return switch (part) {
-          _Lookup.node => node[segment],
-          _Lookup.parent => (node, segment),
-          _Lookup.path =>
-            node[_values]?[segment] != null || node[segment] != null,
-        };
+        return (node, path.substring(start));
       }
 
       final Map? child = node[path.substring(start, end)];
@@ -61,14 +43,10 @@ abstract class _BaseValueStore<T> {
   }
 
   Map? _getNode(String path) {
-    return _lookup(path, _Lookup.node) as Map?;
-  }
-
-  /// Returns the node that owns the final segment of [path] together with that segment, or null
-  /// if the path's parent node is missing. `parent[_values][segment]` is then the path's value and
-  /// `parent[segment]` its child node.
-  (Map, String)? _getParent(String path) {
-    return _lookup(path, _Lookup.parent) as (Map, String)?;
+    if (_getParent(path) case (final parent, final segment)) {
+      return parent[segment];
+    }
+    return null;
   }
 
   (String, T)? _getNearest(
@@ -178,21 +156,10 @@ abstract class _BaseValueStore<T> {
   }
 
   T? get(String path) {
-    // Keep exact reads on a dedicated loop: resolving other lookup kinds here
-    // adds overhead to the engine's most frequent read operation.
-    if (_store.isEmpty) return null;
-
-    Map node = _store;
-    var start = 0;
-    while (true) {
-      final end = _nextStoreDelimiter(path, start);
-      if (end < 0) return node[_values]?[path.substring(start)];
-
-      final Map? child = node[path.substring(start, end)];
-      if (child == null) return null;
-      node = child;
-      start = end + delimiter.length;
+    if (_getParent(path) case (final parent, final segment)) {
+      return parent[_values]?[segment];
     }
+    return null;
   }
 
   /// Returns a map of all values that are immediate children of the given path.
@@ -217,7 +184,11 @@ abstract class _BaseValueStore<T> {
 
   /// Returns whether the path exists in the store, either as a value or path to another descendant value.
   bool hasPath(String path) {
-    return path.isEmpty || _lookup(path, _Lookup.path) == true;
+    if (path.isEmpty) return true;
+    if (_getParent(path) case (final parent, final segment)) {
+      return parent[_values]?[segment] != null || parent[segment] != null;
+    }
+    return false;
   }
 
   T write(String path, T value);

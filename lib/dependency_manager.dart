@@ -62,37 +62,27 @@ class DependencyManager {
       return;
     }
 
-    if (deps != null && prevDeps != null) {
+    if (deps != null) {
       for (final dep in deps) {
-        if (!prevDeps.contains(dep)) {
+        if (prevDeps?.contains(dep) != true) {
           _addDependent(dep, doc);
         }
       }
+    }
+    if (prevDeps != null) {
       for (final dep in prevDeps) {
-        if (!deps.contains(dep)) {
+        if (deps?.contains(dep) != true) {
           _removeDependent(dep, doc);
         }
       }
+    }
 
-      if (deps.isEmpty) {
-        // Only the document's own dependencies are removed; the documents of its
-        // subcollections keep theirs.
-        _dependencies.delete(doc.path, recursive: false);
-      } else {
-        _dependencies.write(doc.path, _DependencyEntry(doc, deps));
-      }
-    } else if (deps != null) {
-      for (final dep in deps) {
-        _addDependent(dep, doc);
-      }
-
-      _dependencies.write(doc.path, _DependencyEntry(doc, deps));
-    } else if (prevDeps != null) {
-      for (final dep in prevDeps) {
-        _removeDependent(dep, doc);
-      }
-
+    if (deps == null || (prevDeps != null && deps.isEmpty)) {
+      // Preserve an initial empty result, but remove entries whose dependencies
+      // were cleared. Subcollections keep their own dependency entries.
       _dependencies.delete(doc.path, recursive: false);
+    } else {
+      _dependencies.write(doc.path, _DependencyEntry(doc, deps));
     }
   }
 

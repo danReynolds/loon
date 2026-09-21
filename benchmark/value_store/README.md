@@ -1,10 +1,27 @@
 # ValueStore performance workflow
 
+Optimize for **time to insight during iteration**. Start with the smallest check
+that answers the question; reserve the full validation matrix for the settled PR.
+
+1. Make a small change and run the tests directly affected by it. Reuse existing
+   regression tests rather than rerunning the entire suite after each edit.
+2. If performance is relevant, run a short comparison of the affected operation.
+   For store-only changes, prefer standalone Dart AOT through `run_core.dart` to
+   rebuilding Flutter hosts. A one-process screen can reject a clearly poor idea;
+   it cannot establish a small performance difference.
+3. Repeat promising candidates or investigate a specific regression. Add JIT or
+   complete engine workloads when they answer an unresolved question. Avoid
+   rebuilding the full Flutter matrix for routine helper refactors.
+4. Once the PR is settled, run the full correctness suite, analysis, and relevant
+   repeated JIT/AOT comparisons in the real headless Flutter host. Record source
+   hashes and measured trade-offs before committing to performance claims.
+
 Use **native AOT results to choose production optimizations**. JIT is a separate
 comparison, useful for development and diagnosis; a JIT win does not establish an
-AOT win. Run both for each serious candidate before selecting an implementation.
+AOT win. Host contention or a noisy small difference is a reason to limit the
+conclusion, not automatically launch another broad run.
 
-The workloads in `workloads/` run unchanged through either the small
+The engine workloads in `workloads/` run unchanged through either the small
 `*_profile_test.dart` wrappers or `native_main.dart` in a real Flutter application.
 The native host imports the actual Loon library. It does not substitute a Dart-only
 copy of the store or mock Flutter to make AOT compilation work.
@@ -55,11 +72,29 @@ Shared helper cleanup and headless execution:
 [implementation trade-offs and results](results/2026-09-21-scoped-cleanup.md),
 with [source snapshots, headless focus checks and timings](results/2026-09-21-scoped-cleanup.json).
 
+Typed parent lookup cleanup:
+[implementation and measured trade-offs](results/2026-09-21-typed-lookup.md),
+with [source snapshots and JIT/AOT samples](results/2026-09-21-typed-lookup.json).
+
+Shared typed getter, using the focused operation filter:
+[decision and results](results/2026-09-21-shared-get.md),
+with [source snapshots and samples](results/2026-09-21-shared-get.json).
+
+Pruning, reference counts, dependency updates and collection-map helpers:
+[cleanup decisions and focused timings](results/2026-09-21-elegance.md),
+with [sources, samples and receipts](results/2026-09-21-elegance.json).
+
 ## Compare exact store versions
 
 ```sh
 # main, the committed PR, and the current working tree; JIT and native Dart AOT.
 dart run benchmark/value_store/run_core.dart
+
+# Focused iteration: read hits/misses only, without rebuilding Flutter hosts.
+dart run benchmark/value_store/run_core.dart \
+  --source committed=git:HEAD --source candidate=dir:. \
+  --filter '(^empty/get$|/(get|get_early_miss|get_late_miss)$)' \
+  --passes 2 --trials 7 --warmups 3 --warmup-ms 80
 
 # Pin any baseline and compare a separate checkout or source snapshot.
 dart run benchmark/value_store/run_core.dart \
@@ -67,6 +102,12 @@ dart run benchmark/value_store/run_core.dart \
   --source previous=git:d18a5e4 \
   --source candidate=dir:. \
   --passes 3 --trials 11 --warmups 5 --warmup-ms 200
+
+# Screen manager algorithms without building Flutter hosts. This standalone-only
+# suite uses fixture handles and cannot establish whole-engine performance.
+dart run benchmark/value_store/run_core.dart --suite manager_core \
+  --source before=dir:/path/to/saved/package --source candidate=dir:. \
+  --modes aot --passes 2 --trials 7 --warmups 3 --warmup-ms 80
 
 # Confirm a candidate against a saved package's store files in real Flutter hosts.
 dart run benchmark/value_store/run.dart \
@@ -81,6 +122,19 @@ Only the store files' `part of` directives change for standalone compilation;
 `Json` keeps its existing alias. The measurement helper gets compilation-mode
 constants in place of its Flutter import. Production method bodies are unchanged.
 Result checks remain enabled in AOT and run outside the timed interval.
+`--filter` selects `store_core` or `manager_core` operation names by regular expression and is
+recorded in the manifest. Unselected operations are not timed; shared fixture
+construction still runs. Short filtered runs are exploratory screens, not the
+full validation required when the PR is settled.
+
+`manager_core` additionally freezes the actual dependency and broadcast manager
+methods, snapshots and set-flattening extension. Its generated workload uses
+explicit fixture document/observer types from `manager_fixtures.dart`; it copies
+the document path/hash/equality behavior and Flutter's set comparison. It omits
+persistence, stored document data and real observer delivery. It covers 200
+updates in a 20k-document dependency graph and propagation across one or 5,000
+collections, with empty/existing event maps and cached observer values. Use it
+to screen these algorithms, then validate semantics against the real Loon tests.
 
 The Flutter `store_before` variant overlays only the three store files and
 `lib/utils/store.dart` from `--store-baseline`. The rest of Loon is identical to

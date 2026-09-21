@@ -16,6 +16,38 @@ void main() {
     await Loon.clearAll(broadcast: false);
   });
 
+  test('Dependency updates preserve null and empty results and child entries',
+      () {
+    final source = Document<int>('sources', 'one');
+    Set<Document>? selected;
+    final doc =
+        Document<int>('items', 'one', dependenciesBuilder: (_) => selected);
+    doc.create(0, broadcast: false, persist: false);
+    expect(doc.dependencies(), isNull);
+
+    final child = doc
+        .subcollection<int>('children', dependenciesBuilder: (_) => {source})
+        .doc('one');
+    child.create(0, broadcast: false, persist: false);
+    for (final (deps, expected, ownsEdge) in [
+      (<Document>{}, <Document>{}, false),
+      (<Document>{}, <Document>{}, false),
+      ({source}, {source}, true),
+      (<Document>{}, null, false),
+      ({source}, {source}, true),
+      (null, null, false),
+    ]) {
+      selected = deps;
+      doc.rebuildDependencies();
+      expect(doc.dependencies(), expected);
+      expect(child.dependencies(), {source});
+      expect(source.dependents(), {
+        child,
+        if (ownsEdge) doc,
+      });
+    }
+  });
+
   test('Propagation handles unusual segment boundaries, diamonds and cycles',
       () {
     fakeAsync((async) {
