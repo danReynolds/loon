@@ -69,47 +69,20 @@ class BroadcastManager {
   }) {
     final dependents = Loon._instance.dependencyManager
         .getDependents(ref, recursive: recursive);
-    if (dependents == null || dependents.isEmpty) return;
-    _queueDependentEvents(dependents);
-  }
 
-  void _queueDependentEvents(Set<Document> dependents) {
-    final manager = Loon._instance.dependencyManager;
-
-    // This synchronous walk only adds events and reads the reverse index. Keep
-    // at most one collection map from each store, only until the walk returns.
-    final eventCollections = _CollectionValues(eventStore);
-    final reverseCollections = _CollectionValues(manager._dependents);
-
-    void visit(Set<Document> dependents) {
-      for (final doc in dependents) {
-        // Unusual constructor inputs can split differently from parent/id.
-        final useBucket = doc.id.isNotEmpty &&
-            !doc.id.contains('__') &&
-            !doc.parent.endsWith('_');
-        final events = useBucket ? eventCollections[doc.parent] : null;
-        final pending =
-            useBucket ? (events?[doc.id]) : eventStore.get(doc.path);
-        if (pending != null) continue;
-
-        observerValueStore.delete(doc.path, recursive: false);
-        observerValueStore.delete(doc.parent, recursive: false);
-        if (events != null) {
-          events[doc.id] = BroadcastEvents.touched;
-        } else {
-          eventStore.write(doc.path, BroadcastEvents.touched);
-          // This write may have created a collection previously cached as absent.
-          eventCollections.invalidate();
-        }
-
-        final next = useBucket
-            ? (reverseCollections[doc.parent]?[doc.id])
-            : manager.getDependents(doc);
-        if (next != null) visit(next);
-      }
+    if (dependents == null || dependents.isEmpty) {
+      return;
     }
 
-    visit(dependents);
+    for (final doc in dependents) {
+      // A dependent with a pending event was already invalidated and has already touched its
+      // own dependents.
+      if (eventStore.putIfAbsent(doc.path, BroadcastEvents.touched)) {
+        observerValueStore.delete(doc.path, recursive: false);
+        observerValueStore.delete(doc.parent, recursive: false);
+        _broadcastDependents(doc);
+      }
+    }
   }
 
   void _deleteRef(StoreReference ref) {
@@ -201,28 +174,5 @@ class BroadcastManager {
       "events": eventStore.inspect(),
       "observerValues": observerValueStore.inspect(),
     };
-  }
-}
-
-/// Reuses the last collection map within a synchronous traversal. The caller
-/// must invalidate after a write that could create or replace that map.
-class _CollectionValues<T> {
-  final ValueStore<T> _store;
-  String? _path;
-  Map<String, T>? _values;
-
-  _CollectionValues(this._store);
-
-  Map<String, T>? operator [](String path) {
-    if (_path != path) {
-      _path = path;
-      _values = _store.getChildValues(path);
-    }
-    return _values;
-  }
-
-  void invalidate() {
-    _path = null;
-    _values = null;
   }
 }
