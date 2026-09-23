@@ -28,12 +28,8 @@ class DependencyManager {
     dependents.add(dependent);
   }
 
-  Set<Document>? _removeDependent(
-    Document dependency,
-    Document dependent, {
-    Set<Document>? dependents,
-  }) {
-    dependents ??= _dependents.get(dependency.path);
+  Set<Document>? _removeDependent(Document dependency, Document dependent) {
+    final dependents = _dependents.get(dependency.path);
     if (dependents == null) return null;
 
     dependents.remove(dependent);
@@ -111,20 +107,13 @@ class DependencyManager {
   void _deleteRef(StoreReference ref) {
     final StoreReference(:path) = ref;
 
-    final entries = _dependencies.extractValues(path);
-    _dependencies.delete(path);
-
-    // Reuse a shared dependency's set only within this removal operation.
-    String? previousPath;
-    Set<Document>? previousDependents;
-    for (final entry in entries) {
+    _dependencies.forEachValue(path, (entry) {
       for (final dependency in entry.dependencies) {
-        final path = dependency.path;
-        previousDependents = _removeDependent(dependency, entry.doc,
-            dependents: path == previousPath ? previousDependents : null);
-        previousPath = path;
+        _removeDependent(dependency, entry.doc);
       }
-    }
+    });
+
+    _dependencies.delete(path);
   }
 
   void deleteDocument(Document doc) {

@@ -321,4 +321,50 @@ abstract class _BaseValueStore<T> {
     return inspect();
   }
 
+  void _forEachValue(
+    Map? node,
+    void Function(T value) visitor,
+  ) {
+    if (node == null) {
+      return;
+    }
+
+    final Map<String, T>? values = node[_values];
+
+    if (values != null) {
+      for (final value in values.values) {
+        visitor(value);
+      }
+
+      if (node.length == 1) {
+        return;
+      }
+    }
+
+    node.forEach((key, child) {
+      if (key != _values) {
+        _forEachValue(child, visitor);
+      }
+    });
+  }
+
+  void forEachValue(
+    String path,
+    void Function(T value) visitor,
+  ) {
+    if (path.isEmpty) {
+      _forEachValue(_store, visitor);
+      return;
+    }
+
+    if (_getParent(path) case (final parent, final segment)) {
+      final Map<String, T>? values = parent[_values];
+
+      if (values?.containsKey(segment) ?? false) {
+        visitor(values![segment] as T);
+      }
+
+      _forEachValue(parent[segment], visitor);
+    }
+  }
 }
