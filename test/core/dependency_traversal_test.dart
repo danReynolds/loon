@@ -16,7 +16,7 @@ void main() {
     await Loon.clearAll(broadcast: false);
   });
 
-  test('Dependency updates preserve null and empty results and child entries',
+  test('Dependency updates store only non-empty results and keep child entries',
       () {
     final source = Document<int>('sources', 'one');
     Set<Document>? selected;
@@ -30,8 +30,8 @@ void main() {
         .doc('one');
     child.create(0, broadcast: false, persist: false);
     for (final (deps, expected, ownsEdge) in [
-      (<Document>{}, <Document>{}, false),
-      (<Document>{}, <Document>{}, false),
+      (<Document>{}, null, false),
+      (<Document>{}, null, false),
       ({source}, {source}, true),
       (<Document>{}, null, false),
       ({source}, {source}, true),

@@ -2782,7 +2782,8 @@ void main() {
           final parent = records.doc('parent')
             ..create(0, broadcast: false, persist: false);
           final child = parent
-              .subcollection<int>('children', dependenciesBuilder: (_) => {})
+              .subcollection<int>('children',
+                  dependenciesBuilder: (_) => {parent})
               .doc('child')
             ..create(0, broadcast: false, persist: false);
 
@@ -2801,7 +2802,7 @@ void main() {
                   '__values': {
                     'child': {
                       'doc': child.path,
-                      'dependencies': [],
+                      'dependencies': [parent.path],
                     },
                   },
                 },
@@ -2809,7 +2810,7 @@ void main() {
             },
           });
           expect(parent.dependencies(), {source});
-          expect(child.dependencies(), isEmpty);
+          expect(child.dependencies(), {parent});
         });
 
         test("Updates the dependencies/dependents stores correctly", () async {

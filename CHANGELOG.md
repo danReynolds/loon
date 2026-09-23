@@ -1,6 +1,7 @@
 ## 5.7.0
 
 * Snapshot builder-owned dependency sets so reusing a mutable set cannot leave stale reverse dependencies.
+* Store dependencies only for documents that have some, so `Document.dependencies()` returns `null` when the dependencies builder returns an empty set.
 * Reduce document allocation and path lookup overhead, and reuse document handles when unlinking a deleted subtree's dependencies.
 * Reuse the last resolved parent node in value stores, so consecutive reads and writes within a collection skip walking its path.
 * Emit `BroadcastEvents.touched` for dependents affected by a write or deletion, so queries re-evaluate their filters and ordering.

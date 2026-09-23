@@ -96,7 +96,8 @@ final dependentsStore = ValueStore<Set<Document>>();
 
 Each private `_DependencyEntry` keeps the dependent document handle and a snapshot of the set returned by its dependencies builder.
 Keeping the handle avoids rebuilding documents from paths when deleting a subtree. The snapshot prevents later mutations to a
-builder-owned set from changing the stored graph. Entries serialize through `toJson()` using document paths, without reading document data.
+builder-owned set from changing the stored graph. Only non-empty sets are stored: a document whose builder returns `null` or an empty
+set has no entry, and `Document.dependencies()` returns `null` for it. Entries serialize through `toJson()` using document paths, without reading document data.
 
 The dependencies index is authoritative: a write with a dependencies builder recalculates its dependencies, updates the index if they
 changed, and deletion clears the index under the deleted path. The

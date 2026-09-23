@@ -16,7 +16,7 @@ class _DependencyEntry {
 }
 
 class DependencyManager {
-  /// The index of dependencies of a document by path.
+  /// The index of dependencies of a document by path. Documents without dependencies have no entry.
   final _dependencies = ValueStore<_DependencyEntry>();
 
   /// The reverse index of dependents of a document by path.
@@ -50,8 +50,7 @@ class DependencyManager {
       return;
     }
 
-    // Keep the previous dependencies independent of a mutable set owned by the builder.
-    final deps = dependenciesBuilder.call(snap)?.toSet();
+    final deps = dependenciesBuilder.call(snap);
     final prevDeps = _dependencies.get(doc.path)?.dependencies;
 
     if (setEquals(deps, prevDeps)) {
@@ -73,12 +72,13 @@ class DependencyManager {
       }
     }
 
-    if (deps == null || (prevDeps != null && deps.isEmpty)) {
-      // Preserve an initial empty result, but remove entries whose dependencies
-      // were cleared. Subcollections keep their own dependency entries.
+    if (deps != null && deps.isNotEmpty) {
+      // Keep the stored dependencies independent of a mutable set owned by the builder.
+      _dependencies.write(doc.path, _DependencyEntry(doc, deps.toSet()));
+    } else if (prevDeps != null) {
+      // Remove the entry of a document whose dependencies were cleared. Subcollections keep
+      // their own dependency entries.
       _dependencies.delete(doc.path, recursive: false);
-    } else {
-      _dependencies.write(doc.path, _DependencyEntry(doc, deps));
     }
   }
 
