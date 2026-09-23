@@ -22,8 +22,7 @@ Future<void> main(List<String> arguments) async {
     ..addOption('out')
     ..addOption('modes', defaultsTo: 'jit,aot')
     ..addOption('suite',
-        defaultsTo: 'store_core',
-        allowed: ['store_core', 'path_cache', 'manager_core'])
+        defaultsTo: 'store_core', allowed: ['store_core', 'manager_core'])
     ..addOption('filter',
         help:
             'Regular expression selecting store_core or manager_core operations')
@@ -50,17 +49,9 @@ Future<void> main(List<String> arguments) async {
   final warmupMs = count('warmup-ms', 0);
   final suite = args['suite'] as String;
   final filter = args['filter'] as String?;
-  if (filter != null) {
-    if (suite == 'path_cache') {
-      throw ArgumentError('--filter is not supported by path_cache');
-    }
-    RegExp(filter);
-  }
-  final entrypoint = switch (suite) {
-    'store_core' => 'profileStoreCore',
-    'manager_core' => 'profileManagerCore',
-    _ => 'profilePathCache',
-  };
+  if (filter != null) RegExp(filter);
+  final entrypoint =
+      suite == 'manager_core' ? 'profileManagerCore' : 'profileStoreCore';
   final modes = (args['modes'] as String).split(',');
   if (modes.isEmpty ||
       modes.toSet().length != modes.length ||
@@ -149,7 +140,6 @@ Future<void> main(List<String> arguments) async {
         'run_core.dart',
         'profile_support.dart',
         'workloads/$suite.dart',
-        if (suite == 'path_cache') 'path_cache_draft.dart',
         if (suite == 'manager_core') 'manager_fixtures.dart',
       ])
         name: hashFile(p.join(repo, 'benchmark/value_store', name))
@@ -219,12 +209,7 @@ Future<void> main(List<String> arguments) async {
             .readAsStringSync();
     File(p.join(root, 'workload.dart')).writeAsStringSync(workload
         .replaceFirst("'package:loon/loon.dart'", "'store.dart'")
-        .replaceFirst("'../profile_support.dart'", "'profile_support.dart'")
-        .replaceFirst("'../path_cache_draft.dart'", "'path_cache_draft.dart'"));
-    if (suite == 'path_cache') {
-      File(p.join(repo, 'benchmark/value_store/path_cache_draft.dart'))
-          .copySync(p.join(root, 'path_cache_draft.dart'));
-    }
+        .replaceFirst("'../profile_support.dart'", "'profile_support.dart'"));
     File(p.join(root, 'main.dart')).writeAsStringSync('''
 import 'dart:convert';
 import 'dart:io';

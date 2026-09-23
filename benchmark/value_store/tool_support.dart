@@ -2,7 +2,6 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:crypto/crypto.dart';
-import 'package:path/path.dart' as p;
 
 const jsonFormat = JsonEncoder.withIndent('  ');
 
@@ -14,46 +13,6 @@ void writeJson(String path, Object value) =>
 
 String hashFile(String path) =>
     sha256.convert(File(path).readAsBytesSync()).toString();
-
-List<File> filesUnder(String directory) => Directory(directory)
-    .listSync(recursive: true, followLinks: false)
-    .whereType<File>()
-    .toList()
-  ..sort((a, b) => a.path.compareTo(b.path));
-
-Map<String, String> sourceHashes(String directory, String relativeTo) => {
-      for (final file in filesUnder(directory))
-        if (file.path.endsWith('.dart'))
-          p.relative(file.path, from: relativeTo): hashFile(file.path),
-    };
-
-void copyTree(String source, String destination) {
-  Directory(destination).createSync(recursive: true);
-  for (final entry in Directory(source).listSync(followLinks: false)) {
-    if ({'results', '__pycache__'}.contains(p.basename(entry.path))) continue;
-    final target = p.join(destination, p.basename(entry.path));
-    if (entry is Directory) {
-      copyTree(entry.path, target);
-    } else if (entry is File) {
-      entry.copySync(target);
-    }
-  }
-}
-
-// pub's generated lockfile has a stable indentation/layout. Only hosted package
-// versions are copied into overrides; path and SDK dependencies remain intact.
-Map<String, String> lockedVersions(String path) {
-  final blocks = RegExp(r'^  (\w+):\n(.*?)(?=^  \w+:|^sdks:|$(?![\s\S]))',
-          multiLine: true, dotAll: true)
-      .allMatches(File(path).readAsStringSync());
-  return {
-    for (final block in blocks)
-      if (block[2]!.contains('    source: hosted'))
-        block[1]!: RegExp(r'^    version: "([^"]+)"', multiLine: true)
-            .firstMatch(block[2]!)!
-            .group(1)!,
-  };
-}
 
 String replaceOnce(String source, String old, String replacement) {
   if (old.allMatches(source).length != 1) {
