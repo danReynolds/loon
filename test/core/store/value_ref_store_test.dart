@@ -468,6 +468,22 @@ void main() {
               expect(store.inspect(), {});
             },
           );
+
+          test(
+            'Does not return values from a deleted subtree',
+            () {
+              final store = ValueRefStore<String>();
+              store.write('users__1', 'Dan');
+              store.write('users__2__friends__1', 'Nik');
+
+              // Reading resolves the `users__2__friends` node before it is deleted.
+              expect(store.get('users__2__friends__1'), 'Nik');
+
+              store.delete('users__2');
+
+              expect(store.get('users__2__friends__1'), isNull);
+            },
+          );
         },
       );
 

@@ -144,6 +144,8 @@ class ValueRefStore<T> extends _BaseValueStore<T> {
     String path, {
     bool recursive = true,
   }) {
+    _forgetLastParent();
+
     if (path.isEmpty) {
       _store = {};
       return;

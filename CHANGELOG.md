@@ -2,6 +2,7 @@
 
 * Snapshot builder-owned dependency sets so reusing a mutable set cannot leave stale reverse dependencies.
 * Reduce document allocation and path lookup overhead, and reuse document handles when unlinking a deleted subtree's dependencies.
+* Reuse the last resolved parent node in value stores, so consecutive reads and writes within a collection skip walking its path.
 * Emit `BroadcastEvents.touched` for dependents affected by a write or deletion, so queries re-evaluate their filters and ordering.
 * Remove deleted documents from the dependency graph eagerly, including documents in nested subcollections.
 * Treat `Document.rebroadcast()` as a touch without persisting data; rebroadcasting a missing document does nothing.

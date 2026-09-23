@@ -599,6 +599,26 @@ void main() {
             expect(store2.inspect(), {});
           },
         );
+
+        test(
+          'The other store no longer reads or writes the moved data',
+          () {
+            final store = ValueStore<String>();
+            final store2 = ValueStore<String>();
+            store2.write('users__1__messages__1', 'Hello');
+            store2.write('users__2', 'Sonja');
+
+            // Reading resolves the source's `users__1__messages` node before it moves.
+            expect(store2.get('users__1__messages__1'), 'Hello');
+
+            store.graft(store2, 'users__1');
+
+            expect(store2.get('users__1__messages__1'), isNull);
+            store2.write('users__1__messages__2', 'Hi');
+            expect(store.get('users__1__messages__1'), 'Hello');
+            expect(store.get('users__1__messages__2'), isNull);
+          },
+        );
       },
     );
 

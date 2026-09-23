@@ -72,20 +72,23 @@ class ValueStore<T> extends _BaseValueStore<T> {
 
   @override
   write(String path, T value) {
-    Map node = _store;
-    var start = 0;
-    while (true) {
-      final end = _nextStoreDelimiter(path, start);
-      if (end < 0) {
-        break;
-      }
-      node = node[path.substring(start, end)] ??= {};
-      start = end + _BaseValueStore.delimiter.length;
-    }
-
-    final values = node[_BaseValueStore._values] ??= <String, T>{};
+    final (parent, start) = _resolveParent(path, create: true)!;
+    final values = parent[_BaseValueStore._values] ??= <String, T>{};
     values[path.substring(start)] = value;
     return value;
+  }
+
+  /// Writes [value] at [path] unless it already has a value, returning whether it was written.
+  bool putIfAbsent(String path, T value) {
+    final (parent, start) = _resolveParent(path, create: true)!;
+    final Map<String, T> values =
+        parent[_BaseValueStore._values] ??= <String, T>{};
+    final key = path.substring(start);
+    if (values[key] != null) {
+      return false;
+    }
+    values[key] = value;
+    return true;
   }
 
   /// Deletes all data under the segment of the path beginning at [start]. Returns whether
@@ -156,6 +159,8 @@ class ValueStore<T> extends _BaseValueStore<T> {
     /// If false, only the values at the given path are deleted and the subtree is maintained.
     bool recursive = true,
   }) {
+    _forgetLastParent();
+
     if (path.isEmpty) {
       _store = {};
       return;
@@ -238,6 +243,7 @@ class ValueStore<T> extends _BaseValueStore<T> {
       other.clear();
       _mergeNode(_store, otherNode);
     } else {
+      other._forgetLastParent();
       _graft(_store, other._store, path, 0);
     }
   }
