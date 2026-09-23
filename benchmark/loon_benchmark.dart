@@ -35,6 +35,22 @@ void main() {
     }
   });
 
+  test('Write throughput (broadcast on)', () async {
+    // Each write also records its broadcast event and looks up its dependents, the
+    // bookkeeping skipped above. Timed before the batched broadcast fires.
+    for (final n in [1000, 10000, 50000]) {
+      await _resetStore();
+      final col = Loon.collection<int>('bench');
+      final sw = Stopwatch()..start();
+      for (var i = 0; i < n; i++) {
+        col.doc('doc_$i').create(i, persist: false);
+      }
+      sw.stop();
+      _report('write + event', n, sw.elapsedMicroseconds);
+      await Future.delayed(Duration.zero);
+    }
+  });
+
   test('Read throughput (cache hit on get)', () {
     final col = Loon.collection<int>('bench');
     const n = 50000;
@@ -183,6 +199,152 @@ void main() {
       final perUpdate = sw.elapsedMicroseconds / rounds;
       print(
           '  ${m.toString().padRight(14)} ${perUpdate.toStringAsFixed(1).padLeft(14)}');
+    }
+  });
+
+  test('Dependency fan-out vs dependent count', () async {
+    // D documents in one collection depend on a single source document, and a query
+    // observes that collection. Each source update propagates to every dependent, and
+    // the broadcast re-evaluates them in the query.
+    const rounds = 20;
+
+    print(
+        '\n  dependency fan-out: update source, $rounds rounds, D dependents');
+    print('  ${'D dependents'.padRight(14)} ${'µs/update'.padLeft(14)}');
+
+    for (final d in [100, 1000, 10000]) {
+      await _resetStore();
+
+      final source = Loon.collection<int>('sources').doc('source');
+      source.create(0, persist: false);
+      final dependents = Loon.collection<int>(
+        'dependents',
+        dependenciesBuilder: (_) => {source},
+      );
+      for (var i = 0; i < d; i++) {
+        dependents.doc('doc_$i').create(i, broadcast: false, persist: false);
+      }
+
+      final sub = dependents.stream().listen((_) {});
+      await Future.delayed(const Duration(milliseconds: 5));
+
+      final sw = Stopwatch()..start();
+      for (var r = 0; r < rounds; r++) {
+        source.update(r + 1, persist: false);
+        await Future.delayed(Duration.zero); // let the broadcast fire
+      }
+      sw.stop();
+
+      await sub.cancel();
+
+      final perUpdate = sw.elapsedMicroseconds / rounds;
+      print(
+          '  ${d.toString().padRight(14)} ${perUpdate.toStringAsFixed(1).padLeft(14)}');
+    }
+  });
+
+  test('Dependency shapes: register, propagate and delete', () async {
+    // 20k documents depend on one source: all in one collection, scattered across 5,000
+    // subcollections, or in one collection with a summary that depends on all of them and
+    // closes a cycle back to the source. Times registering their dependencies, one source
+    // update touching all of them, and deleting their parent collection.
+    const count = 20000;
+    const rounds = 5;
+
+    print('\n  dependency shapes: $count dependents of one source');
+    print('  ${'shape'.padRight(14)} ${'register µs/doc'.padLeft(16)} '
+        '${'µs/update'.padLeft(12)} ${'delete µs'.padLeft(12)}');
+
+    for (final shape in ['one_collection', 'scattered', 'shared_cycle']) {
+      await _resetStore();
+
+      final source = Loon.collection<int>('accounts').doc('source');
+      source.create(0, persist: false);
+      final groups = Loon.collection('groups');
+
+      final sw = Stopwatch()..start();
+      final docs = <Document<int>>[];
+      for (var i = 0; i < count; i++) {
+        final doc = groups
+            .doc('${shape == 'scattered' ? i % 5000 : 0}')
+            .subcollection<int>('items', dependenciesBuilder: (_) => {source})
+            .doc('$i');
+        doc.create(i, broadcast: false, persist: false);
+        docs.add(doc);
+      }
+      sw.stop();
+      final register = sw.elapsedMicroseconds / count;
+
+      if (shape == 'shared_cycle') {
+        final summary = Loon.collection<int>('summaries',
+            dependenciesBuilder: (_) => docs.toSet()).doc('all');
+        summary.create(0, broadcast: false, persist: false);
+        Loon.collection<int>('accounts', dependenciesBuilder: (_) => {summary})
+            .doc('source')
+            .update(0, broadcast: false, persist: false);
+      }
+      await Future.delayed(Duration.zero);
+
+      sw
+        ..reset()
+        ..start();
+      for (var r = 0; r < rounds; r++) {
+        source.update(r + 1, persist: false);
+        await Future.delayed(Duration.zero); // let the broadcast fire
+      }
+      sw.stop();
+      final perUpdate = sw.elapsedMicroseconds / rounds;
+
+      sw
+        ..reset()
+        ..start();
+      groups.delete();
+      await Future.delayed(Duration.zero);
+      sw.stop();
+
+      print(
+          '  ${shape.padRight(14)} ${register.toStringAsFixed(2).padLeft(16)} '
+          '${perUpdate.toStringAsFixed(1).padLeft(12)} '
+          '${sw.elapsedMicroseconds.toString().padLeft(12)}');
+    }
+  });
+
+  test('Sparse updates in a large collection', () async {
+    // 1k scattered updates in a 50k-document collection, with and without one dependent
+    // per document in a second collection. Times the writes and the broadcast they trigger.
+    const count = 50000;
+    const updates = 1000;
+
+    print('\n  sparse updates: $updates of $count documents');
+    print('  ${'dependents'.padRight(14)} ${'µs/update'.padLeft(14)}');
+
+    for (final withDependents in [false, true]) {
+      await _resetStore();
+
+      final sources = Loon.collection<int>('sources');
+      final leaves = Loon.collection<int>('leaves',
+          dependenciesBuilder: (snap) => {sources.doc('${snap.data}')});
+      for (var i = 0; i < count; i++) {
+        sources.doc('$i').create(0, broadcast: false, persist: false);
+        if (withDependents) {
+          leaves.doc('$i').create(i, broadcast: false, persist: false);
+        }
+      }
+      final changed = [
+        for (var i = 0; i < updates; i++) sources.doc('${i * 47 % count}')
+      ];
+      await Future.delayed(Duration.zero);
+
+      final sw = Stopwatch()..start();
+      for (final doc in changed) {
+        doc.update(1, persist: false);
+      }
+      await Future.delayed(Duration.zero); // let the broadcast fire
+      sw.stop();
+
+      final perUpdate = sw.elapsedMicroseconds / updates;
+      print('  ${(withDependents ? 'one each' : 'none').padRight(14)} '
+          '${perUpdate.toStringAsFixed(2).padLeft(14)}');
     }
   });
 }

@@ -114,6 +114,57 @@ void profileManagerCore() {
       }, operations: n);
     }
   }
+  manager.clear();
+  final plain = [for (var i = 0; i < n; i++) Document<int>('plain', '$i')];
+  measure('writes/plain', () {
+    for (final doc in plain) {
+      broadcasts.writeDocument(doc, BroadcastEvents.added);
+    }
+  }, () {
+    return plain.every(
+        (doc) => broadcasts.eventStore.get(doc.path) == BroadcastEvents.added);
+  }, prepare: () {
+    broadcasts.clear(broadcast: false);
+  }, operations: n);
+
+  // Each source has one dependent in each further collection, so writing the sources
+  // alternates between `depth` collections in the event store and the reverse index.
+  for (final (depth, prefix) in [
+    (2, ''),
+    (3, ''),
+    (2, 'orgs__o__groups__g__'),
+    (3, 'orgs__o__groups__g__'),
+  ]) {
+    manager.clear();
+    final sources = [
+      for (var i = 0; i < n ~/ depth; i++) Document<int>('${prefix}level0', '$i')
+    ];
+    final all = <Document<int>>[...sources];
+    var previous = sources;
+    for (var d = 1; d < depth; d++) {
+      final parents = previous;
+      final level = [
+        for (var i = 0; i < parents.length; i++)
+          Document<int>('${prefix}level$d', '$i',
+              dependenciesBuilder: (_) => {parents[i]})
+      ];
+      for (final doc in level) {
+        manager.updateDependencies(DocumentSnapshot(doc: doc, data: 0));
+      }
+      all.addAll(level);
+      previous = level;
+    }
+    final shape = prefix.isEmpty ? 'shallow' : 'deep';
+    measure('propagation/chains_${shape}_$depth', () {
+      for (final source in sources) {
+        broadcasts.writeDocument(source, BroadcastEvents.modified);
+      }
+    }, () {
+      return all.every((doc) => broadcasts.eventStore.get(doc.path) != null);
+    }, prepare: () {
+      broadcasts.clear(broadcast: false);
+    }, operations: all.length);
+  }
   broadcasts.clear(broadcast: false);
   check(results.rows.isNotEmpty, 'No manager_core operations matched $filter');
   results.save();
