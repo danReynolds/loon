@@ -1,5 +1,5 @@
 import 'dart:convert';
-import 'package:loon/loon.dart';
+import 'package:loon/src/store/store.dart';
 import 'package:loon/persistor/data_store.dart';
 import 'package:loon/persistor/data_store_resolver.dart';
 import 'package:loon/persistor/sqlite_persistor/sqlite_persistor.dart';

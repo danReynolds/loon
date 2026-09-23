@@ -1,4 +1,4 @@
-part of '../loon.dart';
+part of 'store.dart';
 
 class ValueRefStore<T> extends _BaseValueStore<T> {
   static const _refs = '__refs';

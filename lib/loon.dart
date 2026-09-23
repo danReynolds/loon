@@ -7,13 +7,11 @@ import 'package:loon/persistor/data_store_encrypter.dart';
 import 'package:loon/utils/id.dart';
 import 'dart:collection';
 import 'persistor/index.dart';
+import 'src/store/store.dart';
 
 export 'widgets/query_stream_builder.dart';
 export 'widgets/document_stream_builder.dart';
 
-part 'store/base_value_store.dart';
-part 'store/value_store.dart';
-part 'store/value_ref_store.dart';
 part 'broadcast_observer.dart';
 part 'query.dart';
 part 'observable_query.dart';
@@ -34,7 +32,6 @@ part 'extensions/set.dart';
 part 'utils/validation.dart';
 part 'utils/logger.dart';
 part 'utils/exceptions.dart';
-part 'utils/store.dart';
 part 'store_reference.dart';
 
 class Loon {

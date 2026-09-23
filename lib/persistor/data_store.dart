@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:loon/loon.dart';
+import 'package:loon/src/store/store.dart';
 import 'package:loon/persistor/data_store_encrypter.dart';
 
 typedef DataStoreFactory = DataStore Function(

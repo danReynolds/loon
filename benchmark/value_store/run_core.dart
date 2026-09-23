@@ -158,27 +158,54 @@ Future<void> main(List<String> arguments) async {
     final code = StringBuffer(
         "import 'dart:convert';\nimport 'dart:async';\nimport 'dart:collection';\ntypedef Json = Map<String, dynamic>;\n");
     final files = <String, Object>{};
-    for (final path in [
-      'lib/store/base_value_store.dart',
-      'lib/store/value_store.dart',
-      'lib/store/value_ref_store.dart',
-      'lib/utils/store.dart',
-      if (suite == 'manager_core') ...[
-        'lib/dependency_manager.dart',
-        'lib/broadcast_manager.dart',
-        'lib/document_snapshot.dart',
-        'lib/extensions/set.dart',
-      ],
-    ]) {
-      String source;
+    Future<String?> read(String path) async {
       if (entry.value.startsWith('git:')) {
         final result = await Process.run('git', ['show', '$origin:$path'],
             workingDirectory: repo);
-        if (result.exitCode != 0 && path == 'lib/utils/store.dart') continue;
-        if (result.exitCode != 0) throw StateError('${result.stderr}');
-        source = result.stdout as String;
-      } else {
-        source = File(p.join(origin, path)).readAsStringSync();
+        return result.exitCode == 0 ? result.stdout as String : null;
+      }
+      final file = File(p.join(origin, path));
+      return file.existsSync() ? file.readAsStringSync() : null;
+    }
+
+    // Each file is read from the first of its paths that the source has. The stores moved to
+    // lib/src/store, and older versions have no path helpers or set extensions.
+    for (final (paths, required) in [
+      (
+        [
+          'lib/src/store/base_value_store.dart',
+          'lib/store/base_value_store.dart'
+        ],
+        true
+      ),
+      (['lib/src/store/value_store.dart', 'lib/store/value_store.dart'], true),
+      (
+        [
+          'lib/src/store/value_ref_store.dart',
+          'lib/store/value_ref_store.dart'
+        ],
+        true
+      ),
+      (['lib/src/store/paths.dart', 'lib/utils/store.dart'], false),
+      if (suite == 'manager_core') ...[
+        (['lib/dependency_manager.dart'], true),
+        (['lib/broadcast_manager.dart'], true),
+        (['lib/document_snapshot.dart'], true),
+        (['lib/extensions/set.dart'], false),
+      ],
+    ]) {
+      String? path;
+      String? source;
+      for (final candidate in paths) {
+        source = await read(candidate);
+        if (source != null) {
+          path = candidate;
+          break;
+        }
+      }
+      if (source == null || path == null) {
+        if (required) throw StateError('${entry.value} has none of $paths');
+        continue;
       }
       final snapshot = File(p.join(root, p.basename(path)))
         ..writeAsStringSync(source);
@@ -209,6 +236,7 @@ Future<void> main(List<String> arguments) async {
             .readAsStringSync();
     File(p.join(root, 'workload.dart')).writeAsStringSync(workload
         .replaceFirst("'package:loon/loon.dart'", "'store.dart'")
+        .replaceFirst("'package:loon/src/store/store.dart'", "'store.dart'")
         .replaceFirst("'../profile_support.dart'", "'profile_support.dart'"));
     File(p.join(root, 'main.dart')).writeAsStringSync('''
 import 'dart:convert';

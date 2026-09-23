@@ -34,7 +34,7 @@ class Document<T> implements StoreReference {
     PersistorSettings? persistorSettings,
     DependenciesBuilder<S>? dependenciesBuilder,
   }) {
-    final (parent, id) = _splitReferencePath(path);
+    final (parent, id) = splitReferencePath(path);
     return Document<S>(
       parent,
       id,

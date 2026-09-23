@@ -1,7 +1,7 @@
 import 'dart:math';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:loon/loon.dart';
+import 'package:loon/src/store/store.dart';
 
 import '../../store_paths.dart';
 

@@ -1,4 +1,4 @@
-part of '../loon.dart';
+part of 'store.dart';
 
 /// A value store is a tree structure that takes a path and indexes its value into the tree as a
 /// key of its parent path, enabling efficient access to all values of the parent path.
@@ -42,7 +42,7 @@ class ValueStore<T> extends _BaseValueStore<T> {
 
   static const root = _BaseValueStore.root;
 
-  static ValueStore fromJson(Json json) {
+  static ValueStore fromJson(Map<String, dynamic> json) {
     return ValueStore(json);
   }
 

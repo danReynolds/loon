@@ -1,4 +1,5 @@
 import 'package:loon/loon.dart';
+import 'package:loon/src/store/store.dart';
 
 class DataStoreResolverConfig {
   final Future<ValueRefStore<String>?> Function() hydrate;

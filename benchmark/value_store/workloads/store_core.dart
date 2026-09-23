@@ -1,4 +1,4 @@
-import 'package:loon/loon.dart';
+import 'package:loon/src/store/store.dart';
 import '../profile_support.dart';
 
 /// Store-only workloads shared by the Dart isolation runner and Flutter hosts.

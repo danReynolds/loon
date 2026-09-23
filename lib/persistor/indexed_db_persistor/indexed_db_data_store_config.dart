@@ -1,6 +1,6 @@
 import 'dart:convert';
 import 'dart:js_interop';
-import 'package:loon/loon.dart';
+import 'package:loon/src/store/store.dart';
 import 'package:loon/persistor/data_store.dart';
 import 'package:loon/persistor/data_store_resolver.dart';
 import 'package:loon/persistor/indexed_db_persistor/indexed_db_persistor.dart';

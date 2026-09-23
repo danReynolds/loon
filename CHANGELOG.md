@@ -11,6 +11,7 @@
 * Add maintainer benchmarks that compare store and manager performance across versions. They are not published with the package.
 * [Breaking] Remove `PathRefStore` and `ObservableDocument.inspect()`, remove `deps` and `docDeps` from `ObservableQuery.inspect()`, and key its `docSnaps` by document ID. Dependency state is available through `Document.dependencies()` and `Document.dependents()`.
 * [Breaking] Change dependency entries in `Loon.inspect()` to objects whose `toJson()` produces `{doc, dependencies}` using document paths.
+* [Breaking] Stop exporting `ValueStore` and `ValueRefStore`, which are internal to Loon.
 
 ## 5.6.1
 

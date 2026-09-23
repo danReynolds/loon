@@ -1,4 +1,4 @@
-part of '../loon.dart';
+part of 'store.dart';
 
 /// Finds the next `__` separator. Specializing the fixed two-character delimiter
 /// avoids the general substring search on every segment of a store path.
@@ -28,7 +28,7 @@ int _lastSegmentStart(String path) {
 }
 
 /// Splits [path] into its parent path and final segment, materializing only those two strings.
-(String, String) _splitReferencePath(String path) {
+(String, String) splitReferencePath(String path) {
   final start = _lastSegmentStart(path);
   return start == 0
       ? ('', path)

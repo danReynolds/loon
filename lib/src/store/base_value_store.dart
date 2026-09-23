@@ -1,4 +1,4 @@
-part of '../loon.dart';
+part of 'store.dart';
 
 abstract class _BaseValueStore<T> {
   Map _store = {};
