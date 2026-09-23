@@ -5,7 +5,10 @@ class ObservableQuery<T> extends Query<T>
         BroadcastObserver<List<DocumentSnapshot<T>>,
             List<DocumentChangeSnapshot<T>>> {
   /// An observable query maintains a cache of snapshots of the documents in its current result set.
-  final Map<Document<T>, DocumentSnapshot<T>> _snapCache = {};
+  final Map<String, DocumentSnapshot<T>> _snapCache = {};
+
+  static final _eventStore = Loon._instance.broadcastManager.eventStore;
+  static final _documentStore = Loon._instance.documentStore;
 
   ObservableQuery(
     super.collection, {
@@ -15,20 +18,10 @@ class ObservableQuery<T> extends Query<T>
   }) {
     final snaps = super.get();
     for (final snap in snaps) {
-      _cacheDoc(snap);
+      _snapCache[snap.id] = snap;
     }
 
     _init(snaps, multicast: multicast);
-  }
-
-  /// Caches the snapshot of a document in the result set.
-  void _cacheDoc(DocumentSnapshot<T> snap) {
-    _snapCache[snap.doc] = snap;
-  }
-
-  /// Removes the document from the result set cache.
-  void _evictDoc(Document<T> doc) {
-    _snapCache.remove(doc);
   }
 
   /// On broadcast, the [ObservableQuery] examines the events that have occurred
@@ -58,47 +51,51 @@ class ObservableQuery<T> extends Query<T>
       final hasChangeListener = _changeController.hasListener;
 
       // 1.  Any path along the query's collection path has been removed.
-      if (Loon._instance.broadcastManager.eventStore
-              .getNearestMatch(path, BroadcastEvents.removed) !=
-          null) {
-        final controllerValue = _controllerValue;
-        if (controllerValue != null && controllerValue.isNotEmpty) {
+      if (_eventStore.getNearestMatch(path, BroadcastEvents.removed) != null) {
+        if (_controllerValue case List<DocumentSnapshot<T>> snaps
+            when snaps.isNotEmpty) {
           shouldRebroadcast = true;
 
-          changeSnaps.addAll(
-            controllerValue.map(
-              (snap) {
-                return DocumentChangeSnapshot<T>(
-                  doc: snap.doc,
-                  event: BroadcastEvents.removed,
-                  prevData: snap.data,
-                  data: null,
-                );
-              },
-            ),
-          );
+          if (hasChangeListener) {
+            changeSnaps.addAll(
+              snaps.map(
+                (snap) {
+                  return DocumentChangeSnapshot<T>(
+                    doc: snap.doc,
+                    event: BroadcastEvents.removed,
+                    prevData: snap.data,
+                    data: null,
+                  );
+                },
+              ),
+            );
+          }
 
           _snapCache.clear();
         }
       }
 
-      final events = Loon._instance.broadcastManager.eventStore
-          .getChildValues(collection.path);
+      final snaps = _documentStore.getChildValues(path);
+      final events = _eventStore.getChildValues(collection.path);
+
       if (events != null) {
         for (final entry in events.entries) {
           final docId = entry.key;
           final event = entry.value;
 
-          final doc = collection.doc(docId);
-          final prevSnap = _snapCache[doc];
-          final snap = doc.get();
+          final prevSnap = _snapCache[docId];
+
+          final raw = snaps?[docId];
+          final snap =
+              raw is DocumentSnapshot<T>? ? raw : collection.doc(docId).get();
 
           switch (event) {
             case BroadcastEvents.added:
             case BroadcastEvents.hydrated:
+
               // 2.a Add new documents that satisfy the query filter.
               if (_filter(snap!)) {
-                _cacheDoc(snap);
+                _snapCache[snap.id] = snap;
 
                 shouldRebroadcast = true;
 
@@ -112,20 +109,20 @@ class ObservableQuery<T> extends Query<T>
                     ),
                   );
                 }
-              } else if (_snapCache.containsKey(doc)) {
+              } else if (prevSnap != null) {
                 // The document was in the result set but a delete + recreate that
                 // coalesced into a single added event (or a re-add) now fails the
                 // filter, so the stale entry must be evicted.
-                _evictDoc(doc);
+                _snapCache.remove(docId);
 
                 shouldRebroadcast = true;
 
                 if (hasChangeListener) {
                   changeSnaps.add(
                     DocumentChangeSnapshot(
-                      doc: doc,
+                      doc: prevSnap.doc,
                       event: BroadcastEvents.removed,
-                      prevData: prevSnap?.data,
+                      prevData: prevSnap.data,
                       data: null,
                     ),
                   );
@@ -134,17 +131,17 @@ class ObservableQuery<T> extends Query<T>
               break;
             case BroadcastEvents.removed:
               // 2.b Remove old documents that previously satisfied the query filter and have been removed.
-              if (_snapCache.containsKey(doc)) {
-                _evictDoc(doc);
+              if (prevSnap != null) {
+                _snapCache.remove(docId);
 
                 shouldRebroadcast = true;
 
                 if (hasChangeListener) {
                   changeSnaps.add(
                     DocumentChangeSnapshot(
-                      doc: doc,
+                      doc: prevSnap.doc,
                       event: BroadcastEvents.removed,
-                      prevData: prevSnap?.data,
+                      prevData: prevSnap.data,
                       data: null,
                     ),
                   );
@@ -162,33 +159,33 @@ class ObservableQuery<T> extends Query<T>
                 break;
               }
 
-              if (_snapCache.containsKey(doc)) {
+              if (prevSnap != null) {
                 shouldRebroadcast = true;
 
                 // 2.c.i Previously satisfied the query filter and still does (updated value must still be rebroadcast on the query).
                 if (_filter(snap)) {
-                  _cacheDoc(snap);
+                  _snapCache[snap.id] = snap;
 
                   if (hasChangeListener) {
                     changeSnaps.add(
                       DocumentChangeSnapshot(
                         doc: snap.doc,
                         event: event,
-                        prevData: prevSnap?.data,
+                        prevData: prevSnap.data,
                         data: snap.data,
                       ),
                     );
                   }
                 } else {
                   // 2.c.ii Previously satisfied the query filter and now does not.
-                  _evictDoc(doc);
+                  _snapCache.remove(docId);
 
                   if (hasChangeListener) {
                     changeSnaps.add(
                       DocumentChangeSnapshot(
-                        doc: doc,
+                        doc: prevSnap.doc,
                         event: BroadcastEvents.removed,
-                        prevData: prevSnap?.data,
+                        prevData: prevSnap.data,
                         data: null,
                       ),
                     );
@@ -197,7 +194,7 @@ class ObservableQuery<T> extends Query<T>
               } else {
                 // 2.c.iii Previously did not satisfy the query filter and now does.
                 if (_filter(snap)) {
-                  _cacheDoc(snap);
+                  _snapCache[snap.id] = snap;
 
                   shouldRebroadcast = true;
 
@@ -206,7 +203,7 @@ class ObservableQuery<T> extends Query<T>
                       DocumentChangeSnapshot(
                         doc: snap.doc,
                         event: BroadcastEvents.added,
-                        prevData: prevSnap?.data,
+                        prevData: null,
                         data: snap.data,
                       ),
                     );

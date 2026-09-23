@@ -2062,7 +2062,7 @@ void main() {
                 // After creating the post document, the query should have cached its snapshot.
                 expect(postsObs.inspect(), {
                   "docSnaps": {
-                    postDoc: DocumentSnapshot(doc: postDoc, data: post1Data),
+                    postDoc.id: DocumentSnapshot(doc: postDoc, data: post1Data),
                   }
                 });
 
@@ -2072,7 +2072,7 @@ void main() {
                 // After updating the document, the cached snapshot should reflect the update.
                 expect(postsObs.inspect(), {
                   "docSnaps": {
-                    postDoc: DocumentSnapshot(doc: postDoc, data: post1Data2),
+                    postDoc.id: DocumentSnapshot(doc: postDoc, data: post1Data2),
                   }
                 });
 
@@ -2082,8 +2082,8 @@ void main() {
 
                 expect(postsObs.inspect(), {
                   "docSnaps": {
-                    postDoc: DocumentSnapshot(doc: postDoc, data: post1Data),
-                    postDoc2: DocumentSnapshot(doc: postDoc2, data: post2Data),
+                    postDoc.id: DocumentSnapshot(doc: postDoc, data: post1Data),
+                    postDoc2.id: DocumentSnapshot(doc: postDoc2, data: post2Data),
                   }
                 });
 
@@ -2092,8 +2092,8 @@ void main() {
 
                 expect(postsObs.inspect(), {
                   "docSnaps": {
-                    postDoc: DocumentSnapshot(doc: postDoc, data: post1Data3),
-                    postDoc2: DocumentSnapshot(doc: postDoc2, data: post2Data),
+                    postDoc.id: DocumentSnapshot(doc: postDoc, data: post1Data3),
+                    postDoc2.id: DocumentSnapshot(doc: postDoc2, data: post2Data),
                   }
                 });
 
@@ -2724,6 +2724,39 @@ void main() {
               }
             },
           );
+        });
+
+        test('Delivers hydrated documents to typed queries', () async {
+          final errors = <Object>[];
+          final onError = FlutterError.onError;
+          FlutterError.onError = (details) => errors.add(details.exception);
+
+          final userDoc = TestUserModel.store.doc('1');
+          final events = <List<TestUserModel>>[];
+          final sub = TestUserModel.store.stream().listen(
+                (snaps) => events.add([for (final snap in snaps) snap.data]),
+              );
+
+          Loon.configure(
+            persistor: TestPersistor(
+              seedData: [
+                DocumentSnapshot(doc: userDoc, data: TestUserModel('User 1')),
+              ],
+            ),
+          );
+
+          try {
+            await Loon.hydrate();
+            // Let the scheduled broadcast run.
+            await Future.delayed(const Duration(milliseconds: 1));
+          } finally {
+            FlutterError.onError = onError;
+            await sub.cancel();
+          }
+
+          // The query parses the hydrated data with its serializer.
+          expect(errors, isEmpty);
+          expect(events.last, [TestUserModel('User 1')]);
         });
 
         test('Does not overwrite existing documents', () async {

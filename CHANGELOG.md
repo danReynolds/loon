@@ -9,7 +9,7 @@
 * Treat `Document.rebroadcast()` as a touch without persisting data; rebroadcasting a missing document does nothing.
 * Compare observable and plain document handles by path, while tracking active observers by identity.
 * Add a Dart profiling suite with JIT, native AOT, and retained-memory comparisons.
-* [Breaking] Remove `PathRefStore` and `ObservableDocument.inspect()`, and remove `deps` and `docDeps` from `ObservableQuery.inspect()`. Dependency state is available through `Document.dependencies()` and `Document.dependents()`.
+* [Breaking] Remove `PathRefStore` and `ObservableDocument.inspect()`, remove `deps` and `docDeps` from `ObservableQuery.inspect()`, and key its `docSnaps` by document ID. Dependency state is available through `Document.dependencies()` and `Document.dependents()`.
 * [Breaking] Change dependency entries in `Loon.inspect()` to objects whose `toJson()` produces `{doc, dependencies}` using document paths.
 
 ## 5.6.1
