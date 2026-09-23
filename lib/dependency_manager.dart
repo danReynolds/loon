@@ -28,16 +28,14 @@ class DependencyManager {
     dependents.add(dependent);
   }
 
-  Set<Document>? _removeDependent(Document dependency, Document dependent) {
+  void _removeDependent(Document dependency, Document dependent) {
     final dependents = _dependents.get(dependency.path);
-    if (dependents == null) return null;
+    if (dependents == null) return;
 
     dependents.remove(dependent);
     if (dependents.isEmpty) {
       _dependents.delete(dependency.path, recursive: false);
-      return null;
     }
-    return dependents;
   }
 
   /// Updates the dependencies/dependents store for the given [DocumentSnapshot]
@@ -99,8 +97,9 @@ class DependencyManager {
 
   /// Deleting a store ref performs two operations:
   ///
-  /// 1. It deletes all dependency entries under the given path.
-  /// 2. It removes the deleted documents from their dependencies' reverse indexes.
+  /// 1. It removes the documents under the given path from their dependencies' reverse indexes,
+  ///    reading their dependency entries.
+  /// 2. It deletes those entries, which must come second since the first step reads them.
   ///
   /// Surviving documents that depend on the deleted path keep their memberships,
   /// so they can react to both its deletion and later recreation.

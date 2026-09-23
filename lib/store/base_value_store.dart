@@ -50,16 +50,19 @@ abstract class _BaseValueStore<T> {
     return _nextStoreDelimiter(path, start) < 0;
   }
 
-  /// Returns the node that owns the final segment of [path] and the index at which that segment
-  /// begins, or null if a node along the path is missing. If [create] is true, missing nodes are
-  /// created instead.
+  /// Returns the node that owns the final segment of [path] together with that segment, or null
+  /// if a node along the path is missing. If [create] is true, missing nodes are created instead.
+  /// `parent[_values][segment]` is the path's value and `parent[segment]` its child node.
   ///
   /// Segments are parsed as they are visited rather than split up front, so a lookup allocates
   /// only the segments it reaches and stops at the first missing node.
   @pragma('vm:prefer-inline')
-  (Map, int)? _resolveParent(String path, {bool create = false}) {
+  (Map, String)? _getParent(String path, {bool create = false}) {
     if (_hasLastParent(path)) {
-      return (_lastParent!, _lastSegmentStart);
+      return (_lastParent!, path.substring(_lastSegmentStart));
+    }
+    if (!create && _store.isEmpty) {
+      return null;
     }
 
     Map node = _store;
@@ -82,22 +85,7 @@ abstract class _BaseValueStore<T> {
     _lastPath = path;
     _lastSegmentStart = start;
     _lastParent = node;
-    return (node, start);
-  }
-
-  /// Returns the node that owns the final segment of [path] together with that segment, or null
-  /// if the parent node is missing. `parent[_values][segment]` is the path's value and
-  /// `parent[segment]` its child node.
-  @pragma('vm:prefer-inline')
-  (Map, String)? _getParent(String path) {
-    if (_store.isEmpty) {
-      return null;
-    }
-
-    if (_resolveParent(path) case (final parent, final start)) {
-      return (parent, path.substring(start));
-    }
-    return null;
+    return (node, path.substring(start));
   }
 
   Map? _getNode(String path) {

@@ -72,18 +72,17 @@ class ValueStore<T> extends _BaseValueStore<T> {
 
   @override
   write(String path, T value) {
-    final (parent, start) = _resolveParent(path, create: true)!;
+    final (parent, key) = _getParent(path, create: true)!;
     final values = parent[_BaseValueStore._values] ??= <String, T>{};
-    values[path.substring(start)] = value;
+    values[key] = value;
     return value;
   }
 
   /// Writes [value] at [path] unless it already has a value, returning whether it was written.
   bool putIfAbsent(String path, T value) {
-    final (parent, start) = _resolveParent(path, create: true)!;
+    final (parent, key) = _getParent(path, create: true)!;
     final Map<String, T> values =
         parent[_BaseValueStore._values] ??= <String, T>{};
-    final key = path.substring(start);
     if (values[key] != null) {
       return false;
     }

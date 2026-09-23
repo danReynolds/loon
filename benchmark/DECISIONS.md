@@ -4,6 +4,19 @@ The performance decisions behind the value store and the dependency and broadcas
 first. Raw samples for the entries up to 2026-09-21 are in git history, for example
 `git show 5efc2e6:benchmark/value_store/results/`.
 
+## 2026-09-23: Visit deleted dependency entries in place
+
+Deleting a collection unlinks its documents from their dependencies' reverse indexes while visiting
+their entries with `ValueStore.forEachValue`, instead of extracting the entries into a set first.
+For 20k records in AOT `manager_core`, it takes 32–37% less time: 2.8 vs 4.5 ms when they share one
+dependency, and 5.5 vs 8.2 ms when each has its own.
+
+## 2026-09-23: Keep the parent cache in the value store
+
+Moving the last-parent state into a helper class was slower on the store's hot paths: empty-store
+gets took about 25% longer, and early misses and plain writes a few percent longer. It stays as
+three fields and two helpers in `_BaseValueStore`.
+
 ## 2026-09-22: Reuse the last parent node in the value store
 
 Sending dependent touches through `writeDocument` read well, but made propagation to 20k dependents in

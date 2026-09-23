@@ -77,6 +77,30 @@ void profileManagerCore() {
     }
   }
 
+  // Deleting a collection unlinks each deleted document from its dependencies' reverse indexes.
+  final deletedSources = [
+    for (var i = 0; i < n; i++) Document<int>('sources', '$i')
+  ];
+  for (final shared in [true, false]) {
+    final records = [
+      for (var i = 0; i < n; i++)
+        Document<int>('records', '$i',
+            dependenciesBuilder: (_) => {deletedSources[shared ? 0 : i]})
+    ];
+    measure('dependencies/delete_${shared ? 'shared' : 'spread'}', () {
+      manager.deleteCollection(Collection('records'));
+    }, () {
+      return manager.getDependents(deletedSources.first) == null &&
+          manager.getDependents(deletedSources.last) == null &&
+          manager.getDependencies(records.last) == null;
+    }, prepare: () {
+      manager.clear();
+      for (final doc in records) {
+        manager.updateDependencies(DocumentSnapshot(doc: doc, data: 0));
+      }
+    }, operations: n);
+  }
+
   final broadcasts = BroadcastManager();
   for (final collections in [1, 5000]) {
     final source = Document<int>('accounts', 'source');
