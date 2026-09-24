@@ -4,6 +4,16 @@ The performance decisions behind the value store and the dependency and broadcas
 first. Raw samples for the entries up to 2026-09-21 are in the history of PR #42. Fetch it with
 `git fetch origin pull/42/head`, then run, for example, `git show 5efc2e6:benchmark/value_store/results/`.
 
+## 2026-09-24: Hold the parent cache in an immutable class
+
+The store's last-parent cache is a small immutable `_PathCache` holding the path, the index at which
+its final segment starts and the parent node, with the prefix check as its `isMatch` method. A walk
+that resolves replaces it, and anything that removes nodes sets it to null. Unlike the helper class
+of 2026-09-23, an empty cache is still one null check on the store, and empty-store gets took 1%
+longer. Against the three fields in AOT, every `store_core` operation stayed within its A/A noise of
+about 10%, including reads that resolve a new parent and allocate a new cache each time, and
+`manager_core` propagation and writes moved by -8% to +4%, also within noise.
+
 ## 2026-09-24: Touch dependents without clearing their document observers
 
 The propagation benchmark wrote observer values at the dependents' and collections' own paths, so the
@@ -52,7 +62,8 @@ dependency, and 5.5 vs 8.2 ms when each has its own.
 
 Moving the last-parent state into a helper class was slower on the store's hot paths: empty-store
 gets took about 25% longer, and early misses and plain writes a few percent longer. It stays as
-three fields and two helpers in `_BaseValueStore`.
+three fields and two helpers in `_BaseValueStore`. Replaced on 2026-09-24 by an immutable cache
+class.
 
 ## 2026-09-22: Reuse the last parent node in the value store
 

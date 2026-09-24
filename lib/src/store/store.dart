@@ -5,4 +5,5 @@ library;
 part 'base_value_store.dart';
 part 'value_store.dart';
 part 'value_ref_store.dart';
-part 'paths.dart';
+part 'utils/paths.dart';
+part 'path_cache.dart';

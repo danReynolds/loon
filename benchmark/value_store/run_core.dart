@@ -186,7 +186,8 @@ Future<void> main(List<String> arguments) async {
         ],
         true
       ),
-      (['lib/src/store/paths.dart'], false),
+      (['lib/src/store/utils/paths.dart', 'lib/src/store/paths.dart'], false),
+      (['lib/src/store/path_cache.dart'], false),
       if (suite == 'manager_core') ...[
         (['lib/dependency_manager.dart'], true),
         (['lib/broadcast_manager.dart'], true),

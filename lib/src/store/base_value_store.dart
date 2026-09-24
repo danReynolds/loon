@@ -3,13 +3,10 @@ part of 'store.dart';
 abstract class _BaseValueStore<T> {
   Map _store = {};
 
-  /// The last resolved path, the index at which its final segment begins, and the node that owns
-  /// that segment. Paths under one parent are often resolved in a row, such as the documents of a
-  /// collection, so they reuse the parent node rather than walking to it again. Any operation that
-  /// removes nodes forgets it.
-  String? _lastPath;
-  int _lastSegmentStart = 0;
-  Map? _lastParent;
+  /// A single-slot cache of the last path accessed and its parent node. Many paths are often
+  /// accessed in a row under the same parent, such as the documents of a collection, so the cache
+  /// saves traversing the store to it again. Any operation that removes nodes clears it.
+  _PathCache? _cache;
 
   static const _values = '__values';
   static const delimiter = '__';
@@ -21,35 +18,6 @@ abstract class _BaseValueStore<T> {
     }
   }
 
-  void _forgetLastParent() {
-    _lastPath = null;
-    _lastParent = null;
-  }
-
-  /// Whether [path] has the same parent as the last resolved path. Their segments before the final
-  /// one are identical, so they split the same way up to it.
-  @pragma('vm:prefer-inline')
-  bool _sharesLastParent(String path) {
-    final lastPath = _lastPath;
-    if (lastPath == null) {
-      return false;
-    }
-    if (identical(path, lastPath)) {
-      return true;
-    }
-
-    final start = _lastSegmentStart;
-    if (path.length < start) {
-      return false;
-    }
-    for (var i = 0; i < start; i++) {
-      if (path.codeUnitAt(i) != lastPath.codeUnitAt(i)) {
-        return false;
-      }
-    }
-    return _nextStoreDelimiter(path, start) < 0;
-  }
-
   /// Returns the node that owns the final segment of [path] together with that segment, or null
   /// if a node along the path is missing. If [create] is true, missing nodes are created instead.
   /// `parent[_values][segment]` is the path's value and `parent[segment]` its child node.
@@ -58,8 +26,8 @@ abstract class _BaseValueStore<T> {
   /// only the segments it reaches and stops at the first missing node.
   @pragma('vm:prefer-inline')
   (Map, String)? _getParent(String path, {bool create = false}) {
-    if (_sharesLastParent(path)) {
-      return (_lastParent!, path.substring(_lastSegmentStart));
+    if (_cache case _PathCache cache when cache.isMatch(path)) {
+      return (cache.lastParentNode, path.substring(cache.lastSegmentStart));
     }
     if (!create && _store.isEmpty) {
       return null;
@@ -82,9 +50,7 @@ abstract class _BaseValueStore<T> {
       start = end + delimiter.length;
     }
 
-    _lastPath = path;
-    _lastSegmentStart = start;
-    _lastParent = node;
+    _cache = _PathCache(path, start, node);
     return (node, path.substring(start));
   }
 
@@ -265,7 +231,7 @@ abstract class _BaseValueStore<T> {
 
   void clear() {
     _store = {};
-    _forgetLastParent();
+    _cache = null;
   }
 
   Map inspect() {

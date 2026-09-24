@@ -1,4 +1,4 @@
-part of 'store.dart';
+part of '../store.dart';
 
 /// Finds the next `__` separator. Specializing the fixed two-character delimiter
 /// avoids the general substring search on every segment of a store path.

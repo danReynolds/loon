@@ -156,7 +156,7 @@ class ValueStore<T> extends _BaseValueStore<T> {
     /// If false, only the values at the given path are deleted and the subtree is maintained.
     bool recursive = true,
   }) {
-    _forgetLastParent();
+    _cache = null;
 
     if (path.isEmpty) {
       _store = {};
@@ -237,7 +237,7 @@ class ValueStore<T> extends _BaseValueStore<T> {
       _mergeNode(_store, otherNode);
     } else if (other.hasPath(path)) {
       // Grafting a path the other store doesn't have would leave empty nodes behind.
-      other._forgetLastParent();
+      other._cache = null;
       _graft(_store, other._store, path, 0);
     }
   }
