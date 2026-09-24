@@ -2072,7 +2072,8 @@ void main() {
                 // After updating the document, the cached snapshot should reflect the update.
                 expect(postsObs.inspect(), {
                   "docSnaps": {
-                    postDoc.id: DocumentSnapshot(doc: postDoc, data: post1Data2),
+                    postDoc.id:
+                        DocumentSnapshot(doc: postDoc, data: post1Data2),
                   }
                 });
 
@@ -2083,7 +2084,8 @@ void main() {
                 expect(postsObs.inspect(), {
                   "docSnaps": {
                     postDoc.id: DocumentSnapshot(doc: postDoc, data: post1Data),
-                    postDoc2.id: DocumentSnapshot(doc: postDoc2, data: post2Data),
+                    postDoc2.id:
+                        DocumentSnapshot(doc: postDoc2, data: post2Data),
                   }
                 });
 
@@ -2092,8 +2094,10 @@ void main() {
 
                 expect(postsObs.inspect(), {
                   "docSnaps": {
-                    postDoc.id: DocumentSnapshot(doc: postDoc, data: post1Data3),
-                    postDoc2.id: DocumentSnapshot(doc: postDoc2, data: post2Data),
+                    postDoc.id:
+                        DocumentSnapshot(doc: postDoc, data: post1Data3),
+                    postDoc2.id:
+                        DocumentSnapshot(doc: postDoc2, data: post2Data),
                   }
                 });
 

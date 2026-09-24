@@ -144,16 +144,21 @@ void profileStoreCore() {
   }, (store) => store.extractValues().length == n,
       prepare: wide.clear, operations: n);
   // Every read is under a different parent, so none can reuse the last parent node.
-  measure('wide/get', () {
-    var sum = 0;
-    for (final path in widePaths) {
-      sum += wide.get(path)!;
-    }
-    return sum;
-  }, (sum) => sum == total, prepare: () {
-    wide.clear();
-    seedWide();
-  }, operations: n);
+  measure(
+      'wide/get',
+      () {
+        var sum = 0;
+        for (final path in widePaths) {
+          sum += wide.get(path)!;
+        }
+        return sum;
+      },
+      (sum) => sum == total,
+      prepare: () {
+        wide.clear();
+        seedWide();
+      },
+      operations: n);
   measure('wide/delete_leaves', () {
     for (final path in widePaths) {
       wide.delete(path);
