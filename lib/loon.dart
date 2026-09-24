@@ -28,7 +28,6 @@ part 'persistor/persistor.dart';
 part 'persistor/operations.dart';
 part 'persistor/persist_manager.dart';
 part 'extensions/iterable.dart';
-part 'extensions/set.dart';
 part 'utils/validation.dart';
 part 'utils/logger.dart';
 part 'utils/exceptions.dart';
@@ -174,6 +173,8 @@ class Loon {
     }
 
     documentStore.delete(doc.path);
+    // The dependency manager prunes the deleted documents from the dependents of their
+    // dependencies before the broadcast manager looks up the dependents to touch.
     dependencyManager.deleteDocument(doc);
     broadcastManager.deleteDocument(doc);
 
@@ -189,6 +190,7 @@ class Loon {
     }
 
     documentStore.delete(path);
+    // See [deleteDocument] for the order of the dependency and broadcast managers.
     dependencyManager.deleteCollection(collection);
     broadcastManager.deleteCollection(collection);
     persistManager?.clear(collection);

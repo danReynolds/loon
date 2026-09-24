@@ -1,17 +1,16 @@
 ## 5.7.0
 
+* Re-evaluate documents touched by a dependency change or `Document.rebroadcast()` in queries the way modified documents are, so a touched document can enter, leave or move within a query's results. Previously a query only re-emitted touched documents that were already in its results.
+* Touch the dependents of every document under a deleted document or collection, including documents in nested subcollections.
+* Remove deleted documents from the dependency graph eagerly, including documents in nested subcollections.
 * Snapshot builder-owned dependency sets so reusing a mutable set cannot leave stale reverse dependencies.
 * Store dependencies only for documents that have some, so `Document.dependencies()` returns `null` when the dependencies builder returns an empty set.
-* Reduce document allocation and path lookup overhead, and reuse document handles when unlinking a deleted subtree's dependencies.
-* Reuse the last resolved parent node in value stores, so consecutive reads and writes within a collection skip walking its path.
-* Emit `BroadcastEvents.touched` for dependents affected by a write or deletion, so queries re-evaluate their filters and ordering.
-* Remove deleted documents from the dependency graph eagerly, including documents in nested subcollections.
-* Treat `Document.rebroadcast()` as a touch without persisting data; rebroadcasting a missing document does nothing.
+* Make rebroadcasting a missing document do nothing.
 * Compare observable and plain document handles by path, while tracking active observers by identity.
+* Speed up the value stores' reads, writes and deletes, and reduce document allocation and path lookup overhead.
 * Fix a data store keeping empty entries after documents move out of it, such as when their persistence key changes, which kept an emptied data store from being deleted.
-* Add maintainer benchmarks that compare store and manager performance across versions. They are not published with the package.
 * [Breaking] Remove `PathRefStore` and `ObservableDocument.inspect()`, remove `deps` and `docDeps` from `ObservableQuery.inspect()`, and key its `docSnaps` by document ID. Dependency state is available through `Document.dependencies()` and `Document.dependents()`.
-* [Breaking] Change dependency entries in `Loon.inspect()` to objects whose `toJson()` produces `{doc, dependencies}` using document paths.
+* [Breaking] In `Loon.inspect()`, return dependency entries as objects whose `toJson()` produces `{doc, dependencies}` using document paths, return `dependentsStore` as a path tree, and remove `dependencyCache`.
 * [Breaking] Stop exporting `ValueStore` and `ValueRefStore`, which are internal to Loon.
 
 ## 5.6.1

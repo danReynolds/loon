@@ -113,7 +113,7 @@ under the deleted path (including the documents of its subcollections) are marke
 in the same way. Since the documents deleted along with the path were pruned, they are not touched; their observers receive the
 `BroadcastEvents.removed` event for the deleted path instead.
 
-A touched document is re-evaluated by its observers as if it had been modified: an `ObservableDocument` re-reads it, and an
+A touched document is re-evaluated by its observers as if it had been modified: an `ObservableDocument` emits it again, and an
 `ObservableQuery` re-runs its filter, adding, refreshing or evicting it from its result set and re-sorting the results when needed. Broadcast observers keep no
 dependency state of their own.
 

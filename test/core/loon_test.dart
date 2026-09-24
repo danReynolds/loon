@@ -5,6 +5,7 @@ import 'package:fake_async/fake_async.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:loon/loon.dart';
+import 'package:loon/src/store/store.dart';
 
 import '../matchers/document_snapshot.dart';
 import '../models/test_persistor.dart';
@@ -929,6 +930,32 @@ void main() {
                   flushBroadcasts(async);
 
                   expect(changes, ['1:touched', '2:added', '1:removed']);
+
+                  sub.cancel();
+                  async.flushMicrotasks();
+                });
+              });
+
+              test(
+                  'Keeps a pending event, and a later event replaces a pending touch',
+                  () {
+                fakeAsync((async) {
+                  final doc = Loon.collection<String>('items').doc('1');
+                  final events = <String>[];
+                  final sub = doc
+                      .streamChanges()
+                      .listen((snap) => events.add(snap.event.name));
+                  flushBroadcasts(async);
+
+                  doc.create('a');
+                  doc.rebroadcast();
+                  flushBroadcasts(async);
+
+                  doc.rebroadcast();
+                  doc.update('b');
+                  flushBroadcasts(async);
+
+                  expect(events, ['added', 'modified']);
 
                   sub.cancel();
                   async.flushMicrotasks();
@@ -2432,12 +2459,15 @@ void main() {
           // broadcast rather than recomputing it. A random walk of creates, updates and deletes
           // over a small id/value space drives documents across the filter boundary and checks
           // after every step that the incremental result equals a fresh full recompute.
-          for (final sorted in [true, false]) {
+          // Filter thresholds that most, over half and few of the random values pass.
+          for (final (sorted, threshold) in [
+            for (final sorted in [true, false])
+              for (final threshold in [1, 4, 8]) (sorted, threshold),
+          ]) {
             test(
-                'Maintains a ${sorted ? 'sorted' : 'unsorted'} result equal to a full recompute across random writes',
+                'Maintains a ${sorted ? 'sorted' : 'unsorted'} result equal to a full recompute across random writes with threshold $threshold',
                 () {
               fakeAsync((async) {
-                const threshold = 4;
                 final random = Random(1000);
                 final items = Loon.collection<int>('items');
                 bool filter(DocumentSnapshot<int> snap) =>
@@ -2922,10 +2952,7 @@ void main() {
           );
         });
 
-        test('overlapping dependency updates remove only departed sources',
-            () async {
-          Loon.configure(persistor: null);
-          await Loon.clearAll(broadcast: false);
+        test('Overlapping dependency updates remove only departed sources', () {
           final sources = Loon.collection<int>('sources');
           final a = sources.doc('a');
           final b = sources.doc('b');
@@ -2947,7 +2974,6 @@ void main() {
           doc.update(2, broadcast: false, persist: false);
           expect(b.dependents(), isNull);
           expect(c.dependents(), isNull);
-          await Loon.clearAll(broadcast: false);
         });
 
         test('Deleting a subtree unlinks every document sharing a dependency',
@@ -3645,6 +3671,120 @@ void main() {
 
             sub.cancel();
             async.flushMicrotasks();
+          });
+        });
+
+        // The events recorded for the next broadcast.
+        ValueStore<BroadcastEvents> pendingEvents() =>
+            ValueStore(Loon.inspect()['broadcastStore']['events']);
+
+        test(
+            'Dependency updates store only non-empty results and keep child entries',
+            () {
+          final source = Document<int>('sources', 'one');
+          Set<Document>? selected;
+          final doc = Document<int>('items', 'one',
+              dependenciesBuilder: (_) => selected);
+          doc.create(0, broadcast: false, persist: false);
+          expect(doc.dependencies(), isNull);
+
+          final child = doc
+              .subcollection<int>('children',
+                  dependenciesBuilder: (_) => {source})
+              .doc('one');
+          child.create(0, broadcast: false, persist: false);
+          for (final (deps, expected, ownsEdge) in [
+            (<Document>{}, null, false),
+            (<Document>{}, null, false),
+            ({source}, {source}, true),
+            (<Document>{}, null, false),
+            ({source}, {source}, true),
+            (null, null, false),
+          ]) {
+            selected = deps;
+            doc.rebuildDependencies();
+            expect(doc.dependencies(), expected);
+            expect(child.dependencies(), {source});
+            expect(source.dependents(), {
+              child,
+              if (ownsEdge) doc,
+            });
+          }
+        });
+
+        test(
+            'Propagation handles unusual segment boundaries, diamonds and cycles',
+            () {
+          fakeAsync((async) {
+            final sink = Document<int>('summaries', 'sink');
+            final source = Document<int>('accounts', 'source',
+                dependenciesBuilder: (_) => {sink});
+            source.create(0, broadcast: false, persist: false);
+            final docs = [
+              for (final (parent, id) in [
+                ('items', 'a'),
+                ('odd_', 'b'),
+                ('items', 'nested__c'),
+                ('empty_id', ''),
+                ('', 'leading'),
+                ('items', 'z'),
+              ])
+                Document<int>(parent, id, dependenciesBuilder: (_) => {source})
+            ];
+            for (final doc in docs) {
+              doc.create(0, broadcast: false, persist: false);
+            }
+            Document<int>(sink.parent, sink.id,
+                    dependenciesBuilder: (_) => {docs.first, docs.last})
+                .create(0, broadcast: false, persist: false);
+            source.update(1, persist: false);
+            expect(pendingEvents().get(source.path), BroadcastEvents.modified);
+            for (final doc in [...docs, sink]) {
+              expect(pendingEvents().get(doc.path), BroadcastEvents.touched,
+                  reason: doc.path);
+            }
+            async.elapse(const Duration(milliseconds: 1));
+            expect(pendingEvents().extract(), isEmpty);
+
+            // A second operation must resolve fresh buckets after event-store clear.
+            source.update(2, persist: false);
+            for (final doc in [...docs, sink]) {
+              expect(pendingEvents().get(doc.path), BroadcastEvents.touched,
+                  reason: doc.path);
+            }
+            async.elapse(const Duration(milliseconds: 1));
+          });
+        });
+
+        test(
+            'Shared-dependency deletion preserves survivors and permits recreation',
+            () {
+          fakeAsync((async) {
+            final source = Loon.collection<int>('accounts').doc('source');
+            source.create(0, broadcast: false, persist: false);
+            final deleted = Loon.collection<int>('deleted',
+                dependenciesBuilder: (_) => {source});
+            final surviving = Loon.collection<int>('surviving',
+                dependenciesBuilder: (_) => {source}).doc('one');
+            for (var i = 0; i < 100; i++) {
+              deleted.doc('$i').create(i, broadcast: false, persist: false);
+            }
+            surviving.create(0, broadcast: false, persist: false);
+            deleted.delete();
+            async.elapse(const Duration(milliseconds: 1));
+            source.update(1, persist: false);
+            expect(
+                pendingEvents().get(surviving.path), BroadcastEvents.touched);
+            expect(pendingEvents().extract('deleted'), isEmpty);
+            async.elapse(const Duration(milliseconds: 1));
+            surviving.delete();
+            deleted.doc('new').create(0, broadcast: false, persist: false);
+            async.elapse(const Duration(milliseconds: 1));
+            source.update(2, persist: false);
+            expect(pendingEvents().get(deleted.doc('new').path),
+                BroadcastEvents.touched);
+            expect(pendingEvents().get(surviving.path), isNull);
+            async.elapse(const Duration(milliseconds: 1));
           });
         });
       });

@@ -4,12 +4,42 @@ The performance decisions behind the value store and the dependency and broadcas
 first. Raw samples for the entries up to 2026-09-21 are in the history of PR #42. Fetch it with
 `git fetch origin pull/42/head`, then run, for example, `git show 5efc2e6:benchmark/value_store/results/`.
 
+## 2026-09-24: Touch dependents without clearing their document observers
+
+The propagation benchmark wrote observer values at the dependents' and collections' own paths, so the
+first collection clear emptied the store and every later clear returned at once, and the 2026-09-22
+one-collection numbers left out the cost of clearing observer values. With values keyed under the
+observed paths, as observers key them, touching 20k dependents in one collection took 16.5 ms in AOT
+`manager_core`, most of it clearing observer values.
+
+A touch doesn't change a dependent's data, so its document observers keep their cached snapshots, and
+only its collection's cached query results are cleared, once per collection. For 20k dependents:
+
+- Without the document clears: 16.5 → 9.0 ms in one collection, and 22.3 → 15.1 ms across 5,000.
+- Then clearing each collection once: 9.1 → 5.2 ms in one collection, and 14.8 → 11.0 ms across
+  5,000 interleaved collections. Skipping only consecutive repeats matched the set in one collection
+  but didn't help interleaved dependents. The set costs 30–80 ns per fan-out of one or two dependents.
+
 ## 2026-09-24: Settle the heap before manager samples
 
 Setup left tens of thousands of young objects that collections during the timed operation copied, so
 builds with the same algorithm differed by up to 24% on the 5,000-collection propagation cases, in
 either direction. Each `manager_core` sample now starts after `settleHeap()` promotes what its setup
 allocated. The same builds then agreed within 3–7%, as they did with a 512 MB young generation.
+
+## 2026-09-24: Write events in one lookup
+
+`writeDocument` writes an event directly, or with `putIfAbsent` for a touch, instead of reading the
+pending event first: 20k writes without dependents took 31–35% less time in AOT `manager_core`
+(3.9 → 2.7 ms), and chained writes 3–15% less. Merging the store's two parent lookups into one
+`_getParent` was neutral in `store_core` over 7 passes, with a 15-pass recheck of overwrites.
+`extractValues` collects through `forEachValue`, with no measurable difference.
+
+## 2026-09-24: Deletes through the parent cache (not adopted)
+
+Deletes that reused the cached parent, and kept it while the node stayed in the tree, took 22–53% less
+time deleting 20k siblings in `store_core`, with no cost on scattered deletes. They didn't change
+propagation once touches stopped clearing document observers, so they're left for bulk-delete work.
 
 ## 2026-09-23: Visit deleted dependency entries in place
 

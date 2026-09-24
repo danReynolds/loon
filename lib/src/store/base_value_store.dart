@@ -29,7 +29,7 @@ abstract class _BaseValueStore<T> {
   /// Whether [path] has the same parent as the last resolved path. Their segments before the final
   /// one are identical, so they split the same way up to it.
   @pragma('vm:prefer-inline')
-  bool _hasLastParent(String path) {
+  bool _sharesLastParent(String path) {
     final lastPath = _lastPath;
     if (lastPath == null) {
       return false;
@@ -58,7 +58,7 @@ abstract class _BaseValueStore<T> {
   /// only the segments it reaches and stops at the first missing node.
   @pragma('vm:prefer-inline')
   (Map, String)? _getParent(String path, {bool create = false}) {
-    if (_hasLastParent(path)) {
+    if (_sharesLastParent(path)) {
       return (_lastParent!, path.substring(_lastSegmentStart));
     }
     if (!create && _store.isEmpty) {
@@ -182,25 +182,6 @@ abstract class _BaseValueStore<T> {
     return values;
   }
 
-  Set<T> _extractValues(Map? node, Set<T> values) {
-    if (node == null) {
-      return values;
-    }
-
-    final Map<String, T>? nodeValues = node[_values];
-
-    if (nodeValues != null) {
-      values.addAll(nodeValues.values);
-      if (node.length == 1) return values;
-    }
-
-    node.forEach((key, child) {
-      if (key != _values) _extractValues(child, values);
-    });
-
-    return values;
-  }
-
   T? get(String path) {
     if (_getParent(path) case (final parent, final segment)) {
       return parent[_values]?[segment];
@@ -268,20 +249,8 @@ abstract class _BaseValueStore<T> {
 
   /// Returns a set of the unique values that exist in the store under the given path.
   Set<T> extractValues([String path = '']) {
-    if (path.isEmpty) {
-      return _extractValues(_store, {});
-    }
-
-    final Set<T> values = {};
-
-    if (_getParent(path) case (final parent, final segment)) {
-      if (parent[_values]?.containsKey(segment) ?? false) {
-        values.add(parent[_values][segment]);
-      }
-
-      return _extractValues(parent[segment], values);
-    }
-
+    final values = <T>{};
+    forEachValue(path, values.add);
     return values;
   }
 

@@ -52,13 +52,13 @@ class ObservableQuery<T> extends Query<T>
 
       // 1.  Any path along the query's collection path has been removed.
       if (_eventStore.getNearestMatch(path, BroadcastEvents.removed) != null) {
-        if (_controllerValue case List<DocumentSnapshot<T>> snaps
-            when snaps.isNotEmpty) {
+        if (_controllerValue case List<DocumentSnapshot<T>> prevSnaps
+            when prevSnaps.isNotEmpty) {
           shouldRebroadcast = true;
 
           if (hasChangeListener) {
             changeSnaps.addAll(
-              snaps.map(
+              prevSnaps.map(
                 (snap) {
                   return DocumentChangeSnapshot<T>(
                     doc: snap.doc,
@@ -76,7 +76,7 @@ class ObservableQuery<T> extends Query<T>
       }
 
       final snaps = _documentStore.getChildValues(path);
-      final events = _eventStore.getChildValues(collection.path);
+      final events = _eventStore.getChildValues(path);
 
       if (events != null) {
         for (final entry in events.entries) {
@@ -92,7 +92,6 @@ class ObservableQuery<T> extends Query<T>
           switch (event) {
             case BroadcastEvents.added:
             case BroadcastEvents.hydrated:
-
               // 2.a Add new documents that satisfy the query filter.
               if (_filter(snap!)) {
                 _snapCache[snap.id] = snap;
@@ -151,7 +150,7 @@ class ObservableQuery<T> extends Query<T>
 
             // 2.c Re-evaluate modified/touched documents. A touched document is re-evaluated in the
             // same way as a modified one, since a touch signals that state its filter or sort depends on
-            // may have changed outside of the store.
+            // may have changed, such as a document it depends on or state outside the store.
             case BroadcastEvents.modified:
             case BroadcastEvents.touched:
               // A touched document that does not exist has no value to re-evaluate.

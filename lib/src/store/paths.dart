@@ -17,7 +17,7 @@ int _nextStoreDelimiter(String path, int start) {
 
 /// Returns the index at which the final segment of [path] begins. Delimiters are matched
 /// left to right without overlapping, as [String.split] does, so `a___b` ends in `_b`.
-int _lastSegmentStart(String path) {
+int _finalSegmentStart(String path) {
   const delimiter = _BaseValueStore.delimiter;
   var start = 0;
   while (true) {
@@ -29,7 +29,7 @@ int _lastSegmentStart(String path) {
 
 /// Splits [path] into its parent path and final segment, materializing only those two strings.
 (String, String) splitReferencePath(String path) {
-  final start = _lastSegmentStart(path);
+  final start = _finalSegmentStart(path);
   return start == 0
       ? ('', path)
       : (

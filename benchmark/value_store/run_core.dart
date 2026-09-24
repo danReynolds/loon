@@ -169,7 +169,7 @@ Future<void> main(List<String> arguments) async {
     }
 
     // Each file is read from the first of its paths that the source has. The stores moved to
-    // lib/src/store, and older versions have no path helpers or set extensions.
+    // lib/src/store, and older versions have no path helpers.
     for (final (paths, required) in [
       (
         [
@@ -191,7 +191,6 @@ Future<void> main(List<String> arguments) async {
         (['lib/dependency_manager.dart'], true),
         (['lib/broadcast_manager.dart'], true),
         (['lib/document_snapshot.dart'], true),
-        (['lib/extensions/set.dart'], false),
       ],
     ]) {
       String? path;

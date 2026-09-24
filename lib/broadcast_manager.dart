@@ -10,7 +10,7 @@ enum BroadcastEvents {
   /// The document has been removed.
   removed,
 
-  /// The document has been touched: its observers re-read it and the queries on its collection
+  /// The document has been touched: its observers emit it again and the queries on its collection
   /// re-evaluate it, either manually through [Document.rebroadcast] or because a document it
   /// depends on was written or deleted.
   touched,
@@ -74,12 +74,18 @@ class BroadcastManager {
       return;
     }
 
+    // A touch leaves a dependent's data unchanged, so its document observers keep their cached
+    // values and only its collection's cached query results are cleared. Many dependents may share
+    // a collection, so each collection is only cleared once.
+    final touchedCollections = <String>{};
+
     for (final doc in dependents) {
-      // A dependent with a pending event was already invalidated and has already touched its
-      // own dependents.
+      // A touched event doesn't replace a pending event. A dependent with a pending event was
+      // already invalidated and has touched its own dependents, so it's skipped, which ends cycles.
       if (eventStore.putIfAbsent(doc.path, BroadcastEvents.touched)) {
-        observerValueStore.delete(doc.path, recursive: false);
-        observerValueStore.delete(doc.parent, recursive: false);
+        if (touchedCollections.add(doc.parent)) {
+          observerValueStore.delete(doc.parent, recursive: false);
+        }
         _broadcastDependents(doc);
       }
     }
@@ -106,14 +112,14 @@ class BroadcastManager {
     final path = doc.path;
 
     // All cached observer values for the document and its collection are invalidated whenever
-    // the document is written or touched.
+    // the document is written or rebroadcast.
     observerValueStore.delete(path, recursive: false);
     observerValueStore.delete(doc.parent, recursive: false);
 
-    final pendingEvent = eventStore.get(path);
-    // Ignore writing a duplicate event or overwriting a pending mutative event type with a touched event.
-    if (pendingEvent == null ||
-        (event != pendingEvent && event != BroadcastEvents.touched)) {
+    // A touched event doesn't replace a pending event.
+    if (event == BroadcastEvents.touched) {
+      eventStore.putIfAbsent(path, event);
+    } else {
       eventStore.write(path, event);
     }
 

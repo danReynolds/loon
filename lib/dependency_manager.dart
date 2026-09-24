@@ -90,9 +90,13 @@ class DependencyManager {
     StoreReference ref, {
     bool recursive = false,
   }) {
-    return recursive
-        ? _dependents.extractValues(ref.path).flatten()
-        : _dependents.get(ref.path);
+    if (!recursive) {
+      return _dependents.get(ref.path);
+    }
+
+    final dependents = <Document>{};
+    _dependents.forEachValue(ref.path, dependents.addAll);
+    return dependents;
   }
 
   /// Deleting a store ref performs two operations:
