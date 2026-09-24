@@ -66,4 +66,36 @@ void main() {
       }
     });
   }
+
+  test('Reads through the last resolved parent match reads from the root', () {
+    // Runs of underscores split differently depending on where a scan starts, so paths that
+    // share a prefix don't always share a parent.
+    const segments = ['', '_', '__', 'a', 'a_', '_a'];
+    final paths = [
+      for (final a in segments) ...[
+        a,
+        for (final b in segments) ...[
+          '${a}__$b',
+          for (final c in segments) '${a}__${b}__$c',
+        ],
+      ],
+    ];
+    final store = ValueStore<int>();
+    for (var i = 0; i < paths.length; i++) {
+      store.write(paths[i], i);
+    }
+
+    final mismatches = <String>[];
+    for (final first in paths) {
+      for (final second in paths) {
+        store.get(first);
+        // A new store over the same tree has no last parent.
+        final fromRoot = ValueStore<int>(store.inspect()).get(second);
+        if (store.get(second) != fromRoot) {
+          mismatches.add('get($second) after get($first)');
+        }
+      }
+    }
+    expect(mismatches, isEmpty);
+  });
 }

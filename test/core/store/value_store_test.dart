@@ -619,6 +619,54 @@ void main() {
             expect(store.get('users__1__messages__2'), isNull);
           },
         );
+
+        test(
+          'The other store writes next to the moved data into its own tree',
+          () {
+            final store = ValueStore<String>();
+            final store2 = ValueStore<String>();
+            store2.write('users__1', 'Dan');
+
+            // Moving the only user prunes the other store's emptied `users` node.
+            store.graft(store2, 'users__1');
+            store2.write('users__2', 'Sonja');
+
+            expect(store2.extract(), {'users__2': 'Sonja'});
+            expect(store.extract(), {'users__1': 'Dan'});
+          },
+        );
+
+        test(
+          'Keeps merged values typed and leaves no empty nodes behind',
+          () {
+            final store = ValueStore<String>();
+            final store2 = ValueStore<String>();
+            store.write('users__1', 'Dan');
+            store2.write('users__2', 'Sonja');
+            store2.write('teams__1__members__1', 'Nik');
+            store2.write('teams__2', 'Blue');
+
+            // Merging into existing values keeps them readable as Map<String, T>.
+            store.graft(store2, 'users__2');
+            expect(store.getChildValues('users'), {'1': 'Dan', '2': 'Sonja'});
+            expect(store.extractValues('users'), {'Dan', 'Sonja'});
+
+            // A path the other store doesn't have moves nothing and creates nothing.
+            store.graft(store2, 'teams__3__members');
+            expect(store.hasPath('teams'), isFalse);
+
+            // Emptied branches of the other store are pruned even when their parent has
+            // other children.
+            store.graft(store2, 'teams__1__members');
+            expect(store.get('teams__1__members__1'), 'Nik');
+            expect(store2.hasPath('teams__1'), isFalse);
+            expect(store2.inspect(), {
+              'teams': {
+                '__values': {'2': 'Blue'},
+              },
+            });
+          },
+        );
       },
     );
 
@@ -907,6 +955,101 @@ void main() {
                   reason: '$reason getNearest($q)');
             }
             expect(store.isEmpty, model.isEmpty, reason: '$reason isEmpty');
+          }
+        }
+      });
+
+      // Every operation that can remove nodes runs right after a read under its target, so a
+      // stale last parent would be read back first. Grafts move values between two stores.
+      test('Reads match reference models across inserts, grafts and clears',
+          () {
+        for (var seed = 0; seed < 100; seed++) {
+          final r = Random(seed);
+          final stores = [ValueStore<int>(), ValueStore<int>()];
+          final models = [<String, int>{}, <String, int>{}];
+          final ops = <String>[];
+          var counter = 0;
+
+          void moveModel(Map<String, int> from, Map<String, int> to, String p) {
+            final moved = {
+              for (final entry in from.entries)
+                if (isAtOrUnder(entry.key, p)) entry.key: entry.value,
+            };
+            to.addAll(moved);
+            from.removeWhere((key, _) => moved.containsKey(key));
+          }
+
+          for (var step = 0; step < 60; step++) {
+            final i = r.nextInt(2);
+            final store = stores[i];
+            final model = models[i];
+            final p = randomPath(r);
+            final under = [
+              for (final segment in pathAlphabet) '$p$pathDelimiter$segment'
+            ];
+            for (final s in stores) {
+              s.get(under.first);
+            }
+
+            switch (r.nextInt(8)) {
+              case 0 || 1:
+                final v = counter++;
+                store.write(p, v);
+                model[p] = v;
+                ops.add('$i.write($p,$v)');
+              case 2:
+                final v = counter++;
+                final expected = !model.containsKey(p);
+                expect(store.putIfAbsent(p, v), expected,
+                    reason: 'seed=$seed ops=$ops putIfAbsent($p)');
+                model.putIfAbsent(p, () => v);
+                ops.add('$i.putIfAbsent($p,$v)');
+              case 3:
+                store.delete(p);
+                model.removeWhere((key, _) => isAtOrUnder(key, p));
+                ops.add('$i.delete($p)');
+              case 4:
+                store.delete(p, recursive: false);
+                model.removeWhere((key, _) => key == p || parentPath(key) == p);
+                ops.add('$i.delete($p, recursive: false)');
+              case 5:
+                store.graft(stores[1 - i], p);
+                moveModel(models[1 - i], model, p);
+                ops.add('$i.graft($p)');
+              case 6:
+                store.graft(stores[1 - i]);
+                moveModel(models[1 - i], model, '');
+                ops.add('$i.graft()');
+              default:
+                store.clear();
+                model.clear();
+                ops.add('$i.clear()');
+            }
+
+            final reason = 'seed=$seed ops=$ops';
+            for (var j = 0; j < stores.length; j++) {
+              final store = stores[j];
+              final model = models[j];
+              for (final q in [...under, p, ...pathGrid, ...model.keys]) {
+                expect(store.get(q), model[q], reason: '$reason $j.get($q)');
+                final hasPath = model.containsKey(q) ||
+                    model.keys.any((k) => k.startsWith('$q$pathDelimiter'));
+                expect(store.hasPath(q), hasPath,
+                    reason: '$reason $j.hasPath($q)');
+              }
+              for (final q in ['', p, ...pathGrid]) {
+                final visited = <int>[];
+                store.forEachValue(q, visited.add);
+                final expected = [
+                  for (final entry in model.entries)
+                    if (isAtOrUnder(entry.key, q)) entry.value,
+                ];
+                expect(visited..sort(), expected..sort(),
+                    reason: '$reason $j.forEachValue($q)');
+              }
+              expect(store.isEmpty, model.isEmpty,
+                  reason: '$reason $j.isEmpty');
+            }
           }
         }
       });

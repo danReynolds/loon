@@ -8,6 +8,7 @@
 * Remove deleted documents from the dependency graph eagerly, including documents in nested subcollections.
 * Treat `Document.rebroadcast()` as a touch without persisting data; rebroadcasting a missing document does nothing.
 * Compare observable and plain document handles by path, while tracking active observers by identity.
+* Fix a data store keeping empty entries after documents move out of it, such as when their persistence key changes, which kept an emptied data store from being deleted.
 * Add maintainer benchmarks that compare store and manager performance across versions. They are not published with the package.
 * [Breaking] Remove `PathRefStore` and `ObservableDocument.inspect()`, remove `deps` and `docDeps` from `ObservableQuery.inspect()`, and key its `docSnaps` by document ID. Dependency state is available through `Document.dependencies()` and `Document.dependents()`.
 * [Breaking] Change dependency entries in `Loon.inspect()` to objects whose `toJson()` produces `{doc, dependencies}` using document paths.

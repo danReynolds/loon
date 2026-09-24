@@ -52,11 +52,9 @@ class ValueStore<T> extends _BaseValueStore<T> {
       final key = entry.key;
 
       if (key == _BaseValueStore._values) {
-        if (node.containsKey(_BaseValueStore._values)) {
-          node[_BaseValueStore._values] = {
-            ...(node[_BaseValueStore._values] as Map),
-            ...entry.value,
-          };
+        // Merge into the existing values in place, keeping their Map<String, T> type.
+        if (node[_BaseValueStore._values] case final Map values) {
+          values.addAll(entry.value);
         } else {
           node[_BaseValueStore._values] = entry.value;
         }
@@ -189,17 +187,13 @@ class ValueStore<T> extends _BaseValueStore<T> {
 
       final Map childNode = node[segment] ??= {};
 
+      // Prune the other store's child once the graft has emptied it.
       if (_graft(childNode, otherChildNode, path,
           end + _BaseValueStore.delimiter.length)) {
-        if (otherNode.length == 1) {
-          if (start == 0) {
-            otherNode.remove(segment);
-          }
-          return true;
-        }
+        otherNode.remove(segment);
       }
 
-      return false;
+      return otherNode.isEmpty;
     }
 
     if (otherNode.containsKey(_BaseValueStore._values)) {
@@ -208,7 +202,7 @@ class ValueStore<T> extends _BaseValueStore<T> {
       if (otherValues.containsKey(segment)) {
         final value = otherValues.remove(segment);
 
-        final values = node[_BaseValueStore._values] ??= {};
+        final values = node[_BaseValueStore._values] ??= <String, T>{};
         values[segment] = value;
       }
 
@@ -241,7 +235,8 @@ class ValueStore<T> extends _BaseValueStore<T> {
       final otherNode = other._store;
       other.clear();
       _mergeNode(_store, otherNode);
-    } else {
+    } else if (other.hasPath(path)) {
+      // Grafting a path the other store doesn't have would leave empty nodes behind.
       other._forgetLastParent();
       _graft(_store, other._store, path, 0);
     }

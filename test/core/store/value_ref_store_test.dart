@@ -558,21 +558,31 @@ void main() {
             }
 
             for (var step = 0; step < 50; step++) {
-              if (r.nextInt(3) != 0) {
-                final p = randomPath(r);
+              final write = r.nextInt(3) != 0;
+              final p = randomPath(r);
+              if (write) {
                 // A small value space produces many shared refs.
                 final v = pathAlphabet[r.nextInt(pathAlphabet.length)];
                 store.write(p, v);
                 model[p] = v;
                 ops.add('write($p,$v)');
               } else {
-                final p = randomPath(r);
+                // Resolve a path under the deleted one first, so a stale last parent would be
+                // read back below.
+                store.get('$p${pathDelimiter}a');
                 store.delete(p);
                 model.removeWhere((k, _) => isAtOrUnder(k, p));
                 ops.add('delete($p)');
               }
 
               final reason = 'seed=$seed ops=$ops';
+              for (final q in [
+                for (final segment in pathAlphabet) '$p$pathDelimiter$segment',
+                ...pathGrid,
+                ...model.keys,
+              ]) {
+                expect(store.get(q), model[q], reason: '$reason get($q)');
+              }
               for (final q in ['', ...pathGrid]) {
                 final expected = refsUnder(q);
                 final actual = store.getRefs(q) ?? const <String, int>{};
