@@ -1,14 +1,14 @@
-## 5.7.0
+## 6.0.0
 
 * Re-evaluate documents touched by a dependency change or `Document.rebroadcast()` in queries the way modified documents are, so a touched document can enter, leave or move within a query's results. Previously a query only re-emitted touched documents that were already in its results.
 * Touch the dependents of every document under a deleted document or collection, including documents in nested subcollections.
 * Remove deleted documents from the dependency graph eagerly, including documents in nested subcollections.
 * Snapshot builder-owned dependency sets so reusing a mutable set cannot leave stale reverse dependencies.
-* Store dependencies only for documents that have some, so `Document.dependencies()` returns `null` when the dependencies builder returns an empty set.
 * Make rebroadcasting a missing document do nothing.
-* Compare observable and plain document handles by path, while tracking active observers by identity.
 * Speed up the value stores' reads, writes and deletes, and reduce document allocation and path lookup overhead.
 * Fix a data store keeping empty entries after documents move out of it, such as when their persistence key changes, which kept an emptied data store from being deleted.
+* [Breaking] Compare observable documents by path like plain documents, so an `ObservableDocument` equals other handles to the same document. Active observers are still tracked by identity.
+* [Breaking] Store dependencies only for documents that have some, so `Document.dependencies()` returns `null` instead of an empty set when the dependencies builder returns one.
 * [Breaking] Remove `PathRefStore` and `ObservableDocument.inspect()`, remove `deps` and `docDeps` from `ObservableQuery.inspect()`, and key its `docSnaps` by document ID. Dependency state is available through `Document.dependencies()` and `Document.dependents()`.
 * [Breaking] In `Loon.inspect()`, return dependency entries as objects whose `toJson()` produces `{doc, dependencies}` using document paths, return `dependentsStore` as a path tree, and remove `dependencyCache`.
 * [Breaking] Stop exporting `ValueStore` and `ValueRefStore`, which are internal to Loon.

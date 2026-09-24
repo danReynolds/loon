@@ -4,7 +4,7 @@ Maintainer tooling for measuring Loon's performance. None of it is published wit
 
 | Tool | Measures | Runs in |
 | --- | --- | --- |
-| [`value_store/run_core.dart`](value_store/run_core.dart) | The value store built from any git ref or directory, and the dependency and broadcast managers from 5.7.0 on | Dart JIT and native AOT |
+| [`value_store/run_core.dart`](value_store/run_core.dart) | The value store built from any git ref or directory, and the dependency and broadcast managers from 6.0.0 on | Dart JIT and native AOT |
 | [`loon_benchmark.dart`](loon_benchmark.dart) | The whole library through its public API | `flutter test` (JIT) |
 
 ## Compare versions
