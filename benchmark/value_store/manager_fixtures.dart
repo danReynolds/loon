@@ -1,6 +1,6 @@
 // Only used by run_core.dart's manager_core isolation experiment. These handles
 // reproduce the fields, equality and lazy path/hash used by the hot algorithms;
-// they omit persistence, data storage, snapshots reads and real observers.
+// they omit persistence, data storage, snapshot reads and real observers.
 // Correctness still requires tests against the actual Loon library.
 const managerFixtures = r'''
 

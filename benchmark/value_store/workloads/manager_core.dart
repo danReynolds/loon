@@ -18,6 +18,7 @@ void profileManagerCore() {
     final samples = <int>[];
     for (final record in samplePhases()) {
       prepare();
+      settleHeap();
       final watch = Stopwatch()..start();
       action();
       watch.stop();
@@ -123,13 +124,16 @@ void profileManagerCore() {
         broadcasts.writeDocument(source, BroadcastEvents.modified);
       }, () {
         return broadcasts.eventStore.get(source.path) == BroadcastEvents.modified &&
-            docs.every((doc) => broadcasts.eventStore.get(doc.path) == BroadcastEvents.touched) &&
-            broadcasts.observerValueStore.isEmpty;
+            docs.every((doc) =>
+                broadcasts.eventStore.get(doc.path) == BroadcastEvents.touched &&
+                // Queries on a touched document's collection must re-evaluate.
+                broadcasts.observerValueStore.get('${doc.parent}__observer') == null);
       }, prepare: () {
         broadcasts.clear(broadcast: false);
         for (final doc in docs) {
-          broadcasts.observerValueStore.write(doc.path, 1);
-          broadcasts.observerValueStore.write(doc.parent, 1);
+          // Observers key their values by an ID under the document or collection they observe.
+          broadcasts.observerValueStore.write('${doc.path}__observer', 1);
+          broadcasts.observerValueStore.write('${doc.parent}__observer', 1);
           if (populated) {
             // Existing siblings keep maps available without marking dependents visited.
             broadcasts.eventStore.write('${doc.parent}__existing', BroadcastEvents.added);

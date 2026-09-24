@@ -4,7 +4,7 @@ Maintainer tooling for measuring Loon's performance. None of it is published wit
 
 | Tool | Measures | Runs in |
 | --- | --- | --- |
-| [`value_store/run_core.dart`](value_store/run_core.dart) | The value store, and the dependency and broadcast managers, built from any git ref or directory | Dart JIT and native AOT |
+| [`value_store/run_core.dart`](value_store/run_core.dart) | The value store built from any git ref or directory, and the dependency and broadcast managers from 5.7.0 on | Dart JIT and native AOT |
 | [`loon_benchmark.dart`](loon_benchmark.dart) | The whole library through its public API | `flutter test` (JIT) |
 
 ## Compare versions
@@ -22,7 +22,7 @@ dart run benchmark/value_store/run_core.dart --suite manager_core --modes aot
 
 # Chosen sources and operations.
 dart run benchmark/value_store/run_core.dart --suite manager_core \
-  --source before=git:5efc2e6 --source after=dir:. \
+  --source before=git:origin/main --source after=dir:. \
   --filter '^propagation/' --modes aot --passes 3 --trials 9
 ```
 
@@ -32,9 +32,11 @@ dart run benchmark/value_store/run_core.dart --suite manager_core \
   reference-counted stores.
 - `manager_core` covers registering and updating dependencies, deleting 20k documents that share one
   dependency or each have their own, propagation to 20k dependents in one or 5,000 collections,
-  chains whose writes alternate between collections, and writes without dependents. It uses the
-  fixture documents in `manager_fixtures.dart`, so it leaves out persistence, document data and
-  observer delivery.
+  chains whose writes alternate between collections, and writes without dependents. Propagation
+  starts with an observer value under each dependent and its collection, keyed the way observers key
+  them. It uses the fixture documents in `manager_fixtures.dart`, so it leaves out persistence,
+  document data and observer delivery. Each sample starts after `settleHeap()` promotes what its
+  setup allocated, so collections during the sample don't copy it.
 - Results go to `build/value_store_profiles/<timestamp>-core`, or `--out`: `report.md`, raw samples,
   source hashes and command receipts. Result checks run outside the timed interval. `summarize.dart`
   rebuilds a report from a results directory.

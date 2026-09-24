@@ -8,11 +8,11 @@ import 'summarize.dart';
 import 'tool_support.dart';
 import 'workloads/manager_core.dart';
 
-/// Isolates the actual store sources from Flutter startup/build costs. Only their
-/// `part of` directives change; the Json alias matches lib/types.dart. Final
-/// candidates must also pass the full library's tests and Flutter AOT workloads.
-/// The optional manager_core suite substitutes explicit document/observer
-/// fixtures around the unchanged manager methods to screen algorithm changes.
+/// Compiles each candidate's actual store sources into a standalone program, away from Flutter
+/// startup and build costs. Only their `part of` directives change; the Json alias matches
+/// lib/types.dart. Candidates must also pass the full library's tests. The manager_core suite
+/// substitutes explicit document/observer fixtures around the unchanged manager methods to screen
+/// algorithm changes.
 Future<void> main(List<String> arguments) async {
   final parser = ArgParser()
     ..addMultiOption('source',
@@ -186,7 +186,7 @@ Future<void> main(List<String> arguments) async {
         ],
         true
       ),
-      (['lib/src/store/paths.dart', 'lib/utils/store.dart'], false),
+      (['lib/src/store/paths.dart'], false),
       if (suite == 'manager_core') ...[
         (['lib/dependency_manager.dart'], true),
         (['lib/broadcast_manager.dart'], true),
@@ -229,7 +229,7 @@ Future<void> main(List<String> arguments) async {
     File(p.join(root, 'profile_support.dart')).writeAsStringSync(replaceOnce(
         support,
         "import 'package:flutter/foundation.dart';",
-        "const kReleaseMode = bool.fromEnvironment('CORE_AOT');\nconst kProfileMode = false;"));
+        "const kReleaseMode = bool.fromEnvironment('CORE_AOT');"));
     final workload = suite == 'manager_core'
         ? managerWorkload
         : File(p.join(repo, 'benchmark/value_store/workloads/$suite.dart'))
@@ -246,7 +246,7 @@ import 'workload.dart';
 void main() {
   ProfileResults.nativeHost = true;
   $entrypoint();
-  final data = {...ProfileResults.completed.single, 'host': 'dart_store_core', 'exit_code': 0};
+  final data = {...ProfileResults.completed.single, 'exit_code': 0};
   File(Platform.environment['PROFILE_OUTPUT']!).writeAsStringSync(jsonEncode(data));
 }
 ''');
@@ -284,7 +284,6 @@ void main() {
             'PROFILE_OUTPUT': p.join(out, '$label.json'),
             'PROFILE_VARIANT': name,
             'PROFILE_SUITE': suite,
-            'PROFILE_ORDER': pass.isOdd ? 'forward' : 'reverse',
             'PROFILE_WARMUPS': '$warmups',
             'PROFILE_WARMUP_MS': '$warmupMs',
             'PROFILE_TRIALS': '$trials',

@@ -1,7 +1,7 @@
 import 'package:loon/src/store/store.dart';
 import '../profile_support.dart';
 
-/// Store-only workloads shared by the Dart isolation runner and Flutter hosts.
+/// Store-only workloads for the standalone runner and CI's `flutter test` check.
 /// Paths are prepared once; mutation setup and result checks stay outside timing.
 void profileStoreCore() {
   final results = ProfileResults();

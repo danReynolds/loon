@@ -6,8 +6,7 @@ import 'tool_support.dart';
 void summarize(String root) {
   final manifest = readJson(p.join(root, 'manifest.json'));
   if (manifest['schema'] != 2) {
-    throw StateError(
-        'Historical JIT reports are archived; this tool expects schema 2.');
+    throw StateError('Unsupported manifest schema ${manifest['schema']}.');
   }
   final modes = (manifest['modes'] as List).cast<String>();
   final variants = (manifest['variants'] as List).cast<String>();
@@ -31,7 +30,7 @@ void summarize(String root) {
               data['mode'] != mode ||
               data['variant'] != variant ||
               data['suite'] != suite ||
-              data['host'] != (manifest['host'] ?? 'flutter_app') ||
+              data['host'] != manifest['host'] ||
               rows == null ||
               rows.isEmpty) {
             throw StateError('Failed or misclassified result: $path');
@@ -58,32 +57,18 @@ void summarize(String root) {
       }
     }
   }
-  final flutter = manifest['flutter'] as Map?;
-  final standalone = manifest['host'] == 'dart_store_core';
   final lines = <String>[
-    '# Native ValueStore profiling',
+    '# Store and manager benchmarks',
     '',
-    if (standalone)
-      'Dart ${manifest['dart']}; ${manifest['machine']}; ${manifest['os']}.'
-    else
-      'Flutter ${flutter!['frameworkVersion']}; Dart ${flutter['dartSdkVersion']}; '
-          '${manifest['machine']}; ${manifest['os']}.',
+    'Dart ${manifest['dart']}; ${manifest['machine']}; ${manifest['os']}.',
     '',
-    if (standalone)
-      'Isolated actual store sources: JIT = Dart VM with assertions; AOT = dart compile exe. '
-          'This isolates store algorithms, not full Flutter-engine or mobile-device performance.'
-    else
-      'JIT = Flutter debug; AOT = Flutter release; profile = instrumented AOT. '
-          'Separate series from actual Flutter desktop apps; these do not qualify '
-          'iOS/Android performance. Source/build hashes and commands are archived.',
-    if (manifest['headless'] == true)
-      'This series uses headless Flutter engines with no windows or rendered frames. '
-          'Compare candidates within this series, not directly against historical windowed runs.',
+    'Isolated actual store sources: JIT = Dart VM with assertions; AOT = dart compile exe. '
+        'This isolates store algorithms, not full Flutter-engine or mobile-device performance.',
     if (manifest['isolation'] case final String isolation) isolation,
     '',
     'Values are pooled medians in milliseconds, with the range of per-process '
         'medians (not a confidence interval). Setup, compilation and correctness '
-        'checks are outside timed intervals. Process RSS is not retained Dart heap.',
+        'checks are outside timed intervals.',
     '',
     'Validation: ${manifest['validation']}.',
     '',

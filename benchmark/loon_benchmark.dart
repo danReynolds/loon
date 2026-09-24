@@ -87,8 +87,7 @@ void main() {
 
   test('Subscription setup throughput', () async {
     // Each observer creation generates an ID, opens two stream controllers,
-    // registers in the broadcast manager, and computes an initial value. The
-    // ID generator is the part this PR changes.
+    // registers in the broadcast manager, and computes an initial value.
     const n = 20000;
     final col = Loon.collection<int>('sub');
     for (var i = 0; i < n; i++) {

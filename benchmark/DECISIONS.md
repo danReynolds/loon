@@ -1,8 +1,15 @@
 # Performance decisions
 
 The performance decisions behind the value store and the dependency and broadcast managers, newest
-first. Raw samples for the entries up to 2026-09-21 are in git history, for example
-`git show 5efc2e6:benchmark/value_store/results/`.
+first. Raw samples for the entries up to 2026-09-21 are in the history of PR #42. Fetch it with
+`git fetch origin pull/42/head`, then run, for example, `git show 5efc2e6:benchmark/value_store/results/`.
+
+## 2026-09-24: Settle the heap before manager samples
+
+Setup left tens of thousands of young objects that collections during the timed operation copied, so
+builds with the same algorithm differed by up to 24% on the 5,000-collection propagation cases, in
+either direction. Each `manager_core` sample now starts after `settleHeap()` promotes what its setup
+allocated. The same builds then agreed within 3–7%, as they did with a 512 MB young generation.
 
 ## 2026-09-23: Visit deleted dependency entries in place
 
@@ -26,7 +33,7 @@ one collection about 6× slower: 2.7 → 16.2 ms in AOT `manager_core`.
 parent reuse it, and every operation that removes nodes forgets it. `ValueStore.putIfAbsent` records a
 touch in one call. This replaced the manager's own collection-map cache.
 
-AOT, against `7157df1`:
+AOT, against sending touches through `writeDocument`:
 
 - Propagation to 20k dependents: 16.2 → 4.9 ms in one collection, 15.4 → 10.1 ms across 5,000.
 - 20k writes without dependents: 4.4 → 3.8 ms. Store reads and writes under one parent take 40–80%
