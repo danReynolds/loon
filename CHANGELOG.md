@@ -11,7 +11,7 @@
 * [Breaking] Store dependencies only for documents that have some, so `Document.dependencies()` returns `null` instead of an empty set when the dependencies builder returns one.
 * [Breaking] Remove `PathRefStore` and `ObservableDocument.inspect()`, remove `deps` and `docDeps` from `ObservableQuery.inspect()`, and key its `docSnaps` by document ID. Dependency state is available through `Document.dependencies()` and `Document.dependents()`.
 * [Breaking] In `Loon.inspect()`, return dependency entries as objects whose `toJson()` produces `{doc, dependencies}` using document paths, return `dependentsStore` as a path tree, and remove `dependencyCache`.
-* [Breaking] Stop exporting `ValueStore` and `ValueRefStore`, which are internal to Loon.
+* [Breaking] Move the implementation under `lib/src` and export Loon's public API only from `package:loon/loon.dart`, which now also exports `FilePersistor`, `SqlitePersistor`, `IndexedDBPersistor`, `DataStoreEncrypter`, `generateSecureId` and `generateFastId`. Imports of other `package:loon/...` paths need to change to `package:loon/loon.dart`. Internal classes such as `ValueStore`, `ValueRefStore`, `BroadcastManager`, `BroadcastObserver`, `DependencyManager`, `PersistManager` and the persistor operations are no longer exported.
 
 ## 5.6.1
 

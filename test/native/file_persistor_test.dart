@@ -3,10 +3,10 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:encrypt/encrypt.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:loon/loon.dart';
-import 'package:loon/persistor/data_store_encrypter.dart';
-import 'package:loon/persistor/file_persistor/file_persistor.dart';
-import 'package:loon/persistor/file_persistor/file_persistor_worker.dart'
+// The public FilePersistor is a stub on platforms without dart:io, so these tests use the real one.
+import 'package:loon/loon.dart' hide FilePersistor;
+import 'package:loon/src/persistor/file_persistor/file_persistor.dart';
+import 'package:loon/src/persistor/file_persistor/file_persistor_worker.dart'
     show fileRegex;
 
 // ignore: depend_on_referenced_packages

@@ -4,7 +4,6 @@ import 'dart:async';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:loon/loon.dart';
-import 'package:loon/utils/id.dart';
 
 /// Performance harness for Loon's hot paths. Not part of the normal test
 /// suite — run explicitly with:

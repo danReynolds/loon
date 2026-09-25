@@ -168,8 +168,8 @@ Future<void> main(List<String> arguments) async {
       return file.existsSync() ? file.readAsStringSync() : null;
     }
 
-    // Each file is read from the first of its paths that the source has. The stores moved to
-    // lib/src/store, and older versions have no path helpers.
+    // Each file is read from the first of its paths that the source has. The implementation moved
+    // under lib/src in 6.0.0, and older versions have no path helpers.
     for (final (paths, required) in [
       (
         [
@@ -189,9 +189,24 @@ Future<void> main(List<String> arguments) async {
       (['lib/src/store/utils/paths.dart', 'lib/src/store/paths.dart'], false),
       (['lib/src/store/path_cache.dart'], false),
       if (suite == 'manager_core') ...[
-        (['lib/dependency_manager.dart'], true),
-        (['lib/broadcast_manager.dart'], true),
-        (['lib/document_snapshot.dart'], true),
+        (
+          [
+            'lib/src/dependencies/dependency_manager.dart',
+            'lib/dependency_manager.dart'
+          ],
+          true
+        ),
+        (
+          [
+            'lib/src/broadcast/broadcast_manager.dart',
+            'lib/broadcast_manager.dart'
+          ],
+          true
+        ),
+        (
+          ['lib/src/document_snapshot.dart', 'lib/document_snapshot.dart'],
+          true
+        ),
       ],
     ]) {
       String? path;

@@ -306,3 +306,13 @@ The `FileDataStoreManager` then iterates over each resolved `FileDataStore` and 
 
 The documents are then written into the Loon document store on the main isolate and broadcast to observers.
 
+## Code layout
+
+`lib/loon.dart` is the package's public API. It exports the public types from the implementation under `lib/src`, which other
+packages shouldn't import.
+
+- `lib/src/loon.dart` is the core library. Documents, collections, queries and observers are its parts, as are the broadcast
+  and dependency managers in `lib/src/broadcast` and `lib/src/dependencies`.
+- `lib/src/store` holds the path-keyed value stores.
+- `lib/src/persistor` holds persistence, including the file, SQLite and IndexedDB persistors and their platform stubs.
+- `lib/src/widgets` holds the stream builder widgets.
