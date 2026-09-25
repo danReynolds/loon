@@ -11,7 +11,6 @@ class _PathCache {
 
   /// Whether [other] has the same parent as [path]. Their segments before the final one are
   /// identical, so they split the same way up to it.
-  // Inlined into every cached lookup (see benchmark/DECISIONS.md).
   @pragma('vm:prefer-inline')
   bool isMatch(String other) {
     if (identical(other, path)) {

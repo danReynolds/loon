@@ -3,7 +3,6 @@ part of '../store.dart';
 /// Finds the next `__` separator. Specializing the fixed two-character delimiter
 /// avoids the general substring search on every segment of a store path.
 /// Callers advance past both characters to preserve non-overlapping matches.
-// Inlined into every path walk (see benchmark/DECISIONS.md).
 @pragma('vm:prefer-inline')
 int _nextStoreDelimiter(String path, int start) {
   const underscore = 0x5f;
