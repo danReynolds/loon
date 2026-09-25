@@ -1,7 +1,7 @@
 import 'package:encrypt/encrypt.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:loon/loon.dart';
-import 'package:loon/persistor/data_store_encrypter.dart';
+import 'package:loon/src/store/store.dart';
 
 import '../../models/test_persistor.dart';
 import '../../models/test_persistor_completer.dart';

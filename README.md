@@ -245,6 +245,9 @@ UserModel.store.streamChanges().listen((changes) {
       case BroadcastEvents.hydrated:
         print('${changeSnap.id} was hydrated from the persisted data.');
         break;
+      case BroadcastEvents.touched:
+        print('${changeSnap.id} was rebroadcast because state it depends on changed.');
+        break;
     }
   }
 });
@@ -275,10 +278,33 @@ final posts = Loon.collection<PostModel>(
 );
 ```
 
-In this example, whenever a post's associated user is updated, the post will also be rebroadcast to its active listeners.
+In this example, whenever a post's associated user is updated or deleted (including through the deletion of a parent document or
+collection), the post is rebroadcast to its active listeners and re-evaluated by any queries that observe it.
 
 Additionally, whenever a document is updated, it will rebuild its set of dependencies, allowing documents to support dynamic dependencies
 that can change in response to updated document data.
+
+### Rebroadcasting
+
+A document can also be rebroadcast manually. This is useful when a query's filter or sort reads state from outside of the store:
+
+```dart
+final blockedUserIds = <String>{};
+
+final visibleUsers = UserModel.store.where((snap) => !blockedUserIds.contains(snap.id));
+
+void blockUser(String userId) {
+  blockedUserIds.add(userId);
+
+  // Re-evaluates the user in queries like `visibleUsers`.
+  UserModel.store.doc(userId).rebroadcast();
+}
+```
+
+A rebroadcast notifies the document's listeners with a `BroadcastEvents.touched` event and has queries on its collection re-evaluate
+whether it belongs in their results and where it sorts. Query change listeners receive `added` or `removed` instead when the document enters
+or leaves the results. Rebroadcasting doesn't persist the document or rebuild its dependencies, and rebroadcasting a missing document does
+nothing. For state stored in another document, a data dependency rebroadcasts automatically instead.
 
 ## 🪴 Root collection
 
