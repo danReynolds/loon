@@ -53,9 +53,10 @@ propagating to and deleting 20k dependents) and sparse updates.
 flutter test benchmark/loon_benchmark.dart
 ```
 
-It only uses public API, so it runs unchanged on older versions: add a worktree for the ref, copy this
-file into its `benchmark/` directory, and run it there. Timings are JIT and vary between runs, so run
-each version a few times.
+It only uses public API, so it runs on older versions: add a worktree for the ref, copy this file into
+its `benchmark/` directory, and run it there. Before 6.0.0, the ID generators also need
+`import 'package:loon/utils/id.dart';`. Timings are JIT and vary between runs, so run each version a few
+times.
 
 ## CI
 

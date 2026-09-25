@@ -1,8 +1,9 @@
 import 'package:loon/src/json.dart';
 import 'package:loon/src/loon.dart';
 
-/// Stands in for a persistor on platforms that don't support it. Stubs take the same constructor
-/// parameters as the persistors they replace, so code analyzes the same way on every platform.
+/// Stands in for a persistor on platforms that don't support it. The analyzer always resolves
+/// `package:loon/loon.dart`'s persistor exports to these stubs, so they take the same constructor
+/// parameters as the persistors they replace. Other persistor members are internal.
 class StubPersistor extends Persistor {
   StubPersistor({
     super.encrypter,

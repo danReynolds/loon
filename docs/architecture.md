@@ -80,7 +80,7 @@ Loon.collection(
 ```
 
 In this example, each post specifies that it has a dependency on its associated user. This means that when a post's user changes,
-observers of the post re-read it, and queries on its collection re-evaluate whether it matches their filters.
+observers of the post emit it again, and queries on its collection re-evaluate whether it matches their filters.
 A query can therefore add a previously excluded post, remove a previously included post, or refresh an existing result.
 
 If a post is displayed alongside its user's profile picture, then without dependencies the code for the post would need to observe

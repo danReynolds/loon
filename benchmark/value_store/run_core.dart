@@ -10,7 +10,7 @@ import 'workloads/manager_core.dart';
 
 /// Compiles each candidate's actual store sources into a standalone program, away from Flutter
 /// startup and build costs. Only their `part of` directives change; the Json alias matches
-/// lib/types.dart. Candidates must also pass the full library's tests. The manager_core suite
+/// lib/src/json.dart. Candidates must also pass the full library's tests. The manager_core suite
 /// substitutes explicit document/observer fixtures around the unchanged manager methods to screen
 /// algorithm changes.
 Future<void> main(List<String> arguments) async {
