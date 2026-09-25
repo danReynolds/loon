@@ -85,6 +85,8 @@ class ObservableQuery<T> extends Query<T>
 
           final prevSnap = _snapCache[docId];
 
+          // The snapshot may not have been de-serialized yet post hydration, in which case its document must be read in order
+          // to parse it. This only occurs once for its first read.
           final raw = snaps?[docId];
           final snap =
               raw is DocumentSnapshot<T>? ? raw : collection.doc(docId).get();

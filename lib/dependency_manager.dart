@@ -71,11 +71,8 @@ class DependencyManager {
     }
 
     if (deps != null && deps.isNotEmpty) {
-      // Keep the stored dependencies independent of a mutable set owned by the builder.
       _dependencies.write(doc.path, _DependencyEntry(doc, deps.toSet()));
     } else if (prevDeps != null) {
-      // Remove the entry of a document whose dependencies were cleared. Subcollections keep
-      // their own dependency entries.
       _dependencies.delete(doc.path, recursive: false);
     }
   }

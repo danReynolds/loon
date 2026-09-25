@@ -74,14 +74,12 @@ class BroadcastManager {
       return;
     }
 
-    // A touch leaves a dependent's data unchanged, so its document observers keep their cached
-    // values and only its collection's cached query results are cleared. Many dependents may share
-    // a collection, so each collection is only cleared once.
+    // Many dependents may exist under the same collection, in which case it is only necessary to traverse and clear
+    // the value for that collection once, rather than per document.
     final touchedCollections = <String>{};
 
     for (final doc in dependents) {
-      // A touched event doesn't replace a pending event. A dependent with a pending event was
-      // already invalidated and has touched its own dependents, so it's skipped, which ends cycles.
+      // A touched event doesn't replace an existing pending event.
       if (eventStore.putIfAbsent(doc.path, BroadcastEvents.touched)) {
         if (touchedCollections.add(doc.parent)) {
           observerValueStore.delete(doc.parent, recursive: false);

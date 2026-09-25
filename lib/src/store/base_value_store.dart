@@ -271,6 +271,7 @@ abstract class _BaseValueStore<T> {
     });
   }
 
+  /// Iterates over all values under the given path, invoking the [visitor] for each value.
   void forEachValue(
     String path,
     void Function(T value) visitor,
