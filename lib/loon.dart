@@ -7,8 +7,10 @@ import 'package:loon/persistor/data_store_encrypter.dart';
 import 'package:loon/utils/id.dart';
 import 'dart:collection';
 import 'persistor/index.dart';
+import 'src/json.dart';
 import 'src/store/store.dart';
 
+export 'src/json.dart';
 export 'widgets/query_stream_builder.dart';
 export 'widgets/document_stream_builder.dart';
 

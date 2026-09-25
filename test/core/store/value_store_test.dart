@@ -37,6 +37,21 @@ void main() {
       });
     });
 
+    group('putIfAbsent', () {
+      test('Writes only where there is no value, treating null as no value',
+          () {
+        final store = ValueStore<String?>();
+        expect(store.putIfAbsent('users__1', 'Dan'), true);
+        expect(store.putIfAbsent('users__1', 'Sonja'), false);
+        expect(store.get('users__1'), 'Dan');
+
+        store.write('users__2', null);
+        expect(store.hasValue('users__2'), false);
+        expect(store.putIfAbsent('users__2', 'Nik'), true);
+        expect(store.get('users__2'), 'Nik');
+      });
+    });
+
     group('get', () {
       test('Preserves empty segments and nullable values in exact lookups', () {
         final store = ValueStore<int?>();

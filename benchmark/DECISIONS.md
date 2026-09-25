@@ -4,6 +4,15 @@ The performance decisions behind the value store and the dependency and broadcas
 first. Raw samples for the entries up to 2026-09-21 are in the history of PR #42. Fetch it with
 `git fetch origin pull/42/head`, then run, for example, `git show 5efc2e6:benchmark/value_store/results/`.
 
+## 2026-09-25: Keep inlining the store's hot helpers
+
+`_getParent`, `_PathCache.isMatch` and `_nextStoreDelimiter` are marked `@pragma('vm:prefer-inline')`,
+which asks the Dart compiler to inline them into their callers even when its size heuristics
+wouldn't. Inlining `_getParent` also lets each caller skip allocating the record it returns. Without
+the pragmas in AOT, empty-store gets took 46% longer, misses and existence checks 5–8% longer, and
+`manager_core` propagation and writes 5–14% longer, while a second copy with them stayed mostly
+within 5%.
+
 ## 2026-09-24: Hold the parent cache in an immutable class
 
 The store's last-parent cache is a small immutable `_PathCache` holding the path, the index at which

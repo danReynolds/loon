@@ -42,7 +42,7 @@ class ValueStore<T> extends _BaseValueStore<T> {
 
   static const root = _BaseValueStore.root;
 
-  static ValueStore fromJson(Map<String, dynamic> json) {
+  static ValueStore fromJson(Json json) {
     return ValueStore(json);
   }
 
@@ -76,7 +76,8 @@ class ValueStore<T> extends _BaseValueStore<T> {
     return value;
   }
 
-  /// Writes [value] at [path] unless it already has a value, returning whether it was written.
+  /// Writes [value] at [path] unless it already has a value, returning whether it was written. Like
+  /// [get] and [hasValue], it treats a null value as no value.
   bool putIfAbsent(String path, T value) {
     final (parent, key) = _getParent(path, create: true)!;
     final Map<String, T> values =

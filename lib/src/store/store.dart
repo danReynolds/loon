@@ -2,6 +2,8 @@
 /// dependencies. They are internal: `package:loon/loon.dart` does not export them.
 library;
 
+import '../json.dart';
+
 part 'base_value_store.dart';
 part 'value_store.dart';
 part 'value_ref_store.dart';

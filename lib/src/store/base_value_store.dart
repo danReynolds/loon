@@ -24,6 +24,8 @@ abstract class _BaseValueStore<T> {
   ///
   /// Segments are parsed as they are visited rather than split up front, so a lookup allocates
   /// only the segments it reaches and stops at the first missing node.
+  // Inlined into every read and write, which also lets callers skip allocating the returned record
+  // (see benchmark/DECISIONS.md).
   @pragma('vm:prefer-inline')
   (Map, String)? _getParent(String path, {bool create = false}) {
     if (_cache case _PathCache cache when cache.isMatch(path)) {

@@ -1,7 +1,5 @@
 part of 'loon.dart';
 
-typedef Json = Map<String, dynamic>;
-
 typedef FilterFn<T> = bool Function(DocumentSnapshot<T> snap);
 typedef SortFn<T> = int Function(DocumentSnapshot<T> a, DocumentSnapshot<T> b);
 
