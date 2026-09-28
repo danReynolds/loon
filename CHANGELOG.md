@@ -1,6 +1,6 @@
 ## 6.0.0
 
-* [Breaking] Validate document IDs, collection names and reference paths at construction. Names and IDs must be nonempty, contain no `__`, and not end with `_`; paths must alternate collection and document segments. Invalid references throw `ArgumentError`, including through direct constructors and `fromPath`. `doc()` still generates an ID. Use an empty parent for top-level collections; `Collection('root', name)` is no longer an alias. Existing persisted references that violate these rules must be migrated before upgrading.
+* [Breaking] Require nonempty document IDs and collection names containing no `__` and not ending with `_`; paths must alternate collection and document segments. Direct constructors and `fromPath` check these rules with assertions in debug builds; profile and release builds omit the checks. `doc()` still generates an ID. Use an empty parent for top-level collections; `Collection('root', name)` is no longer an alias. Existing persisted references that violate these rules must be migrated before upgrading.
 * Re-evaluate documents touched by a dependency change or `Document.rebroadcast()` in queries the way modified documents are, so a touched document can enter, leave or move within a query's results. Previously a query only re-emitted touched documents that were already in its results.
 * Touch the dependents of every document under a deleted document or collection, including documents in nested subcollections.
 * Remove deleted documents from the dependency graph eagerly, including documents in nested subcollections.

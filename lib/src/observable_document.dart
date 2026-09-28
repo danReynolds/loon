@@ -14,20 +14,6 @@ class ObservableDocument<T> extends Document<T>
     _init(super.get(), multicast: multicast);
   }
 
-  /// Used by [Document.observe] to reuse its validated parent and ID. Direct public construction
-  /// still validates both through [Document]'s public constructor.
-  ObservableDocument._validated(
-    super.parent,
-    super.id, {
-    super.fromJson,
-    super.toJson,
-    super.persistorSettings,
-    super.dependenciesBuilder,
-    required bool multicast,
-  }) : super._validated() {
-    _init(super.get(), multicast: multicast);
-  }
-
   /// On broadcast, the [ObservableDocument] examines the broadcast events that have occurred
   /// since the last broadcast and determines if the document needs to rebroadcast to its listeners.
   ///

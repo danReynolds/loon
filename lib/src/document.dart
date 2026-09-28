@@ -10,34 +10,19 @@ class Document<T> implements StoreReference {
   late final PathPersistorSettings? persistorSettings;
 
   /// Creates a document under a collection [parent] path. The [id] must be
-  /// nonempty, contain no `__`, and not end with `_`. Invalid references throw
-  /// [ArgumentError].
+  /// nonempty, contain no `__`, and not end with `_`. These rules are checked
+  /// with assertions.
   Document(
-    String parent,
-    String id, {
-    FromJson<T>? fromJson,
-    ToJson<T>? toJson,
-    DependenciesBuilder<T>? dependenciesBuilder,
-    PersistorSettings? persistorSettings,
-  }) : this._validated(
-          _validateDocumentParent(parent),
-          _validateDocumentId(id),
-          fromJson: fromJson,
-          toJson: toJson,
-          dependenciesBuilder: dependenciesBuilder,
-          persistorSettings: persistorSettings,
-        );
-
-  /// Reuses a validated parent and ID. [Collection.doc] checks only the new ID instead of
-  /// rescanning the entire collection path; [fromPath] validates its complete input once.
-  Document._validated(
     this.parent,
     this.id, {
     this.fromJson,
     this.toJson,
     this.dependenciesBuilder,
     PersistorSettings? persistorSettings,
-  }) {
+  })  : assert(_isValidCollectionPath(parent),
+            'Document parent must be a valid collection path'),
+        assert(_isValidReferenceSegment(id),
+            'Document ID must be nonempty, contain no "__", and not end with "_"') {
     this.persistorSettings = switch (persistorSettings) {
       PathPersistorSettings _ => persistorSettings,
       // If the persistor settings are not yet associated with a path, then the settings
@@ -55,9 +40,9 @@ class Document<T> implements StoreReference {
     PersistorSettings? persistorSettings,
     DependenciesBuilder<S>? dependenciesBuilder,
   }) {
-    _validateDocumentPath(path);
+    assert(_isValidDocumentPath(path), 'Expected a valid document path');
     final (parent, id) = splitReferencePath(path);
-    return Document<S>._validated(
+    return Document<S>(
       parent,
       id,
       fromJson: fromJson,
@@ -91,9 +76,9 @@ class Document<T> implements StoreReference {
     PersistorSettings? persistorSettings,
     DependenciesBuilder<S>? dependenciesBuilder,
   }) {
-    return Collection<S>._validated(
+    return Collection<S>(
       path,
-      _validateCollectionName(name),
+      name,
       fromJson: fromJson,
       toJson: toJson,
       persistorSettings: persistorSettings ?? this.persistorSettings,
@@ -187,7 +172,7 @@ class Document<T> implements StoreReference {
   ObservableDocument<T> observe({
     bool multicast = false,
   }) {
-    return ObservableDocument<T>._validated(
+    return ObservableDocument<T>(
       parent,
       id,
       fromJson: fromJson,

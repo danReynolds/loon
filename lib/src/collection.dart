@@ -24,33 +24,18 @@ class Collection<T> implements Queryable<T>, StoreReference {
 
   /// Creates a collection at the top level (empty [parent]) or under a document
   /// [parent] path. The [name] must be nonempty, contain no `__`, and not end with
-  /// `_`. Invalid references throw [ArgumentError].
+  /// `_`. These rules are checked with assertions.
   Collection(
-    String parent,
-    String name, {
-    FromJson<T>? fromJson,
-    ToJson<T>? toJson,
-    DependenciesBuilder<T>? dependenciesBuilder,
-    PersistorSettings? persistorSettings,
-  }) : this._validated(
-          _validateCollectionParent(parent),
-          _validateCollectionName(name),
-          fromJson: fromJson,
-          toJson: toJson,
-          dependenciesBuilder: dependenciesBuilder,
-          persistorSettings: persistorSettings,
-        );
-
-  /// Reuses a validated parent and name. Internal factories check only the new segment instead
-  /// of rescanning the entire parent path; [fromPath] validates its complete input once.
-  Collection._validated(
     this.parent,
     this.name, {
     this.fromJson,
     this.toJson,
     this.dependenciesBuilder,
     PersistorSettings? persistorSettings,
-  }) {
+  })  : assert(parent.isEmpty || _isValidDocumentPath(parent),
+            'Collection parent must be empty or a valid document path'),
+        assert(_isValidReferenceSegment(name),
+            'Collection name must be nonempty, contain no "__", and not end with "_"') {
     this.persistorSettings = switch (persistorSettings) {
       PathPersistorSettings _ => persistorSettings,
       // If the persistor settings are not yet associated with a path, then if a value key
@@ -68,10 +53,10 @@ class Collection<T> implements Queryable<T>, StoreReference {
     PersistorSettings? persistorSettings,
     DependenciesBuilder<S>? dependenciesBuilder,
   }) {
-    _validateCollectionPath(path);
+    assert(_isValidCollectionPath(path), 'Expected a valid collection path');
     final (parent, id) = splitReferencePath(path);
 
-    return Collection<S>._validated(
+    return Collection<S>(
       parent,
       id,
       fromJson: fromJson,
@@ -104,10 +89,9 @@ class Collection<T> implements Queryable<T>, StoreReference {
   }
 
   Document<T> doc([String? id]) {
-    // Generated IDs are valid by construction.
-    return Document<T>._validated(
+    return Document<T>(
       path,
-      id == null ? generateSecureId() : _validateDocumentId(id),
+      id ?? generateSecureId(),
       fromJson: fromJson,
       toJson: toJson,
       persistorSettings: persistorSettings,

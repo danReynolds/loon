@@ -22,8 +22,8 @@ void main() {
     Loon.configure(persistor: null);
   });
 
-  group('Reference path validation', () {
-    test('rejects invalid IDs and names through every construction API', () {
+  group('Reference path assertions', () {
+    test('asserts valid IDs and names through every construction API', () {
       final users = Loon.collection<int>('users');
       final user = users.doc('alice');
       for (final segment in [
@@ -47,7 +47,7 @@ void main() {
               ObservableDocument(users.path, segment, multicast: false),
         };
         for (final entry in constructors.entries) {
-          expect(entry.value, throwsArgumentError,
+          expect(entry.value, throwsAssertionError,
               reason: '${entry.key}: "$segment"');
         }
       }
@@ -76,7 +76,7 @@ void main() {
       expect(Document.fromPath<int>(child.path).get()!.data, 99);
     });
 
-    test('direct constructors reject invalid parent paths and hierarchy', () {
+    test('direct constructors assert valid parent paths and hierarchy', () {
       for (final parent in [
         '',
         '__',
@@ -86,10 +86,10 @@ void main() {
         'users__alice',
         'root__settings',
       ]) {
-        expect(() => Document(parent, 'one'), throwsArgumentError,
+        expect(() => Document(parent, 'one'), throwsAssertionError,
             reason: 'document parent: "$parent"');
         expect(() => ObservableDocument(parent, 'one', multicast: false),
-            throwsArgumentError,
+            throwsAssertionError,
             reason: 'observable parent: "$parent"');
       }
       for (final parent in [
@@ -100,7 +100,7 @@ void main() {
         'users____alice',
         'users__alice__posts',
       ]) {
-        expect(() => Collection(parent, 'posts'), throwsArgumentError,
+        expect(() => Collection(parent, 'posts'), throwsAssertionError,
             reason: 'collection parent: "$parent"');
       }
       expect(Collection('', 'users').path, 'users');
@@ -109,7 +109,7 @@ void main() {
           'users__alice__posts__one');
     });
 
-    test('fromPath rejects empty segments and trailing underscores', () {
+    test('fromPath asserts before splitting invalid paths', () {
       for (final path in [
         '',
         '_',
@@ -120,9 +120,9 @@ void main() {
         'users__alice_',
         'users__alice____one',
       ]) {
-        expect(() => Document.fromPath(path), throwsArgumentError,
+        expect(() => Document.fromPath(path), throwsAssertionError,
             reason: 'document: "$path"');
-        expect(() => Collection.fromPath(path), throwsArgumentError,
+        expect(() => Collection.fromPath(path), throwsAssertionError,
             reason: 'collection: "$path"');
       }
     });
@@ -130,7 +130,7 @@ void main() {
     test('fromPath distinguishes collection and document paths', () {
       for (final path in ['users', 'root', 'users__alice__posts']) {
         expect(Collection.fromPath(path).path, path);
-        expect(() => Document.fromPath(path), throwsArgumentError);
+        expect(() => Document.fromPath(path), throwsAssertionError);
       }
       for (final path in [
         'users__alice',
@@ -138,7 +138,7 @@ void main() {
         'users__alice__posts__one',
       ]) {
         expect(Document.fromPath(path).path, path);
-        expect(() => Collection.fromPath(path), throwsArgumentError);
+        expect(() => Collection.fromPath(path), throwsAssertionError);
       }
       expect(Loon.doc('settings').path, 'root__settings');
       expect(Loon.doc('settings').subcollection('items').path,
@@ -147,10 +147,11 @@ void main() {
 
     test('formerly colliding names and IDs fail before writing data', () {
       final users = Loon.collection<int>('users');
-      expect(() => users.doc(''), throwsArgumentError);
-      expect(() => Loon.collection('users__alice'), throwsArgumentError);
-      expect(() => users.doc('alice__posts'), throwsArgumentError);
-      expect(() => Loon.collection('users_').doc('alice'), throwsArgumentError);
+      expect(() => users.doc(''), throwsAssertionError);
+      expect(() => Loon.collection('users__alice'), throwsAssertionError);
+      expect(() => users.doc('alice__posts'), throwsAssertionError);
+      expect(
+          () => Loon.collection('users_').doc('alice'), throwsAssertionError);
 
       final valid = users.doc('_alice')..create(42, broadcast: false);
       expect(valid.path, 'users___alice');
@@ -169,13 +170,14 @@ void main() {
           final parsedCollection = Collection.fromPath(collection.path);
           expect(parsedCollection, collection);
           expect(parsedCollection.hashCode, collection.hashCode);
-          expect(() => Document.fromPath(collection.path), throwsArgumentError);
+          expect(
+              () => Document.fromPath(collection.path), throwsAssertionError);
 
           final doc = collection.doc(name());
           final parsedDoc = Document.fromPath(doc.path);
           expect(parsedDoc, doc);
           expect(parsedDoc.hashCode, doc.hashCode);
-          expect(() => Collection.fromPath(doc.path), throwsArgumentError);
+          expect(() => Collection.fromPath(doc.path), throwsAssertionError);
           collection = doc.subcollection(name());
         }
       }
@@ -189,7 +191,7 @@ void main() {
           Loon.collection<int>('user_profiles').doc('_alice').get()!.data, 42);
     });
 
-    test('hydration rejects invalid persisted reference paths', () async {
+    test('hydration asserts valid persisted reference paths', () async {
       for (final path in [
         'users',
         'users__',
@@ -197,7 +199,7 @@ void main() {
         'users__alice_'
       ]) {
         Loon.configure(persistor: _PathPersistor({path: 42}));
-        await expectLater(Loon.hydrate(), throwsArgumentError, reason: path);
+        await expectLater(Loon.hydrate(), throwsAssertionError, reason: path);
         expect(Loon.inspect()['store'], isEmpty);
       }
     });
