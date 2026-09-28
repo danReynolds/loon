@@ -69,7 +69,7 @@ class Loon {
     _validateDataDeserialization<T>(doc: doc, fromJson: fromJson, data: data);
 
     return writeDocument<T>(
-      Document<T>._(
+      Document<T>._validated(
         doc.parent,
         doc.id,
         fromJson: fromJson,

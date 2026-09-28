@@ -14,8 +14,9 @@ class ObservableDocument<T> extends Document<T>
     _init(super.get(), multicast: multicast);
   }
 
-  /// Observes a document whose parent path and ID are already valid.
-  ObservableDocument._(
+  /// Used by [Document.observe] to reuse its validated parent and ID. Direct public construction
+  /// still validates both through [Document]'s public constructor.
+  ObservableDocument._validated(
     super.parent,
     super.id, {
     super.fromJson,
@@ -23,7 +24,7 @@ class ObservableDocument<T> extends Document<T>
     super.persistorSettings,
     super.dependenciesBuilder,
     required bool multicast,
-  }) : super._() {
+  }) : super._validated() {
     _init(super.get(), multicast: multicast);
   }
 

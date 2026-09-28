@@ -19,17 +19,18 @@ class Document<T> implements StoreReference {
     ToJson<T>? toJson,
     DependenciesBuilder<T>? dependenciesBuilder,
     PersistorSettings? persistorSettings,
-  }) : this._(
-          _checkedPath(parent, 'parent', isDocument: false),
-          _checkedSegment(id, 'id'),
+  }) : this._validated(
+          _validateDocumentParent(parent),
+          _validateDocumentId(id),
           fromJson: fromJson,
           toJson: toJson,
           dependenciesBuilder: dependenciesBuilder,
           persistorSettings: persistorSettings,
         );
 
-  /// Creates a document from a parent path and ID that are already valid.
-  Document._(
+  /// Reuses a validated parent and ID. [Collection.doc] checks only the new ID instead of
+  /// rescanning the entire collection path; [fromPath] validates its complete input once.
+  Document._validated(
     this.parent,
     this.id, {
     this.fromJson,
@@ -54,9 +55,9 @@ class Document<T> implements StoreReference {
     PersistorSettings? persistorSettings,
     DependenciesBuilder<S>? dependenciesBuilder,
   }) {
-    _validateReferencePath(path, 'path', isDocument: true);
+    _validateDocumentPath(path);
     final (parent, id) = splitReferencePath(path);
-    return Document<S>._(
+    return Document<S>._validated(
       parent,
       id,
       fromJson: fromJson,
@@ -90,9 +91,9 @@ class Document<T> implements StoreReference {
     PersistorSettings? persistorSettings,
     DependenciesBuilder<S>? dependenciesBuilder,
   }) {
-    return Collection<S>._(
+    return Collection<S>._validated(
       path,
-      _checkedSegment(name, 'name'),
+      _validateCollectionName(name),
       fromJson: fromJson,
       toJson: toJson,
       persistorSettings: persistorSettings ?? this.persistorSettings,
@@ -186,7 +187,7 @@ class Document<T> implements StoreReference {
   ObservableDocument<T> observe({
     bool multicast = false,
   }) {
-    return ObservableDocument<T>._(
+    return ObservableDocument<T>._validated(
       parent,
       id,
       fromJson: fromJson,

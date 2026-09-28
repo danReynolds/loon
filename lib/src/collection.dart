@@ -32,19 +32,18 @@ class Collection<T> implements Queryable<T>, StoreReference {
     ToJson<T>? toJson,
     DependenciesBuilder<T>? dependenciesBuilder,
     PersistorSettings? persistorSettings,
-  }) : this._(
-          parent.isEmpty
-              ? parent
-              : _checkedPath(parent, 'parent', isDocument: true),
-          _checkedSegment(name, 'name'),
+  }) : this._validated(
+          _validateCollectionParent(parent),
+          _validateCollectionName(name),
           fromJson: fromJson,
           toJson: toJson,
           dependenciesBuilder: dependenciesBuilder,
           persistorSettings: persistorSettings,
         );
 
-  /// Creates a collection from a parent path and name that are already valid.
-  Collection._(
+  /// Reuses a validated parent and name. Internal factories check only the new segment instead
+  /// of rescanning the entire parent path; [fromPath] validates its complete input once.
+  Collection._validated(
     this.parent,
     this.name, {
     this.fromJson,
@@ -69,10 +68,10 @@ class Collection<T> implements Queryable<T>, StoreReference {
     PersistorSettings? persistorSettings,
     DependenciesBuilder<S>? dependenciesBuilder,
   }) {
-    _validateReferencePath(path, 'path', isDocument: false);
+    _validateCollectionPath(path);
     final (parent, id) = splitReferencePath(path);
 
-    return Collection<S>._(
+    return Collection<S>._validated(
       parent,
       id,
       fromJson: fromJson,
@@ -106,9 +105,9 @@ class Collection<T> implements Queryable<T>, StoreReference {
 
   Document<T> doc([String? id]) {
     // Generated IDs are valid by construction.
-    return Document<T>._(
+    return Document<T>._validated(
       path,
-      id == null ? generateSecureId() : _checkedSegment(id, 'id'),
+      id == null ? generateSecureId() : _validateDocumentId(id),
       fromJson: fromJson,
       toJson: toJson,
       persistorSettings: persistorSettings,
