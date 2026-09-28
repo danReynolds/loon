@@ -9,7 +9,27 @@ class Document<T> implements StoreReference {
 
   late final PathPersistorSettings? persistorSettings;
 
+  /// Creates a document under a collection [parent] path. The [id] must be
+  /// nonempty, contain no `__`, and not end with `_`. Invalid references throw
+  /// [ArgumentError].
   Document(
+    String parent,
+    String id, {
+    FromJson<T>? fromJson,
+    ToJson<T>? toJson,
+    DependenciesBuilder<T>? dependenciesBuilder,
+    PersistorSettings? persistorSettings,
+  }) : this._(
+          _checkedPath(parent, 'parent', isDocument: false),
+          _checkedSegment(id, 'id'),
+          fromJson: fromJson,
+          toJson: toJson,
+          dependenciesBuilder: dependenciesBuilder,
+          persistorSettings: persistorSettings,
+        );
+
+  /// Creates a document from a parent path and ID that are already valid.
+  Document._(
     this.parent,
     this.id, {
     this.fromJson,
@@ -34,8 +54,9 @@ class Document<T> implements StoreReference {
     PersistorSettings? persistorSettings,
     DependenciesBuilder<S>? dependenciesBuilder,
   }) {
+    _validateReferencePath(path, 'path', isDocument: true);
     final (parent, id) = splitReferencePath(path);
-    return Document<S>(
+    return Document<S>._(
       parent,
       id,
       fromJson: fromJson,
@@ -60,7 +81,7 @@ class Document<T> implements StoreReference {
   late final int hashCode = Object.hash(parent, id);
 
   @override
-  late final String path = id.isEmpty ? parent : '${parent}__$id';
+  late final String path = '${parent}__$id';
 
   Collection<S> subcollection<S>(
     String name, {
@@ -69,9 +90,9 @@ class Document<T> implements StoreReference {
     PersistorSettings? persistorSettings,
     DependenciesBuilder<S>? dependenciesBuilder,
   }) {
-    return Collection<S>(
+    return Collection<S>._(
       path,
-      name,
+      _checkedSegment(name, 'name'),
       fromJson: fromJson,
       toJson: toJson,
       persistorSettings: persistorSettings ?? this.persistorSettings,
@@ -165,7 +186,7 @@ class Document<T> implements StoreReference {
   ObservableDocument<T> observe({
     bool multicast = false,
   }) {
-    return ObservableDocument<T>(
+    return ObservableDocument<T>._(
       parent,
       id,
       fromJson: fromJson,

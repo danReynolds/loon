@@ -22,7 +22,29 @@ class Collection<T> implements Queryable<T>, StoreReference {
 
   static const root = _RootCollection();
 
+  /// Creates a collection at the top level (empty [parent]) or under a document
+  /// [parent] path. The [name] must be nonempty, contain no `__`, and not end with
+  /// `_`. Invalid references throw [ArgumentError].
   Collection(
+    String parent,
+    String name, {
+    FromJson<T>? fromJson,
+    ToJson<T>? toJson,
+    DependenciesBuilder<T>? dependenciesBuilder,
+    PersistorSettings? persistorSettings,
+  }) : this._(
+          parent.isEmpty
+              ? parent
+              : _checkedPath(parent, 'parent', isDocument: true),
+          _checkedSegment(name, 'name'),
+          fromJson: fromJson,
+          toJson: toJson,
+          dependenciesBuilder: dependenciesBuilder,
+          persistorSettings: persistorSettings,
+        );
+
+  /// Creates a collection from a parent path and name that are already valid.
+  Collection._(
     this.parent,
     this.name, {
     this.fromJson,
@@ -47,9 +69,10 @@ class Collection<T> implements Queryable<T>, StoreReference {
     PersistorSettings? persistorSettings,
     DependenciesBuilder<S>? dependenciesBuilder,
   }) {
+    _validateReferencePath(path, 'path', isDocument: false);
     final (parent, id) = splitReferencePath(path);
 
-    return Collection<S>(
+    return Collection<S>._(
       parent,
       id,
       fromJson: fromJson,
@@ -60,8 +83,7 @@ class Collection<T> implements Queryable<T>, StoreReference {
   }
 
   @override
-  late final String path =
-      parent.isEmpty || parent == _rootKey ? name : '${parent}__$name';
+  late final String path = parent.isEmpty ? name : '${parent}__$name';
 
   @override
   bool operator ==(Object other) {
@@ -83,9 +105,10 @@ class Collection<T> implements Queryable<T>, StoreReference {
   }
 
   Document<T> doc([String? id]) {
-    return Document<T>(
+    // Generated IDs are valid by construction.
+    return Document<T>._(
       path,
-      id ?? generateSecureId(),
+      id == null ? generateSecureId() : _checkedSegment(id, 'id'),
       fromJson: fromJson,
       toJson: toJson,
       persistorSettings: persistorSettings,

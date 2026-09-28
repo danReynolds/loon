@@ -31,12 +31,13 @@ dart run benchmark/value_store/run_core.dart --suite manager_core \
   parent, with UUID-like, long, Unicode and underscore-heavy segments. It also covers
   reference-counted stores.
 - `manager_core` covers registering and updating dependencies, deleting 20k documents that share one
-  dependency or each have their own, propagation to 20k dependents in one or 5,000 collections,
-  chains whose writes alternate between collections, and writes without dependents. Propagation
-  starts with an observer value under each dependent and its collection, keyed the way observers key
-  them. It uses the fixture documents in `manager_fixtures.dart`, so it leaves out persistence,
-  document data and observer delivery. Each sample starts after `settleHeap()` promotes what its
-  setup allocated, so collections during the sample don't copy it.
+  dependency or each have their own, propagation to 20k dependents in one or 5,000 collections from
+  one write of their source or five in one tick, chains whose writes alternate between collections,
+  and writes without dependents. Propagation starts with an observer value under each dependent and
+  its collection, keyed the way observers key them. It uses the fixture documents in
+  `manager_fixtures.dart`, so it leaves out persistence, document data and observer delivery. Each
+  sample starts after `settleHeap()` promotes what its setup allocated, so collections during the
+  sample don't copy it.
 - Results go to `build/value_store_profiles/<timestamp>-core`, or `--out`: `report.md`, raw samples,
   source hashes and command receipts. Result checks run outside the timed interval. `summarize.dart`
   rebuilds a report from a results directory.

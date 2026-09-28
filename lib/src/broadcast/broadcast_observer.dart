@@ -27,6 +27,8 @@ mixin BroadcastObserver<T, S> {
   /// The path being observed in the store.
   String get path;
 
+  static final _broadcastManager = Loon._instance.broadcastManager;
+
   void _init(
     T initialValue, {
     required bool multicast,
@@ -46,7 +48,7 @@ mixin BroadcastObserver<T, S> {
 
     _observerId = "${path}__${generateFastId()}";
 
-    Loon._instance.broadcastManager.addObserver(this, initialValue);
+    _broadcastManager.addObserver(this, initialValue);
   }
 
   void dispose() {
@@ -59,12 +61,11 @@ mixin BroadcastObserver<T, S> {
     _changeController.close();
     _controllerValue = null;
 
-    Loon._instance.broadcastManager.removeObserver(this);
+    _broadcastManager.removeObserver(this);
   }
 
   T add(T updatedValue) {
-    Loon._instance.broadcastManager.observerValueStore
-        .write(_observerId, updatedValue);
+    _broadcastManager.observerValueStore.write(_observerId, updatedValue);
     _controller.add(updatedValue);
     return _controllerValue = updatedValue;
   }
@@ -82,12 +83,11 @@ mixin BroadcastObserver<T, S> {
   bool get isDirty;
 
   T? get _value {
-    return Loon._instance.broadcastManager.observerValueStore.get(_observerId);
+    return _broadcastManager.observerValueStore.get(_observerId);
   }
 
   set _value(T? value) {
-    Loon._instance.broadcastManager.observerValueStore
-        .write(_observerId, value);
+    _broadcastManager.observerValueStore.write(_observerId, value);
   }
 
   void _onBroadcast();

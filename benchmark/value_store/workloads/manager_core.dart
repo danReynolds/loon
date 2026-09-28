@@ -119,9 +119,14 @@ void profileManagerCore() {
         doc: Document<int>(source.parent, source.id,
             dependenciesBuilder: (_) => {docs.first, docs.last}),
         data: 0));
-    for (final populated in [false, true]) {
-      measure('propagation/${collections}_${populated ? 'warm' : 'empty'}', () {
-        broadcasts.writeDocument(source, BroadcastEvents.modified);
+    for (final (populated, writes) in [(false, 1), (true, 1), (false, 5)]) {
+      measure(
+          'propagation/${collections}_${populated ? 'warm' : 'empty'}'
+          '${writes > 1 ? '_x$writes' : ''}', () {
+        // Repeated writes of the source in one tick reach dependents with pending events.
+        for (var i = 0; i < writes; i++) {
+          broadcasts.writeDocument(source, BroadcastEvents.modified);
+        }
       }, () {
         return broadcasts.eventStore.get(source.path) == BroadcastEvents.modified &&
             docs.every((doc) =>

@@ -41,6 +41,8 @@ class BroadcastManager {
 
   bool get _pendingBroadcast => _broadcastTimer != null;
 
+  static final _dependencyManager = Loon._instance.dependencyManager;
+
   void _cancelBroadcast() {
     _broadcastTimer?.cancel();
     _broadcastTimer = null;
@@ -63,29 +65,43 @@ class BroadcastManager {
     _broadcastTimer = null;
   }
 
+  /// Broadcast all dependents of the given reference, marking them as touched.
   void _broadcastDependents(
     StoreReference ref, {
     bool recursive = false,
   }) {
-    final dependents = Loon._instance.dependencyManager
-        .getDependents(ref, recursive: recursive);
-
-    if (dependents == null || dependents.isEmpty) {
+    final dependents =
+        _dependencyManager.getDependents(ref, recursive: recursive);
+    if (dependents == null) {
       return;
     }
 
-    // Many dependents may exist under the same collection, in which case it is only necessary to traverse and clear
-    // the value for that collection once, rather than per document.
-    final touchedCollections = <String>{};
+    final Set<String> collectionPaths = {};
+    final Set<StoreReference> visited = {ref};
 
-    for (final doc in dependents) {
-      // A touched event doesn't replace an existing pending event.
-      if (eventStore.putIfAbsent(doc.path, BroadcastEvents.touched)) {
-        if (touchedCollections.add(doc.parent)) {
-          observerValueStore.delete(doc.parent, recursive: false);
-        }
-        _broadcastDependents(doc);
+    void broadcastDep(Document doc) {
+      collectionPaths.add(doc.parent);
+      eventStore.putIfAbsent(doc.path, BroadcastEvents.touched);
+
+      final deps = _dependencyManager.getDependents(doc);
+      if (deps == null || !visited.add(doc)) {
+        return;
       }
+
+      for (final dep in deps) {
+        broadcastDep(dep);
+      }
+    }
+
+    for (final dep in dependents) {
+      broadcastDep(dep);
+    }
+
+    // The collections of the touched documents have their cached observer values invalidated.
+    // This is only done once per collection, reducing fanout of observer value updates when many documents
+    // in a collection have been touched.
+    for (final path in collectionPaths) {
+      observerValueStore.delete(path, recursive: false);
     }
   }
 
@@ -109,7 +125,7 @@ class BroadcastManager {
   void writeDocument(Document doc, BroadcastEvents event) {
     final path = doc.path;
 
-    // All cached observer values for the document and its collection are invalidated whenever
+    // All cached observer values for the document's collection are invalidated whenever
     // the document is written or rebroadcast.
     observerValueStore.delete(path, recursive: false);
     observerValueStore.delete(doc.parent, recursive: false);
@@ -165,12 +181,14 @@ class BroadcastManager {
 
   void unsubscribe() {
     _cancelBroadcast();
+
     eventStore.clear();
+    observerValueStore.clear();
+
     for (final observer in _observers.toList()) {
       observer.dispose();
     }
     _observers.clear();
-    observerValueStore.clear();
   }
 
   Map inspect() {

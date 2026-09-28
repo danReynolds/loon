@@ -26,53 +26,6 @@ void main() {
       });
 
       group('Reference paths', () {
-        test(
-            'reference factories preserve split semantics, including overlapping separators',
-            () {
-          final random = Random(42);
-          final paths = <String>[
-            '',
-            'a',
-            '__',
-            '___',
-            '____',
-            'a___b',
-            'a____b',
-            '__a',
-            'a__',
-            'a__b__',
-            'users__alice__transactions__1',
-            for (var i = 0; i < 3000; i++)
-              List.generate(random.nextInt(40),
-                  (_) => ['_', '_', 'a', 'b'][random.nextInt(4)]).join(),
-          ];
-          for (final path in paths) {
-            final segments = path.split('__');
-            final id = segments.removeLast();
-            final parent = segments.join('__');
-            final doc = Document.fromPath(path);
-            final collection = Collection.fromPath(path);
-            expect((
-              doc.parent,
-              doc.id,
-              doc.path
-            ), (
-              parent,
-              id,
-              Document(parent, id).path
-            ), reason: path);
-            expect((
-              collection.parent,
-              collection.name,
-              collection.path
-            ), (
-              parent,
-              id,
-              Collection(parent, id).path
-            ), reason: path);
-          }
-        });
-
         test('factory configuration and persistence scope survive path parsing',
             () {
           int fromJson(Json json) => json['value'] as int;
@@ -3713,7 +3666,7 @@ void main() {
         });
 
         test(
-            'Propagation handles unusual segment boundaries, diamonds and cycles',
+            'Propagation handles valid underscore segments, diamonds and cycles',
             () {
           fakeAsync((async) {
             final sink = Document<int>('summaries', 'sink');
@@ -3723,10 +3676,10 @@ void main() {
             final docs = [
               for (final (parent, id) in [
                 ('items', 'a'),
-                ('odd_', 'b'),
-                ('items', 'nested__c'),
-                ('empty_id', ''),
-                ('', 'leading'),
+                ('_odd', 'b'),
+                ('items__parent__nested', 'c'),
+                ('items', 'internal_id'),
+                ('items', '_leading'),
                 ('items', 'z'),
               ])
                 Document<int>(parent, id, dependenciesBuilder: (_) => {source})
