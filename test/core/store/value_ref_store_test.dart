@@ -1,5 +1,9 @@
+import 'dart:math';
+
 import 'package:flutter_test/flutter_test.dart';
-import 'package:loon/loon.dart';
+import 'package:loon/src/store/store.dart';
+
+import '../../store_paths.dart';
 
 void main() {
   group(
@@ -464,6 +468,22 @@ void main() {
               expect(store.inspect(), {});
             },
           );
+
+          test(
+            'Does not return values from a deleted subtree',
+            () {
+              final store = ValueRefStore<String>();
+              store.write('users__1', 'Dan');
+              store.write('users__2__friends__1', 'Nik');
+
+              // Reading resolves the `users__2__friends` node before it is deleted.
+              expect(store.get('users__2__friends__1'), 'Nik');
+
+              store.delete('users__2');
+
+              expect(store.get('users__2__friends__1'), isNull);
+            },
+          );
         },
       );
 
@@ -508,6 +528,72 @@ void main() {
             );
           },
         );
+      });
+
+      group('property', () {
+        // Random write/delete sequences are checked against a flat map used as an
+        // independent oracle for the ref aggregation in each subtree.
+        test(
+            'Aggregates refs matching the values in each subtree across random writes and deletes',
+            () {
+          for (var seed = 0; seed < 50; seed++) {
+            final r = Random(seed);
+            final store = ValueRefStore<String>();
+            final model = <String, String>{};
+            final ops = <String>[];
+
+            // getRefs(path) aggregates values strictly under a node; for the root path it
+            // aggregates every value in the store.
+            Map<String, int> refsUnder(String path) {
+              final counts = <String, int>{};
+              for (final entry in model.entries) {
+                final under = path.isEmpty
+                    ? true
+                    : entry.key.startsWith('$path$pathDelimiter');
+                if (under) {
+                  counts[entry.value] = (counts[entry.value] ?? 0) + 1;
+                }
+              }
+              return counts;
+            }
+
+            for (var step = 0; step < 50; step++) {
+              final write = r.nextInt(3) != 0;
+              final p = randomPath(r);
+              if (write) {
+                // A small value space produces many shared refs.
+                final v = pathAlphabet[r.nextInt(pathAlphabet.length)];
+                store.write(p, v);
+                model[p] = v;
+                ops.add('write($p,$v)');
+              } else {
+                // Resolve a path under the deleted one first, so a stale last parent would be
+                // read back below.
+                store.get('$p${pathDelimiter}a');
+                store.delete(p);
+                model.removeWhere((k, _) => isAtOrUnder(k, p));
+                ops.add('delete($p)');
+              }
+
+              final reason = 'seed=$seed ops=$ops';
+              for (final q in [
+                for (final segment in pathAlphabet) '$p$pathDelimiter$segment',
+                ...pathGrid,
+                ...model.keys,
+              ]) {
+                expect(store.get(q), model[q], reason: '$reason get($q)');
+              }
+              for (final q in ['', ...pathGrid]) {
+                final expected = refsUnder(q);
+                final actual = store.getRefs(q) ?? const <String, int>{};
+                expect(Map<String, int>.from(actual), equals(expected),
+                    reason: '$reason getRefs("$q")');
+                expect(store.extractValues(q), equals(expected.keys.toSet()),
+                    reason: '$reason extractValues("$q")');
+              }
+            }
+          }
+        });
       });
     },
   );

@@ -1,6 +1,6 @@
 import 'package:fake_async/fake_async.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:loon/persistor/lock.dart';
+import 'package:loon/src/persistor/lock.dart';
 
 import '../../utils.dart';
 

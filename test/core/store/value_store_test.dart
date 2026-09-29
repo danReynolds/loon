@@ -1,5 +1,9 @@
+import 'dart:math';
+
 import 'package:flutter_test/flutter_test.dart';
-import 'package:loon/loon.dart';
+import 'package:loon/src/store/store.dart';
+
+import '../../store_paths.dart';
 
 void main() {
   group('ValueStore', () {
@@ -33,7 +37,51 @@ void main() {
       });
     });
 
+    group('putIfAbsent', () {
+      test('Writes only where there is no value, treating null as no value',
+          () {
+        final store = ValueStore<String?>();
+        expect(store.putIfAbsent('users__1', 'Dan'), true);
+        expect(store.putIfAbsent('users__1', 'Sonja'), false);
+        expect(store.get('users__1'), 'Dan');
+
+        store.write('users__2', null);
+        expect(store.hasValue('users__2'), false);
+        expect(store.putIfAbsent('users__2', 'Nik'), true);
+        expect(store.get('users__2'), 'Nik');
+      });
+    });
+
     group('get', () {
+      test('Preserves empty segments and nullable values in exact lookups', () {
+        final store = ValueStore<int?>();
+        final paths = [
+          '',
+          '__',
+          '__leading',
+          'trailing__',
+          'a____b',
+          'a_b',
+          'a___b',
+          'a__b__c'
+        ];
+        for (var i = 0; i < paths.length; i++) {
+          store.write(paths[i], i);
+        }
+        store.write('nullable__value', null);
+        for (var i = 0; i < paths.length; i++) {
+          expect(store.get(paths[i]), i, reason: paths[i]);
+        }
+        expect(store.get('nullable__value'), isNull);
+        expect(store.get('missing__branch__value'), isNull);
+        expect(store.get('a__b__missing'), isNull);
+        store.clear();
+        expect(store.get('a__b__c'), isNull);
+        store.delete('a__b', recursive: false);
+        store.write('a__b__c', 42);
+        expect(store.get('a__b__c'), 42);
+      });
+
       test('Retrieves the value at the given path', () {
         final store = ValueStore<String>();
 
@@ -79,6 +127,20 @@ void main() {
     });
 
     group('hasPath', () {
+      test('Distinguishes null values, child nodes and missing paths', () {
+        final store = ValueStore<int?>();
+        store.write('a___b', null);
+        store.write('a___b__child', 7);
+        store.write('null_only', null);
+        expect(store.hasPath(''), isTrue);
+        expect(store.hasPath('a'), isTrue);
+        expect(store.hasPath('a___b'), isTrue);
+        expect(store.hasPath('a___b__child'), isTrue);
+        expect(store.hasPath('a___b__missing'), isFalse);
+        expect(store.hasPath('null_only'), isFalse);
+        expect(store.hasPath('a__b'), isFalse);
+      });
+
       test('Returns whether a given path exists in the store.', () {
         final store = ValueStore<String>();
         store.write('users__1__friends__1', 'Test');
@@ -94,6 +156,16 @@ void main() {
     });
 
     group('delete', () {
+      test('Root deletion detaches an empty backing map', () {
+        for (final store in [ValueStore<int>(), ValueRefStore<int>()]) {
+          final backing = store.inspect();
+          store.delete(ValueStore.root);
+          backing['__values'] = {'late': 1};
+          expect(store.get('late'), isNull);
+          expect(store.isEmpty, isTrue);
+        }
+      });
+
       group(
         "when recursive",
         () {
@@ -542,10 +614,93 @@ void main() {
             expect(store2.inspect(), {});
           },
         );
+
+        test(
+          'The other store no longer reads or writes the moved data',
+          () {
+            final store = ValueStore<String>();
+            final store2 = ValueStore<String>();
+            store2.write('users__1__messages__1', 'Hello');
+            store2.write('users__2', 'Sonja');
+
+            // Reading resolves the source's `users__1__messages` node before it moves.
+            expect(store2.get('users__1__messages__1'), 'Hello');
+
+            store.graft(store2, 'users__1');
+
+            expect(store2.get('users__1__messages__1'), isNull);
+            store2.write('users__1__messages__2', 'Hi');
+            expect(store.get('users__1__messages__1'), 'Hello');
+            expect(store.get('users__1__messages__2'), isNull);
+          },
+        );
+
+        test(
+          'The other store writes next to the moved data into its own tree',
+          () {
+            final store = ValueStore<String>();
+            final store2 = ValueStore<String>();
+            store2.write('users__1', 'Dan');
+
+            // Moving the only user prunes the other store's emptied `users` node.
+            store.graft(store2, 'users__1');
+            store2.write('users__2', 'Sonja');
+
+            expect(store2.extract(), {'users__2': 'Sonja'});
+            expect(store.extract(), {'users__1': 'Dan'});
+          },
+        );
+
+        test(
+          'Keeps merged values typed and leaves no empty nodes behind',
+          () {
+            final store = ValueStore<String>();
+            final store2 = ValueStore<String>();
+            store.write('users__1', 'Dan');
+            store2.write('users__2', 'Sonja');
+            store2.write('teams__1__members__1', 'Nik');
+            store2.write('teams__2', 'Blue');
+
+            // Merging into existing values keeps them readable as Map<String, T>.
+            store.graft(store2, 'users__2');
+            expect(store.getChildValues('users'), {'1': 'Dan', '2': 'Sonja'});
+            expect(store.extractValues('users'), {'Dan', 'Sonja'});
+
+            // A path the other store doesn't have moves nothing and creates nothing.
+            store.graft(store2, 'teams__3__members');
+            expect(store.hasPath('teams'), isFalse);
+
+            // Emptied branches of the other store are pruned even when their parent has
+            // other children.
+            store.graft(store2, 'teams__1__members');
+            expect(store.get('teams__1__members__1'), 'Nik');
+            expect(store2.hasPath('teams__1'), isFalse);
+            expect(store2.inspect(), {
+              'teams': {
+                '__values': {'2': 'Blue'},
+              },
+            });
+          },
+        );
       },
     );
 
     group('getNearest', () {
+      test('Preserves delimiter boundaries and root fallback', () {
+        for (final path in ['a___b', '__leading', 'trailing__', 'a____b']) {
+          final store = ValueStore<int>();
+          store.write('', 0);
+          store.write(path, 1);
+          store.write('${path}__child', 2);
+          expect(store.getNearest('${path}__child__missing'),
+              ('${path}__child', 2));
+          expect(store.getNearestMatch('${path}__child__missing', 1), path);
+          expect(store.getNearest('absent__child'), ('', 0));
+          expect(store.extractParentPath('${path}__child__missing'),
+              {path: 1, '${path}__child': 2, '': 0});
+        }
+      });
+
       test(
         'With no value, returns the nearest non-null node along the given path.',
         () {
@@ -722,5 +877,197 @@ void main() {
         );
       },
     );
+
+    test(
+        'Extraction preserves order, nulls, equality and independent snapshots',
+        () {
+      final store = ValueStore<String?>();
+      store.write('a___b', null);
+      store.write('a___b__first', 'duplicate');
+      store.write('a___b__second', 'duplicate');
+      store.write('a___b__first__deep', 'nested');
+      final values = store.extractValues('a___b');
+      final entries = store.extract('a___b');
+      expect(values.toList(), [null, 'duplicate', 'nested']);
+      expect(entries.keys.toList(),
+          ['a___b', 'a___b__first', 'a___b__second', 'a___b__first__deep']);
+      store.delete('a___b');
+      expect(values.toList(), [null, 'duplicate', 'nested']);
+      expect(entries.length, 4);
+      values.add('local');
+      entries['local'] = 'local';
+      expect(store.isEmpty, isTrue);
+    });
+
+    group('property', () {
+      // Random write/delete sequences are checked against a flat map used as an
+      // independent oracle for the store's incremental bookkeeping. On failure the seed
+      // and operation log identify the case.
+      test('Matches a reference model across random write and delete sequences',
+          () {
+        for (var seed = 0; seed < 50; seed++) {
+          final r = Random(seed);
+          final store = ValueStore<int>();
+          final model = <String, int>{};
+          final ops = <String>[];
+          var counter = 0;
+
+          for (var step = 0; step < 50; step++) {
+            if (r.nextInt(3) != 0) {
+              final p = randomPath(r);
+              final v = counter++;
+              store.write(p, v);
+              model[p] = v;
+              ops.add('write($p,$v)');
+            } else {
+              final p = randomPath(r);
+              store.delete(p);
+              model.removeWhere((k, _) => isAtOrUnder(k, p));
+              ops.add('delete($p)');
+            }
+
+            final reason = 'seed=$seed ops=$ops';
+            for (final q in {...pathGrid, ...model.keys}) {
+              expect(store.get(q), model[q], reason: '$reason get($q)');
+              expect(store.hasValue(q), model.containsKey(q),
+                  reason: '$reason hasValue($q)');
+              final hasPath = model.containsKey(q) ||
+                  model.keys.any((k) => k.startsWith('$q$pathDelimiter'));
+              expect(store.hasPath(q), hasPath, reason: '$reason hasPath($q)');
+            }
+            for (final q in pathGrid) {
+              final expected = <String, int>{};
+              for (final entry in model.entries) {
+                if (parentPath(entry.key) == q) {
+                  expected[lastSegment(entry.key)] = entry.value;
+                }
+              }
+              final actual = store.getChildValues(q) ?? const <String, int>{};
+              expect(actual, equals(expected),
+                  reason: '$reason getChildValues($q)');
+              final subtree = {
+                for (final entry in model.entries)
+                  if (isAtOrUnder(entry.key, q)) entry.key: entry.value,
+              };
+              expect(store.extract(q), subtree, reason: '$reason extract($q)');
+              expect(store.extractValues(q), subtree.values.toSet(),
+                  reason: '$reason extractValues($q)');
+              final ancestors = model.keys
+                  .where((key) => isAtOrUnder(q, key))
+                  .toList()
+                ..sort((a, b) => a.length.compareTo(b.length));
+              expect(
+                  store.extractParentPath(q),
+                  {
+                    for (final path in ancestors) path: model[path],
+                  },
+                  reason: '$reason extractParentPath($q)');
+              expect(
+                  store.getNearest(q),
+                  ancestors.isEmpty
+                      ? null
+                      : (ancestors.last, model[ancestors.last]),
+                  reason: '$reason getNearest($q)');
+            }
+            expect(store.isEmpty, model.isEmpty, reason: '$reason isEmpty');
+          }
+        }
+      });
+
+      // Every operation that can remove nodes runs right after a read under its target, so a
+      // stale last parent would be read back first. Grafts move values between two stores.
+      test('Reads match reference models across inserts, grafts and clears',
+          () {
+        for (var seed = 0; seed < 100; seed++) {
+          final r = Random(seed);
+          final stores = [ValueStore<int>(), ValueStore<int>()];
+          final models = [<String, int>{}, <String, int>{}];
+          final ops = <String>[];
+          var counter = 0;
+
+          void moveModel(Map<String, int> from, Map<String, int> to, String p) {
+            final moved = {
+              for (final entry in from.entries)
+                if (isAtOrUnder(entry.key, p)) entry.key: entry.value,
+            };
+            to.addAll(moved);
+            from.removeWhere((key, _) => moved.containsKey(key));
+          }
+
+          for (var step = 0; step < 60; step++) {
+            final i = r.nextInt(2);
+            final store = stores[i];
+            final model = models[i];
+            final p = randomPath(r);
+            final under = [
+              for (final segment in pathAlphabet) '$p$pathDelimiter$segment'
+            ];
+            for (final s in stores) {
+              s.get(under.first);
+            }
+
+            switch (r.nextInt(8)) {
+              case 0 || 1:
+                final v = counter++;
+                store.write(p, v);
+                model[p] = v;
+                ops.add('$i.write($p,$v)');
+              case 2:
+                final v = counter++;
+                final expected = !model.containsKey(p);
+                expect(store.putIfAbsent(p, v), expected,
+                    reason: 'seed=$seed ops=$ops putIfAbsent($p)');
+                model.putIfAbsent(p, () => v);
+                ops.add('$i.putIfAbsent($p,$v)');
+              case 3:
+                store.delete(p);
+                model.removeWhere((key, _) => isAtOrUnder(key, p));
+                ops.add('$i.delete($p)');
+              case 4:
+                store.delete(p, recursive: false);
+                model.removeWhere((key, _) => key == p || parentPath(key) == p);
+                ops.add('$i.delete($p, recursive: false)');
+              case 5:
+                store.graft(stores[1 - i], p);
+                moveModel(models[1 - i], model, p);
+                ops.add('$i.graft($p)');
+              case 6:
+                store.graft(stores[1 - i]);
+                moveModel(models[1 - i], model, '');
+                ops.add('$i.graft()');
+              default:
+                store.clear();
+                model.clear();
+                ops.add('$i.clear()');
+            }
+
+            final reason = 'seed=$seed ops=$ops';
+            for (var j = 0; j < stores.length; j++) {
+              final store = stores[j];
+              final model = models[j];
+              for (final q in [...under, p, ...pathGrid, ...model.keys]) {
+                expect(store.get(q), model[q], reason: '$reason $j.get($q)');
+                final hasPath = model.containsKey(q) ||
+                    model.keys.any((k) => k.startsWith('$q$pathDelimiter'));
+                expect(store.hasPath(q), hasPath,
+                    reason: '$reason $j.hasPath($q)');
+              }
+              for (final q in ['', p, ...pathGrid]) {
+                final visited = <int>[];
+                store.forEachValue(q, visited.add);
+                final expected = [
+                  for (final entry in model.entries)
+                    if (isAtOrUnder(entry.key, q)) entry.value,
+                ];
+                expect(visited..sort(), expected..sort(),
+                    reason: '$reason $j.forEachValue($q)');
+              }
+              expect(store.isEmpty, model.isEmpty,
+                  reason: '$reason $j.isEmpty');
+            }
+          }
+        }
+      });
+    });
   });
 }

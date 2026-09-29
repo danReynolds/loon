@@ -1,0 +1,330 @@
+/// Loon's core: documents, collections, queries, observers and the managers behind them. It is
+/// internal; `package:loon/loon.dart` exports its public API.
+library;
+
+import 'dart:async';
+import 'dart:collection';
+import 'dart:convert';
+
+import 'package:flutter/foundation.dart' hide Key;
+
+import 'json.dart';
+import 'persistor/data_store_encrypter.dart';
+import 'persistor/index.dart';
+import 'store/store.dart';
+import 'utils/id.dart';
+
+part 'broadcast/broadcast_observer.dart';
+part 'query.dart';
+part 'observable_query.dart';
+part 'collection.dart';
+part 'document.dart';
+part 'observable_document.dart';
+part 'types.dart';
+part 'document_snapshot.dart';
+part 'document_change_snapshot.dart';
+part 'broadcast/broadcast_manager.dart';
+part 'dependencies/dependency_manager.dart';
+part 'transaction_writer.dart';
+part 'persistor/persistor.dart';
+part 'persistor/operations.dart';
+part 'persistor/persist_manager.dart';
+part 'extensions/iterable.dart';
+part 'utils/validation.dart';
+part 'utils/logger.dart';
+part 'utils/exceptions.dart';
+part 'store_reference.dart';
+
+class Loon {
+  static final Loon _instance = Loon._();
+
+  static final logger = Logger('Loon');
+
+  Loon._();
+
+  /// The store of document snapshots indexed by document path.
+  final documentStore = ValueStore<DocumentSnapshot>();
+
+  final broadcastManager = BroadcastManager();
+
+  final dependencyManager = DependencyManager();
+
+  PersistManager? persistManager;
+
+  bool get _isGlobalPersistenceEnabled {
+    return persistManager?.settings.enabled ?? false;
+  }
+
+  // Deserializes a document using its deserializer.
+  DocumentSnapshot<T> parseSnap<T>(
+    DocumentSnapshot snap, {
+    required FromJson<T>? fromJson,
+    required ToJson<T>? toJson,
+    required PersistorSettings? persistorSettings,
+    required DependenciesBuilder<T>? dependenciesBuilder,
+  }) {
+    final doc = snap.doc;
+    final data = snap.data;
+
+    _validateDataDeserialization<T>(doc: doc, fromJson: fromJson, data: data);
+
+    return writeDocument<T>(
+      Document<T>(
+        doc.parent,
+        doc.id,
+        fromJson: fromJson,
+        toJson: toJson,
+        persistorSettings: persistorSettings,
+        dependenciesBuilder: dependenciesBuilder,
+      ),
+      fromJson?.call(snap.data) ?? data as T,
+      event: BroadcastEvents.modified,
+      broadcast: false,
+      persist: false,
+    );
+  }
+
+  bool existsSnap<T>(Document<T> doc) {
+    return documentStore.hasValue(doc.path);
+  }
+
+  DocumentSnapshot<T>? getSnapshot<T>(Document<T> doc) {
+    final snap = documentStore.get(doc.path);
+    if (snap is DocumentSnapshot<T>?) {
+      return snap;
+    }
+
+    return parseSnap(
+      snap,
+      fromJson: doc.fromJson,
+      toJson: doc.toJson,
+      persistorSettings: doc.persistorSettings,
+      dependenciesBuilder: doc.dependenciesBuilder,
+    );
+  }
+
+  List<DocumentSnapshot<T>> getSnapshots<T>(Collection<T> collection) {
+    final snaps = documentStore.getChildValues(collection.path)?.values.map(
+      (snap) {
+        if (snap is DocumentSnapshot<T>) {
+          return snap;
+        }
+
+        return parseSnap(
+          snap,
+          fromJson: collection.fromJson,
+          toJson: collection.toJson,
+          persistorSettings: collection.persistorSettings,
+          dependenciesBuilder: collection.dependenciesBuilder,
+        );
+      },
+    ).toList();
+
+    return snaps ?? [];
+  }
+
+  DocumentSnapshot<T> writeDocument<T>(
+    Document<T> doc,
+    T data, {
+    required BroadcastEvents event,
+    bool broadcast = true,
+    bool persist = true,
+  }) {
+    if (broadcast) {
+      broadcastManager.writeDocument(doc, event);
+    }
+
+    final snap = DocumentSnapshot(doc: doc, data: data);
+    dependencyManager.updateDependencies(snap);
+
+    documentStore.write(doc.path, snap);
+
+    if (persist && doc.isPersistenceEnabled()) {
+      _validateDataSerialization(
+        doc: doc,
+        data: data,
+        toJson: doc.toJson,
+      );
+
+      persistManager?.persist(doc);
+    }
+
+    return snap;
+  }
+
+  List<DocumentSnapshot<T>> replaceCollection<T>(
+    Collection<T> collection,
+    List<DocumentSnapshot<T>> snaps,
+  ) {
+    deleteCollection(collection);
+
+    for (final snap in snaps) {
+      writeDocument(
+        snap.doc,
+        snap.data,
+        event: BroadcastEvents.added,
+      );
+    }
+
+    return snaps;
+  }
+
+  void deleteDocument<T>(Document<T> doc) {
+    if (!documentStore.hasPath(doc.path)) {
+      return;
+    }
+
+    documentStore.delete(doc.path);
+    dependencyManager.deleteDocument(doc);
+    broadcastManager.deleteDocument(doc);
+
+    if (doc.isPersistenceEnabled()) {
+      persistManager?.persist(doc);
+    }
+  }
+
+  void deleteCollection(Collection collection) {
+    final path = collection.path;
+    if (!documentStore.hasPath(path)) {
+      return;
+    }
+
+    documentStore.delete(path);
+    dependencyManager.deleteCollection(collection);
+    broadcastManager.deleteCollection(collection);
+    persistManager?.clear(collection);
+  }
+
+  /// Clears all data from the store.
+  Future<void> _clearAll({
+    bool broadcast = true,
+  }) async {
+    // Clear the store.
+    documentStore.clear();
+
+    // Clear any documents scheduled for broadcast, as whatever events happened prior to the clear are now irrelevant.
+    broadcastManager.clear(broadcast: broadcast);
+
+    dependencyManager.clear();
+
+    await persistManager?.clearAll();
+  }
+
+  static void configure({
+    Persistor? persistor,
+    bool enableLogging = false,
+  }) {
+    logger.enabled = enableLogging;
+
+    if (persistor != null) {
+      _instance.persistManager = PersistManager(persistor: persistor);
+    } else {
+      _instance.persistManager = null;
+    }
+  }
+
+  /// Hydrates persisted data from the store using the persistor specified in [Loon.configure].
+  /// If no arguments are provided, then the entire store is hydrated by default. If specific
+  /// [StoreReference] documents and collections are provided, then only data in the store under those
+  /// references are hydrated.
+  static Future<void> hydrate([List<StoreReference>? refs]) async {
+    if (_instance.persistManager == null) {
+      logger.log('Hydration skipped - persistence not enabled');
+      return;
+    }
+    try {
+      final data = await _instance.persistManager!.hydrate(refs);
+
+      for (final entry in data.entries) {
+        final docPath = entry.key;
+        final data = entry.value;
+
+        if (!_instance.documentStore.hasValue(docPath)) {
+          _instance.writeDocument(
+            Document.fromPath(docPath),
+            data,
+            event: BroadcastEvents.hydrated,
+            persist: false,
+          );
+        }
+      }
+    } catch (e) {
+      logger.log('Error hydrating');
+      rethrow;
+    }
+  }
+
+  static Document<T> doc<T>(
+    String id, {
+    FromJson<T>? fromJson,
+    ToJson<T>? toJson,
+    PersistorSettings? persistorSettings,
+  }) {
+    return collection<T>(
+      _rootKey,
+      fromJson: fromJson,
+      toJson: toJson,
+      persistorSettings: persistorSettings,
+    ).doc(id);
+  }
+
+  static Collection<T> collection<T>(
+    String name, {
+    FromJson<T>? fromJson,
+    ToJson<T>? toJson,
+    PersistorSettings? persistorSettings,
+    DependenciesBuilder<T>? dependenciesBuilder,
+  }) {
+    return Collection<T>(
+      '',
+      name,
+      fromJson: fromJson,
+      toJson: toJson,
+      persistorSettings: persistorSettings,
+      dependenciesBuilder: dependenciesBuilder,
+    );
+  }
+
+  static Future<void> clearAll({
+    bool broadcast = true,
+  }) {
+    return Loon._instance._clearAll(broadcast: broadcast);
+  }
+
+  /// Returns a Map of all of the data and metadata of the store for debugging and inspection purposes.
+  static Json inspect() {
+    return {
+      "store": _instance.documentStore.inspect(),
+      "broadcastStore": _instance.broadcastManager.inspect(),
+      ..._instance.dependencyManager.inspect(),
+    };
+  }
+
+  /// Unsubscribes all active observers of the store, disposing their stream resources.
+  static void unsubscribe() {
+    _instance.broadcastManager.unsubscribe();
+  }
+
+  static PersistorSettings? get persistorSettings {
+    return _instance.persistManager?.settings;
+  }
+
+  static Persistor? get persistor {
+    return _instance.persistManager?.persistor;
+  }
+
+  /// Provides a [TransactionWriter] for committing a set of document changes together and automatically
+  /// rolling them all back to their value before the transaction if it fails.
+  static Future<T> transaction<T>(
+    Future<T> Function(TransactionWriter writer) writeFn,
+  ) async {
+    final writer = TransactionWriter();
+    try {
+      final result = await writeFn(writer);
+      return result;
+    } catch (e) {
+      writer.rollback();
+      rethrow;
+    }
+  }
+}

@@ -1,6 +1,6 @@
 import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:loon/persistor/sqlite_persistor/sqlite_persistor.dart';
+import 'package:loon/src/persistor/sqlite_persistor/sqlite_persistor.dart';
 import '../core/persistor/persistor_test_runner.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
