@@ -30,7 +30,8 @@ dart run benchmark/value_store/run_core.dart --suite manager_core \
   writes, overwrites, deletes and extraction. Paths are shallow, deep, or each under a different
   parent, with UUID-like, long, Unicode and underscore-heavy segments. It also covers
   reference-counted stores.
-- `manager_core` covers registering and updating dependencies, deleting 20k documents that share one
+- `manager_core` covers registering shared dependencies and distinct dependencies under shared or
+  scattered parents, updating dependencies, deleting 20k documents that share one
   dependency or each have their own, propagation to 20k dependents in one or 5,000 collections from
   one write of their source or five in one tick, chains whose writes alternate between collections,
   and writes without dependents. Propagation starts with an observer value under each dependent and

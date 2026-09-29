@@ -4,6 +4,43 @@ The performance decisions behind the value store and the dependency and broadcas
 first. Raw samples for the entries up to 2026-09-21 are in the history of PR #42. Fetch it with
 `git fetch origin pull/42/head`, then run, for example, `git show 5efc2e6:benchmark/value_store/results/`.
 
+## 2026-09-29: Initialize missing values through `get(ifEmpty:)`
+
+`get(path, ifEmpty: initializer)` replaces the separate get/write pairs in dependency registration
+and persistence partition creation. Plain reads remain non-mutating. `ValueStore` reuses an existing
+parent on a missing value; if the parent is absent or the callback changes the cached parent, it uses
+the normal write path. The callback runs before any new nodes are created, so a failed initializer
+does not leave partial branches behind. `ValueRefStore` initializes through its normal write to
+maintain reference counts.
+
+Local macOS arm64 AOT comparisons against `70736b9`, with an unchanged control, used three alternating
+passes, nine measured trials and three warmups (at least 200 ms). For 20k registrations, pooled medians
+in milliseconds were:
+
+| Dependencies | Before | With initializer | Unchanged control |
+| --- | ---: | ---: | ---: |
+| One shared dependency | 8.623 | 8.783 | 8.931 |
+| Eight shared dependencies | 32.328 | 35.366 | 33.259 |
+| Distinct dependencies under one parent | 13.184 | 12.191 | 13.717 |
+| Distinct dependencies under scattered parents | 24.710 | 22.628 | 24.736 |
+
+Ordinary read medians moved by -2% to +4%. Process ranges overlapped substantially and host load was
+high (14–17), so these results do not establish a general speedup. Keep the simpler call sites and
+the bounded parent reuse without making a broader performance claim. The manager fixtures exclude
+document data, persistence and observer delivery.
+
+Reproduce with the current harness, which adds the distinct-dependency workloads:
+
+```sh
+dart run benchmark/value_store/run_core.dart --suite manager_core \
+  --source before=git:70736b9 --source after=dir:. --source control=git:70736b9 \
+  --filter '^dependencies/initial' --modes aot --passes 3 --trials 9 --warmups 3
+dart run benchmark/value_store/run_core.dart --suite store_core \
+  --source before=git:70736b9 --source after=dir:. --source control=git:70736b9 \
+  --filter '^(empty/get|shallow/get.*|deep/get.*|path_shape/uuid/get)$' \
+  --modes aot --passes 3 --trials 9 --warmups 3
+```
+
 ## 2026-09-25: Keep inlining the store's hot helpers
 
 `_getParent`, `_PathCache.isMatch` and `_nextStoreDelimiter` are marked `@pragma('vm:prefer-inline')`,

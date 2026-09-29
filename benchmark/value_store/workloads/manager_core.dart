@@ -78,6 +78,27 @@ void profileManagerCore() {
     }
   }
 
+  for (final scattered in [false, true]) {
+    final initial = [
+      for (var i = 0; i < n; i++)
+        DocumentSnapshot<Set<Document>>(
+          doc: Document<Set<Document>>('records', '$i',
+              dependenciesBuilder: (snap) => snap.data),
+          data: {
+            Document<int>(scattered ? 'orgs__${i}__sources' : 'sources', '$i'),
+          },
+        ),
+    ];
+    measure('dependencies/initial_distinct_${scattered ? 'scattered' : 'siblings'}', () {
+      for (final snap in initial) {
+        manager.updateDependencies(snap);
+      }
+    }, () => initial.every((snap) =>
+        setEquals(manager.getDependents(snap.data.single), {snap.doc}) &&
+        setEquals(manager.getDependencies(snap.doc), snap.data)),
+        prepare: manager.clear, operations: n);
+  }
+
   // Deleting a collection unlinks each deleted document from its dependencies' reverse indexes.
   final deletedSources = [
     for (var i = 0; i < n; i++) Document<int>('sources', '$i')
