@@ -60,6 +60,10 @@ On broadcast, each broadcast observer checks if it is affected by any of the cha
 
 If the broadcast observer has changes, then it emits its updated data to its listeners.
 
+Filtering is incremental, but emitting a fresh result list still takes O(n) time for n matching documents.
+Sorted queries also sort the full result list, taking O(n log n), unless a read already recomputed the cached result
+after its last invalidation. Dependency propagation visits the affected dependents before the broadcast.
+
 ### Dependencies
 
 Documents can specify that they depend on other documents and that they should react to changes to those documents.
@@ -76,24 +80,42 @@ Loon.collection(
 ```
 
 In this example, each post specifies that it has a dependency on its associated user. This means that when a post's user changes,
-any observers of the post, such as an `ObservableDocument` for that specific post or an `ObservableQuery` that currently includes
-that post in its list of documents, should also notify its listeners.
+observers of the post emit it again, and queries on its collection re-evaluate whether it matches their filters.
+A query can therefore add a previously excluded post, remove a previously included post, or refresh an existing result.
 
 If a post is displayed alongside its user's profile picture, then without dependencies the code for the post would need to observe
 both the post and user document for changes separately. With dependencies, it only needs to observe the post and the post will react to any changes to the user automatically.
 
-Document dependencies are modeled using a `ValueStore` for indexing a document's dependencies by path, and a flat map of documents to their set of dependents.
+Document dependencies are modeled with two `ValueStore`s: an index of each document's dependencies by the document's path, and a
+reverse index of each document's dependents by the path of the document they depend on.
 
 ```dart
-final dependenciesStore = ValueStore<Set<Document>>();
-final Map<Document, Set<Document>> dependentsStore = {};
+final dependenciesStore = ValueStore<_DependencyEntry>();
+final dependentsStore = ValueStore<Set<Document>>();
 ```
 
-When a document is updated, it iterates through its set of dependents and marks each of them for broadcast with a `BroadcastEvent.touched` event.
+Each private `_DependencyEntry` keeps the dependent document handle and a snapshot of the set returned by its dependencies builder.
+Keeping the handle avoids rebuilding documents from paths when deleting a subtree. The snapshot prevents later mutations to a
+builder-owned set from changing the stored graph. Only non-empty sets are stored: a document whose builder returns `null` or an empty
+set has no entry, and `Document.dependencies()` returns `null` for it. Entries serialize through `toJson()` using document paths, without reading document data.
 
-When a document or collection is deleted, each broadcast observer with dependencies checks to see if the deleted path is present in its dependency tree and if it is, then the broadcast observer notifies its listeners.
+The dependencies index is authoritative: a write with a dependencies builder recalculates its dependencies, updates the index if they
+changed, and deletion clears the index under the deleted path. The
+dependents index is derived from it and is kept exact in two ways. When a document is written, it is added to the dependents of its new
+dependencies and removed from the dependents of the ones it dropped. When a document or collection is deleted, every document under the
+deleted path is removed from the dependents of its dependencies (read from the dependencies index before it is cleared), so that
+deleted documents are never left behind as dependents and a document that is later re-created does not keep its old memberships.
 
-Each broadcast observer has its own cached dependency tree which maintains a ref count of the number of times a path exists in the tree using the `PathRefStore`. When a path's ref count goes to 0, it is removed from the tree. This ref store is used to determine if a deleted path exists in an observer's dependencies.
+When a document is written, each of its dependents is marked for broadcast with a `BroadcastEvents.touched` event.
+
+When a document or collection is deleted, the dependents index is pruned first, and then the remaining dependents of every document
+under the deleted path (including the documents of its subcollections) are marked for broadcast with a `BroadcastEvents.touched` event
+in the same way. Since the documents deleted along with the path were pruned, they are not touched; their observers receive the
+`BroadcastEvents.removed` event for the deleted path instead.
+
+A touched document is re-evaluated by its observers as if it had been modified: an `ObservableDocument` emits it again, and an
+`ObservableQuery` re-runs its filter, adding, refreshing or evicting it from its result set and re-sorting the results when needed. Broadcast observers keep no
+dependency state of their own.
 
 ## Persistence Layer
 
@@ -284,4 +306,13 @@ The `FileDataStoreManager` then iterates over each resolved `FileDataStore` and 
 
 The documents are then written into the Loon document store on the main isolate and broadcast to observers.
 
+## Code layout
 
+`lib/loon.dart` is the package's public API. It exports the public types from the implementation under `lib/src`, which other
+packages shouldn't import.
+
+- `lib/src/loon.dart` is the core library. Documents, collections, queries and observers are its parts, as are the broadcast
+  and dependency managers in `lib/src/broadcast` and `lib/src/dependencies`.
+- `lib/src/store` holds the path-keyed value stores.
+- `lib/src/persistor` holds persistence, including the file, SQLite and IndexedDB persistors and their platform stubs.
+- `lib/src/widgets` holds the stream builder widgets.

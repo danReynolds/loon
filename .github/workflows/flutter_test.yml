@@ -37,5 +37,19 @@ jobs:
     - name: Run Native tests
       run: flutter test test/native --concurrency=1
 
+    # Validate workload results without treating shared-runner timings as a baseline.
+    - name: Check profiling workloads
+      env:
+        PROFILE_WARMUPS: '1'
+        PROFILE_WARMUP_MS: '0'
+        PROFILE_TRIALS: '1'
+      run: flutter test benchmark/value_store --concurrency=1
+
+    - name: Check manager workloads
+      run: >-
+        dart run benchmark/value_store/run_core.dart --suite manager_core
+        --source workspace=dir:. --modes jit --passes 1 --trials 1
+        --warmups 1 --warmup-ms 0 --out build/ci-manager-core
+
     - name: Run Web tests
       run: flutter test test/web --platform chrome --concurrency=1

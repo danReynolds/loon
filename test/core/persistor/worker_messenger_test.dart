@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:loon/loon.dart';
-import 'package:loon/persistor/worker/persistor_worker_messenger.dart';
+import 'package:loon/src/persistor/worker/persistor_worker_messenger.dart';
 
 void main() {
   group('PersistorWorkerMessenger.failAll', () {
