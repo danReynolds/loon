@@ -109,9 +109,11 @@ class Document<T> implements StoreReference {
     bool? broadcast,
     bool persist = true,
   }) {
-    // Read the raw snapshot because an update may change the document's data type.
-    final previous = Loon._instance.documentStore.get(path);
-    if (previous == null) {
+    // The document store is accessed directly here instead of going through the public [Document.get]
+    // API since [get] checks for type compatibility of the existing value with the current document
+    // and the update may be altering the type of the document.
+    final prevSnap = Loon._instance.documentStore.get(path);
+    if (prevSnap == null) {
       throw Exception('Missing document $path');
     }
 
@@ -120,7 +122,7 @@ class Document<T> implements StoreReference {
       data,
       // As an optimization, broadcasting is skipped when updating a document if its
       // data is unchanged.
-      broadcast: broadcast ?? previous.data != data,
+      broadcast: broadcast ?? prevSnap.data != data,
       persist: persist,
       event: BroadcastEvents.modified,
     );

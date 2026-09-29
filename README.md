@@ -97,24 +97,6 @@ UserModel.store.doc('1').create(
 );
 ```
 
-### Names, IDs and paths
-
-Collection names and document IDs must be nonempty, contain no `__`, and not end with `_`.
-Single underscores at the beginning or inside a name are allowed, such as `_alice` and `user_profiles`.
-Calling `collection.doc()` generates an ID; passing `''` fails an assertion in debug builds.
-
-Complete paths use `__` to separate alternating collection and document segments:
-
-```dart
-final user = Document.fromPath('users__alice');
-final posts = Collection.fromPath('users__alice__posts');
-```
-
-A collection path has an odd number of segments; a document path has an even number.
-Direct constructors and `fromPath` check these rules with assertions in debug builds.
-Profile and release builds omit the checks; callers must still provide valid names, IDs and paths.
-The trailing-underscore restriction prevents `users_` + `alice` from producing the same path as `users` + `_alice`.
-
 ## 📚 Reading documents
 
 ```dart
