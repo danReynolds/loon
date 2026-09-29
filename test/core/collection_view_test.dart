@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:fake_async/fake_async.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -11,15 +13,118 @@ class GuideDog extends TestDogModel {
   const GuideDog(super.name);
 }
 
+class CountingAnimalCollection extends Collection<TestAnimalModel> {
+  CountingAnimalCollection() : super('', 'counted');
+  int documentHandles = 0;
+
+  @override
+  Document<TestAnimalModel> doc([String? id]) {
+    documentHandles++;
+    return super.doc(id);
+  }
+}
+
 void main() {
   final animals = TestAnimalModel.store;
-  final dogs = animals.whereType<TestDogModel>();
+  final dogs = animals.view<TestDogModel>();
 
   setUp(() => Loon.configure(persistor: null));
   tearDown(() async {
     Loon.unsubscribe();
     Loon.configure(persistor: null);
     await Loon.clearAll(broadcast: false);
+  });
+
+  test('constructor and view helper give equivalent typed reads', () {
+    animals.doc('dog').create(const TestDogModel('Rex'));
+    animals.doc('cat').create(const TestCatModel('Cat'));
+    final direct = CollectionView<TestDogModel>(animals);
+    final CollectionView<TestDogModel> inferred = CollectionView(animals);
+    expect(direct.get(), dogs.get());
+    expect(inferred.get(), dogs.get());
+    expect(direct.doc('dog').get(), dogs.doc('dog').get());
+    expect(direct.doc('cat').get(), isNull);
+    expect(direct.where((s) => s.data.barkVolume > 0).path, animals.path);
+    expect(CollectionView<String>(animals).get(), isEmpty);
+  });
+
+  test('sorting and cached reads reuse typed projections without stale values',
+      () {
+    final source = CountingAnimalCollection();
+    for (var i = 0; i < 2000; i++) {
+      source
+          .doc('$i')
+          .create(TestDogModel('${(i * 997) % 2000}'), broadcast: false);
+    }
+    final view = source.view<TestDogModel>();
+    final query = view
+        .where((s) => s.data.barkVolume > 0)
+        .sortBy((a, b) => a.data.name.compareTo(b.data.name));
+    source.documentHandles = 0;
+    expect(query.get(), hasLength(2000));
+    // The comparator must not allocate a new document for every comparison.
+    expect(source.documentHandles, 2000);
+    final observed = query.observe();
+    final first = observed.get();
+    // Readers/listeners share this list; a caller must not corrupt the cache.
+    expect(first.clear, throwsUnsupportedError);
+    source.documentHandles = 0;
+    for (var i = 0; i < 20; i++) {
+      expect(observed.get(), same(first));
+    }
+    expect(view.exists(), isTrue);
+    expect(source.documentHandles, 0);
+
+    source.doc('0').update(const TestDogModel('Changed'));
+    source.documentHandles = 0;
+    final updated = observed.get();
+    expect(updated, isNot(same(first)));
+    expect(updated.singleWhere((s) => s.id == '0').data.name, 'Changed');
+    expect(first.singleWhere((s) => s.id == '0').data.name, '0');
+    expect(source.documentHandles, 1);
+    observed.dispose();
+  });
+
+  test('observed views agree with fresh reads through mixed batched operations',
+      () {
+    fakeAsync((async) {
+      final random = Random(41);
+      final query = dogs
+          .where((s) => s.data.barkVolume > 2)
+          .sortBy((a, b) => a.data.name.compareTo(b.data.name));
+      final observed = query.observe();
+      final watched = dogs.doc('0').observe();
+      List<DocumentSnapshotView<TestDogModel>>? emitted;
+      DocumentSnapshotView<TestDogModel>? emittedDoc;
+      observed.stream().listen((s) => emitted = s);
+      watched.stream().listen((s) => emittedDoc = s);
+      flushBroadcasts(async);
+      for (var batch = 0; batch < 80; batch++) {
+        for (var write = 0; write < 3; write++) {
+          final id = '${random.nextInt(8)}';
+          final doc = animals.doc(id);
+          switch (random.nextInt(5)) {
+            case 0:
+              doc.delete();
+              break;
+            case 1:
+              doc.createOrUpdate(TestCatModel('cat$batch'));
+              break;
+            case 2:
+              animals.delete();
+              break;
+            default:
+              doc.createOrUpdate(
+                  TestDogModel(random.nextBool() ? 'a' : 'dog$batch'));
+          }
+          expect(observed.get(), query.get());
+          expect(watched.get(), dogs.doc('0').get());
+        }
+        flushBroadcasts(async);
+        expect(emitted, query.get());
+        expect(emittedDoc, dogs.doc('0').get());
+      }
+    });
   });
 
   test('selects subtype data and exposes read-only document handles', () {
@@ -43,8 +148,8 @@ void main() {
     expect(dogs.doc('cat').get(), isNull);
     expect(dogs.doc('cat').exists(), isFalse);
     expect(dogs.doc('missing').get(), isNull);
-    expect(dogs.whereType<GuideDog>().get().single.id, 'guide');
-    expect(dogs.doc('dog'), isNot(animals.whereType<GuideDog>().doc('dog')));
+    expect(dogs.view<GuideDog>().get().single.id, 'guide');
+    expect(dogs.doc('dog'), isNot(animals.view<GuideDog>().doc('dog')));
 
     animals.doc('dog').delete();
     animals.doc('guide').delete();
@@ -67,7 +172,7 @@ void main() {
 
   test('missing nullable documents remain absent', () {
     final source = Loon.collection<Object?>('nullable');
-    final view = source.whereType<String?>();
+    final view = source.view<String?>();
     expect(view.doc('missing').get(), isNull);
     source.doc('null').create(null);
     expect(view.doc('null').get(), isNotNull);
@@ -226,7 +331,7 @@ void main() {
           .doc('cat')
           .create(const TestCatModel('Cat'), broadcast: false);
       final query = dependentAnimals
-          .whereType<TestDogModel>()
+          .view<TestDogModel>()
           .where((s) => flag.get()!.data && s.data.barkVolume > 0);
       final obs = query.observe();
       final events = <List<String>>[];
@@ -250,7 +355,7 @@ void main() {
       parent.create(1, broadcast: false);
       final source = parent.subcollection<TestAnimalModel>('animals');
       source.doc('dog').create(const TestDogModel('Rex'), broadcast: false);
-      final view = source.whereType<TestDogModel>();
+      final view = source.view<TestDogModel>();
       final changes = <DocumentChangeSnapshotView<TestDogModel>>[];
       view.doc('dog').streamChanges().listen(changes.add);
       final obs = view.observe();
@@ -279,7 +384,7 @@ void main() {
       DocumentSnapshot(doc: source.doc('cat'), data: const TestCatModel('Cat')),
     ]));
     await Loon.hydrate();
-    final view = source.whereType<TestDogModel>();
+    final view = source.view<TestDogModel>();
     expect(view.doc('missing').get(), isNull);
     expect(parsed, 0);
     final obs = view.doc('dog').observe();
@@ -356,7 +461,7 @@ void main() {
 
   testWidgets('existing builders accept views, switch sources, and dispose',
       (tester) async {
-    final cats = animals.whereType<TestCatModel>();
+    final cats = animals.view<TestCatModel>();
     animals.doc('one').create(const TestDogModel('Rex'), broadcast: false);
     Widget screen(DocumentView<TestAnimalModel> doc,
             Queryable<TestAnimalModel> query) =>

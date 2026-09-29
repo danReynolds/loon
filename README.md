@@ -166,7 +166,7 @@ for (final snap in snaps) {
 
 ## Subtype views
 
-A collection can store several subclasses of a common model. Use `whereType<S>()`
+A collection can store several subclasses of a common model. Use `view<S>()`
 to read one subtype through a live, read-only collection view:
 
 ```dart
@@ -175,7 +175,9 @@ final Collection<Animal> animals = Loon.collection<Animal>(
   fromJson: Animal.fromJson,
   toJson: (animal) => animal.toJson(),
 );
-final CollectionView<Dog> dogs = animals.whereType<Dog>();
+final CollectionView<Dog> dogs = animals.view<Dog>();
+// Equivalent explicit construction:
+final sameDogs = CollectionView<Dog>(animals);
 
 final List<DocumentSnapshotView<Dog>> allDogs = dogs.get();
 final DocumentView<Dog> rex = dogs.doc('rex');
@@ -192,6 +194,10 @@ adultDogs.stream().listen((snaps) {
 });
 ```
 
+`collection.view<S>()` statically requires `S` to extend the collection's type.
+The explicit `CollectionView<S>(collection)` constructor filters by runtime data
+type; an unrelated type simply has no matches.
+
 Only matching documents appear in the view, including subclasses of `Dog`.
 Looking up a missing document or a different subtype returns `null`, and
 `exists()` checks membership in the view. A matching snapshot's `data` has type
@@ -199,7 +205,7 @@ Looking up a missing document or a different subtype returns `null`, and
 
 The view and its documents support `get()`, `observe()`, `stream()`, and
 `streamChanges()`. Collection views also support `where()`, `sortBy()`, and
-further narrowing with `whereType<S>()`. When a document changes from a dog to a
+further narrowing with `view<S>()`. When a document changes from a dog to a
 cat through the original collection, the dog view reports a removal and the cat
 view reports an addition, within Loon's normal broadcast batching.
 
@@ -213,6 +219,8 @@ animals.doc(snap.id).update(snap.data.copyWith(age: 4));
 ```
 
 Read-only refers to Loon operations; model objects are shared and are not frozen.
+Observed result lists are unmodifiable because reads and listeners share the
+cached result. Use `List.of(observed.get())` if you need a locally editable list.
 
 The existing stream builders accept views using the same arguments:
 

@@ -90,7 +90,7 @@ class Collection<T> implements Queryable<T>, StoreReference {
 
   /// Selects documents whose data is [S], including subclasses of [S].
   /// The view shares this collection's storage and exposes only read operations.
-  CollectionView<S> whereType<S extends T>() => CollectionView<S>._(this);
+  CollectionView<S> view<S extends T>() => CollectionView<S>(this);
 
   Document<T> doc([String? id]) {
     return Document<T>(

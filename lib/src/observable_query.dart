@@ -83,14 +83,17 @@ class ObservableQuery<T> extends Query<T>
       }
 
       final snaps = _documentStore.getChildValues(path);
-      final events = _eventStore.getChildValues(path);
+      final document = _document;
+      final events = document == null
+          ? _eventStore.getChildValues(path)
+          : switch (_eventStore.get(document.path)) {
+              final event? => {document.id: event},
+              null => null,
+            };
 
       if (events != null) {
         for (final entry in events.entries) {
           final docId = entry.key;
-          if (_document != null && docId != _document!.id) {
-            continue;
-          }
           final event = entry.value;
 
           final prevSnap = _snapCache[docId];

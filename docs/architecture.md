@@ -44,7 +44,7 @@ Loon.collection('users').where((snap) => snap.data.name == 'Luke Skywalker').str
 
 ### Subtype views
 
-`Collection.whereType<S>()` exposes the collection through the read interfaces
+`Collection.view<S>()` exposes the collection through the read interfaces
 `CollectionView<S>`, `DocumentView<S>`, and `QueryView<S>`. Their snapshots retain
 the original data object and a read-only document handle backed by the parent
 collection's codec. The underlying collection remains responsible for writes,
@@ -54,7 +54,10 @@ Views adapt a parent query with a subtype predicate. They reuse its filtering,
 sorting, cache invalidation, and membership-change engine; the adapters only
 project snapshots and streams onto the read interfaces. A document view observes
 a private single-ID query, which reads its document directly and ignores other
-IDs during broadcasts. Projected observer streams retain their identity across
+IDs during broadcasts using a direct event lookup. Weak-key projection caches
+reuse typed snapshots across filters, sorting, and reads, and reuse observed
+unmodifiable result lists until the underlying query invalidates them. They
+require no separate invalidation protocol. Projected observer streams retain their identity across
 widget rebuilds and delegate cancellation and disposal to the underlying observer.
 
 Ordinary document, snapshot, query, and observer types implement the shared read

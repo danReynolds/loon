@@ -34,6 +34,7 @@ class Query<T> extends QueryView<T> {
         doc,
       );
 
+  @override
   String get path {
     return collection.path;
   }
