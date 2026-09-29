@@ -23,7 +23,8 @@ class DependencyManager {
   final _dependents = ValueStore<Set<Document>>();
 
   void _addDependent(Document dependency, Document dependent) {
-    final dependents = _dependents.get(dependency.path, ifEmpty: () => {})!;
+    final dependents = _dependents.get(dependency.path) ??
+        _dependents.write(dependency.path, {});
     dependents.add(dependent);
   }
 

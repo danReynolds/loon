@@ -46,24 +46,6 @@ class ValueStore<T> extends _BaseValueStore<T> {
     return ValueStore(json);
   }
 
-  @override
-  T? get(String path, {T Function()? ifEmpty}) {
-    if (_getParent(path) case (final parent, final key)) {
-      final T? value = parent[_BaseValueStore._values]?[key];
-      if (value != null || ifEmpty == null) return value;
-
-      final cache = _cache;
-      final created = ifEmpty();
-      // A callback may delete or replace nodes. Only reuse the resolved parent if the cache
-      // is still current; otherwise write through the store again.
-      if (!identical(cache, _cache)) return write(path, created);
-      final values = parent[_BaseValueStore._values] ??= <String, T>{};
-      values[key] = created;
-      return created;
-    }
-    return ifEmpty == null ? null : write(path, ifEmpty());
-  }
-
   /// Merges the values and child keys of the given other node into the given node.
   Map _mergeNode(Map node, Map otherNode) {
     for (final entry in otherNode.entries) {

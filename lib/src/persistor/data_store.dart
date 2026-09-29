@@ -136,7 +136,8 @@ class DataStore {
       return;
     }
 
-    final valueStore = _store.get(resolverPath, ifEmpty: () => ValueStore())!;
+    final valueStore =
+        _store.get(resolverPath) ?? _store.write(resolverPath, ValueStore());
     valueStore.graft(otherValueStore, dataPath);
 
     /// If the the value store at [resolverPath] in the other store is now empty after the graft,
@@ -273,8 +274,8 @@ class DualDataStore {
     otherStore._deletePath(resolverPath, path);
 
     store.isDirty = true;
-    final valueStore =
-        store._store.get(resolverPath, ifEmpty: () => ValueStore())!;
+    final valueStore = store._store.get(resolverPath) ??
+        store._store.write(resolverPath, ValueStore());
     valueStore.write(path, value);
   }
 

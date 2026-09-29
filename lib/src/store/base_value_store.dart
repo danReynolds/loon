@@ -148,14 +148,11 @@ abstract class _BaseValueStore<T> {
     return values;
   }
 
-  /// Returns the value at [path]. If it is null and [ifEmpty] is provided, writes and returns
-  /// the initializer's result. The initializer is not called for an existing non-null value.
-  T? get(String path, {T Function()? ifEmpty}) {
+  T? get(String path) {
     if (_getParent(path) case (final parent, final segment)) {
-      final T? value = parent[_values]?[segment];
-      if (value != null) return value;
+      return parent[_values]?[segment];
     }
-    return ifEmpty == null ? null : write(path, ifEmpty());
+    return null;
   }
 
   /// Returns a map of all values that are immediate children of the given path.
