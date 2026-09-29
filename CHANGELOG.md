@@ -1,3 +1,8 @@
+## Unreleased
+
+* Add `Collection.whereType<S>()` and `Query.whereType<S>()` to narrow a collection of a base type to one subtype. The narrowed collection, its documents and queries are ordinary `Collection<S>`, `Document<S>` and `Query<S>` handles that share the source collection's storage and serialization; documents of other types are absent from their reads and streams, and their writes only affect documents of type `S`.
+* Document and query stream builders resubscribe when their handle changes to another type at the same path.
+
 ## 6.0.0
 
 * [Breaking] Require nonempty document IDs and collection names containing no `__` and not ending with `_`; paths must alternate collection and document segments. Direct constructors and `fromPath` check these rules with assertions in debug builds; profile and release builds omit the checks. `doc()` still generates an ID. Use an empty parent for top-level collections; `Collection('root', name)` is no longer an alias. Existing persisted references that violate these rules must be migrated before upgrading.

@@ -86,16 +86,18 @@ class ObservableQuery<T> extends Query<T>
           final prevSnap = _snapCache[docId];
 
           // The snapshot may not have been de-serialized yet post hydration, in which case its document must be read in order
-          // to parse it. This only occurs once for its first read.
+          // to parse it. This only occurs once for its first read. A query on a narrowed collection reads a document of
+          // another type as absent.
           final raw = snaps?[docId];
-          final snap =
-              raw is DocumentSnapshot<T>? ? raw : collection.doc(docId).get();
+          final snap = raw is DocumentSnapshot<T>? && collection._source == null
+              ? raw
+              : collection.doc(docId).get();
 
           switch (event) {
             case BroadcastEvents.added:
             case BroadcastEvents.hydrated:
               // 2.a Add new documents that satisfy the query filter.
-              if (_filter(snap!)) {
+              if (snap != null && _filter(snap)) {
                 _snapCache[snap.id] = snap;
 
                 shouldRebroadcast = true;
@@ -156,7 +158,7 @@ class ObservableQuery<T> extends Query<T>
             case BroadcastEvents.modified:
             case BroadcastEvents.touched:
               // A touched document that does not exist has no value to re-evaluate.
-              if (snap == null) {
+              if (snap == null && prevSnap == null) {
                 break;
               }
 
@@ -164,7 +166,7 @@ class ObservableQuery<T> extends Query<T>
                 shouldRebroadcast = true;
 
                 // 2.c.i Previously satisfied the query filter and still does (updated value must still be rebroadcast on the query).
-                if (_filter(snap)) {
+                if (snap != null && _filter(snap)) {
                   _snapCache[snap.id] = snap;
 
                   if (hasChangeListener) {
@@ -194,7 +196,7 @@ class ObservableQuery<T> extends Query<T>
                 }
               } else {
                 // 2.c.iii Previously did not satisfy the query filter and now does.
-                if (_filter(snap)) {
+                if (_filter(snap!)) {
                   _snapCache[snap.id] = snap;
 
                   shouldRebroadcast = true;

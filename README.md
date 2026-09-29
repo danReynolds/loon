@@ -164,6 +164,44 @@ for (final snap in snaps) {
 }
 ```
 
+## 🧬 Subtypes
+
+A collection can store several subclasses of a common model. `whereType<S>()` narrows it
+to one subtype, like `Iterable.whereType`:
+
+```dart
+final animals = Loon.collection<Animal>(
+  'animals',
+  fromJson: Animal.fromJson,
+  toJson: (animal) => animal.toJson(),
+);
+final Collection<Dog> dogs = animals.whereType<Dog>();
+
+final Dog? rex = dogs.doc('rex').get()?.data; // null if missing or not a dog
+
+dogs
+    .where((snap) => snap.data.age >= 2)
+    .sortBy((a, b) => a.data.name.compareTo(b.data.name))
+    .stream()
+    .listen((snaps) => print(snaps.map((snap) => snap.data.name)));
+
+dogs.doc('rex').modify((snap) => snap.data.copyWith(age: 4));
+```
+
+A narrowed collection is an ordinary `Collection<Dog>` that shares the animals' storage and
+serialization. Documents of other types are absent from its reads, queries and streams: a
+document that changes from a dog to a cat is removed from `dogs` observers and added to
+`cats` observers. Queries narrow the same way with `query.whereType<Dog>()`.
+
+Writes through a narrowed collection use the source collection's serializer and only affect
+documents of its type: `update`, `modify` and `delete` treat a cat as a missing dog, and
+`create` never overwrites an existing document of any type. To change a document's type,
+write it through the source collection:
+
+```dart
+animals.doc('rex').update(Cat(name: 'Rex'));
+```
+
 ## 🔎 Queries
 
 Documents can be filtered using queries:

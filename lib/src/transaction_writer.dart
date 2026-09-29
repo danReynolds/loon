@@ -9,10 +9,13 @@ class TransactionWriter {
     if (_isCanceled) {
       throw 'Cannot write a transaction after a rollback';
     }
+    // A narrowed document is recorded and restored through its source, which can restore
+    // the document whatever its type was before the transaction.
+    final source = doc._source ?? doc;
     // `??=` cannot distinguish a missing key from a stored null, which would
     // overwrite the "doc did not exist" rollback state on subsequent writes.
-    if (!_rollbackIndex.containsKey(doc)) {
-      _rollbackIndex[doc] = doc.get()?.data;
+    if (!_rollbackIndex.containsKey(source)) {
+      _rollbackIndex[source] = source.get()?.data;
     }
   }
 

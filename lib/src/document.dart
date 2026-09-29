@@ -9,6 +9,10 @@ class Document<T> implements StoreReference {
 
   late final PathPersistorSettings? persistorSettings;
 
+  /// The document this handle was narrowed from by [Collection.whereType]. It owns the stored
+  /// snapshot and its serialization; this handle reads the document only while its data is [T].
+  final Document<Object?>? _source;
+
   /// Creates a document under a collection [parent] path. The [id] must be
   /// nonempty, contain no `__`, and not end with `_`. These rules are checked
   /// with assertions.
@@ -19,7 +23,8 @@ class Document<T> implements StoreReference {
     this.toJson,
     this.dependenciesBuilder,
     PersistorSettings? persistorSettings,
-  })  : assert(_isValidCollectionPath(parent),
+  })  : _source = null,
+        assert(_isValidCollectionPath(parent),
             'Document parent must be a valid collection path'),
         assert(_isValidReferenceSegment(id),
             'Document ID must be nonempty, contain no "__", and not end with "_"') {
@@ -31,6 +36,17 @@ class Document<T> implements StoreReference {
         PathPersistorSettings(settings: persistorSettings, ref: this),
       _ => persistorSettings,
     };
+  }
+
+  Document._narrowed(
+    Document<Object?> source, {
+    this.toJson,
+    this.dependenciesBuilder,
+  })  : parent = source.parent,
+        id = source.id,
+        fromJson = null,
+        _source = source._source ?? source {
+    persistorSettings = source.persistorSettings;
   }
 
   static Document<S> fromPath<S>(
@@ -91,6 +107,13 @@ class Document<T> implements StoreReference {
     bool broadcast = true,
     bool persist = true,
   }) {
+    final source = _source;
+    if (source != null) {
+      // The source rejects an ID that is taken by a document of any type.
+      source.create(data, broadcast: broadcast, persist: persist);
+      return DocumentSnapshot(doc: this, data: data);
+    }
+
     if (exists()) {
       throw Exception('Cannot create duplicate document');
     }
@@ -109,6 +132,17 @@ class Document<T> implements StoreReference {
     bool? broadcast,
     bool persist = true,
   }) {
+    final source = _source;
+    if (source != null) {
+      // A narrowed document only updates a document of its type. Changing a document's type is
+      // a write through the collection that owns it.
+      if (!exists()) {
+        throw Exception('Missing document $path');
+      }
+      source.update(data, broadcast: broadcast, persist: persist);
+      return DocumentSnapshot(doc: this, data: data);
+    }
+
     // The document store is accessed directly here instead of going through the public [Document.get]
     // API since [get] checks for type compatibility of the existing value with the current document
     // and the update may be altering the type of the document.
@@ -160,17 +194,46 @@ class Document<T> implements StoreReference {
     );
   }
 
+  /// Deletes the document. A narrowed document is deleted only while its data is [T].
   void delete() {
+    final source = _source;
+    if (source != null) {
+      if (exists()) {
+        source.delete();
+      }
+      return;
+    }
+
     Loon._instance.deleteDocument<T>(this);
   }
 
   DocumentSnapshot<T>? get() {
-    return Loon._instance.getSnapshot(this);
+    final source = _source;
+    if (source == null) {
+      return Loon._instance.getSnapshot(this);
+    }
+
+    final snap = source.get();
+    if (snap == null) {
+      return null;
+    }
+    final data = snap.data;
+    return data is T ? DocumentSnapshot(doc: this, data: data) : null;
   }
 
   ObservableDocument<T> observe({
     bool multicast = false,
   }) {
+    final source = _source;
+    if (source != null) {
+      return ObservableDocument<T>._narrowed(
+        source,
+        toJson: toJson,
+        dependenciesBuilder: dependenciesBuilder,
+        multicast: multicast,
+      );
+    }
+
     return ObservableDocument<T>(
       parent,
       id,
@@ -191,6 +254,10 @@ class Document<T> implements StoreReference {
   }
 
   bool exists() {
+    if (_source != null) {
+      return get() != null;
+    }
+
     return Loon._instance.existsSnap(this);
   }
 
@@ -240,6 +307,14 @@ class Document<T> implements StoreReference {
 
   /// Rebuild the document's dependencies with the [dependenciesBuilder].
   void rebuildDependencies() {
+    final source = _source;
+    if (source != null) {
+      if (exists()) {
+        source.rebuildDependencies();
+      }
+      return;
+    }
+
     final snap = get();
     if (snap == null) {
       return;

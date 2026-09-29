@@ -22,7 +22,9 @@ class QueryStreamBuilderState<T> extends State<QueryStreamBuilder<T>> {
   void didUpdateWidget(covariant QueryStreamBuilder<T> oldWidget) {
     super.didUpdateWidget(oldWidget);
 
-    if (oldWidget.query != widget.query) {
+    // Collections compare by path, so a collection narrowed to another type is also compared by type.
+    if (oldWidget.query != widget.query ||
+        oldWidget.query.runtimeType != widget.query.runtimeType) {
       _observable.dispose();
       _observable = widget.query.toQuery().observe();
     }

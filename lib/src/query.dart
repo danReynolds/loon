@@ -79,6 +79,15 @@ class Query<T> extends Queryable<T> {
     );
   }
 
+  /// Narrows the query to the documents whose data is [S], keeping its filters and sort.
+  Query<S> whereType<S extends T>() {
+    return Query<S>(
+      collection.whereType<S>(),
+      filters: [...filters],
+      sort: sort,
+    );
+  }
+
   @override
   toQuery() {
     return this;

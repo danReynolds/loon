@@ -20,6 +20,10 @@ class Collection<T> implements Queryable<T>, StoreReference {
   /// [DocumentSnapshot] is dependent on.
   final DependenciesBuilder<T>? dependenciesBuilder;
 
+  /// The collection this handle was narrowed from by [whereType]. It owns the stored
+  /// snapshots and their serialization; this handle reads only the documents whose data is [T].
+  final Collection<Object?>? _source;
+
   static const root = _RootCollection();
 
   /// Creates a collection at the top level (empty [parent]) or under a document
@@ -32,7 +36,8 @@ class Collection<T> implements Queryable<T>, StoreReference {
     this.toJson,
     this.dependenciesBuilder,
     PersistorSettings? persistorSettings,
-  })  : assert(parent.isEmpty || _isValidDocumentPath(parent),
+  })  : _source = null,
+        assert(parent.isEmpty || _isValidDocumentPath(parent),
             'Collection parent must be empty or a valid document path'),
         assert(_isValidReferenceSegment(name),
             'Collection name must be nonempty, contain no "__", and not end with "_"') {
@@ -44,6 +49,17 @@ class Collection<T> implements Queryable<T>, StoreReference {
         PathPersistorSettings(settings: persistorSettings, ref: this),
       _ => persistorSettings,
     };
+  }
+
+  Collection._narrowed(
+    Collection<Object?> source, {
+    this.toJson,
+    this.dependenciesBuilder,
+  })  : parent = source.parent,
+        name = source.name,
+        fromJson = null,
+        _source = source {
+    persistorSettings = source.persistorSettings;
   }
 
   static Collection<S> fromPath<S>(
@@ -88,7 +104,28 @@ class Collection<T> implements Queryable<T>, StoreReference {
         Loon._instance._isGlobalPersistenceEnabled;
   }
 
+  /// Returns this collection narrowed to the documents whose data is [S], including
+  /// subclasses of [S]. The narrowed collection shares this collection's storage and
+  /// serialization, so documents of other types are absent from its reads, queries and
+  /// streams, and its writes only affect documents of type [S].
+  Collection<S> whereType<S extends T>() {
+    return Collection<S>._narrowed(
+      _source ?? this,
+      toJson: toJson,
+      dependenciesBuilder: dependenciesBuilder,
+    );
+  }
+
   Document<T> doc([String? id]) {
+    final source = _source;
+    if (source != null) {
+      return Document<T>._narrowed(
+        source.doc(id),
+        toJson: toJson,
+        dependenciesBuilder: dependenciesBuilder,
+      );
+    }
+
     return Document<T>(
       path,
       id ?? generateSecureId(),
@@ -99,11 +136,35 @@ class Collection<T> implements Queryable<T>, StoreReference {
     );
   }
 
+  /// Deletes the collection. A narrowed collection deletes only its documents.
   void delete() {
+    if (_source != null) {
+      for (final snap in get()) {
+        snap.doc.delete();
+      }
+      return;
+    }
+
     Loon._instance.deleteCollection(this);
   }
 
+  /// Replaces the collection's documents with [snaps]. A narrowed collection replaces
+  /// only its documents, and throws if a replacement ID belongs to a document of another type.
   void replace(List<DocumentSnapshot<T>> snaps) {
+    final source = _source;
+    if (source != null) {
+      for (final snap in snaps) {
+        if (source.doc(snap.id).exists() && !doc(snap.id).exists()) {
+          throw Exception('Cannot replace document ${snap.path} of another type');
+        }
+      }
+      delete();
+      for (final snap in snaps) {
+        doc(snap.id).create(snap.data);
+      }
+      return;
+    }
+
     Loon._instance.replaceCollection<T>(
       this,
       snaps,
@@ -111,10 +172,26 @@ class Collection<T> implements Queryable<T>, StoreReference {
   }
 
   List<DocumentSnapshot<T>> get() {
-    return Loon._instance.getSnapshots(this);
+    final source = _source;
+    if (source == null) {
+      return Loon._instance.getSnapshots(this);
+    }
+
+    // Handles come from the source rather than the stored snapshots, so that they read and
+    // write with the source's serialization.
+    return [
+      for (final snap in source.get())
+        if (snap.data case final T data)
+          DocumentSnapshot(doc: doc(snap.id), data: data),
+    ];
   }
 
   bool exists() {
+    final source = _source;
+    if (source != null) {
+      return source.get().any((snap) => snap.data is T);
+    }
+
     return Loon._instance.documentStore.hasChildValues(path);
   }
 

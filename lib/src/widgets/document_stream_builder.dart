@@ -23,7 +23,9 @@ class DocumentStreamBuilderState<T> extends State<DocumentStreamBuilder<T>> {
   void didUpdateWidget(covariant DocumentStreamBuilder<T> oldWidget) {
     super.didUpdateWidget(oldWidget);
 
-    if (oldWidget.doc != widget.doc) {
+    // Documents compare by path, so a handle narrowed to another type is also compared by type.
+    if (oldWidget.doc != widget.doc ||
+        oldWidget.doc.runtimeType != widget.doc.runtimeType) {
       _observable.dispose();
       _observable = widget.doc.observe();
     }

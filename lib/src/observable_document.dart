@@ -14,6 +14,15 @@ class ObservableDocument<T> extends Document<T>
     _init(super.get(), multicast: multicast);
   }
 
+  ObservableDocument._narrowed(
+    super.source, {
+    super.toJson,
+    super.dependenciesBuilder,
+    required bool multicast,
+  }) : super._narrowed() {
+    _init(super.get(), multicast: multicast);
+  }
+
   /// On broadcast, the [ObservableDocument] examines the broadcast events that have occurred
   /// since the last broadcast and determines if the document needs to rebroadcast to its listeners.
   ///
@@ -35,6 +44,20 @@ class ObservableDocument<T> extends Document<T>
 
     if (event != null) {
       final snap = get();
+
+      // A narrowed document reports changes relative to its type: a document that becomes a [T]
+      // is added, one that stops being a [T] is removed, and changes to other types are skipped.
+      if (_source != null) {
+        final prevSnap = _controllerValue;
+        if (prevSnap == null && snap == null) {
+          return;
+        }
+        if (prevSnap == null && event != BroadcastEvents.hydrated) {
+          event = BroadcastEvents.added;
+        } else if (snap == null) {
+          event = BroadcastEvents.removed;
+        }
+      }
 
       if (_changeController.hasListener) {
         _changeController.add(
