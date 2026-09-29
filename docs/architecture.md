@@ -42,6 +42,25 @@ Loon.collection('users').stream();
 Loon.collection('users').where((snap) => snap.data.name == 'Luke Skywalker').stream();
 ```
 
+### Subtype views
+
+`Collection.whereType<S>()` exposes the collection through the read interfaces
+`CollectionView<S>`, `DocumentView<S>`, and `QueryView<S>`. Their snapshots retain
+the original data object and a read-only document handle backed by the parent
+collection's codec. The underlying collection remains responsible for writes,
+persistence, and dependencies.
+
+Views adapt a parent query with a subtype predicate. They reuse its filtering,
+sorting, cache invalidation, and membership-change engine; the adapters only
+project snapshots and streams onto the read interfaces. A document view observes
+a private single-ID query, which reads its document directly and ignores other
+IDs during broadcasts. Projected observer streams retain their identity across
+widget rebuilds and delegate cancellation and disposal to the underlying observer.
+
+Ordinary document, snapshot, query, and observer types implement the shared read
+interfaces while retaining their existing writable APIs. Stream builders use
+those read interfaces so they can consume either ordinary handles or views.
+
 ### Broadcasts
 
 Each observable (`ObservableDocument`, `ObservableQuery`) implements the `BroadcastObserver` interface, and are stored in a set of broadcast observers

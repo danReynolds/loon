@@ -1,3 +1,9 @@
+## Unreleased
+
+* Add `Collection.whereType<S>()` and live, read-only `CollectionView<S>` / `DocumentView<S>` handles with subtype-aware snapshots, queries, observation, and change streams. Other subtypes are absent from reads and ID lookups; writes remain on the original collection.
+* Accept views in the existing document and query stream builders, and dispose their observers when removed from the widget tree.
+* [Breaking] Widget builder callbacks now receive `DocumentSnapshotView<T>` instead of `DocumentSnapshot<T>`. Change explicit callback annotations to the read-only type and perform writes through the original collection or document. `Queryable.toQuery()` now returns the shared `QueryView<T>` read API; direct `Collection.toQuery()` and ordinary query/document methods retain their existing concrete return types.
+
 ## 6.0.0
 
 * [Breaking] Require nonempty document IDs and collection names containing no `__` and not ending with `_`; paths must alternate collection and document segments. Direct constructors and `fromPath` check these rules with assertions in debug builds; profile and release builds omit the checks. `doc()` still generates an ID. Use an empty parent for top-level collections; `Collection('root', name)` is no longer an alias. Existing persisted references that violate these rules must be migrated before upgrading.

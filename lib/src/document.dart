@@ -1,7 +1,9 @@
 part of 'loon.dart';
 
-class Document<T> implements StoreReference {
+class Document<T> implements DocumentView<T> {
+  @override
   final String id;
+  @override
   final String parent;
   final FromJson<T>? fromJson;
   final ToJson<T>? toJson;
@@ -164,10 +166,14 @@ class Document<T> implements StoreReference {
     Loon._instance.deleteDocument<T>(this);
   }
 
+  @override
   DocumentSnapshot<T>? get() {
     return Loon._instance.getSnapshot(this);
   }
 
+  Query<T> _toQuery() => Query<T>._forDocument(this);
+
+  @override
   ObservableDocument<T> observe({
     bool multicast = false,
   }) {
@@ -182,14 +188,17 @@ class Document<T> implements StoreReference {
     );
   }
 
+  @override
   Stream<DocumentSnapshot<T>?> stream() {
     return observe().stream();
   }
 
+  @override
   Stream<DocumentChangeSnapshot<T>> streamChanges() {
     return observe().streamChanges();
   }
 
+  @override
   bool exists() {
     return Loon._instance.existsSnap(this);
   }

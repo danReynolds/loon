@@ -164,6 +164,74 @@ for (final snap in snaps) {
 }
 ```
 
+## Subtype views
+
+A collection can store several subclasses of a common model. Use `whereType<S>()`
+to read one subtype through a live, read-only collection view:
+
+```dart
+final Collection<Animal> animals = Loon.collection<Animal>(
+  'animals',
+  fromJson: Animal.fromJson,
+  toJson: (animal) => animal.toJson(),
+);
+final CollectionView<Dog> dogs = animals.whereType<Dog>();
+
+final List<DocumentSnapshotView<Dog>> allDogs = dogs.get();
+final DocumentView<Dog> rex = dogs.doc('rex');
+final Dog? dog = rex.get()?.data;
+
+final adultDogs = dogs
+    .where((snap) => snap.data.age >= 2)
+    .sortBy((a, b) => a.data.name.compareTo(b.data.name));
+
+adultDogs.stream().listen((snaps) {
+  for (final snap in snaps) {
+    print(snap.data.name); // Dog properties are available without casts.
+  }
+});
+```
+
+Only matching documents appear in the view, including subclasses of `Dog`.
+Looking up a missing document or a different subtype returns `null`, and
+`exists()` checks membership in the view. A matching snapshot's `data` has type
+`Dog`; other subtypes do not produce snapshots with null data.
+
+The view and its documents support `get()`, `observe()`, `stream()`, and
+`streamChanges()`. Collection views also support `where()`, `sortBy()`, and
+further narrowing with `whereType<S>()`. When a document changes from a dog to a
+cat through the original collection, the dog view reports a removal and the cat
+view reports an addition, within Loon's normal broadcast batching.
+
+Views share the original collection's storage and serialization. Their document
+handles, including `snapshot.doc`, expose no mutation methods. Write through the
+original collection:
+
+```dart
+final snap = dogs.doc('rex').get()!;
+animals.doc(snap.id).update(snap.data.copyWith(age: 4));
+```
+
+Read-only refers to Loon operations; model objects are shared and are not frozen.
+
+The existing stream builders accept views using the same arguments:
+
+```dart
+DocumentStreamBuilder(
+  doc: dogs.doc('rex'),
+  builder: (context, snap) => Text(snap?.data.name ?? 'No dog'),
+);
+QueryStreamBuilder(
+  query: adultDogs,
+  builder: (context, snaps) => Text('${snaps.length} adult dogs'),
+);
+```
+
+Both builders expose `DocumentSnapshotView<T>` in their callbacks, also when
+reading ordinary collections or documents. Explicit callback annotations should
+use that type. For edits from a builder, retain the original writable document
+or obtain it with `animals.doc(snap.id)`.
+
 ## 🔎 Queries
 
 Documents can be filtered using queries:

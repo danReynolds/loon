@@ -77,7 +77,7 @@ class _MyHomePageState extends State<MyHomePage> {
               content: TextFormField(
                 initialValue: user.name,
                 onChanged: (updatedName) {
-                  userSnap.doc.update(
+                  doc.update(
                     user.copyWith(name: updatedName),
                   );
                 },
@@ -155,7 +155,8 @@ class _MyHomePageState extends State<MyHomePage> {
                                       Flexible(child: Text(user.name)),
                                       TextButton(
                                         onPressed: () {
-                                          _showEditDialog(userSnap.doc);
+                                          _showEditDialog(
+                                              UserModel.store.doc(userSnap.id));
                                         },
                                         child: const Text('Edit'),
                                       ),

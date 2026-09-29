@@ -1,7 +1,8 @@
 part of './loon.dart';
 
 class ObservableDocument<T> extends Document<T>
-    with BroadcastObserver<DocumentSnapshot<T>?, DocumentChangeSnapshot<T>> {
+    with BroadcastObserver<DocumentSnapshot<T>?, DocumentChangeSnapshot<T>>
+    implements ObservableDocumentView<T> {
   ObservableDocument(
     super.parent,
     super.id, {

@@ -1,8 +1,10 @@
 part of 'loon.dart';
 
 /// A snapshot of a document's data and dependencies at any given moment.
-class DocumentSnapshot<T> {
+class DocumentSnapshot<T> implements DocumentSnapshotView<T> {
+  @override
   final Document<T> doc;
+  @override
   final T data;
 
   DocumentSnapshot({
@@ -24,10 +26,12 @@ class DocumentSnapshot<T> {
   @override
   int get hashCode => Object.hash(doc, data);
 
+  @override
   String get id {
     return doc.id;
   }
 
+  @override
   String get path {
     return doc.path;
   }

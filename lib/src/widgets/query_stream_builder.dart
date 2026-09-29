@@ -3,7 +3,7 @@ import 'package:loon/src/loon.dart';
 
 class QueryStreamBuilder<T> extends StatefulWidget {
   final Queryable<T> query;
-  final Widget Function(BuildContext, List<DocumentSnapshot<T>>) builder;
+  final Widget Function(BuildContext, List<DocumentSnapshotView<T>>) builder;
 
   const QueryStreamBuilder({
     super.key,
@@ -16,7 +16,7 @@ class QueryStreamBuilder<T> extends StatefulWidget {
 }
 
 class QueryStreamBuilderState<T> extends State<QueryStreamBuilder<T>> {
-  late ObservableQuery<T> _observable = widget.query.toQuery().observe();
+  late ObservableQueryView<T> _observable = widget.query.toQuery().observe();
 
   @override
   void didUpdateWidget(covariant QueryStreamBuilder<T> oldWidget) {
@@ -29,8 +29,14 @@ class QueryStreamBuilderState<T> extends State<QueryStreamBuilder<T>> {
   }
 
   @override
+  void dispose() {
+    _observable.dispose();
+    super.dispose();
+  }
+
+  @override
   build(context) {
-    return StreamBuilder<List<DocumentSnapshot<T>>>(
+    return StreamBuilder<List<DocumentSnapshotView<T>>>(
       initialData: _observable.get(),
       stream: _observable.stream(),
       builder: (context, snap) => widget.builder(context, snap.data!),

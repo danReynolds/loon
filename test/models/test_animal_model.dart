@@ -49,6 +49,8 @@ sealed class TestAnimalModel {
 class TestDogModel extends TestAnimalModel {
   const TestDogModel(super.name);
 
+  int get barkVolume => name.length;
+
   @override
   Json toJson() {
     return {

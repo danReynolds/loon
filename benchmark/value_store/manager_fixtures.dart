@@ -8,6 +8,15 @@ abstract class StoreReference {
   String get path;
 }
 
+// The real snapshot implements this read contract. Keep only its metadata here;
+// the isolated manager workloads do not read documents or run view queries.
+abstract class DocumentSnapshotView<T> {
+  Document<T> get doc;
+  T get data;
+  String get id;
+  String get path;
+}
+
 class Document<T> implements StoreReference {
   final String parent;
   final String id;

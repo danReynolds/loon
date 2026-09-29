@@ -1,7 +1,10 @@
 part of 'loon.dart';
 
-class DocumentChangeSnapshot<T> extends DocumentSnapshot<T?> {
+class DocumentChangeSnapshot<T> extends DocumentSnapshot<T?>
+    implements DocumentChangeSnapshotView<T> {
+  @override
   final BroadcastEvents event;
+  @override
   final T? prevData;
 
   DocumentChangeSnapshot({

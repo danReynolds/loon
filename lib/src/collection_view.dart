@@ -1,58 +1,27 @@
 part of 'loon.dart';
 
-class DocumentSnapshotView<S extends T, T> {
-  final DocumentSnapshot<T> _snap;
+/// A live, read-only selection of a collection's documents by data type.
+///
+/// Create one with [Collection.whereType]. Documents of other types are absent
+/// from the view. Reads use the original collection's serialization and storage.
+class CollectionView<T> extends _QueryView<T> implements StoreReference {
+  final Collection<Object?> _collection;
 
-  DocumentSnapshotView(this._snap);
+  CollectionView._(this._collection)
+      : super(_collection.where((snap) => snap.data is T));
 
-  S? get data {
-    if (_snap.data case S data) {
-      return data;
-    }
+  @override
+  String get path => _collection.path;
 
-    return null;
-  }
-}
+  String get parent => _collection.parent;
+  String get name => _collection.name;
 
-class DocumentView<S extends T, T> {
-  final Document<T> doc;
+  /// Returns a read-only handle. Missing documents and other subtypes read null.
+  DocumentView<T> doc(String id) => _DocumentView<T>(_collection.doc(id));
 
-  DocumentView(this.doc);
+  bool exists() => get().isNotEmpty;
 
-  DocumentSnapshotView<S, T>? get() {
-    final snap = doc.get();
-    if (snap == null) {
-      return null;
-    }
-    return DocumentSnapshotView(snap);
-  }
-
-  Stream<DocumentSnapshotView<S, T>?> stream() {
-    return doc
-        .stream()
-        .map((snap) => snap == null ? null : DocumentSnapshotView(snap));
-  }
-}
-
-/// A view of a collection that allows for type-safe narrowing to a specific subtype of the collection's document type.
-class CollectionView<S extends T, T> {
-  final Collection<T> _collection;
-
-  CollectionView(this._collection);
-
-  DocumentView<S, T> doc(String id) {
-    return DocumentView(_collection.doc(id));
-  }
-
-  List<DocumentSnapshotView<S, T>> get() {
-    return _collection
-        .get()
-        .map((snap) => DocumentSnapshotView<S, T>(snap))
-        .toList();
-  }
-
-  Stream<List<DocumentSnapshotView<S, T>>> stream() {
-    return _collection.stream().map((snaps) =>
-        snaps.map((snap) => DocumentSnapshotView<S, T>(snap)).toList());
-  }
+  /// Narrows this view further, including subclasses of [S].
+  CollectionView<S> whereType<S extends T>() =>
+      CollectionView<S>._(_collection);
 }

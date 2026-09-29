@@ -3,7 +3,9 @@ part of 'loon.dart';
 class ObservableQuery<T> extends Query<T>
     with
         BroadcastObserver<List<DocumentSnapshot<T>>,
-            List<DocumentChangeSnapshot<T>>> {
+            List<DocumentChangeSnapshot<T>>>
+    implements
+        ObservableQueryView<T> {
   /// An observable query maintains a cache of snapshots of the documents in its current result set.
   final Map<String, DocumentSnapshot<T>> _snapCache = {};
 
@@ -11,11 +13,16 @@ class ObservableQuery<T> extends Query<T>
   static final _documentStore = Loon._instance.documentStore;
 
   ObservableQuery(
-    super.collection, {
-    required super.filters,
-    required super.sort,
+    Collection<T> collection, {
+    required List<FilterFn<T>> filters,
+    required SortFn<T>? sort,
     required bool multicast,
-  }) {
+  }) : this._(Query(collection, filters: filters, sort: sort),
+            multicast: multicast);
+
+  ObservableQuery._(Query<T> query, {required bool multicast})
+      : super._(query.collection, query._document,
+            filters: query.filters, sort: query.sort) {
     final snaps = super.get();
     for (final snap in snaps) {
       _snapCache[snap.id] = snap;
@@ -81,6 +88,9 @@ class ObservableQuery<T> extends Query<T>
       if (events != null) {
         for (final entry in events.entries) {
           final docId = entry.key;
+          if (_document != null && docId != _document!.id) {
+            continue;
+          }
           final event = entry.value;
 
           final prevSnap = _snapCache[docId];
