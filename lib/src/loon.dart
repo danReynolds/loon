@@ -20,6 +20,7 @@ part 'observable_query.dart';
 part 'collection.dart';
 part 'document.dart';
 part 'observable_document.dart';
+part 'where_type.dart';
 part 'types.dart';
 part 'document_snapshot.dart';
 part 'document_change_snapshot.dart';

@@ -89,9 +89,10 @@ class ObservableQuery<T> extends Query<T>
           // to parse it. This only occurs once for its first read. A query on a narrowed collection reads a document of
           // another type as absent.
           final raw = snaps?[docId];
-          final snap = raw is DocumentSnapshot<T>? && collection._source == null
-              ? raw
-              : collection.doc(docId).get();
+          final snap =
+              raw is DocumentSnapshot<T>? && collection is! _NarrowedCollection
+                  ? raw
+                  : collection.doc(docId).get();
 
           switch (event) {
             case BroadcastEvents.added:

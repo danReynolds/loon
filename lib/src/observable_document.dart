@@ -11,17 +11,19 @@ class ObservableDocument<T> extends Document<T>
     super.dependenciesBuilder,
     required bool multicast,
   }) {
-    _init(super.get(), multicast: multicast);
+    _init(_readSnapshot(), multicast: multicast);
   }
 
-  ObservableDocument._narrowed(
-    super.source, {
-    super.toJson,
-    super.dependenciesBuilder,
-    required bool multicast,
-  }) : super._narrowed() {
-    _init(super.get(), multicast: multicast);
-  }
+  /// Reads the document's snapshot from the store rather than the observer's cached value.
+  DocumentSnapshot<T>? _readSnapshot() => super.get();
+
+  /// Returns the change to report when a broadcast [event] leaves the document at [snap],
+  /// or null to report nothing.
+  BroadcastEvents? _changeEvent(
+    BroadcastEvents event,
+    DocumentSnapshot<T>? snap,
+  ) =>
+      event;
 
   /// On broadcast, the [ObservableDocument] examines the broadcast events that have occurred
   /// since the last broadcast and determines if the document needs to rebroadcast to its listeners.
@@ -44,26 +46,16 @@ class ObservableDocument<T> extends Document<T>
 
     if (event != null) {
       final snap = get();
-
-      // A narrowed document reports changes relative to its type: a document that becomes a [T]
-      // is added, one that stops being a [T] is removed, and changes to other types are skipped.
-      if (_source != null) {
-        final prevSnap = _controllerValue;
-        if (prevSnap == null && snap == null) {
-          return;
-        }
-        if (prevSnap == null && event != BroadcastEvents.hydrated) {
-          event = BroadcastEvents.added;
-        } else if (snap == null) {
-          event = BroadcastEvents.removed;
-        }
+      final change = _changeEvent(event, snap);
+      if (change == null) {
+        return;
       }
 
       if (_changeController.hasListener) {
         _changeController.add(
           DocumentChangeSnapshot(
             doc: this,
-            event: event,
+            event: change,
             data: snap?.data,
             prevData: _controllerValue?.data,
           ),
@@ -75,7 +67,7 @@ class ObservableDocument<T> extends Document<T>
   }
 
   @override
-  get isDirty => _value == null && super.get() != null;
+  get isDirty => _value == null && _readSnapshot() != null;
 
   @override
   ObservableDocument<T> observe({
@@ -86,6 +78,6 @@ class ObservableDocument<T> extends Document<T>
 
   @override
   get() {
-    return _value ?? (_value = super.get());
+    return _value ?? (_value = _readSnapshot());
   }
 }

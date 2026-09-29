@@ -76,9 +76,13 @@ void main() {
         .where((s) => s.data.barkVolume > 0)
         .sortBy((a, b) => a.data.name.compareTo(b.data.name));
     source.documentHandles = 0;
-    expect(query.get(), hasLength(2000));
-    // One source handle per projected snapshot; comparisons allocate nothing.
-    expect(source.documentHandles, 2000);
+    final snaps = query.get();
+    expect(snaps, hasLength(2000));
+    // Projection, filtering and sorting create no source handles; a snapshot's document
+    // creates one when it is first used.
+    expect(source.documentHandles, 0);
+    expect(snaps.first.doc.get(), snaps.first);
+    expect(source.documentHandles, 1);
     final observed = query.observe();
     final first = observed.get();
     source.documentHandles = 0;
