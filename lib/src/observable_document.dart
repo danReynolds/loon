@@ -23,17 +23,11 @@ class ObservableDocument<T> extends Document<T>
   /// 2. There is a [BroadcastEvents.removed] event for any path above the document path.
   @override
   void _onBroadcast() {
-    BroadcastEvents? event;
-
-    // 1.
-    event = Loon._instance.broadcastManager.eventStore.get(path);
-
-    // 2.
-    final isRemoved = Loon._instance.broadcastManager.eventStore
-            .getNearestMatch(path, BroadcastEvents.removed) !=
-        null;
-
-    if (event == null && isRemoved) {
+    var event = Loon._instance.broadcastManager.eventStore.get(path);
+    if (event == null &&
+        Loon._instance.broadcastManager.eventStore
+                .getNearestMatch(path, BroadcastEvents.removed) !=
+            null) {
       event = BroadcastEvents.removed;
     }
 
@@ -67,6 +61,11 @@ class ObservableDocument<T> extends Document<T>
 
   @override
   get() {
-    return isDirty ? (_value = super.get()) : _value;
+    final cached = _value;
+    if (cached != null) return cached;
+
+    final snap = super.get();
+    if (snap != null) _value = snap;
+    return snap;
   }
 }

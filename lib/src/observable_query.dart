@@ -256,7 +256,7 @@ class ObservableQuery<T> extends Query<T>
 
   @override
   get() {
-    return isDirty ? (_value = super.get()) : _value!;
+    return _value ?? (_value = super.get());
   }
 
   Map inspect() {
