@@ -107,6 +107,39 @@ void main() {
     shared.dispose();
   });
 
+  testWidgets('document and query builders give writable snapshots',
+      (tester) async {
+    final things = Loon.collection<String>('things');
+    things.doc('one').create('a', broadcast: false);
+    DocumentSnapshot<String>? latestDoc;
+    List<DocumentSnapshot<String>> latestQuery = [];
+    await tester.pumpWidget(MaterialApp(
+      home: Column(children: [
+        DocumentStreamBuilder<String>(
+          doc: things.doc('one'),
+          builder: (_, snap) {
+            latestDoc = snap;
+            return Text('doc:${snap?.data}');
+          },
+        ),
+        QueryStreamBuilder<String>(
+          query: things,
+          builder: (_, snaps) {
+            latestQuery = snaps;
+            return Text('query:${snaps.map((s) => s.data).join()}');
+          },
+        ),
+      ]),
+    ));
+
+    latestDoc!.doc.update('b');
+    await flush(tester);
+    expect(find.text('doc:b'), findsOneWidget);
+    latestQuery.single.doc.update('c');
+    await flush(tester);
+    expect(find.text('query:c'), findsOneWidget);
+  });
+
   testWidgets('switching sources keeps a caller-owned observer open',
       (tester) async {
     final things = Loon.collection<String>('things');
@@ -118,7 +151,7 @@ void main() {
     shared.stream().listen((s) => values.add(s?.data), onDone: () {
       done = true;
     });
-    Widget screen(DocumentView<String> doc) => MaterialApp(
+    Widget screen(Document<String> doc) => MaterialApp(
           home: DocumentStreamBuilder<String>(
             doc: doc,
             builder: (_, snap) => Text('v:${snap?.data}'),
@@ -137,38 +170,63 @@ void main() {
     shared.dispose();
   });
 
-  testWidgets('removing a builder keeps a caller-owned view observer open',
+  testWidgets('removing view builders keeps caller-owned view observers open',
       (tester) async {
     animals.doc('rex').create(const TestDogModel('Rex'), broadcast: false);
-    final shared = dogs.observe(multicast: true);
+    final sharedQuery = dogs.observe(multicast: true);
+    final sharedDoc = dogs.doc('rex').observe(multicast: true);
     final names = <List<String>>[];
-    shared.stream().listen((s) => names.add(s.map((s) => s.data.name).toList()));
+    final rex = <String?>[];
+    sharedQuery
+        .stream()
+        .listen((s) => names.add(s.map((s) => s.data.name).toList()));
+    sharedDoc.stream().listen((s) => rex.add(s?.data.name));
 
     await tester.pumpWidget(MaterialApp(
-      home: QueryStreamBuilder<TestDogModel>(
-        query: shared,
-        builder: (_, snaps) => Text('n:${snaps.length}'),
-      ),
+      home: Column(children: [
+        QueryViewStreamBuilder<TestDogModel>(
+          query: sharedQuery,
+          builder: (_, snaps) => Text('n:${snaps.length}'),
+        ),
+        DocumentViewStreamBuilder<TestDogModel>(
+          doc: sharedDoc,
+          builder: (_, snap) => Text('rex:${snap?.data.name}'),
+        ),
+      ]),
     ));
     await tester.pumpWidget(const SizedBox.shrink());
     animals.doc('fido').create(const TestDogModel('Fido'));
+    animals.doc('rex').update(const TestDogModel('Rex II'));
     await flush(tester);
 
     expect(names, [
-      ['Rex', 'Fido']
+      ['Rex II', 'Fido']
     ]);
-    shared.dispose();
+    expect(rex, ['Rex II']);
+    sharedQuery.dispose();
+    sharedDoc.dispose();
   });
 
   testWidgets('builder-created observers are released when removed or switched',
       (tester) async {
     animals.doc('one').create(const TestDogModel('Rex'), broadcast: false);
+    animals.doc('two').create(const TestCatModel('Tom'), broadcast: false);
     Widget screen(
-      DocumentView<TestAnimalModel> doc,
+      DocumentView<TestAnimalModel> docView,
+      QueryView<TestAnimalModel> queryView,
+      Document<TestAnimalModel> doc,
       Queryable<TestAnimalModel> query,
     ) =>
         MaterialApp(
           home: Column(children: [
+            DocumentViewStreamBuilder(
+              doc: docView,
+              builder: (_, snap) => Text('doc view:${snap?.data.name}'),
+            ),
+            QueryViewStreamBuilder(
+              query: queryView,
+              builder: (_, snaps) => Text('query view:${snaps.length}'),
+            ),
             DocumentStreamBuilder(
               doc: doc,
               builder: (_, snap) => Text('doc:${snap?.data.name}'),
@@ -180,9 +238,13 @@ void main() {
           ]),
         );
 
-    await tester.pumpWidget(screen(dogs.doc('one'), dogs));
-    await tester.pumpWidget(screen(animals.doc('one'), animals));
-    await tester.pumpWidget(screen(dogs.doc('one'), dogs.where((_) => true)));
+    await tester.pumpWidget(
+        screen(dogs.doc('one'), dogs, animals.doc('one'), animals));
+    // View builders also accept ordinary documents and queries.
+    await tester.pumpWidget(screen(animals.doc('one'), animals.toQuery(),
+        animals.doc('two'), animals.where((_) => true)));
+    await tester.pumpWidget(screen(dogs.doc('one'), dogs.where((_) => true),
+        animals.doc('one'), animals));
     await tester.pump();
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pump();

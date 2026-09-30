@@ -48,4 +48,6 @@ export 'src/persistor/index.dart'
     show FilePersistor, IndexedDBPersistor, SqlitePersistor;
 export 'src/utils/id.dart' show generateFastId, generateSecureId;
 export 'src/widgets/document_stream_builder.dart';
+export 'src/widgets/document_view_stream_builder.dart';
 export 'src/widgets/query_stream_builder.dart';
+export 'src/widgets/query_view_stream_builder.dart';

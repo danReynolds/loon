@@ -1,10 +1,10 @@
 part of 'loon.dart';
 
 abstract class Queryable<T> {
-  QueryView<T> toQuery();
+  Query<T> toQuery();
 }
 
-class Query<T> extends QueryView<T> {
+class Query<T> extends QueryView<T> implements Queryable<T> {
   final Collection<T> collection;
   final List<FilterFn<T>> filters;
   final SortFn<T>? sort;

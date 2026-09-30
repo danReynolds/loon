@@ -57,7 +57,7 @@ void main() {
     Widget screen(int build) => MaterialApp(
           home: Column(children: [
             Text('build:$build'),
-            QueryStreamBuilder(
+            QueryViewStreamBuilder(
               query: source.view<TestDogModel>(),
               builder: (_, snaps) => Text('dogs:${snaps.length}'),
             ),
@@ -227,7 +227,6 @@ void main() {
         .where((snap) => snap.data.name.startsWith('R'));
     expect(query.get().map((s) => s.id), ['three']);
     expect(query.get().single.doc, isNot(isA<Document>()));
-    expect(query.toQuery(), same(query));
   });
 
   test('collection and document observations share subtype membership events',
@@ -495,19 +494,19 @@ void main() {
     });
   });
 
-  testWidgets('existing builders accept views, switch sources, and dispose',
+  testWidgets('view builders accept views, switch sources, and dispose',
       (tester) async {
     final cats = animals.view<TestCatModel>();
     animals.doc('one').create(const TestDogModel('Rex'), broadcast: false);
     Widget screen(DocumentView<TestAnimalModel> doc,
-            Queryable<TestAnimalModel> query) =>
+            QueryView<TestAnimalModel> query) =>
         MaterialApp(
             home: Column(children: [
-          DocumentStreamBuilder(
+          DocumentViewStreamBuilder(
               doc: doc,
               builder: (_, snap) =>
                   Text('doc:${snap?.data.name ?? "missing"}')),
-          QueryStreamBuilder(
+          QueryViewStreamBuilder(
               query: query,
               builder: (_, snaps) =>
                   Text('list:${snaps.map((s) => s.data.name).join(",")}')),

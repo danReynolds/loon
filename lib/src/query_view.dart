@@ -1,7 +1,7 @@
 part of 'loon.dart';
 
 /// The read operations shared by ordinary queries and subtype views.
-abstract class QueryView<T> extends Queryable<T> {
+abstract class QueryView<T> {
   String get path;
 
   List<DocumentSnapshotView<T>> get();
@@ -18,9 +18,6 @@ abstract class QueryView<T> extends Queryable<T> {
 
   Stream<List<DocumentChangeSnapshotView<T>>> streamChanges() =>
       observe().streamChanges();
-
-  @override
-  QueryView<T> toQuery() => this;
 }
 
 /// An observed query with an explicit lifetime, shared by queries and views.

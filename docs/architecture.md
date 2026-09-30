@@ -61,8 +61,9 @@ require no separate invalidation protocol. Projected observer streams retain the
 widget rebuilds and delegate cancellation and disposal to the underlying observer.
 
 Ordinary document, snapshot, query, and observer types implement the shared read
-interfaces while retaining their existing writable APIs. Stream builders use
-those read interfaces so they can consume either ordinary handles or views.
+interfaces while retaining their existing writable APIs. The view stream builders
+use those read interfaces, so they consume either views or ordinary handles; the
+document and query stream builders keep their writable snapshot types.
 
 ### Broadcasts
 
