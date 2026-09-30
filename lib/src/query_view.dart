@@ -27,8 +27,14 @@ abstract interface class ObservableQueryView<T> implements QueryView<T> {
   void dispose();
 }
 
+typedef _ViewSortFn<T> = int Function(
+  DocumentSnapshotView<T> a,
+  DocumentSnapshotView<T> b,
+);
+
 // Keep the parent's query and runtime type intact. Its existing engine owns
-// filtering, sorting, hydration, membership changes, and observer caching.
+// filtering, hydration, membership changes, and observer caching. The view sorts
+// its projected snapshots itself, so that comparisons don't look up projections.
 class _QueryView<T> extends QueryView<T> {
   final Query<Object?> _query;
 
@@ -36,8 +42,18 @@ class _QueryView<T> extends QueryView<T> {
   // share its typed projection without retaining replaced/deleted snapshots.
   final Expando<DocumentSnapshotView<T>> _snapshots;
 
-  _QueryView(this._query, [Expando<DocumentSnapshotView<T>>? snapshots])
-      : _snapshots = snapshots ?? Expando();
+  final _ViewSortFn<T>? _sort;
+
+  _QueryView(
+    this._query, [
+    Expando<DocumentSnapshotView<T>>? snapshots,
+    this._sort,
+  ]) : _snapshots = snapshots ?? Expando();
+
+  List<DocumentSnapshotView<T>> _sorted(List<DocumentSnapshotView<T>> snaps) {
+    final sort = _sort;
+    return sort == null ? snaps : (snaps..sort(sort));
+  }
 
   @override
   String get path => _query.path;
@@ -58,31 +74,41 @@ class _QueryView<T> extends QueryView<T> {
       );
 
   @override
-  List<DocumentSnapshotView<T>> get() => _query.get().map(_snapshot).toList();
+  List<DocumentSnapshotView<T>> get() =>
+      _sorted(_query.get().map(_snapshot).toList());
 
   @override
   QueryView<T> where(bool Function(DocumentSnapshotView<T> snap) filter) =>
-      _QueryView(_query.where((snap) => filter(_snapshot(snap))), _snapshots);
+      _QueryView(
+        _query.where((snap) => filter(_snapshot(snap))),
+        _snapshots,
+        _sort,
+      );
 
   @override
   QueryView<T> sortBy(
     int Function(DocumentSnapshotView<T> a, DocumentSnapshotView<T> b) sort,
   ) =>
-      _QueryView(_query.sortBy((a, b) => sort(_snapshot(a), _snapshot(b))),
-          _snapshots);
+      _QueryView(_query, _snapshots, sort);
 
   @override
   ObservableQueryView<T> observe({bool multicast = false}) =>
-      _ObservableQueryView(_query.observe(multicast: multicast), _snapshots);
+      _ObservableQueryView(
+        _query.observe(multicast: multicast),
+        _snapshots,
+        _sort,
+      );
 }
 
 class _ObservableQueryView<T> extends _QueryView<T>
     implements ObservableQueryView<T> {
   final ObservableQuery<Object?> _observer;
 
-  _ObservableQueryView(this._observer,
-      [Expando<DocumentSnapshotView<T>>? snapshots])
-      : super(_observer, snapshots);
+  _ObservableQueryView(
+    this._observer, [
+    Expando<DocumentSnapshotView<T>>? snapshots,
+    _ViewSortFn<T>? sort,
+  ]) : super(_observer, snapshots, sort);
 
   // The underlying observer replaces its result list when invalidated. Reuse
   // the projection for reads/listeners of that same list, without another cache
@@ -91,7 +117,8 @@ class _ObservableQueryView<T> extends _QueryView<T>
 
   List<DocumentSnapshotView<T>> _project(
           List<DocumentSnapshot<Object?>> snaps) =>
-      _results[snaps] ??= List.unmodifiable(snaps.map(_snapshot));
+      _results[snaps] ??=
+          List.unmodifiable(_sorted(snaps.map(_snapshot).toList()));
 
   @override
   List<DocumentSnapshotView<T>> get() => _project(_observer.get());
