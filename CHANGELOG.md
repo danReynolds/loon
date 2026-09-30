@@ -3,6 +3,7 @@
 * Add `CollectionView<S>(collection)` and `collection.view<S>()` for live, read-only `CollectionView<S>` / `DocumentView<S>` handles with subtype-aware snapshots, queries, observation, and change streams. Other subtypes are absent from reads and ID lookups; writes remain on the original collection.
 * Accept views in the existing document and query stream builders, and dispose their observers when removed from the widget tree.
 * [Breaking] Widget builder callbacks now receive `DocumentSnapshotView<T>` instead of `DocumentSnapshot<T>`. Change explicit callback annotations to the read-only type and perform writes through the original collection or document. `Queryable.toQuery()` now returns the shared `QueryView<T>` read API; direct `Collection.toQuery()` and ordinary query/document methods retain their existing concrete return types.
+* Stream builders dispose only the observers they create, so an observer passed in by the caller stays open when a builder is removed or switches sources.
 
 ## 6.0.0
 

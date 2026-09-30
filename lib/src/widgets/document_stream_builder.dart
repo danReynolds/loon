@@ -24,14 +24,22 @@ class DocumentStreamBuilderState<T> extends State<DocumentStreamBuilder<T>> {
     super.didUpdateWidget(oldWidget);
 
     if (oldWidget.doc != widget.doc) {
-      _observable.dispose();
+      _release(oldWidget.doc);
       _observable = widget.doc.observe();
+    }
+  }
+
+  // An observed document returns itself from observe(). Its lifetime belongs to the caller
+  // that passed it in, so the builder only disposes an observer it created.
+  void _release(DocumentView<T> doc) {
+    if (!identical(_observable, doc)) {
+      _observable.dispose();
     }
   }
 
   @override
   void dispose() {
-    _observable.dispose();
+    _release(widget.doc);
     super.dispose();
   }
 

@@ -23,14 +23,22 @@ class QueryStreamBuilderState<T> extends State<QueryStreamBuilder<T>> {
     super.didUpdateWidget(oldWidget);
 
     if (oldWidget.query != widget.query) {
-      _observable.dispose();
+      _release(oldWidget.query);
       _observable = widget.query.toQuery().observe();
+    }
+  }
+
+  // An observed query returns itself from observe(). Its lifetime belongs to the caller
+  // that passed it in, so the builder only disposes an observer it created.
+  void _release(Queryable<T> query) {
+    if (!identical(_observable, query)) {
+      _observable.dispose();
     }
   }
 
   @override
   void dispose() {
-    _observable.dispose();
+    _release(widget.query);
     super.dispose();
   }
 
