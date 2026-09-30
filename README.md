@@ -210,15 +210,15 @@ final Collection<Animal> animals = Loon.collection(
   toJson: (animal) => animal.toJson(),
 );
 
-final QueryView<Dog> dogs = animals.view<Dog>();
+final CollectionView<Dog> dogs = animals.view<Dog>();
+
+final Dog? rex = dogs.doc('rex').get()?.data; // null if rex is missing or not a dog
+
 dogs
     .where((snap) => snap.data.age >= 2)
     .sortBy((a, b) => a.data.name.compareTo(b.data.name))
     .stream()
     .listen((snaps) => print(snaps.map((snap) => snap.data.name)));
-
-final DocumentView<Dog> rex = animals.doc('rex').view<Dog>();
-final Dog? dog = rex.get()?.data; // null if rex is missing or not a dog
 ```
 
 Views are live and read-only. Documents of other types are absent from them, so a
@@ -228,9 +228,8 @@ cat view. Write through the collection, as in `animals.doc(snap.id).update(...)`
 Build from views with `QueryViewStreamBuilder` and `DocumentViewStreamBuilder`,
 which take the same arguments as `QueryStreamBuilder` and `DocumentStreamBuilder`.
 
-A view is the collection's own query or document, given a narrower type at compile
-time, so its snapshots and streams are the store's own and it costs nothing extra
-at runtime.
+A view is the collection's own query, given a narrower type at compile time, so its
+snapshots and streams are the store's own and it costs nothing extra at runtime.
 
 ## ✏️ Updating documents
 

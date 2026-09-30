@@ -27,8 +27,6 @@ class CountingAnimalCollection extends Collection<TestAnimalModel> {
 void main() {
   final animals = TestAnimalModel.store;
   final dogs = animals.view<TestDogModel>();
-  DocumentView<TestDogModel> dog(String id) =>
-      animals.doc(id).view<TestDogModel>();
 
   setUp(() => Loon.configure(persistor: null));
   tearDown(() async {
@@ -41,29 +39,28 @@ void main() {
     animals.doc('dog').create(const TestDogModel('Rex'));
     animals.doc('cat').create(const TestCatModel('Cat'));
     final again = animals.view<TestDogModel>();
-    final QueryView<TestDogModel> inferred = animals.view();
-    final DocumentView<TestDogModel> inferredDoc = animals.doc('dog').view();
+    final CollectionView<TestDogModel> inferred = animals.view();
     expect(again.get(), dogs.get());
     expect(inferred.get(), dogs.get());
-    expect(inferredDoc.get(), dog('dog').get());
-    expect(dog('cat').get(), isNull);
+    expect(inferred.doc('dog').get(), dogs.doc('dog').get());
+    expect(dogs.doc('cat').get(), isNull);
     expect(again.where((s) => s.data.barkVolume > 0).path, animals.path);
   });
 
   test('document views compare equal by document and subtype', () {
-    expect(dog('dog'), animals.doc('dog').view<TestDogModel>());
-    expect(dog('dog').hashCode, animals.doc('dog').view<TestDogModel>().hashCode);
-    expect(dog('dog'), isNot(animals.doc('dog').view<GuideDog>()));
-    expect(dog('dog'), isNot(dog('other')));
+    expect(dogs.doc('dog'), animals.view<TestDogModel>().doc('dog'));
+    expect(dogs.doc('dog').hashCode,
+        animals.view<TestDogModel>().doc('dog').hashCode);
+    expect(dogs.doc('dog'), isNot(animals.view<GuideDog>().doc('dog')));
+    expect(dogs.doc('dog'), isNot(dogs.doc('other')));
   });
 
   test('a view keeps its subtype when its static type is widened', () {
     animals.doc('dog').create(const TestDogModel('Rex'));
     animals.doc('cat').create(const TestCatModel('Cat'));
-    final QueryView<TestAnimalModel> widened = dogs;
+    final CollectionView<TestAnimalModel> widened = dogs;
     expect(widened.get().map((s) => s.id), ['dog']);
-    final DocumentView<TestAnimalModel> widenedDoc = dog('cat');
-    expect(widenedDoc.get(), isNull);
+    expect(widened.doc('cat').get(), isNull);
   });
 
   test('sorting and cached reads use the store snapshots without copies', () {
@@ -108,7 +105,7 @@ void main() {
       List<DocumentSnapshotView<TestDogModel>>? emitted;
       DocumentSnapshotView<TestDogModel>? emittedDoc;
       observed.stream().listen((s) => emitted = s);
-      dog('0').stream().listen((s) => emittedDoc = s);
+      dogs.doc('0').stream().listen((s) => emittedDoc = s);
       flushBroadcasts(async);
       for (var batch = 0; batch < 80; batch++) {
         for (var write = 0; write < 3; write++) {
@@ -132,7 +129,7 @@ void main() {
         }
         flushBroadcasts(async);
         expect(emitted, query.get());
-        expect(emittedDoc, dog('0').get());
+        expect(emittedDoc, dogs.doc('0').get());
       }
     });
   });
@@ -150,10 +147,10 @@ void main() {
     expect(snaps.first as Object, same(animals.doc('dog').get()));
     expect(snaps.first.path, animals.doc('dog').path);
     expect(dogs.path, animals.path);
-    expect(dog('dog').exists(), isTrue);
-    expect(dog('cat').get(), isNull);
-    expect(dog('cat').exists(), isFalse);
-    expect(dog('missing').get(), isNull);
+    expect(dogs.doc('dog').exists(), isTrue);
+    expect(dogs.doc('cat').get(), isNull);
+    expect(dogs.doc('cat').exists(), isFalse);
+    expect(dogs.doc('missing').get(), isNull);
     expect(animals.view<GuideDog>().get().single.id, 'guide');
 
     animals.doc('dog').delete();
@@ -167,7 +164,7 @@ void main() {
         fromJson: (json) => TestDogModel(json['name']),
         toJson: (dog) => dog.toJson());
     narrowWriter.doc('one').create(const TestDogModel('Rex'));
-    final handle = dog('one');
+    final handle = dogs.doc('one');
     expect(handle.get()!.data.name, 'Rex');
     animals.doc('one').update(const TestCatModel('Cat'));
     expect(handle.get(), isNull);
@@ -178,10 +175,10 @@ void main() {
   test('missing nullable documents remain absent', () {
     final source = Loon.collection<Object?>('nullable');
     final view = source.view<String?>();
-    expect(source.doc('missing').view<String?>().get(), isNull);
+    expect(view.doc('missing').get(), isNull);
     source.doc('null').create(null);
-    expect(source.doc('null').view<String?>().get(), isNotNull);
-    expect(source.doc('null').view<String?>().get()!.data, isNull);
+    expect(view.doc('null').get(), isNotNull);
+    expect(view.doc('null').get()!.data, isNull);
     expect(view.get().single.id, 'null');
   });
 
@@ -208,7 +205,7 @@ void main() {
           .stream()
           .listen((s) => lists.add(s.map((s) => s.data.name).toList()));
       collection.streamChanges().listen(changes.addAll);
-      dog('one').stream().listen((s) => values.add(s?.data.name));
+      dogs.doc('one').stream().listen((s) => values.add(s?.data.name));
       flushBroadcasts(async);
 
       doc.create(const TestCatModel('Cat'));
@@ -281,13 +278,13 @@ void main() {
       doc.create(const TestDogModel('First'), broadcast: false);
       final collection = dogs.observe();
       final emissions = <String?>[];
-      dog('one').stream().listen((s) => emissions.add(s?.data.name));
+      dogs.doc('one').stream().listen((s) => emissions.add(s?.data.name));
       flushBroadcasts(async);
       doc.update(const TestCatModel('Cat'));
-      expect(dog('one').get(), isNull);
+      expect(dogs.doc('one').get(), isNull);
       expect(collection.get(), isEmpty);
       doc.update(const TestDogModel('Last'));
-      expect(dog('one').get()!.data.name, 'Last');
+      expect(dogs.doc('one').get()!.data.name, 'Last');
       expect(collection.get().single.data.name, 'Last');
       flushBroadcasts(async);
       expect(emissions, ['First', 'Last']);
@@ -302,7 +299,7 @@ void main() {
       final changes = <DocumentChangeSnapshotView<TestDogModel>>[];
       obs.streamChanges().listen(changes.addAll);
       final values = <String?>[];
-      dog('one').stream().listen((s) => values.add(s?.data.name));
+      dogs.doc('one').stream().listen((s) => values.add(s?.data.name));
       flushBroadcasts(async);
       doc.delete();
       doc.create(const TestCatModel('Cat'));
@@ -355,11 +352,7 @@ void main() {
       source.doc('dog').create(const TestDogModel('Rex'), broadcast: false);
       final view = source.view<TestDogModel>();
       final values = <String?>[];
-      source
-          .doc('dog')
-          .view<TestDogModel>()
-          .stream()
-          .listen((s) => values.add(s?.data.name));
+      view.doc('dog').stream().listen((s) => values.add(s?.data.name));
       final obs = view.observe();
       final changes = <DocumentChangeSnapshotView<TestDogModel>>[];
       obs.streamChanges().listen(changes.addAll);
@@ -391,12 +384,12 @@ void main() {
     ]));
     await Loon.hydrate();
     final view = source.view<TestDogModel>();
-    expect(source.doc('missing').view<TestDogModel>().get(), isNull);
+    expect(view.doc('missing').get(), isNull);
     expect(parsed, 0);
-    final first = source.doc('dog').view<TestDogModel>().stream().first;
+    final first = view.doc('dog').stream().first;
     expect((await first)!.data.name, 'Rex');
     expect(parsed, 1);
-    expect(source.doc('cat').view<TestDogModel>().get(), isNull);
+    expect(view.doc('cat').get(), isNull);
     expect(parsed, 2);
     expect(view.get().map((s) => s.id), ['dog', 'other']);
     expect(parsed, 3);
@@ -413,7 +406,7 @@ void main() {
     ]));
     final query = dogs.observe();
     final queryEvent = query.stream().firstWhere((s) => s.isNotEmpty);
-    final documentEvent = dog('dog').stream().firstWhere((s) => s != null);
+    final documentEvent = dogs.doc('dog').stream().firstWhere((s) => s != null);
     await Loon.hydrate();
     expect((await queryEvent).single.data, const TestDogModel('Rex'));
     expect((await documentEvent)!.data, const TestDogModel('Rex'));
@@ -427,7 +420,7 @@ void main() {
       expect(query.stream(), query.stream());
       expect(query.streamChanges(), query.streamChanges());
       final a = query.stream().listen((_) {});
-      final b = dog('dog').stream().listen((_) {});
+      final b = dogs.doc('dog').stream().listen((_) {});
       a.cancel();
       b.cancel();
       flushBroadcasts(async);
@@ -471,7 +464,6 @@ void main() {
 
   testWidgets('view builders accept views and switch sources', (tester) async {
     final cats = animals.view<TestCatModel>();
-    final catOne = animals.doc('one').view<TestCatModel>();
     animals.doc('one').create(const TestDogModel('Rex'), broadcast: false);
     Widget screen(DocumentView<TestAnimalModel> doc,
             QueryView<TestAnimalModel> query) =>
@@ -486,10 +478,10 @@ void main() {
               builder: (_, snaps) =>
                   Text('list:${snaps.map((s) => s.data.name).join(",")}')),
         ]));
-    await tester.pumpWidget(screen(dog('one'), dogs));
+    await tester.pumpWidget(screen(dogs.doc('one'), dogs));
     expect(find.text('doc:Rex'), findsOneWidget);
     expect(find.text('list:Rex'), findsOneWidget);
-    await tester.pumpWidget(screen(dog('one'), dogs));
+    await tester.pumpWidget(screen(dogs.doc('one'), dogs));
     await tester.pump();
     expect(tester.takeException(), isNull);
     animals.doc('one').update(const TestCatModel('Mittens'));
@@ -497,7 +489,7 @@ void main() {
     await tester.pump();
     expect(find.text('doc:missing'), findsOneWidget);
     expect(find.text('list:'), findsOneWidget);
-    await tester.pumpWidget(screen(catOne, cats));
+    await tester.pumpWidget(screen(cats.doc('one'), cats));
     await tester.pump();
     expect(find.text('doc:Mittens'), findsOneWidget);
     expect(find.text('list:Mittens'), findsOneWidget);
