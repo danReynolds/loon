@@ -176,8 +176,6 @@ final Collection<Animal> animals = Loon.collection<Animal>(
   toJson: (animal) => animal.toJson(),
 );
 final CollectionView<Dog> dogs = animals.view<Dog>();
-// Equivalent explicit construction:
-final sameDogs = CollectionView<Dog>(animals);
 
 final List<DocumentSnapshotView<Dog>> allDogs = dogs.get();
 final DocumentView<Dog> rex = dogs.doc('rex');
@@ -194,9 +192,7 @@ adultDogs.stream().listen((snaps) {
 });
 ```
 
-`collection.view<S>()` statically requires `S` to extend the collection's type.
-The explicit `CollectionView<S>(collection)` constructor filters by runtime data
-type; an unrelated type simply has no matches.
+`view<S>()` statically requires `S` to extend the collection's type.
 
 Only matching documents appear in the view, including subclasses of `Dog`.
 Looking up a missing document or a different subtype returns `null`, and

@@ -7,10 +7,7 @@ part of 'loon.dart';
 class CollectionView<T> extends _QueryView<T> implements StoreReference {
   final Collection<Object?> _collection;
 
-  /// Selects documents whose data is [T], using the source collection's codec.
-  /// A type with no matching documents produces an empty view. Prefer
-  /// [Collection.view] when a statically checked subtype bound is useful.
-  CollectionView(Collection<Object?> collection)
+  CollectionView._(Collection<Object?> collection)
       : _collection = collection,
         super(collection.where((snap) => snap.data is T));
 
@@ -26,5 +23,5 @@ class CollectionView<T> extends _QueryView<T> implements StoreReference {
   bool exists() => _collection.get().any((snap) => snap.data is T);
 
   /// Narrows this view further, including subclasses of [S].
-  CollectionView<S> view<S extends T>() => CollectionView<S>(_collection);
+  CollectionView<S> view<S extends T>() => CollectionView<S>._(_collection);
 }

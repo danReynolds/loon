@@ -35,17 +35,16 @@ void main() {
     await Loon.clearAll(broadcast: false);
   });
 
-  test('constructor and view helper give equivalent typed reads', () {
+  test('views of the same subtype give equivalent typed reads', () {
     animals.doc('dog').create(const TestDogModel('Rex'));
     animals.doc('cat').create(const TestCatModel('Cat'));
-    final direct = CollectionView<TestDogModel>(animals);
-    final CollectionView<TestDogModel> inferred = CollectionView(animals);
-    expect(direct.get(), dogs.get());
+    final again = animals.view<TestDogModel>();
+    final CollectionView<TestDogModel> inferred = animals.view();
+    expect(again.get(), dogs.get());
     expect(inferred.get(), dogs.get());
-    expect(direct.doc('dog').get(), dogs.doc('dog').get());
-    expect(direct.doc('cat').get(), isNull);
-    expect(direct.where((s) => s.data.barkVolume > 0).path, animals.path);
-    expect(CollectionView<String>(animals).get(), isEmpty);
+    expect(again.doc('dog').get(), dogs.doc('dog').get());
+    expect(again.doc('cat').get(), isNull);
+    expect(again.where((s) => s.data.barkVolume > 0).path, animals.path);
   });
 
   test('sorting and cached reads reuse typed projections without stale values',
