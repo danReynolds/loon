@@ -16,11 +16,18 @@ class GuideDog extends TestDogModel {
 class CountingAnimalCollection extends Collection<TestAnimalModel> {
   CountingAnimalCollection() : super('', 'counted');
   int documentHandles = 0;
+  int scans = 0;
 
   @override
   Document<TestAnimalModel> doc([String? id]) {
     documentHandles++;
     return super.doc(id);
+  }
+
+  @override
+  List<DocumentSnapshot<TestAnimalModel>> get() {
+    scans++;
+    return super.get();
   }
 }
 
@@ -33,6 +40,36 @@ void main() {
     Loon.unsubscribe();
     Loon.configure(persistor: null);
     await Loon.clearAll(broadcast: false);
+  });
+
+  test('views compare equal by collection and subtype', () {
+    final guideDogs = animals.view<GuideDog>();
+    expect(animals.view<TestDogModel>(), dogs);
+    expect(animals.view<TestDogModel>().hashCode, dogs.hashCode);
+    expect(dogs.view<GuideDog>(), guideDogs);
+    expect(dogs, isNot(guideDogs));
+    expect(dogs, isNot(Loon.collection<TestAnimalModel>('other').view<TestDogModel>()));
+  });
+
+  testWidgets('a view created on every build is observed once', (tester) async {
+    final source = CountingAnimalCollection();
+    source.doc('rex').create(const TestDogModel('Rex'), broadcast: false);
+    Widget screen(int build) => MaterialApp(
+          home: Column(children: [
+            Text('build:$build'),
+            QueryStreamBuilder(
+              query: source.view<TestDogModel>(),
+              builder: (_, snaps) => Text('dogs:${snaps.length}'),
+            ),
+          ]),
+        );
+    await tester.pumpWidget(screen(0));
+    final scans = source.scans;
+    for (var build = 1; build <= 10; build++) {
+      await tester.pumpWidget(screen(build));
+    }
+    expect(source.scans, scans);
+    expect(find.text('dogs:1'), findsOneWidget);
   });
 
   test('views of the same subtype give equivalent typed reads', () {

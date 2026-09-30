@@ -24,4 +24,15 @@ class CollectionView<T> extends _QueryView<T> implements StoreReference {
 
   /// Narrows this view further, including subclasses of [S].
   CollectionView<S> view<S extends T>() => CollectionView<S>._(_collection);
+
+  // Views of the same type over the same collection select the same documents, so a view
+  // created again on every build compares equal and is not observed again.
+  @override
+  bool operator ==(Object other) =>
+      other is CollectionView<T> && other._viewType == T && other.path == path;
+
+  Type get _viewType => T;
+
+  @override
+  int get hashCode => Object.hash(path, T);
 }
