@@ -1,3 +1,8 @@
+## Unreleased
+
+* Add `collection.view<S>()` and `document.view<S>()`: live, read-only views of the documents whose data is an `S`, with `QueryViewStreamBuilder` and `DocumentViewStreamBuilder` to build from them. Views are extension types over the collection's queries and documents, so they add no runtime objects.
+* [Breaking] Require Dart 3.3, for extension types.
+
 ## 6.0.0
 
 * [Breaking] Require nonempty document IDs and collection names containing no `__` and not ending with `_`; paths must alternate collection and document segments. Direct constructors and `fromPath` check these rules with assertions in debug builds; profile and release builds omit the checks. `doc()` still generates an ID. Use an empty parent for top-level collections; `Collection('root', name)` is no longer an alias. Existing persisted references that violate these rules must be migrated before upgrading.
