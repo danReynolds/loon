@@ -1,36 +1,39 @@
 import 'package:flutter/material.dart';
 import 'package:loon/src/loon.dart';
 
-class QueryStreamBuilder<T> extends StatefulWidget {
-  final Queryable<T> query;
-  final Widget Function(BuildContext, List<DocumentSnapshot<T>>) builder;
+/// Builds from a [QueryView], such as a [CollectionView] or one of its queries, with its
+/// read-only snapshots. An ordinary [Query] is also a query view.
+class QueryViewStreamBuilder<T> extends StatefulWidget {
+  final QueryView<T> query;
+  final Widget Function(BuildContext, List<DocumentSnapshotView<T>>) builder;
 
-  const QueryStreamBuilder({
+  const QueryViewStreamBuilder({
     super.key,
     required this.query,
     required this.builder,
   });
 
   @override
-  QueryStreamBuilderState<T> createState() => QueryStreamBuilderState<T>();
+  QueryViewStreamBuilderState<T> createState() =>
+      QueryViewStreamBuilderState<T>();
 }
 
-class QueryStreamBuilderState<T> extends State<QueryStreamBuilder<T>> {
-  late ObservableQuery<T> _observable = widget.query.toQuery().observe();
+class QueryViewStreamBuilderState<T> extends State<QueryViewStreamBuilder<T>> {
+  late ObservableQueryView<T> _observable = widget.query.observe();
 
   @override
-  void didUpdateWidget(covariant QueryStreamBuilder<T> oldWidget) {
+  void didUpdateWidget(covariant QueryViewStreamBuilder<T> oldWidget) {
     super.didUpdateWidget(oldWidget);
 
     if (oldWidget.query != widget.query) {
       _release(oldWidget.query);
-      _observable = widget.query.toQuery().observe();
+      _observable = widget.query.observe();
     }
   }
 
   // An observed query returns itself from observe(). Its lifetime belongs to the caller
   // that passed it in, so the builder only disposes an observer it created.
-  void _release(Queryable<T> query) {
+  void _release(QueryView<T> query) {
     if (!identical(_observable, query)) {
       _observable.dispose();
     }
@@ -44,7 +47,7 @@ class QueryStreamBuilderState<T> extends State<QueryStreamBuilder<T>> {
 
   @override
   build(context) {
-    return StreamBuilder<List<DocumentSnapshot<T>>>(
+    return StreamBuilder<List<DocumentSnapshotView<T>>>(
       initialData: _observable.get(),
       stream: _observable.stream(),
       builder: (context, snap) => widget.builder(context, snap.data!),

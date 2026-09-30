@@ -176,8 +176,6 @@ final Collection<Animal> animals = Loon.collection<Animal>(
   toJson: (animal) => animal.toJson(),
 );
 final CollectionView<Dog> dogs = animals.view<Dog>();
-// Equivalent explicit construction:
-final sameDogs = CollectionView<Dog>(animals);
 
 final List<DocumentSnapshotView<Dog>> allDogs = dogs.get();
 final DocumentView<Dog> rex = dogs.doc('rex');
@@ -194,9 +192,7 @@ adultDogs.stream().listen((snaps) {
 });
 ```
 
-`collection.view<S>()` statically requires `S` to extend the collection's type.
-The explicit `CollectionView<S>(collection)` constructor filters by runtime data
-type; an unrelated type simply has no matches.
+`view<S>()` statically requires `S` to extend the collection's type.
 
 Only matching documents appear in the view, including subclasses of `Dog`.
 Looking up a missing document or a different subtype returns `null`, and
@@ -222,23 +218,23 @@ Read-only refers to Loon operations; model objects are shared and are not frozen
 Observed result lists are unmodifiable because reads and listeners share the
 cached result. Use `List.of(observed.get())` if you need a locally editable list.
 
-The existing stream builders accept views using the same arguments:
+Views have their own stream builders, which take the same arguments as
+`DocumentStreamBuilder` and `QueryStreamBuilder`:
 
 ```dart
-DocumentStreamBuilder(
+DocumentViewStreamBuilder(
   doc: dogs.doc('rex'),
   builder: (context, snap) => Text(snap?.data.name ?? 'No dog'),
 );
-QueryStreamBuilder(
+QueryViewStreamBuilder(
   query: adultDogs,
   builder: (context, snaps) => Text('${snaps.length} adult dogs'),
 );
 ```
 
-Both builders expose `DocumentSnapshotView<T>` in their callbacks, also when
-reading ordinary collections or documents. Explicit callback annotations should
-use that type. For edits from a builder, retain the original writable document
-or obtain it with `animals.doc(snap.id)`.
+Their callbacks receive read-only `DocumentSnapshotView<T>` snapshots. For edits
+from a builder, write through the collection with `animals.doc(snap.id)`. The
+view builders also accept ordinary documents and queries.
 
 ## 🔎 Queries
 

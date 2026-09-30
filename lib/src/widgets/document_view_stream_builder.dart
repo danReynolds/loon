@@ -1,26 +1,29 @@
 import 'package:flutter/material.dart';
 import 'package:loon/src/loon.dart';
 
-class DocumentStreamBuilder<T> extends StatefulWidget {
-  final Document<T> doc;
-  final Widget Function(BuildContext, DocumentSnapshot<T>?) builder;
+/// Builds from a [DocumentView], such as a document of a [CollectionView], with its read-only
+/// snapshots. An ordinary [Document] is also a document view.
+class DocumentViewStreamBuilder<T> extends StatefulWidget {
+  final DocumentView<T> doc;
+  final Widget Function(BuildContext, DocumentSnapshotView<T>?) builder;
 
-  const DocumentStreamBuilder({
+  const DocumentViewStreamBuilder({
     super.key,
     required this.doc,
     required this.builder,
   });
 
   @override
-  DocumentStreamBuilderState<T> createState() =>
-      DocumentStreamBuilderState<T>();
+  DocumentViewStreamBuilderState<T> createState() =>
+      DocumentViewStreamBuilderState<T>();
 }
 
-class DocumentStreamBuilderState<T> extends State<DocumentStreamBuilder<T>> {
-  late ObservableDocument<T> _observable = widget.doc.observe();
+class DocumentViewStreamBuilderState<T>
+    extends State<DocumentViewStreamBuilder<T>> {
+  late ObservableDocumentView<T> _observable = widget.doc.observe();
 
   @override
-  void didUpdateWidget(covariant DocumentStreamBuilder<T> oldWidget) {
+  void didUpdateWidget(covariant DocumentViewStreamBuilder<T> oldWidget) {
     super.didUpdateWidget(oldWidget);
 
     if (oldWidget.doc != widget.doc) {
@@ -31,7 +34,7 @@ class DocumentStreamBuilderState<T> extends State<DocumentStreamBuilder<T>> {
 
   // An observed document returns itself from observe(). Its lifetime belongs to the caller
   // that passed it in, so the builder only disposes an observer it created.
-  void _release(Document<T> doc) {
+  void _release(DocumentView<T> doc) {
     if (!identical(_observable, doc)) {
       _observable.dispose();
     }
@@ -45,7 +48,7 @@ class DocumentStreamBuilderState<T> extends State<DocumentStreamBuilder<T>> {
 
   @override
   build(context) {
-    return StreamBuilder<DocumentSnapshot<T>?>(
+    return StreamBuilder<DocumentSnapshotView<T>?>(
       initialData: _observable.get(),
       stream: _observable.stream(),
       builder: (context, snap) => widget.builder(context, snap.data),

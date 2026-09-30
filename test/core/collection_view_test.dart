@@ -16,11 +16,18 @@ class GuideDog extends TestDogModel {
 class CountingAnimalCollection extends Collection<TestAnimalModel> {
   CountingAnimalCollection() : super('', 'counted');
   int documentHandles = 0;
+  int scans = 0;
 
   @override
   Document<TestAnimalModel> doc([String? id]) {
     documentHandles++;
     return super.doc(id);
+  }
+
+  @override
+  List<DocumentSnapshot<TestAnimalModel>> get() {
+    scans++;
+    return super.get();
   }
 }
 
@@ -35,17 +42,46 @@ void main() {
     await Loon.clearAll(broadcast: false);
   });
 
-  test('constructor and view helper give equivalent typed reads', () {
+  test('views compare equal by collection and subtype', () {
+    final guideDogs = animals.view<GuideDog>();
+    expect(animals.view<TestDogModel>(), dogs);
+    expect(animals.view<TestDogModel>().hashCode, dogs.hashCode);
+    expect(dogs.view<GuideDog>(), guideDogs);
+    expect(dogs, isNot(guideDogs));
+    expect(dogs, isNot(Loon.collection<TestAnimalModel>('other').view<TestDogModel>()));
+  });
+
+  testWidgets('a view created on every build is observed once', (tester) async {
+    final source = CountingAnimalCollection();
+    source.doc('rex').create(const TestDogModel('Rex'), broadcast: false);
+    Widget screen(int build) => MaterialApp(
+          home: Column(children: [
+            Text('build:$build'),
+            QueryViewStreamBuilder(
+              query: source.view<TestDogModel>(),
+              builder: (_, snaps) => Text('dogs:${snaps.length}'),
+            ),
+          ]),
+        );
+    await tester.pumpWidget(screen(0));
+    final scans = source.scans;
+    for (var build = 1; build <= 10; build++) {
+      await tester.pumpWidget(screen(build));
+    }
+    expect(source.scans, scans);
+    expect(find.text('dogs:1'), findsOneWidget);
+  });
+
+  test('views of the same subtype give equivalent typed reads', () {
     animals.doc('dog').create(const TestDogModel('Rex'));
     animals.doc('cat').create(const TestCatModel('Cat'));
-    final direct = CollectionView<TestDogModel>(animals);
-    final CollectionView<TestDogModel> inferred = CollectionView(animals);
-    expect(direct.get(), dogs.get());
+    final again = animals.view<TestDogModel>();
+    final CollectionView<TestDogModel> inferred = animals.view();
+    expect(again.get(), dogs.get());
     expect(inferred.get(), dogs.get());
-    expect(direct.doc('dog').get(), dogs.doc('dog').get());
-    expect(direct.doc('cat').get(), isNull);
-    expect(direct.where((s) => s.data.barkVolume > 0).path, animals.path);
-    expect(CollectionView<String>(animals).get(), isEmpty);
+    expect(again.doc('dog').get(), dogs.doc('dog').get());
+    expect(again.doc('cat').get(), isNull);
+    expect(again.where((s) => s.data.barkVolume > 0).path, animals.path);
   });
 
   test('sorting and cached reads reuse typed projections without stale values',
@@ -191,7 +227,6 @@ void main() {
         .where((snap) => snap.data.name.startsWith('R'));
     expect(query.get().map((s) => s.id), ['three']);
     expect(query.get().single.doc, isNot(isA<Document>()));
-    expect(query.toQuery(), same(query));
   });
 
   test('collection and document observations share subtype membership events',
@@ -459,19 +494,19 @@ void main() {
     });
   });
 
-  testWidgets('existing builders accept views, switch sources, and dispose',
+  testWidgets('view builders accept views, switch sources, and dispose',
       (tester) async {
     final cats = animals.view<TestCatModel>();
     animals.doc('one').create(const TestDogModel('Rex'), broadcast: false);
     Widget screen(DocumentView<TestAnimalModel> doc,
-            Queryable<TestAnimalModel> query) =>
+            QueryView<TestAnimalModel> query) =>
         MaterialApp(
             home: Column(children: [
-          DocumentStreamBuilder(
+          DocumentViewStreamBuilder(
               doc: doc,
               builder: (_, snap) =>
                   Text('doc:${snap?.data.name ?? "missing"}')),
-          QueryStreamBuilder(
+          QueryViewStreamBuilder(
               query: query,
               builder: (_, snaps) =>
                   Text('list:${snaps.map((s) => s.data.name).join(",")}')),

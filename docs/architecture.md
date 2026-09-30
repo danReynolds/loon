@@ -51,18 +51,20 @@ collection's codec. The underlying collection remains responsible for writes,
 persistence, and dependencies.
 
 Views adapt a parent query with a subtype predicate. They reuse its filtering,
-sorting, cache invalidation, and membership-change engine; the adapters only
-project snapshots and streams onto the read interfaces. A document view observes
+cache invalidation, and membership-change engine; the adapters project snapshots
+and streams onto the read interfaces, and sort the projected snapshots themselves
+so that comparisons don't look up projections. A document view observes
 a private single-ID query, which reads its document directly and ignores other
 IDs during broadcasts using a direct event lookup. Weak-key projection caches
-reuse typed snapshots across filters, sorting, and reads, and reuse observed
+reuse typed snapshots across filters and reads, and reuse observed sorted,
 unmodifiable result lists until the underlying query invalidates them. They
 require no separate invalidation protocol. Projected observer streams retain their identity across
 widget rebuilds and delegate cancellation and disposal to the underlying observer.
 
 Ordinary document, snapshot, query, and observer types implement the shared read
-interfaces while retaining their existing writable APIs. Stream builders use
-those read interfaces so they can consume either ordinary handles or views.
+interfaces while retaining their existing writable APIs. The view stream builders
+use those read interfaces, so they consume either views or ordinary handles; the
+document and query stream builders keep their writable snapshot types.
 
 ### Broadcasts
 
