@@ -1,7 +1,6 @@
 import 'dart:math';
 
 import 'package:fake_async/fake_async.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:loon/loon.dart';
 
@@ -460,43 +459,5 @@ void main() {
       flushBroadcasts(async);
       expect(done, isTrue);
     });
-  });
-
-  testWidgets('view builders accept views and switch sources', (tester) async {
-    final cats = animals.view<TestCatModel>();
-    animals.doc('one').create(const TestDogModel('Rex'), broadcast: false);
-    Widget screen(DocumentView<TestAnimalModel> doc,
-            QueryView<TestAnimalModel> query) =>
-        MaterialApp(
-            home: Column(children: [
-          DocumentViewStreamBuilder(
-              doc: doc,
-              builder: (_, snap) =>
-                  Text('doc:${snap?.data.name ?? "missing"}')),
-          QueryViewStreamBuilder(
-              query: query,
-              builder: (_, snaps) =>
-                  Text('list:${snaps.map((s) => s.data.name).join(",")}')),
-        ]));
-    await tester.pumpWidget(screen(dogs.doc('one'), dogs));
-    expect(find.text('doc:Rex'), findsOneWidget);
-    expect(find.text('list:Rex'), findsOneWidget);
-    await tester.pumpWidget(screen(dogs.doc('one'), dogs));
-    await tester.pump();
-    expect(tester.takeException(), isNull);
-    animals.doc('one').update(const TestCatModel('Mittens'));
-    await tester.pump(const Duration(milliseconds: 1));
-    await tester.pump();
-    expect(find.text('doc:missing'), findsOneWidget);
-    expect(find.text('list:'), findsOneWidget);
-    await tester.pumpWidget(screen(cats.doc('one'), cats));
-    await tester.pump();
-    expect(find.text('doc:Mittens'), findsOneWidget);
-    expect(find.text('list:Mittens'), findsOneWidget);
-    await tester.pumpWidget(const SizedBox.shrink());
-    animals.doc('one').update(const TestDogModel('Back'));
-    await tester.pump(const Duration(milliseconds: 1));
-    expect(tester.takeException(), isNull);
-    expect(Loon.inspect()['broadcastStore']['observerValues'], isEmpty);
   });
 }

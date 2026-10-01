@@ -1,6 +1,6 @@
 ## Unreleased
 
-* Add `collection.view<S>()`: a live, read-only view of the documents whose data is an `S`, read by ID with `doc(id)` or through queries, with `QueryViewStreamBuilder` and `DocumentViewStreamBuilder` to build from it. Views are extension types over the collection's queries and documents, so they add no runtime objects.
+* Add `collection.view<S>()`: a live, read-only view of the documents whose data is an `S`, read by ID with `doc(id)` or through queries. Views are extension types over the collection's queries and documents, so they add no runtime objects.
 * [Breaking] Require Dart 3.3, for extension types.
 
 ## 6.0.0

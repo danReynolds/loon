@@ -225,11 +225,9 @@ Views are live and read-only. Documents of other types are absent from them, so 
 document that changes from a dog to a cat is removed from a dog view and added to a
 cat view. Write through the collection, as in `animals.doc(snap.id).update(...)`.
 
-Build from views with `QueryViewStreamBuilder` and `DocumentViewStreamBuilder`,
-which take the same arguments as `QueryStreamBuilder` and `DocumentStreamBuilder`.
-
-A view is the collection's own query, given a narrower type at compile time, so its
-snapshots and streams are the store's own and it costs nothing extra at runtime.
+A view is the collection's own query, given a narrower type at compile time, so it
+costs nothing extra at runtime: its snapshots are the store's own, and its lists and
+streams are its query's.
 
 ## ✏️ Updating documents
 

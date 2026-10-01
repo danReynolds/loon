@@ -1,14 +1,11 @@
 /// Live, read-only views of the documents of a collection whose data is one of its subtypes.
 ///
 /// A view is the collection's ordinary query, filtered by type and given a narrower static type
-/// with extension types. Its snapshots, lists and streams are the store's own, so views need no
-/// wrappers, caches or invalidation of their own.
+/// with extension types. Its snapshots are the store's own and its lists and streams are its
+/// query's, so views need no wrappers, caches or invalidation of their own.
 library;
 
-import 'package:flutter/widgets.dart';
 import 'package:loon/src/loon.dart';
-import 'package:loon/src/widgets/document_stream_builder.dart';
-import 'package:loon/src/widgets/query_stream_builder.dart';
 
 extension CollectionViews<T> on Collection<T> {
   /// Views the documents whose data is [S], including subclasses of [S].
@@ -20,7 +17,7 @@ extension CollectionViews<T> on Collection<T> {
 
 /// A live, read-only view of a collection's documents whose data is a [T].
 extension type const CollectionView<T>._(_View _view) implements QueryView<T> {
-  /// Views the document [id] while its data is a [T].
+  /// Views the document [id] while its data is a [T], using this view's type test.
   DocumentView<T> doc(String id) =>
       DocumentView._((doc: _view.query.collection.doc(id), test: _view.test));
 }
@@ -76,6 +73,8 @@ extension type const DocumentView<T>._(
 
   bool exists() => get() != null;
 
+  /// The document's snapshots while its data is a [T], and a single null while it is missing or
+  /// another type.
   Stream<DocumentSnapshotView<T>?> stream() => _view.doc
       .stream()
       .map(_select)
@@ -108,7 +107,8 @@ extension type const DocumentChangeSnapshotView<T>._(
 /// test, so widening a view's static type never widens what it reads.
 typedef _View = ({Query<Object?> query, _TypeTest<Object?> test});
 
-/// Whether a snapshot's data is an [S]. Tests compare by type, so they can key a document view.
+/// Whether a snapshot's data is an [S]. Tests of the same type are equal, so document views of the
+/// same document and type are too.
 class _TypeTest<S> {
   bool call(DocumentSnapshot<Object?> snap) => snap.data is S;
 
@@ -117,41 +117,4 @@ class _TypeTest<S> {
 
   @override
   int get hashCode => runtimeType.hashCode;
-}
-
-/// Builds with the snapshots of a [QueryView], such as a [CollectionView].
-class QueryViewStreamBuilder<T> extends StatelessWidget {
-  final QueryView<T> query;
-  final Widget Function(BuildContext, List<DocumentSnapshotView<T>>) builder;
-
-  const QueryViewStreamBuilder({
-    super.key,
-    required this.query,
-    required this.builder,
-  });
-
-  @override
-  Widget build(BuildContext context) => QueryStreamBuilder<Object?>(
-        query: query._view.query,
-        builder: (context, snaps) =>
-            builder(context, snaps as List<DocumentSnapshotView<T>>),
-      );
-}
-
-/// Builds with the snapshot of a [DocumentView], or null while it is missing or not a [T].
-class DocumentViewStreamBuilder<T> extends StatelessWidget {
-  final DocumentView<T> doc;
-  final Widget Function(BuildContext, DocumentSnapshotView<T>?) builder;
-
-  const DocumentViewStreamBuilder({
-    super.key,
-    required this.doc,
-    required this.builder,
-  });
-
-  @override
-  Widget build(BuildContext context) => DocumentStreamBuilder<Object?>(
-        doc: doc._view.doc,
-        builder: (context, snap) => builder(context, doc._select(snap)),
-      );
 }
