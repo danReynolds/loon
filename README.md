@@ -225,9 +225,9 @@ Views are live and read-only. Documents of other types are absent from them, so 
 document that changes from a dog to a cat is removed from a dog view and added to a
 cat view. Write through the collection, as in `animals.doc(snap.id).update(...)`.
 
-A view is the collection's own query, given a narrower type at compile time, so it
-costs nothing extra at runtime: its snapshots are the store's own, and its lists and
-streams are its query's.
+A view runs on the collection's own query, filtered by type, so the store does its
+filtering, sorting and change tracking. Each snapshot it returns wraps the store's
+snapshot, with its data typed as the view's type.
 
 ## ✏️ Updating documents
 

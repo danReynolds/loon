@@ -146,6 +146,6 @@ class Collection<T> implements Queryable<T>, StoreReference {
   }
 
   CollectionView<S> view<S extends T>() {
-    return CollectionView<S>(toQuery());
+    return CollectionView<S>._(where((snap) => snap.data is S));
   }
 }

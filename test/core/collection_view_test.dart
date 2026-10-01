@@ -2,7 +2,7 @@ import 'dart:math';
 
 import 'package:fake_async/fake_async.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:loon/src/loon.dart';
+import 'package:loon/loon.dart';
 
 import '../models/test_animal_model.dart';
 import '../models/test_persistor.dart';
@@ -11,6 +11,13 @@ import '../utils.dart';
 class GuideDog extends TestDogModel {
   const GuideDog(super.name);
 }
+
+/// View snapshots compare by identity, so tests compare their IDs and data.
+List<(String, Object?)> rows(List<DocumentSnapshotView> snaps) =>
+    [for (final snap in snaps) (snap.id, snap.data)];
+
+(String, Object?)? row(DocumentSnapshotView? snap) =>
+    snap == null ? null : (snap.id, snap.data);
 
 class CountingAnimalCollection extends Collection<TestAnimalModel> {
   CountingAnimalCollection() : super('', 'counted');
@@ -39,19 +46,11 @@ void main() {
     animals.doc('cat').create(const TestCatModel('Cat'));
     final again = animals.view<TestDogModel>();
     final CollectionView<TestDogModel> inferred = animals.view();
-    expect(again.get(), dogs.get());
-    expect(inferred.get(), dogs.get());
-    expect(inferred.doc('dog').get(), dogs.doc('dog').get());
+    expect(rows(again.get()), rows(dogs.get()));
+    expect(rows(inferred.get()), rows(dogs.get()));
+    expect(row(inferred.doc('dog').get()), row(dogs.doc('dog').get()));
     expect(dogs.doc('cat').get(), isNull);
     expect(again.where((s) => s.data.barkVolume > 0).path, animals.path);
-  });
-
-  test('document views compare equal by document and subtype', () {
-    expect(dogs.doc('dog'), animals.view<TestDogModel>().doc('dog'));
-    expect(dogs.doc('dog').hashCode,
-        animals.view<TestDogModel>().doc('dog').hashCode);
-    expect(dogs.doc('dog'), isNot(animals.view<GuideDog>().doc('dog')));
-    expect(dogs.doc('dog'), isNot(dogs.doc('other')));
   });
 
   test('a view keeps its subtype when its static type is widened', () {
@@ -62,7 +61,7 @@ void main() {
     expect(widened.doc('cat').get(), isNull);
   });
 
-  test('sorting and cached reads use the store snapshots without copies', () {
+  test('sorting and cached reads create no document handles', () {
     final source = CountingAnimalCollection();
     for (var i = 0; i < 2000; i++) {
       source
@@ -80,14 +79,13 @@ void main() {
     final observed = query.observe();
     final first = observed.get();
     for (var i = 0; i < 20; i++) {
-      expect(observed.get(), same(first));
+      expect(rows(observed.get()), rows(first));
     }
     expect(view.get(), isNotEmpty);
     expect(source.documentHandles, 0);
 
     source.doc('0').update(const TestDogModel('Changed'));
     final updated = observed.get();
-    expect(updated, isNot(same(first)));
     expect(updated.singleWhere((s) => s.id == '0').data.name, 'Changed');
     expect(first.singleWhere((s) => s.id == '0').data.name, '0');
     observed.dispose();
@@ -124,11 +122,11 @@ void main() {
               doc.createOrUpdate(
                   TestDogModel(random.nextBool() ? 'a' : 'dog$batch'));
           }
-          expect(observed.get(), query.get());
+          expect(rows(observed.get()), rows(query.get()));
         }
         flushBroadcasts(async);
-        expect(emitted, query.get());
-        expect(emittedDoc, dogs.doc('0').get());
+        expect(rows(emitted!), rows(query.get()));
+        expect(row(emittedDoc), row(dogs.doc('0').get()));
       }
     });
   });
@@ -142,8 +140,6 @@ void main() {
     final List<DocumentSnapshotView<TestDogModel>> snaps = dogs.get();
     expect(snaps.map((s) => s.id), ['dog', 'guide']);
     expect(snaps.first.data, same(rex));
-    // A view snapshot is the store's own snapshot.
-    expect(snaps.first as Object, same(animals.doc('dog').get()));
     expect(snaps.first.path, animals.doc('dog').path);
     expect(dogs.path, animals.path);
     expect(dogs.doc('dog').exists(), isTrue);
@@ -155,6 +151,38 @@ void main() {
     animals.doc('dog').delete();
     animals.doc('guide').delete();
     expect(dogs.get(), isEmpty);
+  });
+
+  test('changes follow the view filters', () {
+    fakeAsync((async) {
+      animals.doc('al').create(const TestDogModel('Al'), broadcast: false);
+      final events = <String>[];
+      dogs.where((snap) => snap.data.name.length > 3).streamChanges().listen(
+          (changes) => events
+              .addAll([for (final c in changes) '${c.event.name} ${c.id}']));
+      flushBroadcasts(async);
+      animals.doc('al').update(const TestDogModel('Al2'));
+      flushBroadcasts(async);
+      animals.doc('al').update(const TestDogModel('Alfred'));
+      flushBroadcasts(async);
+      animals.doc('al').update(const TestDogModel('Al'));
+      flushBroadcasts(async);
+      expect(events, ['added al', 'removed al']);
+    });
+  });
+
+  test('view lists accept view-typed values', () {
+    animals.doc('rex').create(const TestDogModel('Rex'));
+    animals.doc('alexander').create(const TestDogModel('Alexander'));
+    final rex = dogs.doc('rex').get()!;
+    final snaps = dogs.get();
+    expect(
+        snaps
+            .reduce((a, b) => a.data.barkVolume >= b.data.barkVolume ? a : b)
+            .id,
+        'alexander');
+    expect(snaps.firstWhere((s) => s.id == 'missing', orElse: () => rex), rex);
+    expect(snaps + [rex], hasLength(3));
   });
 
   test('document views keep the parent codec after writes through another type',
@@ -241,7 +269,6 @@ void main() {
       expect(changes[2].prevData, const TestDogModel('Updated'));
       expect(changes[2].data, isNull);
       expect(changes.first.id, 'one');
-      expect(collection.observe(), collection);
     });
   });
 
@@ -335,7 +362,7 @@ void main() {
       expect(obs.get(), isEmpty);
       flag.update(true);
       flushBroadcasts(async);
-      expect(obs.get(), query.get());
+      expect(rows(obs.get()), rows(query.get()));
       expect(events, [
         ['one'],
         ['one']
@@ -411,13 +438,9 @@ void main() {
     expect((await documentEvent)!.data, const TestDogModel('Rex'));
   });
 
-  test('observed streams are the query streams and release on cancellation',
-      () {
+  test('cancelling view streams releases their observers', () {
     fakeAsync((async) {
       final query = dogs.observe();
-      // The view's streams are its query's own, which compare equal per observer.
-      expect(query.stream(), query.stream());
-      expect(query.streamChanges(), query.streamChanges());
       final a = query.stream().listen((_) {});
       final b = dogs.doc('dog').stream().listen((_) {});
       a.cancel();

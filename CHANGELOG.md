@@ -1,7 +1,6 @@
 ## Unreleased
 
-* Add `collection.view<S>()`: a live, read-only view of the documents whose data is an `S`, read by ID with `doc(id)` or through queries. Views are extension types over the collection's queries and documents, so they add no runtime objects.
-* [Breaking] Require Dart 3.3, for extension types.
+* Add `collection.view<S>()` and `query.view<S>()`: live, read-only views of the documents whose data is an `S`, read by ID with `doc(id)` or through `where`, `sortBy` and streams, with snapshots typed as `S`. A view's change stream reports a document that becomes an `S` as added and one that stops being an `S` as removed.
 
 ## 6.0.0
 
