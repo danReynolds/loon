@@ -3,8 +3,7 @@ part of 'loon.dart';
 class CollectionView<T> extends QueryView<T> {
   CollectionView(super._query);
 
-  /// Views the document [id] while its data is a [T], using this view's type test.
-  DocumentView<T> doc(String id) => DocumentView._(_query.collection.doc(id));
+  DocumentView<T> doc(String id) => DocumentView(_query.collection.doc(id));
 }
 
 typedef QueryViewFilterFn<T> = bool Function(DocumentSnapshotView<T>);
@@ -56,7 +55,6 @@ class QueryView<T> {
       QueryView(_query, filters: _filters, sortBy: sortBy);
 }
 
-/// An observed [QueryView] with an explicit lifetime, like an [ObservableQuery].
 class ObservableQueryView<T> extends QueryView<T> {
   @override
   // ignore: overridden_fields
@@ -72,25 +70,29 @@ class ObservableQueryView<T> extends QueryView<T> {
   void dispose() => _query.dispose();
 }
 
-/// A live, read-only view of a document that reads as absent while its data is not a [T].
-/// Views of the same document and type are equal.
-extension type const DocumentView<T>._(Document doc) {
-  String get id => doc.id;
-  String get path => doc.path;
+class DocumentView<T> {
+  final Document _doc;
 
-  DocumentSnapshotView<T>? get() => DocumentSnapshotView.of<T>(doc.get());
+  DocumentView(this._doc);
+
+  String get id => _doc.id;
+  String get path => _doc.path;
+
+  DocumentSnapshotView<T>? get() => DocumentSnapshotView.of<T>(_doc.get());
 
   bool exists() => get() != null;
 
   /// The document's snapshots while its data is a [T], and a single null while it is missing or
   /// another type.
   Stream<DocumentSnapshotView<T>?> stream() =>
-      doc.stream().map(DocumentSnapshotView.of<T>);
+      _doc.stream().map(DocumentSnapshotView.of<T>);
 }
 
-/// A snapshot read through a view, with its data typed as [T].
-extension type const DocumentSnapshotView<T>._(
-    DocumentSnapshot<Object?> _snap) {
+class DocumentSnapshotView<T> {
+  final DocumentSnapshot<Object?> _snap;
+
+  DocumentSnapshotView._(this._snap);
+
   String get id => _snap.id;
   String get path => _snap.path;
   T get data => _snap.data as T;
@@ -103,10 +105,11 @@ extension type const DocumentSnapshotView<T>._(
   }
 }
 
-/// A change to a view's documents. A document that becomes a [T] is added to the view, and one
-/// that stops being a [T] is removed from it.
-extension type const DocumentChangeSnapshotView<T>._(
-    DocumentChangeSnapshot<Object?> _change) {
+class DocumentChangeSnapshotView<T> {
+  final DocumentChangeSnapshot<Object?> _change;
+
+  DocumentChangeSnapshotView._(this._change);
+
   String get id => _change.id;
   String get path => _change.path;
   BroadcastEvents get event => _change.event;
