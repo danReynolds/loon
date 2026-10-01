@@ -2,7 +2,7 @@ import 'dart:math';
 
 import 'package:fake_async/fake_async.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:loon/loon.dart';
+import 'package:loon/src/loon.dart';
 
 import '../models/test_animal_model.dart';
 import '../models/test_persistor.dart';

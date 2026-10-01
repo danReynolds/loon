@@ -83,4 +83,8 @@ class Query<T> extends Queryable<T> {
   toQuery() {
     return this;
   }
+
+  QueryView<S> view<S extends T>() {
+    return QueryView<S>(this);
+  }
 }

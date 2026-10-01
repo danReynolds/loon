@@ -1,87 +1,91 @@
-/// Live, read-only views of the documents of a collection whose data is one of its subtypes.
-///
-/// A view is the collection's ordinary query, filtered by type and given a narrower static type
-/// with extension types. Its snapshots are the store's own and its lists and streams are its
-/// query's, so views need no wrappers, caches or invalidation of their own.
-library;
+part of 'loon.dart';
 
-import 'package:loon/src/loon.dart';
+class CollectionView<T> extends QueryView<T> {
+  CollectionView(super._query);
 
-extension CollectionViews<T> on Collection<T> {
-  /// Views the documents whose data is [S], including subclasses of [S].
-  CollectionView<S> view<S extends T>() {
-    final test = _TypeTest<S>();
-    return CollectionView._((query: where(test.call), test: test));
-  }
-}
-
-/// A live, read-only view of a collection's documents whose data is a [T].
-extension type const CollectionView<T>._(_View _view) implements QueryView<T> {
   /// Views the document [id] while its data is a [T], using this view's type test.
-  DocumentView<T> doc(String id) =>
-      DocumentView._((doc: _view.query.collection.doc(id), test: _view.test));
+  DocumentView<T> doc(String id) => DocumentView._(_query.collection.doc(id));
 }
 
-/// A live, read-only query of a view's documents.
-///
-/// A view snapshot is its store snapshot, so the view's filters and comparators are its query's.
-extension type const QueryView<T>._(_View _view) {
-  String get path => _view.query.path;
+typedef QueryViewFilterFn<T> = bool Function(DocumentSnapshotView<T>);
+typedef QueryViewSortByFn<T> = int Function(
+    DocumentSnapshotView<T> a, DocumentSnapshotView<T> b);
 
-  List<DocumentSnapshotView<T>> get() =>
-      _view.query.get() as List<DocumentSnapshotView<T>>;
+class QueryView<T> {
+  final Query _query;
+  final List<QueryViewFilterFn<T>> _filters;
+  final QueryViewSortByFn<T>? _sortBy;
+
+  QueryView(
+    this._query, {
+    List<QueryViewFilterFn<T>>? filters,
+    QueryViewSortByFn<T>? sortBy,
+  })  : _filters = filters ?? [],
+        _sortBy = sortBy;
+
+  String get path => _query.path;
+
+  List<DocumentSnapshotView<T>> _convert(List<DocumentSnapshot> snaps) => snaps
+      .map(DocumentSnapshotView.of<T>)
+      .whereType<DocumentSnapshotView<T>>()
+      .where((snap) => _filters.every((filter) => filter(snap)))
+      .toList();
+
+  List<DocumentSnapshotView<T>> get() => _convert(_query.get());
 
   Stream<List<DocumentSnapshotView<T>>> stream() =>
-      _view.query.stream() as Stream<List<DocumentSnapshotView<T>>>;
+      _query.stream().map(_convert);
 
   Stream<List<DocumentChangeSnapshotView<T>>> streamChanges() =>
-      _view.query.streamChanges()
-          as Stream<List<DocumentChangeSnapshotView<T>>>;
-
-  QueryView<T> where(bool Function(DocumentSnapshotView<T> snap) filter) =>
-      _with(_view.query.where(filter as FilterFn<Object?>));
-
-  QueryView<T> sortBy(
-    int Function(DocumentSnapshotView<T> a, DocumentSnapshotView<T> b) sort,
-  ) =>
-      _with(_view.query.sortBy(sort as SortFn<Object?>));
+      _query.streamChanges().map((changes) => changes
+          .map(DocumentChangeSnapshotView.of<T>)
+          .whereType<DocumentChangeSnapshotView<T>>()
+          .toList());
 
   ObservableQueryView<T> observe({bool multicast = false}) =>
-      ObservableQueryView._(
-          (query: _view.query.observe(multicast: multicast), test: _view.test));
+      ObservableQueryView._(_query.observe(multicast: multicast));
 
-  QueryView<T> _with(Query<Object?> query) =>
-      QueryView._((query: query, test: _view.test));
+  QueryView<T> where(QueryViewFilterFn filter) => QueryView(_query,
+      filters: [
+        ..._filters,
+        filter,
+      ],
+      sortBy: _sortBy);
+
+  QueryView<T> sortBy(QueryViewSortByFn<T> sortBy) =>
+      QueryView(_query, filters: _filters, sortBy: sortBy);
 }
 
 /// An observed [QueryView] with an explicit lifetime, like an [ObservableQuery].
-extension type const ObservableQueryView<T>._(
-        ({ObservableQuery<Object?> query, _TypeTest<Object?> test}) _view)
-    implements QueryView<T> {
-  bool get multicast => _view.query.multicast;
-  void dispose() => _view.query.dispose();
+class ObservableQueryView<T> extends QueryView<T> {
+  @override
+  // ignore: overridden_fields
+  final ObservableQuery _query;
+
+  ObservableQueryView._(
+    this._query, {
+    super.filters,
+    super.sortBy,
+  }) : super(_query);
+
+  bool get multicast => _query.multicast;
+  void dispose() => _query.dispose();
 }
 
 /// A live, read-only view of a document that reads as absent while its data is not a [T].
 /// Views of the same document and type are equal.
-extension type const DocumentView<T>._(
-    ({Document<Object?> doc, _TypeTest<Object?> test}) _view) {
-  String get id => _view.doc.id;
-  String get path => _view.doc.path;
+extension type const DocumentView<T>._(Document doc) {
+  String get id => doc.id;
+  String get path => doc.path;
 
-  DocumentSnapshotView<T>? get() => _select(_view.doc.get());
+  DocumentSnapshotView<T>? get() => DocumentSnapshotView.of<T>(doc.get());
 
   bool exists() => get() != null;
 
   /// The document's snapshots while its data is a [T], and a single null while it is missing or
   /// another type.
-  Stream<DocumentSnapshotView<T>?> stream() => _view.doc
-      .stream()
-      .map(_select)
-      .distinct((prev, next) => prev == null && next == null);
-
-  DocumentSnapshotView<T>? _select(DocumentSnapshot<Object?>? snap) =>
-      snap != null && _view.test(snap) ? DocumentSnapshotView._(snap) : null;
+  Stream<DocumentSnapshotView<T>?> stream() =>
+      doc.stream().map(DocumentSnapshotView.of<T>);
 }
 
 /// A snapshot read through a view, with its data typed as [T].
@@ -90,6 +94,13 @@ extension type const DocumentSnapshotView<T>._(
   String get id => _snap.id;
   String get path => _snap.path;
   T get data => _snap.data as T;
+
+  static DocumentSnapshotView<T>? of<T>(DocumentSnapshot? snap) {
+    if (snap is DocumentSnapshot<T>) {
+      return DocumentSnapshotView._(snap);
+    }
+    return null;
+  }
 }
 
 /// A change to a view's documents. A document that becomes a [T] is added to the view, and one
@@ -101,20 +112,11 @@ extension type const DocumentChangeSnapshotView<T>._(
   BroadcastEvents get event => _change.event;
   T? get data => _change.data as T?;
   T? get prevData => _change.prevData as T?;
-}
 
-/// A view's query, and the type test that selects its documents. A view's documents keep its
-/// test, so widening a view's static type never widens what it reads.
-typedef _View = ({Query<Object?> query, _TypeTest<Object?> test});
-
-/// Whether a snapshot's data is an [S]. Tests of the same type are equal, so document views of the
-/// same document and type are too.
-class _TypeTest<S> {
-  bool call(DocumentSnapshot<Object?> snap) => snap.data is S;
-
-  @override
-  bool operator ==(Object other) => other.runtimeType == runtimeType;
-
-  @override
-  int get hashCode => runtimeType.hashCode;
+  static DocumentChangeSnapshotView<T>? of<T>(DocumentChangeSnapshot? change) {
+    if (change is DocumentChangeSnapshot<T>) {
+      return DocumentChangeSnapshotView._(change);
+    }
+    return null;
+  }
 }

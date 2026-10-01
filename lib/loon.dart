@@ -42,4 +42,3 @@ export 'src/persistor/index.dart'
 export 'src/utils/id.dart' show generateFastId, generateSecureId;
 export 'src/widgets/document_stream_builder.dart';
 export 'src/widgets/query_stream_builder.dart';
-export 'src/views.dart';

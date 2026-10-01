@@ -34,6 +34,7 @@ part 'utils/validation.dart';
 part 'utils/logger.dart';
 part 'utils/exceptions.dart';
 part 'store_reference.dart';
+part 'views.dart';
 
 class Loon {
   static final Loon _instance = Loon._();
