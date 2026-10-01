@@ -1,3 +1,7 @@
+## Unreleased
+
+* Add `collection.view<S>()` and `query.view<S>()`: live, read-only views of the documents whose data is an `S`, read by ID with `doc(id)` or through `where`, `sortBy` and streams, with snapshots typed as `S`. A view's change stream reports a document that becomes an `S` as added and one that stops being an `S` as removed.
+
 ## 6.0.0
 
 * [Breaking] Require nonempty document IDs and collection names containing no `__` and not ending with `_`; paths must alternate collection and document segments. Direct constructors and `fromPath` check these rules with assertions in debug builds; profile and release builds omit the checks. `doc()` still generates an ID. Use an empty parent for top-level collections; `Collection('root', name)` is no longer an alias. Existing persisted references that violate these rules must be migrated before upgrading.

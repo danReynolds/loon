@@ -198,6 +198,37 @@ class MyWidget extends StatelessWidget {
 }
 ```
 
+## 🧬 Subtype views
+
+A collection can store several subclasses of a common model. `view<S>()` reads the
+documents whose data is an `S`, including subclasses of `S`:
+
+```dart
+final Collection<Animal> animals = Loon.collection(
+  'animals',
+  fromJson: Animal.fromJson,
+  toJson: (animal) => animal.toJson(),
+);
+
+final CollectionView<Dog> dogs = animals.view<Dog>();
+
+final Dog? rex = dogs.doc('rex').get()?.data; // null if rex is missing or not a dog
+
+dogs
+    .where((snap) => snap.data.age >= 2)
+    .sortBy((a, b) => a.data.name.compareTo(b.data.name))
+    .stream()
+    .listen((snaps) => print(snaps.map((snap) => snap.data.name)));
+```
+
+Views are live and read-only. Documents of other types are absent from them, so a
+document that changes from a dog to a cat is removed from a dog view and added to a
+cat view. Write through the collection, as in `animals.doc(snap.id).update(...)`.
+
+A view runs on the collection's own query, filtered by type, so the store does its
+filtering, sorting and change tracking. Each snapshot it returns wraps the store's
+snapshot, with its data typed as the view's type.
+
 ## ✏️ Updating documents
 
 Assuming a model has a `copyWith` function, documents can be updated as shown below:

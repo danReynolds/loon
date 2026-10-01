@@ -144,4 +144,8 @@ class Collection<T> implements Queryable<T>, StoreReference {
   Query<T> toQuery() {
     return Query(this);
   }
+
+  CollectionView<S> view<S extends T>() {
+    return CollectionView<S>._(toQuery());
+  }
 }

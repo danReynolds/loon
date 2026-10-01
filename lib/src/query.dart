@@ -29,6 +29,9 @@ class Query<T> extends Queryable<T> {
   }
 
   List<DocumentSnapshot<T>> _filterQuery(List<DocumentSnapshot<T>> snaps) {
+    if (filters.isEmpty) {
+      return snaps;
+    }
     return snaps.where(_filter).toList();
   }
 
@@ -82,5 +85,9 @@ class Query<T> extends Queryable<T> {
   @override
   toQuery() {
     return this;
+  }
+
+  QueryView<S> view<S extends T>() {
+    return QueryView<S>._(this);
   }
 }
