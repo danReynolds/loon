@@ -1,7 +1,7 @@
 part of 'loon.dart';
 
 class CollectionView<T> extends QueryView<T> {
-  CollectionView._(super._query) : super._();
+  CollectionView._(super.query) : super._();
 
   DocumentView<T> doc(String id) => DocumentView(_query.collection.doc(id));
 }
@@ -15,7 +15,12 @@ class QueryView<T> {
   final Query _query;
   final QueryViewSortByFn<T>? _sortBy;
 
-  QueryView._(this._query, {QueryViewSortByFn<T>? sortBy}) : _sortBy = sortBy;
+  /// Views the documents of [query] whose data is a [T].
+  QueryView._(Query query)
+      : this._selected(query.where((snap) => snap.data is T));
+
+  QueryView._selected(this._query, {QueryViewSortByFn<T>? sortBy})
+      : _sortBy = sortBy;
 
   String get path => _query.path;
 
@@ -45,13 +50,13 @@ class QueryView<T> {
       ObservableQueryView._(_query.observe(multicast: multicast),
           sortBy: _sortBy);
 
-  QueryView<T> where(QueryViewFilterFn<T> filter) => QueryView._(
+  QueryView<T> where(QueryViewFilterFn<T> filter) => QueryView._selected(
         _query.where((snap) => filter(DocumentSnapshotView<T>._(snap))),
         sortBy: _sortBy,
       );
 
   QueryView<T> sortBy(QueryViewSortByFn<T> sortBy) =>
-      QueryView._(_query, sortBy: sortBy);
+      QueryView._selected(_query, sortBy: sortBy);
 }
 
 class ObservableQueryView<T> extends QueryView<T> {
@@ -62,7 +67,7 @@ class ObservableQueryView<T> extends QueryView<T> {
   ObservableQueryView._(
     this._query, {
     super.sortBy,
-  }) : super._(_query);
+  }) : super._selected(_query);
 
   bool get multicast => _query.multicast;
   void dispose() => _query.dispose();

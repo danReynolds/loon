@@ -88,6 +88,6 @@ class Query<T> extends Queryable<T> {
   }
 
   QueryView<S> view<S extends T>() {
-    return QueryView<S>._(where((snap) => snap.data is S));
+    return QueryView<S>._(this);
   }
 }
