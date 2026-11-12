@@ -1,0 +1,15 @@
+# Secure-storage v11 migration and Loon encryption keys
+
+Loon keeps one AES-256 key under `loon_encrypted_file_persistor_key` in `flutter_secure_storage`. Encrypted file and SQLite stores depend on that *same* key across app updates; losing or replacing it makes their existing ciphertext unreadable. On startup Loon reads the key (or generates it only if genuinely absent) before starting a persistence worker. `resetOnError: false` prevents Android's default error recovery from deleting secure storage, and Loon checks the plugin's read-only upgrade status before deciding that a missing key means a fresh installation. Neither measure can reconstruct a key that was already lost.
+
+## Android release sequence
+
+1. Inventory the plugin version in *deployed app binaries*, not just the current dependency declaration. Back up user data before rollout; keep the original app data and Android Keystore intact during verification. Android backup/restore without the matching Keystore key can also make storage unreadable.
+2. If a deployed app could have saved keys with `flutter_secure_storage` 9.x, first release an app using v10 (ideally latest 10.3.x). Run it on existing installs and successfully read the Loon key so v10 migrates the legacy RSA/CBC ciphers to supported RSA-OAEP/AES-GCM. Verify existing encrypted documents remain readable, including after restarting the app. Do **not** skip this release for users who have not yet run it.
+3. Only then release an app resolving v11.2.x. Recheck reads of the same encrypted documents after the upgrade and restart. Keep a recovery path for devices that missed the v10 rollout: pause their update, or restore a pre-upgrade backup to a v10 build and migrate there first. Never clear storage or generate a new key as a purported repair.
+
+A direct 9.x → 11.x jump is **not** a supported Loon key migration: v11 removed the ciphers needed to read unmigrated 9.x data. `resetOnError: false` keeps errors visible rather than automatically deleting corrupted encrypted values; `checkUpgradeStatus()` also blocks key creation when v11 recognizes legacy unreadable data. It does not make those values decryptable. App-specific recovery must be designed before rollout, and direct upgrades must be tested with representative saved data. If a key was already deleted by an earlier release, Loon cannot recover encrypted stores from it.
+
+The v11 plugin requires Dart >=3.8, Flutter >=3.19, Android API >=24 and (through its Darwin implementation) iOS >=13. Confirm the consuming application's build, deployment range and transitive dependencies; users on older Android/iOS versions need a compatible release. Loon leaves the iOS/macOS Keychain options unchanged, but applications should still validate keychain entitlements, installed-app update behavior and encrypted-store reads on real Apple devices. Loon's unit tests mock the plugin and are not a substitute for an on-device migration test.
+
+See the [flutter_secure_storage v11 changelog](https://pub.dev/packages/flutter_secure_storage/changelog#1100) for removed algorithms and platform requirements.
