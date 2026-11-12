@@ -1,3 +1,9 @@
+## Unreleased
+
+* Upgrade `flutter_secure_storage` to 11.2.x. Loon disables Android's destructive `resetOnError` for its persisted encryption key and refuses to generate a replacement when the plugin reports unreadable legacy data. Read failures propagate instead of silently replacing the key.
+* **Android migration:** applications with keys written by `flutter_secure_storage` 9.x must run a v10 release (and successfully access/migrate the key) before installing v11; a direct v9 → v11 upgrade cannot decrypt legacy ciphers. Back up data and validate key continuity before rollout. See [secure-storage migration](docs/secure_storage_migration.md).
+* v11 requires Android API 24+, iOS 13+ (Darwin implementation), Flutter 3.19+, and Dart 3.8+; apps targeting earlier versions must stay on a compatible release until they can upgrade.
+
 ## 6.0.0
 
 * [Breaking] Require nonempty document IDs and collection names containing no `__` and not ending with `_`; paths must alternate collection and document segments. Direct constructors and `fromPath` check these rules with assertions in debug builds; profile and release builds omit the checks. `doc()` still generates an ID. Use an empty parent for top-level collections; `Collection('root', name)` is no longer an alias. Existing persisted references that violate these rules must be migrated before upgrading.
